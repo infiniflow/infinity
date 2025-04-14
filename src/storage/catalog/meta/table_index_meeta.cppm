@@ -26,10 +26,13 @@ namespace infinity {
 class KVInstance;
 class TableMeeta;
 class IndexBase;
+struct SegmentUpdateTS;
 
 export class TableIndexMeeta {
 public:
     TableIndexMeeta(String index_id_str, TableMeeta &table_meta);
+
+    ~TableIndexMeeta();
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
@@ -53,6 +56,12 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
+private:
+    Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
+
+public:
+    Status UpdateFulltextSegmentTS(TxnTimeStamp ts);
+
     Status InitSet(const SharedPtr<IndexBase> &index_base);
 
     Status UninitSet();
@@ -74,6 +83,7 @@ private:
 
     SharedPtr<IndexBase> index_def_;
     Optional<Vector<SegmentID>> segment_ids_;
+    SharedPtr<SegmentUpdateTS> segment_update_ts_;
 };
 
 } // namespace infinity

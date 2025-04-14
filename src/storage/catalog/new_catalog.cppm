@@ -88,6 +88,11 @@ export struct SegmentIndexFtInfo {
     u32 ft_column_len_cnt_{}; // increase only
 };
 
+export struct SegmentUpdateTS {
+    std::shared_mutex mtx_;
+    TxnTimeStamp ts_{0};
+};
+
 export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
@@ -225,6 +230,15 @@ public:
 private:
     std::shared_mutex segment_index_ft_info_mtx_{};
     HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
+
+public:
+    Status AddSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
+    Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
+    Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
+
+private:
+    std::shared_mutex segment_update_ts_mtx_{};
+    HashMap<String, SharedPtr<SegmentUpdateTS>> segment_update_ts_map_{};
 
 public:
     void AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta);

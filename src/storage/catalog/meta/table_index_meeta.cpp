@@ -26,11 +26,15 @@ import logger;
 import index_base;
 import meta_info;
 import create_index_info;
+import new_catalog;
+import infinity_context;
 
 namespace infinity {
 
 TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta)
     : kv_instance_(table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
+
+TableIndexMeeta::~TableIndexMeeta() = default;
 
 Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     if (!index_def_) {
@@ -100,6 +104,34 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
+Status TableIndexMeeta::GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts) {
+    if (segment_update_ts_) {
+        segment_update_ts = segment_update_ts_;
+        return Status::OK();
+    }
+    String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    Status status = new_catalog->GetSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    segment_update_ts_ = segment_update_ts;
+    return Status::OK();
+}
+
+Status TableIndexMeeta::UpdateFulltextSegmentTS(TxnTimeStamp ts) {
+    SharedPtr<SegmentUpdateTS> segment_update_ts;
+    Status status = GetSegmentUpdateTS(segment_update_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    status = table_meta_.UpdateFulltextSegmentTS(ts, *segment_update_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
     {
         Status status = SetSegmentIDs({});
@@ -109,6 +141,15 @@ Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
     }
     {
         Status status = SetIndexBase(index_base);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+        auto segment_update_ts = MakeShared<SegmentUpdateTS>();
+        Status status = new_catalog->AddSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
         if (!status.ok()) {
             return status;
         }
@@ -126,6 +167,13 @@ Status TableIndexMeeta::UninitSet() {
     }
     if (index_base->index_type_ == IndexType::kFullText) {
         status = table_meta_.RemoveFtIndexCache();
+        if (!status.ok()) {
+            return status;
+        }
+
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+        status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
         if (!status.ok()) {
             return status;
         }

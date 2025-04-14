@@ -545,6 +545,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
 Status
 NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -589,7 +590,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                     String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                     mem_index->memory_indexer_ =
                         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
-                    // table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
+                    segment_index_meta.table_index_meta().UpdateFulltextSegmentTS(commit_ts);
                 } else {
                     RowID exp_begin_row_id = mem_index->memory_indexer_->GetBaseRowId() + mem_index->memory_indexer_->GetDocCount();
                     assert(base_row_id >= exp_begin_row_id);
@@ -1122,9 +1123,6 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
         base_name_out = dst_base_name;
     }
 
-    // // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
-    // TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
-    // table_index_entry->UpdateFulltextSegmentTs(ts);
     LOG_INFO(fmt::format("done merging {} {}", *index_fulltext->index_name_, dst_base_name));
 
     return Status::OK();
@@ -1475,10 +1473,10 @@ Status NewTxn::AddChunkWal(const String &db_name,
     auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), deprecate_ids);
     if (dump_index_cause == DumpIndexCause::kDumpMemIndex) {
         dump_cmd->clear_mem_index_ = true;
-        dump_cmd->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
-        dump_cmd->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
-        dump_cmd->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     }
+    dump_cmd->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
+    dump_cmd->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
+    dump_cmd->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     dump_cmd->table_key_ = table_key;
     dump_cmd->dump_cause_ = dump_index_cause;
 
@@ -1734,7 +1732,9 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
         auto ft_cache = MakeShared<TableIndexReaderCache>(db_id_str, table_id_str);
         Status status = table_meta.AddFtIndexCache(ft_cache);
         if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kCatalogError) {
+                return status;
+            }
         }
     }
 
@@ -1758,13 +1758,11 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
     //        }
     //    }
 
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
+
+    const String &index_id_str_ = dump_index_cmd->index_id_str_;
+    TableIndexMeeta table_index_meta(index_id_str_, table_meta);
     if (dump_index_cmd->clear_mem_index_) {
-
-        TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
-
-        const String &index_id_str_ = dump_index_cmd->index_id_str_;
-        TableIndexMeeta table_index_meta(index_id_str_, table_meta);
-
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         SharedPtr<MemIndex> mem_index;
         Status status = segment_index_meta.GetMemIndex(mem_index);
@@ -1775,6 +1773,15 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    auto [index_base, status] = table_index_meta.GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+    }
+
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
         new_catalog->AddCleanedMeta(commit_ts, MakeUnique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id));

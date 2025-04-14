@@ -26,6 +26,7 @@ class KVInstance;
 class TableDef;
 class TableInfo;
 class TableIndexReaderCache;
+struct SegmentUpdateTS;
 
 export class TableMeeta {
 public:
@@ -121,6 +122,8 @@ public:
 
     Status SetNextColumnID(ColumnID next_column_id);
 
+    Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
+
 private:
     Status LoadComment();
 
@@ -141,6 +144,8 @@ private:
     String GetTableTag(const String &tag) const;
 
 private:
+    std::mutex mtx_;
+
     TxnTimeStamp begin_ts_ = 0;
     KVInstance &kv_instance_;
     String db_id_str_;

@@ -848,6 +848,45 @@ Status NewCatalog::DropSegmentIndexFtInfoByKey(const String &segment_index_key) 
     return Status::OK();
 }
 
+Status NewCatalog::AddSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts) {
+    bool insert_success = false;
+    HashMap<String, SharedPtr<SegmentUpdateTS>>::iterator iter;
+    {
+        std::unique_lock lock(segment_update_ts_mtx_);
+        std::tie(iter, insert_success) = segment_update_ts_map_.emplace(std::move(segment_update_ts_key), std::move(segment_update_ts));
+    }
+    if (!insert_success) {
+        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} already exists", iter->first));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts) {
+    segment_update_ts = nullptr;
+    {
+        std::shared_lock<std::shared_mutex> lck(segment_update_ts_mtx_);
+        if (auto iter = segment_update_ts_map_.find(segment_update_ts_key); iter != segment_update_ts_map_.end()) {
+            segment_update_ts = iter->second;
+        }
+    }
+    if (segment_update_ts == nullptr) {
+        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} not found", segment_update_ts_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
+    bool delete_success = false;
+    {
+        std::unique_lock lock(segment_update_ts_mtx_);
+        delete_success = segment_update_ts_map_.erase(segment_update_ts_key) > 0;
+    }
+    if (!delete_success) {
+        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} not found", segment_update_ts_key));
+    }
+    return Status::OK();
+}
+
 void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta) {
     std::unique_lock lock(cleaned_meta_mtx_);
 

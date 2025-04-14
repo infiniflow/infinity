@@ -483,6 +483,17 @@ Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
     return Status::OK();
 }
 
+Status TableMeeta::UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts) {
+    SharedPtr<TableIndexReaderCache> ft_index_cache;
+    Status status = GetFtIndexCache(ft_index_cache);
+    if (!status.ok()) {
+        return status;
+    }
+    ft_index_cache->UpdateKnownUpdateTs(ts, segment_update_ts.mtx_, segment_update_ts.ts_);
+
+    return Status::OK();
+}
+
 Status TableMeeta::LoadComment() {
     String table_comment_key = GetTableTag("comment");
     String table_comment;
@@ -680,6 +691,8 @@ Status TableMeeta::CheckSegments(const Vector<SegmentID> &segment_ids) {
 }
 
 Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() {
+    std::unique_lock<std::mutex> lock(mtx_);
+
     if (!column_defs_) {
         auto status = LoadColumnDefs();
         if (!status.ok()) {

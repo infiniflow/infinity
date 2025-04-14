@@ -544,7 +544,17 @@ private:
             }
             case Enum::kFilterFulltextExpr: {
                 auto *filter_fulltext_expr = static_cast<const FilterFulltextExpression *>(index_filter_tree_node.src_ptr->get());
-                auto index_reader = query_context_->GetTxn()->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_);
+                bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
+                SharedPtr<IndexReader> index_reader;
+                if (use_new_catalog) {
+                    NewTxn *new_txn = query_context_->GetNewTxn();
+                    Status status = new_txn->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_, index_reader);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
+                    }
+                } else {
+                    index_reader = query_context_->GetTxn()->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_);
+                }
 
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kAuto;
                 UniquePtr<QueryNode> query_tree;
