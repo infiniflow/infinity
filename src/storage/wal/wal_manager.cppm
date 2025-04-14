@@ -141,6 +141,8 @@ private:
     // Checkpoint Helper
     void FullCheckpointInner(Txn *txn);
     void DeltaCheckpointInner(Txn *txn);
+    void FullCheckpointInner(NewTxn *txn);
+    void DeltaCheckpointInner(NewTxn *txn);
 
 public:
     void CommitFullCheckpoint(TxnTimeStamp max_commit_ts);

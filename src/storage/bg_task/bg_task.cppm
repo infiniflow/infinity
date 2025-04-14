@@ -18,6 +18,7 @@ export module bg_task;
 
 import stl;
 import txn;
+import new_txn;
 import catalog;
 import catalog_delta_entry;
 import buffer_manager;
@@ -121,6 +122,8 @@ export struct CheckpointTask final : public CheckpointTaskBase {
 export struct ForceCheckpointTask final : public CheckpointTaskBase {
     explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0)
         : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
+    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0)
+        : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), new_txn_(new_txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
 
     ~ForceCheckpointTask() = default;
 
@@ -133,6 +136,7 @@ export struct ForceCheckpointTask final : public CheckpointTaskBase {
     }
 
     Txn *txn_{};
+    NewTxn *new_txn_{};
     bool is_full_checkpoint_{};
     TxnTimeStamp cleanup_ts_ = 0;
 };

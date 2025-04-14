@@ -627,27 +627,49 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
 
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint) {
-    TxnManager *txn_mgr = storage_->txn_manager();
-    Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
-    if (txn == nullptr) {
-        RecoverableError(Status::FailToStartTxn("System is checkpointing"));
-    }
-    if (is_full_checkpoint) {
-        FullCheckpointInner(txn);
+    bool use_new_catalog = InfinityContext::instance().config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxnManager *txn_mgr = storage_->new_txn_manager();
+        NewTxn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
+        if (txn == nullptr) {
+            RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+        }
+        if (is_full_checkpoint) {
+            FullCheckpointInner(txn);
+        } else {
+            DeltaCheckpointInner(txn);
+        }
+        txn_mgr->CommitTxn(txn);
     } else {
-        DeltaCheckpointInner(txn);
+        TxnManager *txn_mgr = storage_->txn_manager();
+        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
+        if (txn == nullptr) {
+            RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+        }
+        if (is_full_checkpoint) {
+            FullCheckpointInner(txn);
+        } else {
+            DeltaCheckpointInner(txn);
+        }
+        txn_mgr->CommitTxn(txn);
     }
-
-    txn_mgr->CommitTxn(txn);
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
-
-    if (is_full_checkpoint) {
-        FullCheckpointInner(ckp_task->txn_);
+    bool use_new_catalog = InfinityContext::instance().config()->UseNewCatalog();
+    if (use_new_catalog) {
+        if (is_full_checkpoint) {
+            FullCheckpointInner(ckp_task->new_txn_);
+        } else {
+            DeltaCheckpointInner(ckp_task->new_txn_);
+        }
     } else {
-        DeltaCheckpointInner(ckp_task->txn_);
+        if (is_full_checkpoint) {
+            FullCheckpointInner(ckp_task->txn_);
+        } else {
+            DeltaCheckpointInner(ckp_task->txn_);
+        }
     }
 }
 
@@ -692,6 +714,82 @@ void WalManager::FullCheckpointInner(Txn *txn) {
 }
 
 void WalManager::DeltaCheckpointInner(Txn *txn) {
+    DeferFn defer([&] { checkpoint_in_progress_.store(false); });
+
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    auto [max_commit_ts, wal_size] = GetCommitState();
+    max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
+    // wal_size may be larger than the actual size. but it's ok. it only makes the swap of wal file a little bit later.
+
+    if (max_commit_ts == last_ckp_ts) {
+        LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
+        return;
+    }
+    if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts >= max_commit_ts) {
+        String error_message = fmt::format("last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts);
+        UnrecoverableError(error_message);
+    }
+
+    try {
+        LOG_DEBUG(fmt::format("Delta Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
+        TxnTimeStamp new_max_commit_ts = 0;
+        if (!txn->DeltaCheckpoint(last_ckp_ts, new_max_commit_ts)) {
+            return;
+        }
+        if (new_max_commit_ts == 0) {
+            UnrecoverableError(fmt::format("new_max_commit_ts = 0"));
+        }
+        max_commit_ts = new_max_commit_ts;
+        SetLastCkpWalSize(wal_size);
+
+        LOG_DEBUG(fmt::format("Delta Checkpoint is done for commit_ts <= {}", max_commit_ts));
+    } catch (RecoverableException &e) {
+        LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+        throw e;
+    }
+    last_ckp_ts_ = max_commit_ts;
+}
+
+void WalManager::FullCheckpointInner(NewTxn *txn) {
+    DeferFn defer([&] { checkpoint_in_progress_.store(false); });
+
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    TxnTimeStamp last_full_ckp_ts = last_full_ckp_ts_;
+    auto [_, wal_size] = GetCommitState();
+    TxnTimeStamp max_commit_ts = txn->BeginTS();
+
+    if (max_commit_ts == last_full_ckp_ts) {
+        LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
+        return;
+    }
+    if ((last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) || (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts)) {
+        String error_msg = fmt::format("last_full_ckp_ts {} >= max_commit_ts {} or last_ckp_ts {} > max_commit_ts {}",
+                                       last_full_ckp_ts,
+                                       max_commit_ts,
+                                       last_ckp_ts,
+                                       max_commit_ts);
+        UnrecoverableError(error_msg);
+    }
+
+    try {
+        LOG_DEBUG(fmt::format("Full Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
+        txn->FullCheckpoint(max_commit_ts);
+        SetLastCkpWalSize(wal_size);
+
+        LOG_DEBUG(fmt::format("Full Checkpoint is done for commit_ts <= {}", max_commit_ts));
+    } catch (RecoverableException &e) {
+        LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+        throw e;
+    }
+    last_ckp_ts_ = max_commit_ts;
+    last_full_ckp_ts_ = max_commit_ts;
+}
+
+void WalManager::DeltaCheckpointInner(NewTxn *txn) {
     DeferFn defer([&] { checkpoint_in_progress_.store(false); });
 
     TxnTimeStamp last_ckp_ts = last_ckp_ts_;
