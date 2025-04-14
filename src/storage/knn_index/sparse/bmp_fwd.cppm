@@ -255,10 +255,10 @@ public:
     }
 
     void Prefetch() const {
-        _mm_prefetch(block_size_prefix_sum_, _MM_HINT_T0);
-        _mm_prefetch(term_ids_, _MM_HINT_T0);
-        _mm_prefetch(block_offsets_, _MM_HINT_T0);
-        _mm_prefetch(values_, _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char *>(block_size_prefix_sum_), _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char *>(term_ids_), _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char *>(block_offsets_), _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char *>(values_), _MM_HINT_T0);
     }
 
 private:
