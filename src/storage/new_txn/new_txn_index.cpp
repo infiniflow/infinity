@@ -1736,6 +1736,8 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
                 return status;
             }
         }
+
+        table_index_meta.UpdateFulltextSegmentTS(commit_ts);
     }
 
     return Status::OK();
