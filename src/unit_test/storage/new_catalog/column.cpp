@@ -889,7 +889,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         status = txn4->AddColumns(*db_name, table_name, columns4);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
