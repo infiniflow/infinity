@@ -91,6 +91,10 @@ Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_p
         UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_path);
     }
 
+    status = kv_instance->Commit();
+    if (!status.ok()) {
+        return status;
+    }
     // Rename the old meta filename
     return Status::OK();
 }

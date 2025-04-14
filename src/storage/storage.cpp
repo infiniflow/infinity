@@ -894,6 +894,14 @@ void Storage::CreateDefaultDB() {
         NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create default_db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase("default_db", ConflictType::kError, MakeShared<String>());
         if (!status.ok()) {
+            if (status.code_ == ErrorCode::kDuplicateDatabaseName) {
+                // Only valid for unit test
+                status = new_txn_mgr_->RollBackTxn(txn);
+                if (!status.ok()) {
+                    UnrecoverableError("Can't rollback txn for creating 'default_db'");
+                }
+                return;
+            }
             UnrecoverableError("Can't create 'default_db'");
         }
         status = new_txn_mgr_->CommitTxn(txn);
