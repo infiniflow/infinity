@@ -51,7 +51,12 @@ import status;
 import mem_index;
 import kv_store;
 
+import new_catalog;
+
 namespace infinity {
+
+ColumnIndexReader::~ColumnIndexReader() = default;
+
 void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn) {
     flag_ = flag;
     index_dir_ = std::move(index_dir);
@@ -71,9 +76,13 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
                                                                                                   flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
-        chunk_index_entries_.insert(chunk_index_entries_.end(),
-                                    std::move_iterator(chunk_index_entries.begin()),
-                                    std::move_iterator(chunk_index_entries.end()));
+        for (auto &chunk_index_entry : chunk_index_entries) {
+            chunk_index_meta_infos_.emplace_back(ColumnReaderChunkInfo{chunk_index_entry->GetBufferObj(),
+                                                                       chunk_index_entry->base_rowid_,
+                                                                       u32(chunk_index_entry->row_count_),
+                                                                       chunk_index_entry->chunk_id_,
+                                                                       chunk_index_entry->segment_index_entry_->segment_id()});
+        }
         if (memory_indexer.get() != nullptr && memory_indexer->GetDocCount() != 0) {
             // segment_reader
             SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
@@ -121,6 +130,15 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             SharedPtr<DiskIndexSegmentReader> segment_reader =
                 MakeShared<DiskIndexSegmentReader>(segment_id, chunk_id, *index_dir, chunk_info_ptr->base_name_, chunk_info_ptr->base_row_id_, flag);
             segment_readers_.push_back(std::move(segment_reader));
+
+            BufferObj *index_buffer = nullptr;
+            Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+            if (!status.ok()) {
+                return status;
+            }
+
+            chunk_index_meta_infos_.emplace_back(
+                ColumnReaderChunkInfo{index_buffer, chunk_info_ptr->base_row_id_, u32(chunk_info_ptr->row_cnt_), chunk_id, segment_id});
         }
 
         SharedPtr<MemoryIndexer> memory_indexer;
@@ -140,7 +158,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             memory_indexer_ = memory_indexer;
         }
 
-        SegmentIndexFtInfo *ft_info_ptr = nullptr;
+        SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
         {
             Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
             if (!status.ok()) {
@@ -149,6 +167,8 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
         }
         column_len_sum += ft_info_ptr->ft_column_len_sum_;
         column_len_cnt += ft_info_ptr->ft_column_len_cnt_;
+
+        segment_index_ft_infos_.emplace(segment_id, std::move(ft_info_ptr));
     }
     if (column_len_cnt != 0) {
         total_df_ = column_len_cnt;
@@ -180,11 +200,20 @@ Pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() {
     if (total_df_ == 0) {
         u64 column_len_sum = 0;
         u32 column_len_cnt = 0;
-        for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-            auto [sum, cnt] = segment_index_entry->GetFulltextColumnLenInfo();
-            column_len_sum += sum;
-            column_len_cnt += cnt;
+
+        if (index_by_segment_.empty()) {
+            for (auto &[segment_id, segment_index_ft_info] : segment_index_ft_infos_) {
+                column_len_sum += segment_index_ft_info->ft_column_len_sum_;
+                column_len_cnt += segment_index_ft_info->ft_column_len_cnt_;
+            }
+        } else {
+            for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                auto [sum, cnt] = segment_index_entry->GetFulltextColumnLenInfo();
+                column_len_sum += sum;
+                column_len_cnt += cnt;
+            }
         }
+
         if (column_len_cnt != 0) {
             total_df_ = column_len_cnt;
             avg_column_length_ = static_cast<float>(column_len_sum) / column_len_cnt;
@@ -201,9 +230,9 @@ void ColumnIndexReader::InvalidateSegment(SegmentID segment_id) {
             ++iter;
         }
     }
-    for (auto iter = chunk_index_entries_.begin(); iter != chunk_index_entries_.end();) {
-        if ((*iter)->segment_index_entry_->segment_id() == segment_id) {
-            iter = chunk_index_entries_.erase(iter);
+    for (auto iter = chunk_index_meta_infos_.begin(); iter != chunk_index_meta_infos_.end();) {
+        if ((*iter).segment_id_ == segment_id) {
+            iter = chunk_index_meta_infos_.erase(iter);
         } else {
             ++iter;
         }
@@ -218,9 +247,9 @@ void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) 
             ++iter;
         }
     }
-    for (auto iter = chunk_index_entries_.begin(); iter != chunk_index_entries_.end();) {
-        if ((*iter)->segment_index_entry_->segment_id() == segment_id && (*iter)->chunk_id_ == chunk_id) {
-            iter = chunk_index_entries_.erase(iter);
+    for (auto iter = chunk_index_meta_infos_.begin(); iter != chunk_index_meta_infos_.end();) {
+        if ((*iter).segment_id_ == segment_id && (*iter).chunk_id_ == chunk_id) {
+            iter = chunk_index_meta_infos_.erase(iter);
         } else {
             ++iter;
         }

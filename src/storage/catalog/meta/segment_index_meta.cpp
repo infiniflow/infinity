@@ -33,18 +33,21 @@ import chunk_index_meta;
 
 namespace infinity {
 
-void SegmentIndexFtInfo::ToJson(nlohmann::json &json) const {
-    json["ft_column_len_sum"] = ft_column_len_sum_;
-    json["ft_column_len_cnt"] = ft_column_len_cnt_;
-}
-
-void SegmentIndexFtInfo::FromJson(const nlohmann::json &json) {
-    ft_column_len_sum_ = json["ft_column_len_sum"].get<u64>();
-    ft_column_len_cnt_ = json["ft_column_len_cnt"].get<u32>();
-}
-
 SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta)
     : kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
+
+SegmentIndexMeta::~SegmentIndexMeta() = default;
+
+Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
+    if (!ft_info_) {
+        Status status = LoadFtInfo();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ft_info = ft_info_;
+    return Status::OK();
+}
 
 Status SegmentIndexMeta::SetChunkIDs(const Vector<ChunkID> &chunk_ids) {
     chunk_ids_ = chunk_ids;
@@ -83,13 +86,12 @@ Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::SetFtInfo(const SegmentIndexFtInfo &ft_info) {
+Status SegmentIndexMeta::SetFtInfo(const SharedPtr<SegmentIndexFtInfo> &ft_info) {
     ft_info_ = ft_info;
     String ft_info_key = GetSegmentIndexTag("ft_info");
-    nlohmann::json ft_info_json;
-    ft_info.ToJson(ft_info_json);
-    String ft_info_str = ft_info_json.dump();
-    Status status = kv_instance_.Put(ft_info_key, ft_info_str);
+
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    Status status = new_catalog->AddSegmentIndexFtInfo(ft_info_key, ft_info);
     if (!status.ok()) {
         return status;
     }
@@ -105,10 +107,6 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     }
     ft_info_->ft_column_len_sum_ += column_len_sum;
     ft_info_->ft_column_len_cnt_ += column_len_cnt;
-    Status status = SetFtInfo(*ft_info_);
-    if (!status.ok()) {
-        return status;
-    }
     return Status::OK();
 }
 
@@ -157,7 +155,7 @@ Status SegmentIndexMeta::InitSet() {
             return status;
         }
         if (index_base->index_type_ == IndexType::kFullText) {
-            SegmentIndexFtInfo ft_info{};
+            auto ft_info = MakeShared<SegmentIndexFtInfo>();
             Status status = this->SetFtInfo(ft_info);
             if (!status.ok()) {
                 return status;
@@ -331,14 +329,11 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 
 Status SegmentIndexMeta::LoadFtInfo() {
     String ft_info_key = GetSegmentIndexTag("ft_info");
-    String ft_info_str;
-    Status status = kv_instance_.Get(ft_info_key, ft_info_str);
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    Status status = new_catalog->GetSegmentIndexFtInfo(ft_info_key, ft_info_);
     if (!status.ok()) {
         return status;
     }
-    nlohmann::json ft_info_json = nlohmann::json::parse(ft_info_str);
-    ft_info_ = SegmentIndexFtInfo();
-    ft_info_->FromJson(ft_info_json);
     return Status::OK();
 }
 

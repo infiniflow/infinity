@@ -29,23 +29,27 @@ import buffer_handle;
 namespace infinity {
 
 FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader)
-    : index_dir_(reader->index_dir_), chunk_index_entries_(reader->chunk_index_entries_), memory_indexer_(reader->memory_indexer_) {
+    : index_dir_(reader->index_dir_), memory_indexer_(reader->memory_indexer_) {
+    chunk_index_meta_infos_ = reader->chunk_index_meta_infos_;
+
     Pair<u64, float> df_and_avg_column_len = reader->GetTotalDfAndAvgColumnLength();
     total_df_ = df_and_avg_column_len.first;
     avg_column_len_ = df_and_avg_column_len.second;
 }
 
+FullTextColumnLengthReader::~FullTextColumnLengthReader() = default;
+
 u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     // determine the ChunkIndexEntry which contains row_id
     current_chunk_buffer_handle_.~BufferHandle();
     SizeT left = 0;
-    SizeT right = chunk_index_entries_.size();
+    SizeT right = chunk_index_meta_infos_.size();
     SizeT current_chunk = std::numeric_limits<SizeT>::max();
     while (left < right) {
         SizeT mid = left + (right - left) / 2;
-        if (chunk_index_entries_[mid]->base_rowid_ > row_id) {
+        if (chunk_index_meta_infos_[mid].base_rowid_ > row_id) {
             right = mid;
-        } else if (chunk_index_entries_[mid]->base_rowid_ + chunk_index_entries_[mid]->row_count_ <= row_id) {
+        } else if (chunk_index_meta_infos_[mid].base_rowid_ + chunk_index_meta_infos_[mid].row_count_ <= row_id) {
             left = mid + 1;
         } else {
             current_chunk = mid;
@@ -57,10 +61,10 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     }
 
     // Load the column-length file of the ChunkIndexEntry
-    current_chunk_buffer_handle_ = chunk_index_entries_[current_chunk]->GetBufferObj()->Load();
+    current_chunk_buffer_handle_ = chunk_index_meta_infos_[current_chunk].index_buffer_->Load();
     column_lengths_ = (const u32 *)current_chunk_buffer_handle_.GetData();
-    current_chunk_base_rowid_ = chunk_index_entries_[current_chunk]->base_rowid_;
-    current_chunk_row_count_ = chunk_index_entries_[current_chunk]->row_count_;
+    current_chunk_base_rowid_ = chunk_index_meta_infos_[current_chunk].base_rowid_;
+    current_chunk_row_count_ = chunk_index_meta_infos_[current_chunk].row_count_;
     return column_lengths_[row_id - current_chunk_base_rowid_];
 }
 } // namespace infinity

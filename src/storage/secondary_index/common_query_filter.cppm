@@ -110,6 +110,8 @@ private:
 
     void BuildFilter(u32 task_id);
 
+    void NewBuildFilter(u32 task_id);
+
     // for PassFilter
     SegmentID current_segment_id_ = INVALID_SEGMENT_ID;
     const Bitmask *doc_id_bitmask_ = nullptr;

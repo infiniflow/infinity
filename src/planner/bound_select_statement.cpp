@@ -221,7 +221,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_text_expr = std::dynamic_pointer_cast<MatchExpression>(match_expr);
                     if (match_text_expr->optional_filter_) {
                         filter_expr = match_text_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        if (use_new_catalog) {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetNewTxn());
+                        } else {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        }
                     }
                     SharedPtr<LogicalMatch> match_node =
                         MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_text_expr));

@@ -25,7 +25,6 @@ import index_defines;
 // import memory_indexer;
 import internal_types;
 import segment_index_entry;
-import chunk_index_entry;
 import logger;
 import status;
 
@@ -36,9 +35,22 @@ class Txn;
 class NewTxn;
 class MemoryIndexer;
 class TableIndexMeeta;
+class BufferObj;
+struct SegmentIndexFtInfo;
+
+struct ColumnReaderChunkInfo {
+    BufferObj *index_buffer_ = nullptr;
+    RowID base_rowid_{};
+    u32 row_count_{};
+
+    SegmentID segment_id_ = 0;
+    ChunkID chunk_id_ = 0;
+};
 
 export class ColumnIndexReader {
 public:
+    ~ColumnIndexReader();
+
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn);
 
     Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
@@ -63,6 +75,8 @@ private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
+    Map<SegmentID, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_infos_;
+
     u64 total_df_ = 0;
     float avg_column_length_ = 0.0f;
 
@@ -71,8 +85,9 @@ public:
     String analyzer_;
     // for loading column length files
     String index_dir_;
-    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_;
     SharedPtr<MemoryIndexer> memory_indexer_{nullptr};
+
+    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_;
 };
 
 namespace detail {

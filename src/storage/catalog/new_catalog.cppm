@@ -83,6 +83,11 @@ export struct BlockLock {
     TxnTimeStamp checkpoint_ts_{};
 };
 
+export struct SegmentIndexFtInfo {
+    u64 ft_column_len_sum_{}; // increase only
+    u32 ft_column_len_cnt_{}; // increase only
+};
+
 export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
@@ -211,6 +216,15 @@ public:
 private:
     std::shared_mutex ft_index_cache_mtx_{};
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
+
+public:
+    Status AddSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
+    Status GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info);
+    Status DropSegmentIndexFtInfoByKey(const String &segment_index_key);
+
+private:
+    std::shared_mutex segment_index_ft_info_mtx_{};
+    HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
 
 public:
     void AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta);
