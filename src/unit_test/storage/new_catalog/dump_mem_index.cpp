@@ -7006,3 +7006,767 @@ TEST_P(TestDumpMemIndex, dump_and_dump) {
 
     RemoveDbDirs();
 }
+
+TEST_P(TestDumpMemIndex, test_dump_index_and_optimize_index) {
+
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&](const Value &v1, const Value &v2) {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, const Value &v) {
+            for (u32 i = 0; i < block_row_cnt; ++i) {
+                col.AppendValue(v);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, v1);
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, v2);
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
+    auto PrepareForDumpAndOptimize = [&] {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        // For optimize
+        for (int i = 0; i < 2; ++i) {
+            {
+                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
+                SharedPtr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                Status status = txn->Append(*db_name, *table_name, input_block);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
+
+            //            new_txn_mgr->PrintAllKeyValue();
+            {
+                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
+                Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
+        }
+
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    auto CheckTable = [&](const Vector<SegmentID> &segment_ids, const Vector<ChunkID> &chunk_ids) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Optional<TableIndexMeeta> table_index_meta;
+        status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
+        EXPECT_TRUE(status.ok());
+
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_base->index_name_, *index_name1);
+
+        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
+
+        SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, chunk_ids);
+    };
+
+    auto DropDB = [&] {
+        // drop database
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+    };
+
+    //    t1      dump      commit (success)
+    //    |----------|---------|
+    //                            |----------------------|----------------|
+    //                           t2                  optimize index     commit (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      dump      commit (success)
+    //    |----------|---------|
+    //                    |------------------|----------------|
+    //                    t2             optimize (fail)     commit
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {0, 1, 2});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      dump index                       commit (success)
+    //    |----------|--------------------------------|
+    //                    |-----------------------|-------------------------|
+    //                    t2                    optimize fail        rollback (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {0, 1, 2});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      dump index                                   commit (success)
+    //    |----------|-----------------------------------------------|
+    //                    |-------------|-----------------------|
+    //                    t2        optimize fail          rollback (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {0, 1, 2});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1                                      dump index fail                               rollback (success)
+    //    |------------------------------------------|------------------------------------------|
+    //                    |----------------------|------------------------------|
+    //                    t2                optimize                     commit (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {2});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1                                                       dump index                                   commit (success)
+    //    |-----------------------------------------------------------|------------------------------------------|
+    //                    |----------------------|--------------|
+    //                    t2                  optimize index   commit (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {2});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                                  t1                  dump                                   commit (success)
+    //                                                  |--------------------|------------------------------------------|
+    //                    |----------------------|---------------|
+    //                    t2                  optimize   commit (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {2});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                                           t1                  dump                             commit (success)
+    //                                                          |--------------------|------------------------------------------|
+    //                    |-----------------|------------|
+    //                    t2           optimize index   commit (success)
+    {
+        PrepareForDumpAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0}, {2, 3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    RemoveDbDirs();
+}
+
+TEST_P(TestDumpMemIndex, test_dump_index_and_compact) {
+
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&](const Value &v1, const Value &v2) {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, const Value &v) {
+            for (u32 i = 0; i < block_row_cnt; ++i) {
+                col.AppendValue(v);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, v1);
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, v2);
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
+    auto PrepareForCompactAndOptimize = [&] {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        // For compact
+        for (int i = 0; i < 2; ++i) {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+            Status status = txn->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        // For dump index
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    auto CheckTable = [&](const Vector<SegmentID> &segment_ids, SegmentID dump_segment_id, const Vector<ChunkID> &chunk_ids) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Optional<TableIndexMeeta> table_index_meta;
+        status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
+        EXPECT_TRUE(status.ok());
+
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_base->index_name_, *index_name1);
+
+        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
+
+        SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[dump_segment_id], *table_index_meta);
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, chunk_ids);
+    };
+
+    auto DropDB = [&] {
+        // drop database
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+    };
+
+    //    t1      compact      commit (success)
+    //    |----------|---------|
+    //                            |----------------------|----------------|
+    //                           t2                  dump index     commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        Status status = txn->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3}, 0, {0});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+//    //    t1      dump      commit (success)
+//    //    |----------|---------|
+//    //                    |------------------|----------------|
+//    //                    t2             optimize (fail)     commit
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//
+//        status = new_txn_mgr->CommitTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_FALSE(status.ok());
+//        status = new_txn_mgr->RollBackTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {0, 1, 2});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+//
+//    //    t1      dump index                       commit (success)
+//    //    |----------|--------------------------------|
+//    //                    |-----------------------|-------------------------|
+//    //                    t2                    optimize fail        rollback (success)
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_FALSE(status.ok());
+//
+//        status = new_txn_mgr->CommitTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = new_txn_mgr->RollBackTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {0, 1, 2});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+//
+//    //    t1      dump index                                   commit (success)
+//    //    |----------|-----------------------------------------------|
+//    //                    |-------------|-----------------------|
+//    //                    t2        optimize fail          rollback (success)
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_FALSE(status.ok());
+//
+//        status = new_txn_mgr->CommitTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = new_txn_mgr->RollBackTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {0, 1, 2});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+//
+//    //    t1                                      dump index fail                               rollback (success)
+//    //    |------------------------------------------|------------------------------------------|
+//    //                    |----------------------|------------------------------|
+//    //                    t2                optimize                     commit (success)
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_FALSE(status.ok());
+//
+//        status = new_txn_mgr->CommitTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = new_txn_mgr->RollBackTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {2});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+//
+//    //    t1                                                       dump index                                   commit (success)
+//    //    |-----------------------------------------------------------|------------------------------------------|
+//    //                    |----------------------|--------------|
+//    //                    t2                  optimize index   commit (success)
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//        status = new_txn_mgr->CommitTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_FALSE(status.ok());
+//
+//        status = new_txn_mgr->RollBackTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {2});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+//
+//    //                                                  t1                  dump                                   commit (success)
+//    //                                                  |--------------------|------------------------------------------|
+//    //                    |----------------------|---------------|
+//    //                    t2                  optimize   commit (success)
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//
+//        status = new_txn_mgr->CommitTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_FALSE(status.ok());
+//
+//        status = new_txn_mgr->RollBackTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {2});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+//
+//    //                                                           t1                  dump                             commit (success)
+//    //                                                          |--------------------|------------------------------------------|
+//    //                    |-----------------|------------|
+//    //                    t2           optimize index   commit (success)
+//    {
+//        PrepareForDumpAndOptimize();
+//
+//        SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+//
+//        // optimize index
+//        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+//        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//        status = new_txn_mgr->CommitTxn(txn2);
+//        EXPECT_TRUE(status.ok());
+//
+//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index {}"), TransactionType::kNormal);
+//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 0);
+//        EXPECT_TRUE(status.ok());
+//        status = new_txn_mgr->CommitTxn(txn);
+//        EXPECT_TRUE(status.ok());
+//
+//        CheckTable({0}, {2, 3});
+//
+//        DropDB();
+//
+//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+//    }
+
+    RemoveDbDirs();
+}

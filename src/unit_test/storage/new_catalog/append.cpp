@@ -43,6 +43,7 @@ import constant_expr;
 import default_values;
 import index_secondary;
 import create_index_info;
+import index_base;
 
 using namespace infinity;
 
@@ -5190,7 +5191,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
         return input_block;
     };
 
-    auto PrepareForCompactAndOptimize = [&] {
+    auto PrepareForAppendAndOptimize = [&] {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
             Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -5246,42 +5247,31 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
 
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        Optional<TableIndexMeeta> table_index_meta;
+        status = txn->GetTableIndexMeta(*index_name1, *table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, segment_ids);
-        EXPECT_EQ(segment_ids_ptr->size(), 1);
-        SegmentMeta segment_meta(segment_ids_ptr->at(0), *table_meta);
 
-        NewTxnGetVisibleRangeState state;
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-        EXPECT_EQ(block_ids_ptr->size(), 4);
-        for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta);
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
-            EXPECT_TRUE(status.ok());
-            Pair<BlockOffset, BlockOffset> range;
-            BlockOffset offset = 0;
-            SizeT row_id = 0;
-            while (true) {
-                bool has_next = state.Next(offset, range);
-                if (!has_next) {
-                    break;
-                }
-                EXPECT_EQ(range.first, row_id);
-                EXPECT_EQ(range.second, 8192);
-                offset = range.second;
-                row_id += 2;
-            }
-        }
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_base->index_name_, *index_name1);
+
+        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
+
+        SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
     };
 
     auto DropDB = [&] {
@@ -5298,7 +5288,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                            |----------------------|----------------|
     //                           t2                  optimize index     commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5328,7 +5318,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |------------------|----------------|
     //                    t2             optimize           commit
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5360,7 +5350,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |-----------------------|-------------------------|
     //                    t2                    optimize         commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5392,7 +5382,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |-------------|-----------------------|
     //                    t2        optimize          commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5424,7 +5414,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |----------------------|------------------------------|
     //                    t2                optimize                     commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5457,7 +5447,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |----------------------|--------------|
     //                    t2                  optimize index   commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5488,7 +5478,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |----------------------|---------------|
     //                    t2                  optimize   commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
@@ -5520,7 +5510,7 @@ TEST_P(TestAppend, test_append_and_optimize_index) {
     //                    |-----------------|------------|
     //                    t2           optimize index   commit (success)
     {
-        PrepareForCompactAndOptimize();
+        PrepareForAppendAndOptimize();
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
