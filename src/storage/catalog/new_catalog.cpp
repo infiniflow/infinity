@@ -38,6 +38,7 @@ import catalog_delta_entry;
 import db_meeta;
 import table_def;
 import table_meeta;
+import segment_meta;
 
 namespace infinity {
 
@@ -152,10 +153,10 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, String const& db_name) {
+Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, String const &db_name) {
     String table_name = table_meta_json["table_name"];
     if (table_meta_json.contains("table_entries")) {
-        auto& kv_instance = db_meta->kv_instance();
+        auto &kv_instance = db_meta->kv_instance();
         for (auto &table_entry_json : table_meta_json["table_entries"]) {
             bool deleted = table_entry_json["deleted"];
             if (deleted) {
@@ -204,7 +205,7 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
             }
 
             String table_comment;
-            auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name),  MakeShared<String>(table_comment), columns);
+            auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(table_comment), columns);
             Optional<TableMeeta> table_meta;
             status = AddNewTable(db_meta.value(), table_id_str, table_begin_ts, table_commit_ts, table_def, table_meta);
             if (!status.ok()) {
@@ -213,7 +214,7 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
 
             if (table_entry_json.contains("segments")) {
                 for (auto &segment_json : table_entry_json["segments"]) {
-                    status = TransformCatalogSegment(segment_json, &kv_instance);
+                    status = TransformCatalogSegment(table_meta, segment_json);
                     if (!status.ok()) {
                         return status;
                     }
@@ -233,8 +234,41 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogSegment(const nlohmann::json &segment_entry_json, KVInstance *kv_instance) {
+Status NewCatalog::TransformCatalogSegment(Optional<TableMeeta> &table_meta, const nlohmann::json &segment_entry_json) {
+    auto &kv_instance = table_meta->kv_instance();
+    for (const auto &segment_json : segment_entry_json) {
+        TxnTimeStamp segment_commit_ts = segment_json["commit_ts"];
 
+        Optional<SegmentMeta> segment_meta;
+        Status status = NewCatalog::AddNewSegment1(table_meta.value(), segment_commit_ts, segment_meta);
+        if (!status.ok()) {
+            return status;
+        }
+
+        if (segment_json.contains("block_entries")) {
+            for (const auto &block_entry_json : segment_json["block_entries"]) {
+                Status status = TransformCatalogBlock(block_entry_json, &kv_instance);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+    }
+
+    // Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
+    //     Status status;
+    //     SegmentID segment_id = 0;
+    //     std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     segment_meta.emplace(segment_id, table_meta);
+    //     status = segment_meta->InitSet();
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     return Status::OK();
+    // }
     return Status::OK();
 }
 Status NewCatalog::TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance) { return Status::OK(); }
