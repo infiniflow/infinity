@@ -443,7 +443,7 @@ private:
 
     Status AppendIndex(TableIndexMeeta &table_index_meta, const Vector<AppendRange> &append_ranges);
 
-    Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
+    Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
     Status PopulateIndex(const String &db_name,
                          const String &table_name,

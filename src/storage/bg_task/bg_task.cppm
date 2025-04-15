@@ -18,7 +18,6 @@ export module bg_task;
 
 import stl;
 import txn;
-import new_txn;
 import catalog;
 import catalog_delta_entry;
 import buffer_manager;
@@ -44,6 +43,7 @@ export enum class BGTaskType {
 
 class BaseMemIndex;
 struct ChunkIndexEntry;
+class NewTxn;
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {
@@ -120,12 +120,10 @@ export struct CheckpointTask final : public CheckpointTaskBase {
 };
 
 export struct ForceCheckpointTask final : public CheckpointTaskBase {
-    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0)
-        : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
-    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0)
-        : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), new_txn_(new_txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
+    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
+    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
 
-    ~ForceCheckpointTask() = default;
+    ~ForceCheckpointTask();
 
     String ToString() const override {
         if (is_full_checkpoint_) {

@@ -484,10 +484,9 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
                 return status;
             }
         }
-        SegmentOffset block_offset = block_meta->block_capacity() * block_meta->block_id();
-        RowID base_row_id(segment_meta->segment_id(), block_offset);
+        BlockID block_id = block_meta->block_id();
         {
-            Status status = this->AppendMemIndex(*segment_index_meta, base_row_id, col, cur_offset, cur_row_cnt);
+            Status status = this->AppendMemIndex(*segment_index_meta, block_id, col, cur_offset, cur_row_cnt);
             if (!status.ok()) {
                 return status;
             }
@@ -543,7 +542,10 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
 }
 
 Status
-NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
+NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
+    SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+    RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
@@ -571,7 +573,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 }
                 memory_secondary_index = mem_index->memory_secondary_index_;
             }
-            memory_secondary_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
+            memory_secondary_index->InsertBlockData(block_offset, col, offset, row_cnt);
             break;
         }
         case IndexType::kFullText: {
@@ -624,7 +626,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 }
                 memory_ivf_index = mem_index->memory_ivf_index_;
             }
-            memory_ivf_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
+            memory_ivf_index->InsertBlockData(block_offset, col, offset, row_cnt);
             break;
         }
         case IndexType::kHnsw: {
@@ -640,7 +642,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 }
                 memory_hnsw_index = mem_index->memory_hnsw_index_;
             }
-            memory_hnsw_index->InsertVecs(base_row_id.segment_offset_, col, offset, row_cnt);
+            memory_hnsw_index->InsertVecs(block_offset, col, offset, row_cnt);
             break;
         }
         case IndexType::kBMP: {
@@ -656,7 +658,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 }
                 memory_bmp_index = mem_index->memory_bmp_index_;
             }
-            memory_bmp_index->AddDocs(base_row_id.segment_offset_, col, offset, row_cnt);
+            memory_bmp_index->AddDocs(block_offset, col, offset, row_cnt);
             break;
         }
         case IndexType::kEMVB: {
@@ -875,10 +877,8 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         if (!status.ok()) {
             return status;
         }
-        SegmentOffset block_offset = block_meta.block_capacity() * block_meta.block_id();
-        RowID begin_row_id(segment_meta.segment_id(), block_offset);
         u32 offset = 0;
-        status = this->AppendMemIndex(segment_index_meta, begin_row_id, col, offset, row_cnt);
+        status = this->AppendMemIndex(segment_index_meta, block_id, col, offset, row_cnt);
         if (!status.ok()) {
             return status;
         }
