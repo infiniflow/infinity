@@ -362,7 +362,7 @@ Status TableMeeta::UninitSet() {
 
     status = RemoveFtIndexCache();
     if (!status.ok()) {
-        if (status.code() != ErrorCode::kNotFound) {
+        if (status.code() != ErrorCode::kCatalogError) {
             return status;
         }
     }
