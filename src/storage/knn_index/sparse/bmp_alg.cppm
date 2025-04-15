@@ -102,7 +102,7 @@ public:
             if constexpr (std::is_same_v<Filter, std::nullptr_t>) {
                 result_handler.AddResult(0 /*query_id*/, score, doc_id);
             } else {
-                if (filter(doc_ids_[doc_id])) {
+                if (doc_id < BMPDocID(doc_ids_.size()) && filter(doc_ids_[doc_id])) {
                     result_handler.AddResult(0 /*query_id*/, score, doc_id);
                 }
             }

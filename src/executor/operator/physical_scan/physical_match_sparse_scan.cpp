@@ -651,9 +651,15 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             auto it = common_query_filter_->filter_result_.find(segment_id);
             if (it != common_query_filter_->filter_result_.end()) {
                 SizeT segment_row_count = 0;
-                {
+                if (!use_new_catalog) {
                     auto segment_it = block_index->segment_block_index_.find(segment_id);
                     if (segment_it == block_index->segment_block_index_.end()) {
+                        UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+                    }
+                    segment_row_count = segment_it->second.segment_offset_;
+                } else {
+                    auto segment_it = block_index->new_segment_block_index_.find(segment_id);
+                    if (segment_it == block_index->new_segment_block_index_.end()) {
                         UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
                     }
                     segment_row_count = segment_it->second.segment_offset_;
