@@ -212,8 +212,14 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
                 return status;
             }
 
+            SegmentID unsealed_segment_id = table_entry_json["unsealed_id"];
+            table_meta->SetUnsealedSegmentID(unsealed_segment_id);
+
             if (table_entry_json.contains("segments")) {
                 for (auto &segment_json : table_entry_json["segments"]) {
+                    if (segment_json["deleted"]) {
+                        continue;
+                    }
                     status = TransformCatalogSegment(table_meta, segment_json);
                     if (!status.ok()) {
                         return status;
@@ -235,40 +241,24 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
 }
 
 Status NewCatalog::TransformCatalogSegment(Optional<TableMeeta> &table_meta, const nlohmann::json &segment_entry_json) {
-    auto &kv_instance = table_meta->kv_instance();
-    for (const auto &segment_json : segment_entry_json) {
-        TxnTimeStamp segment_commit_ts = segment_json["commit_ts"];
+    // auto &kv_instance = table_meta->kv_instance();
+    TxnTimeStamp segment_commit_ts = segment_entry_json["commit_ts"];
 
-        Optional<SegmentMeta> segment_meta;
-        Status status = NewCatalog::AddNewSegment1(table_meta.value(), segment_commit_ts, segment_meta);
-        if (!status.ok()) {
-            return status;
-        }
-
-        if (segment_json.contains("block_entries")) {
-            for (const auto &block_entry_json : segment_json["block_entries"]) {
-                Status status = TransformCatalogBlock(block_entry_json, &kv_instance);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-        }
+    Optional<SegmentMeta> segment_meta;
+    Status status = NewCatalog::AddNewSegment1(table_meta.value(), segment_commit_ts, segment_meta);
+    if (!status.ok()) {
+        return status;
     }
 
-    // Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
-    //     Status status;
-    //     SegmentID segment_id = 0;
-    //     std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
-    //     if (!status.ok()) {
-    //         return status;
+    // if (segment_entry_json.contains("block_entries")) {
+    //     for (const auto &block_entry_json : segment_entry_json["block_entries"]) {
+    //         Status status = TransformCatalogBlock(block_entry_json, &kv_instance);
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
     //     }
-    //     segment_meta.emplace(segment_id, table_meta);
-    //     status = segment_meta->InitSet();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    //     return Status::OK();
     // }
+
     return Status::OK();
 }
 Status NewCatalog::TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance) { return Status::OK(); }
