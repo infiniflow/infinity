@@ -237,8 +237,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                             txn_ptr->GetFullTextIndexReader(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
                     } else {
                         Status status = new_txn_ptr->GetFullTextIndexReader(*base_table_ref->table_info_->db_name_,
-                                                                        *base_table_ref->table_info_->table_name_,
-                                                                        match_node->index_reader_);
+                                                                            *base_table_ref->table_info_->table_name_,
+                                                                            match_node->index_reader_);
                         if (!status.ok()) {
                             UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
                         }
@@ -405,7 +405,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_dense_expr = std::dynamic_pointer_cast<KnnExpression>(match_expr);
                     if (match_dense_expr->optional_filter_) {
                         filter_expr = match_dense_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        if (use_new_catalog) {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetNewTxn());
+                        } else {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        }
                     }
                     auto knn_scan = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
                                                                base_table_ref,
@@ -420,7 +424,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_tensor_expr = std::dynamic_pointer_cast<MatchTensorExpression>(match_expr);
                     if (match_tensor_expr->optional_filter_) {
                         filter_expr = match_tensor_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        if (use_new_catalog) {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetNewTxn());
+                        } else {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        }
                     }
                     auto match_tensor_node =
                         MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_tensor_expr));
@@ -434,7 +442,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_sparse_expr = std::dynamic_pointer_cast<MatchSparseExpression>(match_expr);
                     if (match_sparse_expr->optional_filter_) {
                         filter_expr = match_sparse_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        if (use_new_catalog) {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetNewTxn());
+                        } else {
+                            common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
+                        }
                     }
                     auto match_sparse_node =
                         MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_sparse_expr));

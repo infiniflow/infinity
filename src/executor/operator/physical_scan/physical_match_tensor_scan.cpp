@@ -397,7 +397,12 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntri
 }
 
 // TODO: how many threads for brute force scan?
-SizeT PhysicalMatchTensorScan::TaskletCount() { return block_column_entries_.size() + index_entries_.size(); }
+SizeT PhysicalMatchTensorScan::TaskletCount() {
+    if (!block_metas_ && segment_index_metas_) {
+        return block_column_entries_.size() + index_entries_.size();
+    }
+    return (block_metas_ ? block_metas_->size() : 0) + (segment_index_metas_ ? segment_index_metas_->size() : 0);
+}
 
 bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *match_tensor_scan_operator_state = static_cast<MatchTensorScanOperatorState *>(operator_state);

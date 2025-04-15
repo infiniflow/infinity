@@ -754,7 +754,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
             case IndexType::kDiskAnn: { // TODO
                 LOG_WARN("Not implemented yet");
-                break;
+                return Status::OK();
             }
             default: {
                 UnrecoverableError("Invalid index type");
