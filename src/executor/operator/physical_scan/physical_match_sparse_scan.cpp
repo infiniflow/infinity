@@ -184,6 +184,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
                 }
                 IndexIndex *index_index = base_table_ref_->index_index_.get();
                 auto index_snapshot = index_index->Insert(index_name, table_index_meta);
+                break;
             }
         } else {
             auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), match_sparse_expr_->index_name_);

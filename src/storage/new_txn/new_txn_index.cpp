@@ -484,7 +484,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
                 return status;
             }
         }
-        SegmentOffset block_offset = block_meta->block_capacity() * block_meta->block_id() + cur_offset;
+        SegmentOffset block_offset = block_meta->block_capacity() * block_meta->block_id();
         RowID base_row_id(segment_meta->segment_id(), block_offset);
         {
             Status status = this->AppendMemIndex(*segment_index_meta, base_row_id, col, cur_offset, cur_row_cnt);
