@@ -129,8 +129,8 @@ private:
     Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance);
     Status TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, String const& db_name);
     Status TransformCatalogSegment(Optional<TableMeeta> &table_meta, const nlohmann::json &segment_entry_json);
-    Status TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance);
-    Status TransformCatalogBlockColumn(const nlohmann::json &block_column_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogBlock(Optional<SegmentMeta> &segment_meta, const nlohmann::json &block_entry_json);
+    Status TransformCatalogBlockColumn(Optional<BlockMeta> &block_meta, const nlohmann::json &block_column_entry_json);
     Status TransformCatalogTableIndex(const nlohmann::json &table_index_entry_json, KVInstance *kv_instance);
     Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
     Status TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance);
@@ -313,6 +313,8 @@ public:
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
+
+    static Status AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 
     static Status LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts);
 

@@ -649,6 +649,37 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     return Status::OK();
 }
 
+Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
+    Status status;
+
+    BlockID block_id;
+    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    block_meta.emplace(block_id, segment_meta);
+    // status = block_meta->InitSet();
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    return Status::OK();
+}
+
+// Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
+//     Status status;
+//     SegmentID segment_id = 0;
+//     std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     segment_meta.emplace(segment_id, table_meta);
+//     status = segment_meta->InitSet();
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     return Status::OK();
+// }
+
 Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
     Status status;
 

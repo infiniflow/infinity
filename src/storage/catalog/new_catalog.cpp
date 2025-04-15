@@ -39,6 +39,8 @@ import db_meeta;
 import table_def;
 import table_meeta;
 import segment_meta;
+import block_meta;
+import column_meta;
 
 namespace infinity {
 
@@ -164,7 +166,7 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
             }
 
             String table_id_str;
-            Status status = IncrLatestID(&kv_instance, table_id_str, LATEST_DATABASE_ID);
+            Status status = IncrLatestID(&kv_instance, table_id_str, LATEST_TABLE_ID);
             if (!status.ok()) {
                 return status;
             }
@@ -241,7 +243,6 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
 }
 
 Status NewCatalog::TransformCatalogSegment(Optional<TableMeeta> &table_meta, const nlohmann::json &segment_entry_json) {
-    // auto &kv_instance = table_meta->kv_instance();
     TxnTimeStamp segment_commit_ts = segment_entry_json["commit_ts"];
 
     Optional<SegmentMeta> segment_meta;
@@ -252,17 +253,69 @@ Status NewCatalog::TransformCatalogSegment(Optional<TableMeeta> &table_meta, con
 
     // if (segment_entry_json.contains("block_entries")) {
     //     for (const auto &block_entry_json : segment_entry_json["block_entries"]) {
-    //         Status status = TransformCatalogBlock(block_entry_json, &kv_instance);
+    //         status = TransformCatalogBlock(segment_meta, block_entry_json);
     //         if (!status.ok()) {
     //             return status;
     //         }
     //     }
     // }
-
     return Status::OK();
 }
-Status NewCatalog::TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance) { return Status::OK(); }
-Status NewCatalog::TransformCatalogBlockColumn(const nlohmann::json &block_column_entry_json, KVInstance *kv_instance) { return Status::OK(); }
+
+Status NewCatalog::TransformCatalogBlock(Optional<SegmentMeta> &segment_meta, const nlohmann::json &block_entry_json) {
+    // Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
+    //     Status status;
+    //
+    //     BlockID block_id;
+    //     std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     block_meta.emplace(block_id, segment_meta);
+    //     status = block_meta->InitSet();
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    //     {
+    //         TableMeeta &table_meta = segment_meta.table_meta();
+    //         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
+    //     }
+    //     for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+    //         ColumnMeta column_meta(column_idx, *block_meta);
+    //         status = column_meta.InitSet();
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
+    //     }
+    //     return Status::OK();
+    // }
+    TxnTimeStamp block_commit_ts = block_entry_json["commit_ts"];
+    Optional<BlockMeta> block_meta;
+    Status status = NewCatalog::AddNewBlock1(segment_meta.value(), block_commit_ts, block_meta);
+    for (const auto &block_column_json : block_entry_json["columns"]) {
+        Status status = TransformCatalogBlockColumn(block_meta, block_column_json);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::TransformCatalogBlockColumn(Optional<BlockMeta> &block_meta, const nlohmann::json &block_column_entry_json) {
+    // TODO...
+    // static Status AddNewBlockColumn(
+    // BlockMeta & block_meta,
+    // SizeT column_idx,
+    // Optional<ColumnMeta> & column_meta)
+    Optional<ColumnMeta> column_meta;
+    SizeT column_id = block_column_entry_json["column_id"];
+    Status status = NewCatalog::AddNewBlockColumn(block_meta.value(), column_id, column_meta);
+    return Status::OK();
+}
 
 Status NewCatalog::TransformCatalogTableIndex(const nlohmann::json &table_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
 Status NewCatalog::TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
