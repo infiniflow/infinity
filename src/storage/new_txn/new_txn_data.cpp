@@ -1559,7 +1559,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *k
     if (!delete_status.ok()) {
         return delete_status;
     }
-    const DeleteState &delete_state = txn_table_store->delete_state();
+    DeleteState &delete_state = txn_table_store->delete_state();
     DeleteState &undo_delete_state = txn_table_store->undo_delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
@@ -1592,6 +1592,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *k
             }
         }
     }
+    delete_state.rows_.clear();
     return Status::OK();
 }
 

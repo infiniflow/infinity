@@ -1169,7 +1169,8 @@ Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp beg
             break;
         }
         for (BlockOffset i = offset; i < range.first; ++i) {
-            bitmask.SetFalse(i);
+            SegmentOffset off = block_meta.block_capacity() * block_meta.block_id() + i;
+            bitmask.SetFalse(off);
         }
         offset = range.second;
     }
