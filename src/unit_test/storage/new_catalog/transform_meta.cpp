@@ -29,6 +29,7 @@ import txn_state;
 import catalog;
 import new_txn;
 import extra_ddl_info;
+import table_meeta;
 
 using namespace infinity;
 
@@ -71,7 +72,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TransformMeta,
                          ::testing::Values(TransformMeta::NEW_CONFIG_PATH, TransformMeta::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TransformMeta, transform_meta00) {
+TEST_P(TransformMeta, db_meta_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
     Status status = config_ptr->Init(config_path, nullptr);
     EXPECT_TRUE(status.ok());
@@ -84,7 +85,8 @@ TEST_P(TransformMeta, transform_meta00) {
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
-    kv_store_ptr->Flush();
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
@@ -111,7 +113,7 @@ TEST_P(TransformMeta, transform_meta00) {
     UnInit();
 }
 
-TEST_P(TransformMeta, transform_meta01) {
+TEST_P(TransformMeta, db_meta_transform_01) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
     Status status = config_ptr->Init(config_path, nullptr);
     EXPECT_TRUE(status.ok());
@@ -124,6 +126,8 @@ TEST_P(TransformMeta, transform_meta01) {
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
@@ -150,7 +154,7 @@ TEST_P(TransformMeta, transform_meta01) {
     UnInit();
 }
 
-TEST_P(TransformMeta, transform_meta02) {
+TEST_P(TransformMeta, db_meta_transform_02) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
     Status status = config_ptr->Init(config_path, nullptr);
     EXPECT_TRUE(status.ok());
@@ -163,6 +167,8 @@ TEST_P(TransformMeta, transform_meta02) {
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
@@ -170,16 +176,7 @@ TEST_P(TransformMeta, transform_meta02) {
     Init();
 
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-    {
-        status = txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
         Optional<DBMeeta> db_meta;
         status = txn->GetDBMeta("db1", db_meta);
@@ -189,6 +186,47 @@ TEST_P(TransformMeta, transform_meta02) {
     {
         Optional<DBMeeta> db_meta;
         status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
+}
+
+TEST_P(TransformMeta, table_meta_transform_00) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/table_meta_00.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn->GetTableMeta("db1", "test_table", db_meta, table_meta);
+        // Status GetTableMeta(const String &db_name,
+        //                     const String &table_name,
+        //                     Optional<DBMeeta> &db_meta,
+        //                     Optional<TableMeeta> &table_meta,
+        //                     String *table_key = nullptr);
         EXPECT_TRUE(status.ok());
     }
 

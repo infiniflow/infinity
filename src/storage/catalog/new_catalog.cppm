@@ -127,7 +127,7 @@ public:
 
 private:
     Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance);
-    Status TransformCatalogTable(Optional<DBMeeta> &DBMeta, const nlohmann::json &table_meta_json, KVInstance *kv_instance);
+    Status TransformCatalogTable(Optional<DBMeeta> &DBMeta, const nlohmann::json &table_meta_json, String const& db_name);
     Status TransformCatalogSegment(const nlohmann::json &segment_entry_json, KVInstance *kv_instance);
     Status TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance);
     Status TransformCatalogBlockColumn(const nlohmann::json &block_column_entry_json, KVInstance *kv_instance);

@@ -36,6 +36,8 @@ import meta_key;
 import catalog;
 import catalog_delta_entry;
 import db_meeta;
+import table_def;
+import table_meeta;
 
 namespace infinity {
 
@@ -137,7 +139,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
 
                 if (db_entry_json.contains("tables")) {
                     for (const auto &table_meta_json : db_entry_json["tables"]) {
-                        Status status = TransformCatalogTable(db_meta, table_meta_json, kv_instance);
+                        Status status = TransformCatalogTable(db_meta, table_meta_json, db_name);
                         if (!status.ok()) {
                             return status;
                         }
@@ -150,115 +152,85 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
     return Status::OK();
 }
 
-// Status NewCatalog::AddNewTable(DBMeeta &db_meta,
-//                                const String &table_id_str,
-//                                TxnTimeStamp begin_ts,
-//                                TxnTimeStamp commit_ts,
-//                                const SharedPtr<TableDef> &table_def,
-//                                Optional<TableMeeta> &table_meta) {
-//     // Create table key value pair
-//     KVInstance &kv_instance = db_meta.kv_instance();
-//     String table_key = KeyEncode::CatalogTableKey(db_meta.db_id_str(), *table_def->table_name(), commit_ts);
-//     Status status = kv_instance.Put(table_key, table_id_str);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//
-//     table_meta.emplace(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
-//     status = table_meta->InitSet(table_def);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//
-//     return status;
-// }
+Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, String const& db_name) {
+    String table_name = table_meta_json["table_name"];
+    if (table_meta_json.contains("table_entries")) {
+        auto& kv_instance = db_meta->kv_instance();
+        for (auto &table_entry_json : table_meta_json["table_entries"]) {
+            bool deleted = table_entry_json["deleted"];
+            if (deleted) {
+                continue;
+            }
 
-Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, KVInstance *kv_instance) {
-    //     String table_name = table_meta_json["table_name"];
-    //     if (table_meta_json.contains("table_entries")) {
-    //
-    //         for (auto& table_entry_json : table_meta_json["table_entries"]) {
-    //             bool deleted = table_entry_json["deleted"];
-    //             if (deleted) {
-    //                 continue;
-    //             }
-    //
-    //             String table_id_str;
-    //             Status status = IncrLatestID(kv_instance, table_id_str, LATEST_DATABASE_ID);
-    //             if (!status.ok()) {
-    //                 return status;
-    //             }
-    //
-    //             TxnTimeStamp table_begin_ts = table_entry_json["begin_ts"];
-    //             TxnTimeStamp table_end_ts = table_entry_json["end_ts"];
-    //
-    //             Optional<TableMeeta> table_meta;
-    //
-    //             Vector<SharedPtr<ColumnDef>> columns;
-    //
-    //             SharedPtr<String> table_entry_dir;
-    //             table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
-    //
-    //             for (const auto &column_def_json : table_entry_json["column_definition"]) {
-    //                 SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
-    //                 i64 column_id = column_def_json["column_id"];
-    //                 String column_name = column_def_json["column_name"];
-    //
-    //                 std::set<ConstraintType> constraints;
-    //                 if (column_def_json.contains("constraints")) {
-    //                     for (const auto &column_constraint : column_def_json["constraints"]) {
-    //                         ConstraintType constraint = column_constraint;
-    //                         constraints.emplace(constraint);
-    //                     }
-    //                 }
-    //
-    //                 String comment;
-    //                 if (column_def_json.contains("column_comment")) {
-    //                     comment = column_def_json["column_comment"];
-    //                 }
-    //
-    //                 SharedPtr<ParsedExpr> default_expr = nullptr;
-    //                 if (column_def_json.contains("default")) {
-    //                     default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
-    //                 }
-    //
-    //                 SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
-    //                 columns.emplace_back(column_def);
-    //             }
-    //
-    // //      static inline SharedPtr<TableDef>
-    // // Make(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment, Vector<SharedPtr<ColumnDef>> columns) {
-    // //      return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(table_comment), std::move(columns));
-    // //   }
-    //
-    //             SharedPtr<TableDef> table_def = TableDef::Make(, table_name)
-    //
-    //
-    //             status = AddNewTable(db_meta, table_id_str, table_begin_ts, table_end_ts, , table_meta);
-    //             if (!status.ok()) {
-    //                 return status;
-    //             }
-    //
-    //             if (table_entry_json.contains("segments")) {
-    //                 for (auto& segment_json : table_entry_json["segments"]) {
-    //                     status = TransformCatalogSegment();
-    //                     if (!status.ok()) {
-    //                         return status;
-    //                     }
-    //                 }
-    //             }
-    //
-    //             if (table_entry_json.contains("table_indexes")) {
-    //                 for (auto& index_json : table_entry_json["table_indexes"]) {
-    //                     status = TransformCatalogTableIndex();
-    //                     if (!status.ok()) {
-    //                         return status;
-    //                     }
-    //                 }
-    //             }
-    //             break;
-    //         }
-    //     }
+            String table_id_str;
+            Status status = IncrLatestID(&kv_instance, table_id_str, LATEST_DATABASE_ID);
+            if (!status.ok()) {
+                return status;
+            }
+
+            TxnTimeStamp table_begin_ts = table_entry_json["begin_ts"];
+            TxnTimeStamp table_commit_ts = table_entry_json["commit_ts"];
+
+            Vector<SharedPtr<ColumnDef>> columns;
+
+            SharedPtr<String> table_entry_dir;
+            table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
+
+            for (const auto &column_def_json : table_entry_json["column_definition"]) {
+                SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
+                i64 column_id = column_def_json["column_id"];
+                String column_name = column_def_json["column_name"];
+
+                std::set<ConstraintType> constraints;
+                if (column_def_json.contains("constraints")) {
+                    for (const auto &column_constraint : column_def_json["constraints"]) {
+                        ConstraintType constraint = column_constraint;
+                        constraints.emplace(constraint);
+                    }
+                }
+
+                String comment;
+                if (column_def_json.contains("column_comment")) {
+                    comment = column_def_json["column_comment"];
+                }
+
+                SharedPtr<ParsedExpr> default_expr = nullptr;
+                if (column_def_json.contains("default")) {
+                    default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+                }
+
+                SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
+                columns.emplace_back(column_def);
+            }
+
+            String table_comment;
+            auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name),  MakeShared<String>(table_comment), columns);
+            Optional<TableMeeta> table_meta;
+            status = AddNewTable(db_meta.value(), table_id_str, table_begin_ts, table_commit_ts, table_def, table_meta);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // if (table_entry_json.contains("segments")) {
+            //     for (auto &segment_json : table_entry_json["segments"]) {
+            //         status = TransformCatalogSegment();
+            //         if (!status.ok()) {
+            //             return status;
+            //         }
+            //     }
+            // }
+            //
+            // if (table_entry_json.contains("table_indexes")) {
+            //     for (auto &index_json : table_entry_json["table_indexes"]) {
+            //         status = TransformCatalogTableIndex();
+            //         if (!status.ok()) {
+            //             return status;
+            //         }
+            //     }
+            // }
+            // break;
+        }
+    }
     return Status::OK();
 }
 
