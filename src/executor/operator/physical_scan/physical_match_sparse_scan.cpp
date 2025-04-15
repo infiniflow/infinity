@@ -124,13 +124,13 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes()
 SizeT PhysicalMatchSparseScan::TaskletCount() {
     SizeT ret = base_table_ref_->block_index_->BlockCount();
     if (base_table_ref_->index_index_.get() != nullptr) {
-        if (base_table_ref_->index_index_->new_index_snapshots_vec_.empty()) {
+        if (!base_table_ref_->index_index_->index_snapshots_vec_.empty()) {
             const auto &index_snapshots = base_table_ref_->index_index_->index_snapshots_vec_;
             if (index_snapshots.size() != 1) {
                 UnrecoverableError("Multiple index snapshots are not supported.");
             }
             ret = index_snapshots[0]->segment_index_entries_.size();
-        } else {
+        } else if (!base_table_ref_->index_index_->new_index_snapshots_vec_.empty()) {
             const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
             if (index_snapshots.size() != 1) {
                 UnrecoverableError("Multiple index snapshots are not supported.");
@@ -141,7 +141,7 @@ SizeT PhysicalMatchSparseScan::TaskletCount() {
     return ret;
 }
 
-SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
+void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     SizeT search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
 
     bool use_new_catalog = query_context->global_config()->UseNewCatalog();
@@ -149,9 +149,6 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
         Status status;
 
         TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
-
-        BlockIndex *block_index = base_table_ref_->block_index_.get();
-        SizeT ret = block_index->BlockCount();
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
@@ -225,9 +222,8 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
             }
             IndexIndex *index_index = base_table_ref_->index_index_.get();
             auto index_snapshot = index_index->Insert(index_name, table_index_meta);
-            ret = index_snapshot->segment_index_metas_.size();
         }
-        return ret;
+        return;
     }
     Txn *txn = query_context->GetTxn();
 
@@ -236,9 +232,6 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
     if (!status.ok()) {
         RecoverableError(status);
     }
-
-    BlockIndex *block_index = base_table_ref_->block_index_.get();
-    SizeT ret = block_index->BlockCount();
 
     ColumnExpression *column_expr = static_cast<ColumnExpression *>(match_sparse_expr_->arguments()[0].get());
     SizeT knn_column_id = column_expr->binding().column_idx;
@@ -266,7 +259,6 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
                 }
                 IndexIndex *index_index = base_table_ref_->index_index_.get();
                 auto index_snapshot = index_index->Insert(table_index_entry, txn);
-                ret = index_snapshot->segment_index_entries_.size();
                 break;
             }
         } else {
@@ -302,11 +294,8 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
             }
             IndexIndex *index_index = base_table_ref_->index_index_.get();
             auto index_snapshot = index_index->Insert(table_index_entry, txn);
-            ret = index_snapshot->segment_index_entries_.size();
         }
     }
-
-    return ret;
 }
 
 Vector<SharedPtr<Vector<SegmentID>>>
@@ -321,7 +310,7 @@ PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> 
     }
     IndexIndex *index_index = base_table_ref_->index_index_.get();
     if (use_new_catalog) {
-        if (index_index != nullptr) {
+        if (index_index != nullptr && !index_index->new_index_snapshots_.empty()) {
             block_groups.assign(parallel_count, MakeShared<Vector<GlobalBlockID>>());
             SizeT group_idx = 0;
             for (const auto &[idx_name, index_snapshot] : index_index->new_index_snapshots_) {
@@ -333,7 +322,7 @@ PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> 
             }
         }
     } else {
-        if (index_index != nullptr) {
+        if (index_index != nullptr && !index_index->index_snapshots_.empty()) {
             block_groups.assign(parallel_count, MakeShared<Vector<GlobalBlockID>>());
             SizeT group_idx = 0;
             for (const auto &[idx_name, index_snapshot] : index_index->index_snapshots_) {
@@ -662,9 +651,15 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             auto it = common_query_filter_->filter_result_.find(segment_id);
             if (it != common_query_filter_->filter_result_.end()) {
                 SizeT segment_row_count = 0;
-                {
+                if (!use_new_catalog) {
                     auto segment_it = block_index->segment_block_index_.find(segment_id);
                     if (segment_it == block_index->segment_block_index_.end()) {
+                        UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+                    }
+                    segment_row_count = segment_it->second.segment_offset_;
+                } else {
+                    auto segment_it = block_index->new_segment_block_index_.find(segment_id);
+                    if (segment_it == block_index->new_segment_block_index_.end()) {
                         UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
                     }
                     segment_row_count = segment_it->second.segment_offset_;

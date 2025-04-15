@@ -209,10 +209,10 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 LOG_TRACE("Try to find an index to use");
                 for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
                     const String &index_id_str = (*index_id_strs_ptr)[i];
-                    table_index_meta_ = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+                    auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
                     SharedPtr<IndexBase> index_base;
-                    std::tie(index_base, status) = table_index_meta_->GetIndexBase();
+                    std::tie(index_base, status) = table_index_meta->GetIndexBase();
                     if (!status.ok()) {
                         RecoverableError(status);
                     }
@@ -231,6 +231,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                         LOG_TRACE(fmt::format("MatchTensorScan: PlanWithIndex(): Skipping non-knn index."));
                         continue;
                     }
+                    table_index_meta_ = std::move(table_index_meta);
+                    break;
                 }
             } else {
                 LOG_TRACE(fmt::format("Use index: {}", src_match_tensor_expr_->index_name_));
@@ -240,10 +242,10 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     RecoverableError(std::move(status));
                 }
                 const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-                table_index_meta_ = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+                auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
                 SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = table_index_meta_->GetIndexBase();
+                std::tie(index_base, status) = table_index_meta->GetIndexBase();
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
@@ -264,6 +266,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     Status error_status = Status::InvalidIndexType("invalid index");
                     RecoverableError(std::move(error_status));
                 }
+                table_index_meta_ = std::move(table_index_meta);
             }
             // Fill the segment with index
             if (table_index_meta_) {
@@ -397,7 +400,12 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntri
 }
 
 // TODO: how many threads for brute force scan?
-SizeT PhysicalMatchTensorScan::TaskletCount() { return block_column_entries_.size() + index_entries_.size(); }
+SizeT PhysicalMatchTensorScan::TaskletCount() {
+    if (!block_metas_ && segment_index_metas_) {
+        return block_column_entries_.size() + index_entries_.size();
+    }
+    return (block_metas_ ? block_metas_->size() : 0) + (segment_index_metas_ ? segment_index_metas_->size() : 0);
+}
 
 bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *match_tensor_scan_operator_state = static_cast<MatchTensorScanOperatorState *>(operator_state);
@@ -1253,8 +1261,23 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         const SegmentOffset segment_offset = row_id.segment_offset_;
         const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-        BlockEntry *block_entry = block_index->segment_block_index_.at(segment_id).block_map_.at(block_id);
-        auto column_vec = block_entry->GetConstColumnVector(buffer_mgr, column_id);
+        ColumnVector column_vec;
+        if (!block_index->segment_block_index_.empty()) {
+            BlockEntry *block_entry = block_index->segment_block_index_.at(segment_id).block_map_.at(block_id);
+            column_vec = block_entry->GetConstColumnVector(buffer_mgr, column_id);
+
+        } else {
+            BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map_.at(block_id).get();
+            ColumnMeta column_meta(column_id, *block_meta);
+            auto [block_row_cnt, status] = block_meta->GetRowCnt1();
+            if (!status.ok()) {
+                UnrecoverableError("GetRowCnt1 failed!");
+            }
+            status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vec);
+            if (!status.ok()) {
+                UnrecoverableError("GetRowCnt1 failed!");
+            }
+        }
         doc.score_ = CalcutateScoreOfRowOp::Execute(column_vec, block_offset, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
     }
 }

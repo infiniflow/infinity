@@ -55,7 +55,7 @@ public:
 
     SizeT TaskletCount() override;
 
-    SizeT GetTaskletCount(QueryContext *query_context);
+    void PlanWithIndex(QueryContext *query_context);
 
     Vector<SharedPtr<Vector<SegmentID>>>
     PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context);
