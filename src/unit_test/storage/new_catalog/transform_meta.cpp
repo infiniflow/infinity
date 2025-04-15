@@ -223,11 +223,6 @@ TEST_P(TransformMeta, table_meta_transform_00) {
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetTableMeta("db1", "test_table", db_meta, table_meta);
-        // Status GetTableMeta(const String &db_name,
-        //                     const String &table_name,
-        //                     Optional<DBMeeta> &db_meta,
-        //                     Optional<TableMeeta> &table_meta,
-        //                     String *table_key = nullptr);
         EXPECT_TRUE(status.ok());
     }
 
@@ -237,7 +232,7 @@ TEST_P(TransformMeta, table_meta_transform_00) {
     UnInit();
 }
 
-TEST_P(TransformMeta, table_meta_transform_01) {
+TEST_P(TransformMeta, table_index_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
     Status status = config_ptr->Init(config_path, nullptr);
     EXPECT_TRUE(status.ok());
@@ -246,7 +241,7 @@ TEST_P(TransformMeta, table_meta_transform_01) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/table_meta_01.json";
+    String full_ckp_path = String(test_data_path()) + "/json/table_index_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -275,8 +270,45 @@ TEST_P(TransformMeta, table_meta_transform_01) {
             status = txn->GetTableIndexMeta("idx_test_table_age", table_meta.value(), table_index_meta);
             EXPECT_TRUE(status.ok());
         }
+    }
 
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
 
+    UnInit();
+}
+
+TEST_P(TransformMeta, segment_transform_00) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/segment_00.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        auto [segment_p_s, status] = txn->GetSegmentsInfo("db1", "test_table");
+        EXPECT_TRUE(status.ok());
+        for (auto& segment_p : segment_p_s) {
+            auto segment_id = segment_p->segment_id_;
+            auto [_, status] = txn->GetSegmentInfo("db1", "test_table", segment_id);
+            EXPECT_TRUE(status.ok());
+        }
     }
 
     status = new_txn_mgr->CommitTxn(txn);
