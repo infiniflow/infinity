@@ -111,89 +111,89 @@ TEST_P(TransformMeta, transform_meta00) {
     UnInit();
 }
 
-// TEST_P(TransformMeta, transform_meta01) {
-//     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-//     Status status = config_ptr->Init(config_path, nullptr);
-//     EXPECT_TRUE(status.ok());
-//     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
-//     status = kv_store_ptr->Init(config_ptr->CatalogDir());
-//     EXPECT_TRUE(status.ok());
-//     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
-//
-//     String full_ckp_path = String(test_data_path()) + "/json/db_meta_01.json";
-//     Vector<String> delta_ckp_path_array;
-//     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
-//
-//     kv_store_ptr->Uninit();
-//     kv_store_ptr.reset();
-//     new_catalog_ptr.reset();
-//
-//     Init();
-//
-//     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-//     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
-//     {
-//         Optional<DBMeeta> db_meta;
-//         status = txn->GetDBMeta("db1", db_meta);
-//         EXPECT_TRUE(!status.ok());
-//     }
-//
-//     {
-//         Optional<DBMeeta> db_meta;
-//         status = txn->GetDBMeta("default_db", db_meta);
-//         EXPECT_TRUE(status.ok());
-//     }
-//
-//     status = new_txn_mgr->CommitTxn(txn);
-//     EXPECT_TRUE(status.ok());
-//
-//     UnInit();
-// }
-//
-// TEST_P(TransformMeta, transform_meta02) {
-//     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-//     Status status = config_ptr->Init(config_path, nullptr);
-//     EXPECT_TRUE(status.ok());
-//     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
-//     status = kv_store_ptr->Init(config_ptr->CatalogDir());
-//     EXPECT_TRUE(status.ok());
-//     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
-//
-//     String full_ckp_path = String(test_data_path()) + "/json/db_meta_02.json";
-//     Vector<String> delta_ckp_path_array;
-//     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
-//
-//     kv_store_ptr->Uninit();
-//     kv_store_ptr.reset();
-//     new_catalog_ptr.reset();
-//
-//     Init();
-//
-//     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-//     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-//     {
-//         status = txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-//         EXPECT_TRUE(status.ok());
-//
-//         status = new_txn_mgr->CommitTxn(txn);
-//         EXPECT_TRUE(status.ok());
-//     }
-//
-//     txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
-//     {
-//         Optional<DBMeeta> db_meta;
-//         status = txn->GetDBMeta("db1", db_meta);
-//         EXPECT_TRUE(status.ok());
-//     }
-//
-//     {
-//         Optional<DBMeeta> db_meta;
-//         status = txn->GetDBMeta("default_db", db_meta);
-//         EXPECT_TRUE(status.ok());
-//     }
-//
-//     status = new_txn_mgr->CommitTxn(txn);
-//     EXPECT_TRUE(status.ok());
-//
-//     UnInit();
-// }
+TEST_P(TransformMeta, transform_meta01) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/db_meta_01.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("db1", db_meta);
+        EXPECT_TRUE(!status.ok());
+    }
+
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
+}
+
+TEST_P(TransformMeta, transform_meta02) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/db_meta_02.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    {
+        status = txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("db1", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
+}
