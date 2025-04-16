@@ -111,9 +111,8 @@ private:
     CreateEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // restore snapshot
-    Status ApplyTableSnapshot(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&restore_entry,
-                              TransactionID txn_id,
-                              TxnTimeStamp begin_ts);
+    Status ApplyTableSnapshot(std::function<SharedPtr<TableEntry>()> &&restore_entry,
+                              Txn *txn_ptr);
 
     void UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, TransactionID, TxnTimeStamp)> &&update_entry,
                            TransactionID txn_id,
