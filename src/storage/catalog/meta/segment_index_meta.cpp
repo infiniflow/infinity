@@ -99,10 +99,10 @@ Tuple<ChunkID, Status> SegmentIndexMeta::AddChunkID1(TxnTimeStamp commit_ts) {
 
     TableMeeta &table_meta = table_index_meta_.table_meta();
 
-    String segment_id_key =
+    String chunk_id_key =
         KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_.Put(segment_id_key, commit_ts_str);
+    status = kv_instance_.Put(chunk_id_key, commit_ts_str);
     if (!status.ok()) {
         return {0, status};
     }
@@ -361,16 +361,16 @@ Status SegmentIndexMeta::LoadChunkIDs() {
 Status SegmentIndexMeta::LoadChunkIDs1() {
     chunk_ids_ = Vector<ChunkID>();
     Vector<SegmentID> &chunk_ids = *chunk_ids_;
+    TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
 
     TableMeeta &table_meta = table_index_meta_.table_meta();
-    //    CatalogIdxChunkPrefix(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
     String chunk_id_prefix =
         KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(chunk_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(chunk_id_prefix)) {
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts_) {
+        if (commit_ts > begin_ts) {
             iter->Next();
             continue;
         }

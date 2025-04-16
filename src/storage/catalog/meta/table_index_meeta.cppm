@@ -52,9 +52,13 @@ public:
 
     Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
 
+    Tuple<Vector<SegmentID>*, Status> GetSegmentIDs1();
+
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status AddSegmentID(SegmentID segment_id);
+
+    Tuple<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
 
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
@@ -70,6 +74,8 @@ private:
     Status LoadIndexDef();
 
     Status LoadSegmentIDs();
+
+    Status LoadSegmentIDs1();
 
     String GetTableIndexTag(const String &tag) const;
 

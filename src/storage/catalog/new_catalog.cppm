@@ -326,6 +326,8 @@ public:
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
+    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, TxnTimeStamp commit_ts, Optional<SegmentIndexMeta> &segment_index_meta);
+
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
 
     static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,

@@ -144,6 +144,10 @@ String KeyEncode::CatalogIdxSegmentKey(const String &db_id, const String &table_
     return fmt::format("idx_seg|{}|{}|{}|{}", db_id, table_id, index_id, segment_id);
 }
 
+String KeyEncode::CatalogIdxSegmentKeyPrefix(const String &db_id, const String &table_id, const String &index_id) {
+    return fmt::format("idx_seg|{}|{}|{}|", db_id, table_id, index_id);
+}
+
 String KeyEncode::CatalogIdxSegmentTagKey(const String &db_id,
                                           const String &table_id,
                                           const String &index_id,

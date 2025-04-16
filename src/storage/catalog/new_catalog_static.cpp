@@ -793,6 +793,20 @@ Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, Segment
     return Status::OK();
 }
 
+Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, TxnTimeStamp commit_ts, Optional<SegmentIndexMeta> &segment_index_meta) {
+    auto [segment_id, status] = table_index_meta.AddSegmentID1(commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    segment_index_meta.emplace(segment_id, table_index_meta);
+    status = segment_index_meta->InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
     Status status;
 

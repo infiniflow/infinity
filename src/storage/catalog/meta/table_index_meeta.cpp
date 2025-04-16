@@ -79,6 +79,16 @@ Status TableIndexMeeta::GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
     return Status::OK();
 }
 
+Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIDs1() {
+    if (!segment_ids_) {
+        auto status = LoadSegmentIDs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {&*segment_ids_, Status::OK()};
+}
+
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
     String segment_ids_key = GetTableIndexTag("segment_ids");
     String segment_ids_str = nlohmann::json(segment_ids).dump();
@@ -102,6 +112,25 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
         return status;
     }
     return Status::OK();
+}
+
+Tuple<SegmentID, Status> TableIndexMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
+    SegmentID segment_id = 0;
+
+    auto [chunk_ids_ptr, status] = GetSegmentIDs1();
+    if (!status.ok()) {
+        return {0, status};
+    }
+    segment_id = chunk_ids_ptr->empty() ? 0 : chunk_ids_ptr->back() + 1;
+    segment_ids_->push_back(segment_id);
+
+    String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    status = kv_instance_.Put(segment_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return {0, status};
+    }
+    return {segment_id, Status::OK()};
 }
 
 Status TableIndexMeeta::GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts) {
@@ -216,6 +245,29 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     }
     Vector<SegmentID> segment_ids = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
     segment_ids_ = segment_ids;
+    return Status::OK();
+}
+
+Status TableIndexMeeta::LoadSegmentIDs1() {
+    segment_ids_ = Vector<SegmentID>();
+    Vector<SegmentID> &segment_ids = *segment_ids_;
+
+    TxnTimeStamp begin_ts = table_meta_.begin_ts();
+    String segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(segment_id_prefix);
+    while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
+        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+        if (commit_ts > begin_ts) {
+            iter->Next();
+            continue;
+        }
+        SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
+        segment_ids.push_back(segment_id);
+        iter->Next();
+    }
+
+    std::sort(segment_ids.begin(), segment_ids.end());
     return Status::OK();
 }
 

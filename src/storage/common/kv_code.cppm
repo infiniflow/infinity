@@ -114,6 +114,7 @@ public:
     static String CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
 
     static String CatalogIdxSegmentKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
+    static String CatalogIdxSegmentKeyPrefix(const String &db_id, const String &table_id, const String &index_id);
     static String
     CatalogIdxSegmentTagKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, const String &tag_name);
 
