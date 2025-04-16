@@ -105,6 +105,7 @@ void ReadDataBlock(DataBlock *output,
             output->column_vectors[i]->Finalize(row_count);
         }
     }
+    output->Finalize();
 }
 
 void CollectUsedColumnRef(BaseExpression *expr, Vector<bool> &column_should_load) {
