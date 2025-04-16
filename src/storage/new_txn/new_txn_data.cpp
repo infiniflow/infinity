@@ -308,6 +308,11 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         import_command->db_id_str_ = db_meta->db_id_str();
         import_command->table_id_str_ = table_meta.table_id_str();
         import_command->table_key_ = table_key;
+
+        status = this->AddSegmentVersion(import_command->segment_info_, *segment_meta);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     // index
@@ -641,6 +646,11 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         compact_command->table_key_ = table_key;
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
+
+        status = this->AddSegmentVersion(compact_command->new_segment_infos_[0], *compact_state.new_segment_meta_);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     Vector<String> *index_id_strs_ptr = nullptr;
@@ -1734,8 +1744,26 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
     return Status::OK();
 }
 
+Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
+    TxnTimeStamp save_ts = txn_context_ptr_->begin_ts_;
+    for (WalBlockInfo &block_info : segment_info.block_infos_) {
+        BlockMeta block_meta(block_info.block_id_, segment_meta);
+        SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+
+        auto [version_buffer, status] = block_meta.GetVersionBuffer();
+        if (!status.ok()) {
+            return status;
+        }
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+
+        block_version->Append(save_ts, block_info.row_count_);
+    }
+    return Status::OK();
+}
+
 Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
-    // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    TxnTimeStamp save_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto *pm = InfinityContext::instance().persistence_manager();
 
@@ -1750,7 +1778,7 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         BufferHandle buffer_handle = version_buffer->Load();
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
 
-        block_version->Append(commit_ts, block_info.row_count_);
+        block_version->CommitAppend(save_ts, commit_ts);
         version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
 
         SharedPtr<BlockLock> block_lock;

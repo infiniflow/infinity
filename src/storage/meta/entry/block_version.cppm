@@ -64,6 +64,8 @@ export struct BlockVersion {
 
     void Append(TxnTimeStamp commit_ts, i32 row_count);
 
+    void CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts);
+
     Status Delete(i32 offset, TxnTimeStamp commit_ts);
 
     void RollbackDelete(i32 offset);

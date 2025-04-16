@@ -186,6 +186,15 @@ void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     latest_change_ts_ = commit_ts;
 }
 
+void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
+    for (auto &[create_ts, row_count] : created_) {
+        if (create_ts == save_ts) {
+            create_ts = commit_ts;
+            break;
+        }
+    }
+}
+
 Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
     if (deleted_[offset] != 0) {
         return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
