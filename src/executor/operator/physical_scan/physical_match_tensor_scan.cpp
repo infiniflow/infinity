@@ -401,7 +401,7 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntri
 
 // TODO: how many threads for brute force scan?
 SizeT PhysicalMatchTensorScan::TaskletCount() {
-    if (!block_metas_ && segment_index_metas_) {
+    if (!block_metas_ && !segment_index_metas_) {
         return block_column_entries_.size() + index_entries_.size();
     }
     return (block_metas_ ? block_metas_->size() : 0) + (segment_index_metas_ ? segment_index_metas_->size() : 0);
