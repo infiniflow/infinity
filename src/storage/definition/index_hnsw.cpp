@@ -80,6 +80,14 @@ HnswBuildType StringToHnswBuildType(const String &str) {
     }
 }
 
+void TrimSpace(std::string_view &str) {
+    if (str.empty()) {
+        return;
+    }
+    str.remove_prefix(str.find_first_not_of(' '));
+    str.remove_suffix(str.size() - str.find_last_not_of(' ') - 1);
+}
+
 LSGConfig LSGConfig::FromString(const String &str) {
     // example: "sample_raito=0.01,ls_k=10,alpha=1.0"
     LSGConfig lsg_config;
@@ -102,6 +110,8 @@ LSGConfig LSGConfig::FromString(const String &str) {
         }
         auto key = kv.substr(0, pos);
         auto value = kv.substr(pos + 1);
+        TrimSpace(key);
+        TrimSpace(value);
         if (key == "sample_raito") {
             lsg_config.sample_ratio_ = std::stof(String(value));
         } else if (key == "ls_k") {

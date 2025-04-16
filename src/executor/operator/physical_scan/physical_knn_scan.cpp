@@ -447,7 +447,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
                 SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = table_index_meta_->GetIndexBase();
+                std::tie(index_base, status) = table_index_meta->GetIndexBase();
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
@@ -943,8 +943,18 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
                                         if (block_id != prev_block_id) {
                                             prev_block_id = block_id;
-                                            BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-                                            column_vector = block_entry->GetConstColumnVector(buffer_mgr, knn_column_id);
+                                            if (!use_new_catalog) {
+                                                BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+                                                column_vector = block_entry->GetConstColumnVector(buffer_mgr, knn_column_id);
+                                            } else {
+                                                BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
+                                                auto [block_row_cnt, status] = block_meta->GetRowCnt1();
+                                                ColumnMeta column_meta(knn_column_id, *block_meta);
+                                                status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                                                if (!status.ok()) {
+                                                    UnrecoverableError(status.message());
+                                                }
+                                            }
                                         }
                                         if constexpr (t == LogicalType::kEmbedding) {
                                             const auto *data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
