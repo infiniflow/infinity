@@ -51,6 +51,8 @@ public:
         return Status::OK();
     }
 
+    Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
+
     Status GetNextChunkID(ChunkID &chunk_id) {
         if (!next_chunk_id_) {
             Status status = LoadNextChunkID();
@@ -67,6 +69,8 @@ public:
     Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
 
     Status AddChunkID(ChunkID chunk_id);
+
+    Tuple<ChunkID, Status> AddChunkID1(TxnTimeStamp commit_ts);
 
     Status SetNextChunkID(ChunkID chunk_id);
 
@@ -96,6 +100,8 @@ private:
 
     Status LoadChunkIDs();
 
+    Status LoadChunkIDs1();
+
     Status LoadNextChunkID();
 
     Status LoadFtInfo();
@@ -103,15 +109,16 @@ private:
     String GetSegmentIndexTag(const String &tag);
 
 private:
+    TxnTimeStamp begin_ts_{};
     KVInstance &kv_instance_;
     TableIndexMeeta &table_index_meta_;
-    SegmentID segment_id_;
+    SegmentID segment_id_{};
 
-    Optional<Vector<ChunkID>> chunk_ids_;
-    Optional<ChunkID> next_chunk_id_;
-    Optional<bool> has_mem_index_;
+    Optional<Vector<ChunkID>> chunk_ids_{};
+    Optional<ChunkID> next_chunk_id_{};
+    Optional<bool> has_mem_index_{};
 
-    SharedPtr<SegmentIndexFtInfo> ft_info_;
+    SharedPtr<SegmentIndexFtInfo> ft_info_{};
 };
 
 } // namespace infinity

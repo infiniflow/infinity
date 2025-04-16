@@ -116,6 +116,8 @@ public:
     static String CatalogIdxSegmentKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
     static String
     CatalogIdxSegmentTagKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, const String &tag_name);
+
+    static String CatalogIdxChunkKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id);
     static String CatalogIdxChunkPrefix(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
     static String CatalogIdxChunkTagKey(const String &db_id,
                                         const String &table_id,
