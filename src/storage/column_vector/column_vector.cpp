@@ -1673,9 +1673,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
         case LogicalType::kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
+            String default_val = "0";
             if (embedding_info->Dimension() < ele_str_views.size()) {
                 Status status = Status::ImportFileFormatError("Embedding data size exceeds dimension.");
                 RecoverableError(status);
+            }
+            if (ele_str_views.size() < embedding_info->Dimension()) {
+                for (SizeT i = ele_str_views.size(); i < embedding_info->Dimension(); ++i) {
+                    ele_str_views.emplace_back(default_val);
+                }
             }
             SizeT dst_off = index * data_type_->Size();
             switch (embedding_info->Type()) {

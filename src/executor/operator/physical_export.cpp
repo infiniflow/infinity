@@ -318,14 +318,14 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                     }
                 }
 
-                Bitmask bitmask;
+                Bitmask bitmask(block_row_count);
                 status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
 
                 for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                    if (bitmask.IsTrue(row_idx)) {
+                    if (!bitmask.IsTrue(row_idx)) {
                         continue;
                     }
                     if (offset > 0) {
@@ -591,7 +591,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             bool need_switch_to_new_file = false;
             for (block_rows_for_output.clear(); start_block_row_idx < block_row_count; ++start_block_row_idx) {
                 if (use_new_filter) {
-                    if (bitmask->IsTrue(start_block_row_idx)) {
+                    if (!bitmask->IsTrue(start_block_row_idx)) {
                         continue;
                     }
                 } else {
@@ -682,7 +682,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                         }
                     }
                 }
-                Bitmask bitmask;
+                Bitmask bitmask(block_row_count);
                 status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
                 if (!status.ok()) {
                     RecoverableError(status);
