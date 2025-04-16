@@ -114,23 +114,14 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Tuple<SegmentID, Status> TableIndexMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
-    SegmentID segment_id = 0;
-
-    auto [chunk_ids_ptr, status] = GetSegmentIDs1();
-    if (!status.ok()) {
-        return {0, status};
-    }
-    segment_id = chunk_ids_ptr->empty() ? 0 : chunk_ids_ptr->back() + 1;
-    segment_ids_->push_back(segment_id);
-
+Status TableIndexMeeta::AddSegmentID1(SegmentID segment_id, TxnTimeStamp commit_ts) {
     String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_.Put(segment_id_key, commit_ts_str);
+    Status status = kv_instance_.Put(segment_id_key, commit_ts_str);
     if (!status.ok()) {
-        return {0, status};
+        return status;
     }
-    return {segment_id, Status::OK()};
+    return Status::OK();
 }
 
 Status TableIndexMeeta::GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts) {

@@ -127,10 +127,10 @@ public:
 
 private:
     Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance);
-    Status TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, String const& db_name);
-    Status TransformCatalogSegment(Optional<TableMeeta> &table_meta, const nlohmann::json &segment_entry_json);
-    Status TransformCatalogBlock(Optional<SegmentMeta> &segment_meta, const nlohmann::json &block_entry_json);
-    Status TransformCatalogBlockColumn(Optional<BlockMeta> &block_meta, const nlohmann::json &block_column_entry_json);
+    Status TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json &table_meta_json, String const &db_name);
+    Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json);
+    Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json);
+    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json);
     Status TransformCatalogTableIndex(const nlohmann::json &table_index_entry_json, KVInstance *kv_instance);
     Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
     Status TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance);
@@ -322,11 +322,16 @@ public:
 
     static Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
+    static Status AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
+
     static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def);
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
-    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, TxnTimeStamp commit_ts, Optional<SegmentIndexMeta> &segment_index_meta);
+    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                      SegmentID segment_id,
+                                      TxnTimeStamp commit_ts,
+                                      Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
 

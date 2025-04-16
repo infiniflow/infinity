@@ -296,4 +296,115 @@ Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID
     return {block_column_info, Status::OK()};
 }
 
+// Pair<ColumnID, Status> BlockMeta::AddBlockColumnID1(TxnTimeStamp commit_ts) {
+//     Status status;
+//
+//     BlockID column_id = 0;
+//     {
+//         Vector<ColumnID> *column_ids_ptr = nullptr;
+//         std::tie(column_ids_ptr, status) = GetBlockColumnIDs1();
+//         if (!status.ok()) {
+//             return {INVALID_BLOCK_ID, status};
+//         }
+//         block_id = column_ids_ptr->empty() ? 0 : column_ids_ptr->back() + 1;
+//         column_ids_ptr->push_back(block_id);
+//     }
+//
+//     auto &table_meta = segment_meta_.table_meta();
+//     String block_column_id_key =
+//         KeyEncode::CatalogTableSegmentBlockColumnKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, );
+//     String commit_ts_str = fmt::format("{}", commit_ts);
+//     status = kv_instance_.Put(block_column_id_key, commit_ts_str);
+//     if (!status.ok()) {
+//         return {0, status};
+//     }
+//     return {block_id, Status::OK()};
+// }
+//
+// // Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
+// //     Status status;
+// //
+// //     BlockID block_id = 0;
+// //     {
+// //         Vector<BlockID> *block_ids_ptr = nullptr;
+// //         std::tie(block_ids_ptr, status) = GetBlockIDs1();
+// //         if (!status.ok()) {
+// //             return {INVALID_BLOCK_ID, status};
+// //         }
+// //         block_id = block_ids_ptr->empty() ? 0 : block_ids_ptr->back() + 1;
+// //         block_ids1_->push_back(block_id);
+// //     }
+// //
+// //     String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
+// //     String commit_ts_str = fmt::format("{}", commit_ts);
+// //     status = kv_instance_.Put(block_id_key, commit_ts_str);
+// //     if (!status.ok()) {
+// //         return {0, status};
+// //     }
+// //     return {block_id, Status::OK()};
+// // }
+//
+// // Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
+// //     if (!block_ids1_) {
+// //         Status status = LoadBlockIDs1();
+// //         if (!status.ok()) {
+// //             return {nullptr, status};
+// //         }
+// //     }
+// //     return {&*block_ids1_, Status::OK()};
+// // }
+//
+// // Status SegmentMeta::LoadBlockIDs1() {
+// //     block_ids1_ = Vector<BlockID>();
+// //     Vector<BlockID> &block_ids = *block_ids1_;
+// //
+// //     String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
+// //     auto iter = kv_instance_.GetIterator();
+// //     iter->Seek(block_id_prefix);
+// //     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
+// //         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+// //         if (commit_ts > begin_ts_) {
+// //             iter->Next();
+// //             continue;
+// //         }
+// //         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
+// //         block_ids.push_back(block_id);
+// //         iter->Next();
+// //     }
+// //
+// //     std::sort(block_ids.begin(), block_ids.end());
+// //     return Status::OK();
+// // }
+//
+// Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
+//     if (!column_ids1_) {
+//         Status status = LoadBlockColumnIDs1();
+//         if (!status.ok()) {
+//             return {nullptr, status};
+//         }
+//     }
+//     return {&*column_ids1_, Status::OK()};
+// }
+//
+// Status BlockMeta::LoadBlockColumnIDs1() {
+//     column_ids1_ = Vector<ColumnID>();
+//     Vector<ColumnID> &column_ids = *column_ids1_;
+//
+//     String block_column_id_prefix = KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(),
+//     segment_id_, block_id_, ); auto iter = kv_instance_.GetIterator(); iter->Seek(block_column_id_prefix); while (iter->Valid() &&
+//     iter->Key().starts_with(block_column_id_prefix)) {
+//         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+//         if (commit_ts > begin_ts_) {
+//             iter->Next();
+//             continue;
+//         }
+//         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_column_id_prefix.size()));
+//         column_ids.push_back(block_id);
+//         iter->Next();
+//     }
+//
+//     std::sort(column_ids.begin(), column_ids.end());
+//     return Status::OK();
+// }
+
 } // namespace infinity

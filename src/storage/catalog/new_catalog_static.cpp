@@ -665,21 +665,6 @@ Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeSta
     return Status::OK();
 }
 
-// Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
-//     Status status;
-//     SegmentID segment_id = 0;
-//     std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     segment_meta.emplace(segment_id, table_meta);
-//     status = segment_meta->InitSet();
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
 Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
     Status status;
 
@@ -765,6 +750,28 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Op
     return Status::OK();
 }
 
+Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts) {
+    auto &kv_instance = block_meta.kv_instance();
+    column_meta.emplace(column_idx, block_meta);
+    auto &segment_meta = block_meta.segment_meta();
+    auto &table_meta = segment_meta.table_meta();
+    String block_id_key = KeyEncode::CatalogTableSegmentBlockColumnKey(table_meta.db_id_str(),
+                                                                       table_meta.table_id_str(),
+                                                                       segment_meta.segment_id(),
+                                                                       block_meta.block_id(),
+                                                                       column_idx,
+                                                                       commit_ts);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    Status status = kv_instance.Put(block_id_key, commit_ts_str);
+    // {
+    //     Status status = column_meta->InitSet();
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
+    return Status::OK();
+}
+
 Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def) {
     Status status;
 
@@ -793,8 +800,11 @@ Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, Segment
     return Status::OK();
 }
 
-Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, TxnTimeStamp commit_ts, Optional<SegmentIndexMeta> &segment_index_meta) {
-    auto [segment_id, status] = table_index_meta.AddSegmentID1(commit_ts);
+Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                       SegmentID segment_id,
+                                       TxnTimeStamp commit_ts,
+                                       Optional<SegmentIndexMeta> &segment_index_meta) {
+    Status status = table_index_meta.AddSegmentID1(segment_id, commit_ts);
     if (!status.ok()) {
         return status;
     }

@@ -359,48 +359,54 @@ TEST_P(TransformMeta, block_transform_00) {
     UnInit();
 }
 
-// TEST_P(TransformMeta, block_column_transform_00) {
-//     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-//     Status status = config_ptr->Init(config_path, nullptr);
-//     EXPECT_TRUE(status.ok());
-//     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
-//     status = kv_store_ptr->Init(config_ptr->CatalogDir());
-//     EXPECT_TRUE(status.ok());
-//     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
-//
-//     String full_ckp_path = String(test_data_path()) + "/json/segment_00.json";
-//     Vector<String> delta_ckp_path_array;
-//     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
-//
-//     status = kv_store_ptr->Flush();
-//     EXPECT_TRUE(status.ok());
-//     kv_store_ptr->Uninit();
-//     kv_store_ptr.reset();
-//     new_catalog_ptr.reset();
-//
-//     Init();
-//
-//     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-//     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
-//     {
-//         auto [segment_p_s, status] = txn->GetSegmentsInfo("db1", "test_table");
-//         EXPECT_TRUE(status.ok());
-//         for (auto &segment_p : segment_p_s) {
-//             auto segment_id = segment_p->segment_id_;
-//             auto [block_p_s, status] = txn->GetBlocksInfo("db1", "test_table", segment_id);
-//             EXPECT_TRUE(status.ok());
-//             for (auto &block_p : block_p_s) {
-//                 auto block_id = block_p->block_id_;
-//                 auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", segment_id, block_id);
-//                 EXPECT_TRUE(status.ok());
-//             }
-//         }
-//     }
-//     //     Tuple<SharedPtr<BlockColumnInfo>, Status>
-//     // GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
-//
-//     status = new_txn_mgr->CommitTxn(txn);
-//     EXPECT_TRUE(status.ok());
-//
-//     UnInit();
-// }
+TEST_P(TransformMeta, block_column_transform_00) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/segment_00.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        auto [segment_p_s, status] = txn->GetSegmentsInfo("db1", "test_table");
+        EXPECT_TRUE(status.ok());
+        for (auto &segment_p : segment_p_s) {
+            auto segment_id = segment_p->segment_id_;
+            auto [block_p_s, status] = txn->GetBlocksInfo("db1", "test_table", segment_id);
+            EXPECT_TRUE(status.ok());
+            for (auto &block_p : block_p_s) {
+                auto block_id = block_p->block_id_;
+                {
+                    auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", segment_id, block_id, 0);
+                    EXPECT_TRUE(status.ok());
+                }
+                {
+                    auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", segment_id, block_id, 1);
+                    EXPECT_TRUE(status.ok());
+                }
+            }
+        }
+    }
+    //     Tuple<SharedPtr<BlockColumnInfo>, Status>
+    // GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
+}
