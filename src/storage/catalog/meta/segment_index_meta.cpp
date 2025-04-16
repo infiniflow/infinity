@@ -34,9 +34,21 @@ import chunk_index_meta;
 namespace infinity {
 
 SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta)
-    : kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
+    : kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {
+    begin_ts_ = table_index_meta_.table_meta().begin_ts();
+}
 
 SegmentIndexMeta::~SegmentIndexMeta() = default;
+
+Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
+    if (!chunk_ids_) {
+        auto status = LoadChunkIDs1();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {&*chunk_ids_, Status::OK()};
+}
 
 Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
     if (!ft_info_) {
@@ -73,6 +85,28 @@ Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
         return status;
     }
     return Status::OK();
+}
+
+Tuple<ChunkID, Status> SegmentIndexMeta::AddChunkID1(TxnTimeStamp commit_ts) {
+    ChunkID chunk_id = 0;
+
+    auto [chunk_ids_ptr, status] = GetChunkIDs1();
+    if (!status.ok()) {
+        return {0, status};
+    }
+    chunk_id = chunk_ids_ptr->empty() ? 0 : chunk_ids_ptr->back() + 1;
+    chunk_ids_->push_back(chunk_id);
+
+    TableMeeta &table_meta = table_index_meta_.table_meta();
+
+    String segment_id_key =
+        KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    status = kv_instance_.Put(segment_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return {0, status};
+    }
+    return {chunk_id, Status::OK()};
 }
 
 Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
@@ -238,8 +272,9 @@ Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
     }
 
     // append -> dump -> clear memindex -> new txn { append -> mem index(visible) -> put rocksdb has_mem_index before commit rocksdb.
-    // At same time, another full text commit thread will commit mem index, since rocksdb isn't commit has_mem_index flag, the memindex will be removed below following code.
-    if(!has_mem_index) {
+    // At same time, another full text commit thread will commit mem index, since rocksdb isn't commit has_mem_index flag, the memindex will be
+    // removed below following code.
+    if (!has_mem_index) {
         mem_index = MakeShared<MemIndex>();
         return Status::OK();
     }
@@ -320,6 +355,31 @@ Status SegmentIndexMeta::LoadChunkIDs() {
         return status;
     }
     chunk_ids_ = nlohmann::json::parse(chunk_ids_str).get<Vector<ChunkID>>();
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::LoadChunkIDs1() {
+    chunk_ids_ = Vector<ChunkID>();
+    Vector<SegmentID> &chunk_ids = *chunk_ids_;
+
+    TableMeeta &table_meta = table_index_meta_.table_meta();
+    //    CatalogIdxChunkPrefix(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
+    String chunk_id_prefix =
+        KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(chunk_id_prefix);
+    while (iter->Valid() && iter->Key().starts_with(chunk_id_prefix)) {
+        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+        if (commit_ts > begin_ts_) {
+            iter->Next();
+            continue;
+        }
+        ChunkID chunk_id = std::stoull(iter->Key().ToString().substr(chunk_id_prefix.size()));
+        chunk_ids.push_back(chunk_id);
+        iter->Next();
+    }
+
+    std::sort(chunk_ids.begin(), chunk_ids.end());
     return Status::OK();
 }
 

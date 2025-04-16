@@ -152,6 +152,10 @@ String KeyEncode::CatalogIdxSegmentTagKey(const String &db_id,
     return fmt::format("idx_seg|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, tag_name);
 }
 
+String KeyEncode::CatalogIdxChunkKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id) {
+    return fmt::format("idx_chunk|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, chunk_id);
+}
+
 String KeyEncode::CatalogIdxChunkPrefix(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id) {
     return fmt::format("idx_chunk|{}|{}|{}|{}|", db_id, table_id, index_id, segment_id);
 }
