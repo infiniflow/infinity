@@ -142,7 +142,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
 
                 if (db_entry_json.contains("tables")) {
                     for (const auto &table_meta_json : db_entry_json["tables"]) {
-                        Status status = TransformCatalogTable(db_meta, table_meta_json, db_name);
+                        Status status = TransformCatalogTable(db_meta.value(), table_meta_json, db_name);
                         if (!status.ok()) {
                             return status;
                         }
@@ -155,10 +155,10 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, String const &db_name) {
+Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json &table_meta_json, String const &db_name) {
     String table_name = table_meta_json["table_name"];
     if (table_meta_json.contains("table_entries")) {
-        auto &kv_instance = db_meta->kv_instance();
+        auto &kv_instance = db_meta.kv_instance();
         for (auto &table_entry_json : table_meta_json["table_entries"]) {
             bool deleted = table_entry_json["deleted"];
             if (deleted) {
@@ -209,7 +209,7 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
             String table_comment;
             auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(table_comment), columns);
             Optional<TableMeeta> table_meta;
-            status = AddNewTable(db_meta.value(), table_id_str, table_begin_ts, table_commit_ts, table_def, table_meta);
+            status = AddNewTable(db_meta, table_id_str, table_begin_ts, table_commit_ts, table_def, table_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -222,7 +222,7 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
                     if (segment_json["deleted"]) {
                         continue;
                     }
-                    status = TransformCatalogSegment(table_meta, segment_json);
+                    status = TransformCatalogSegment(table_meta.value(), segment_json);
                     if (!status.ok()) {
                         return status;
                     }
@@ -242,27 +242,27 @@ Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohm
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogSegment(Optional<TableMeeta> &table_meta, const nlohmann::json &segment_entry_json) {
+Status NewCatalog::TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json) {
     TxnTimeStamp segment_commit_ts = segment_entry_json["commit_ts"];
 
     Optional<SegmentMeta> segment_meta;
-    Status status = NewCatalog::AddNewSegment1(table_meta.value(), segment_commit_ts, segment_meta);
+    Status status = NewCatalog::AddNewSegment1(table_meta, segment_commit_ts, segment_meta);
     if (!status.ok()) {
         return status;
     }
 
-    // if (segment_entry_json.contains("block_entries")) {
-    //     for (const auto &block_entry_json : segment_entry_json["block_entries"]) {
-    //         status = TransformCatalogBlock(segment_meta, block_entry_json);
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-    // }
+    if (segment_entry_json.contains("block_entries")) {
+        for (const auto &block_entry_json : segment_entry_json["block_entries"]) {
+            status = TransformCatalogBlock(segment_meta.value(), block_entry_json);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogBlock(Optional<SegmentMeta> &segment_meta, const nlohmann::json &block_entry_json) {
+Status NewCatalog::TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json) {
     // Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
     //     Status status;
     //
@@ -295,9 +295,9 @@ Status NewCatalog::TransformCatalogBlock(Optional<SegmentMeta> &segment_meta, co
     // }
     TxnTimeStamp block_commit_ts = block_entry_json["commit_ts"];
     Optional<BlockMeta> block_meta;
-    Status status = NewCatalog::AddNewBlock1(segment_meta.value(), block_commit_ts, block_meta);
+    Status status = NewCatalog::AddNewBlockForTransform(segment_meta, block_commit_ts, block_meta);
     for (const auto &block_column_json : block_entry_json["columns"]) {
-        Status status = TransformCatalogBlockColumn(block_meta, block_column_json);
+        Status status = TransformCatalogBlockColumn(block_meta.value(), block_column_json);
         if (!status.ok()) {
             return status;
         }
@@ -305,15 +305,11 @@ Status NewCatalog::TransformCatalogBlock(Optional<SegmentMeta> &segment_meta, co
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogBlockColumn(Optional<BlockMeta> &block_meta, const nlohmann::json &block_column_entry_json) {
-    // TODO...
-    // static Status AddNewBlockColumn(
-    // BlockMeta & block_meta,
-    // SizeT column_idx,
-    // Optional<ColumnMeta> & column_meta)
+Status NewCatalog::TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json) {
     Optional<ColumnMeta> column_meta;
     SizeT column_id = block_column_entry_json["column_id"];
-    Status status = NewCatalog::AddNewBlockColumn(block_meta.value(), column_id, column_meta);
+    TxnTimeStamp commit_ts = block_column_entry_json["commit_ts"];
+    Status status = NewCatalog::AddNewBlockColumnForTransform(block_meta, column_id, column_meta, commit_ts);
     return Status::OK();
 }
 
