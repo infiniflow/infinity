@@ -25,6 +25,7 @@ import logger;
 import third_party;
 import table_scan_function_data;
 import knn_scan_data;
+import compact_state_data;
 
 namespace infinity {
 
@@ -33,6 +34,30 @@ TableScanOperatorState::~TableScanOperatorState() = default;
 
 KnnScanOperatorState::KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 KnnScanOperatorState::~KnnScanOperatorState() = default;
+
+CompactOperatorState::CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data)
+    : OperatorState(PhysicalOperatorType::kCompact), segment_groups_(std::move(segment_groups)), compact_state_data_(compact_state_data) {}
+
+CompactOperatorState::~CompactOperatorState() = default;
+
+CompactIndexPrepareOperatorState::CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                                   SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+    : OperatorState(PhysicalOperatorType::kCompactIndexPrepare), compact_state_data_(compact_state_data),
+      create_index_shared_data_(create_index_shared_data) {}
+
+CompactIndexPrepareOperatorState::~CompactIndexPrepareOperatorState() = default;
+
+CompactIndexDoOperatorState::CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                         SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+    : OperatorState(PhysicalOperatorType::kCompactIndexDo), compact_state_data_(compact_state_data),
+      create_index_shared_data_(create_index_shared_data) {}
+
+CompactIndexDoOperatorState::~CompactIndexDoOperatorState() = default;
+
+CompactFinishOperatorState::CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data)
+    : OperatorState(PhysicalOperatorType::kCompactFinish), compact_state_data_(compact_state_data) {}
+
+CompactFinishOperatorState::~CompactFinishOperatorState() = default;
 
 void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
     auto it = num_tasks_.find(fragment_id);

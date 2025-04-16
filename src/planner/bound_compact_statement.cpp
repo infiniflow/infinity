@@ -36,6 +36,13 @@ Vector<SharedPtr<LogicalNode>> BoundCompactStatement::BuildPlans(QueryContext *q
     Vector<SharedPtr<LogicalNode>> res;
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
 
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        auto compact_node = MakeShared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
+        res.emplace_back(compact_node);
+        return res;
+    }
+
     auto compact_node = MakeShared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
     auto &index_index = base_table_ref_->index_index_;
     if (!index_index->IsEmpty()) {

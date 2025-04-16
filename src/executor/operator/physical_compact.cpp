@@ -38,6 +38,10 @@ import wal_entry;
 import wal_manager;
 import infinity_context;
 
+import new_txn;
+import db_meeta;
+import table_meeta;
+
 namespace infinity {
 
 class GreedyCompactableSegmentsGenerator {
@@ -83,6 +87,46 @@ private:
 };
 
 void PhysicalCompact::Init(QueryContext *query_context) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+
+        const String &db_name = *base_table_ref_->table_info_->db_name_;
+        const String &table_name = *base_table_ref_->table_info_->table_name_;
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+
+        if (compact_type_ == CompactStatementType::kManual) {
+            LOG_DEBUG(fmt::format("Manual compact {} start", table_name));
+
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            Vector<SegmentID> segment_ids = *segment_ids_ptr;
+            SegmentID unsealed_id = 0;
+            status = table_meta->GetUnsealedSegmentID(unsealed_id);
+            if (!status.ok()) {
+                if (status.code() != ErrorCode::kNotFound) {
+                    RecoverableError(status);
+                }
+            } else {
+                segment_ids.erase(std::remove(segment_ids.begin(), segment_ids.end(), unsealed_id), segment_ids.end());
+            }
+            compactible_segment_ids_ = segment_ids;
+
+        } else {
+            RecoverableError(Status::NotSupport("Not implemented"));
+        }
+        return;
+    }
+
     auto [table_entry, status] =
         query_context->GetTxn()->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
     if (!status.ok()) {
@@ -118,6 +162,23 @@ void PhysicalCompact::Init(QueryContext *query_context) {
 }
 
 bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        auto *compact_operator_state = static_cast<CompactOperatorState *>(operator_state);
+
+        const String &db_name = *base_table_ref_->table_info_->db_name_;
+        const String &table_name = *base_table_ref_->table_info_->table_name_;
+        NewTxn *new_txn = query_context->GetNewTxn();
+
+        Status status = new_txn->Compact(db_name, table_name, compactible_segment_ids_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+
+        compact_operator_state->SetComplete();
+        return true;
+    }
+
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
     if (storage_mode == StorageMode::kUnInitialized) {
         UnrecoverableError("Uninitialized storage mode");
@@ -160,7 +221,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     compact_state_data->SetScanTS(scan_ts);
 
     auto [table_entry, status] = txn->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
 

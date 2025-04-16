@@ -815,6 +815,17 @@ SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index
 }
 
 SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentContext *fragment_context, FragmentContext *parent_context) {
+    if (parent_context == nullptr) {
+        SizeT task_n = compact_operator->TaskletCount();
+        if (fragment_context->ContextType() != FragmentType::kParallelMaterialize) {
+            String error_message = "Compact operator should be in serial materialized fragment.";
+            UnrecoverableError(error_message);
+        }
+        auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
+        parallel_materialize_fragment_ctx->compact_state_data_ = MakeShared<CompactStateData>(compact_operator->base_table_ref_->table_info_);
+        return task_n;
+    }
+
     SizeT task_n = compact_operator->TaskletCount();
     if (fragment_context->ContextType() != FragmentType::kParallelMaterialize) {
         String error_message = "Compact operator should be in parallel materialized fragment.";
@@ -1033,7 +1044,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             auto *match_sparse_scan_operator = static_cast<PhysicalMatchSparseScan *>(first_operator);
             Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = match_sparse_scan_operator->PlanBlockEntries(parallel_count);
-            Vector<SharedPtr<Vector<SegmentID>>> segment_group = match_sparse_scan_operator->PlanWithIndex(blocks_group, parallel_count, query_context_);
+            Vector<SharedPtr<Vector<SegmentID>>> segment_group =
+                match_sparse_scan_operator->PlanWithIndex(blocks_group, parallel_count, query_context_);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<MatchSparseScanSourceState>(std::move(blocks_group[task_id]), segment_group[task_id]);
             }
@@ -1588,6 +1600,16 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
             sum += summaryState->sum_;
         }
         result_table = DataTable::MakeSummaryResultTable(counter, sum);
+        return result_table;
+    } else if (tasks_[0]->sink_state_->state_type() == SinkStateType::kMessage) {
+        auto *message_sink_state = static_cast<MessageSinkState *>(tasks_[0]->sink_state_.get());
+        if (message_sink_state->message_.get() == nullptr) {
+            String error_message = "No response message";
+            UnrecoverableError(error_message);
+        }
+
+        SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
+        result_table->SetResultMsg(std::move(message_sink_state->message_));
         return result_table;
     }
 

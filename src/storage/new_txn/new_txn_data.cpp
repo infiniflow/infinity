@@ -129,19 +129,19 @@ struct NewTxnCompactState {
             // }
             block_row_cnts_.push_back(cur_block_row_cnt_);
             segment_row_cnt_ += cur_block_row_cnt_;
-        }
-        for (ColumnID i = 0; i < column_cnt_; ++i) {
-            ColumnMeta column_meta(i, *block_meta_);
-            BufferObj *buffer_obj = nullptr;
-            BufferObj *outline_buffer_obj = nullptr;
+            for (ColumnID i = 0; i < column_cnt_; ++i) {
+                ColumnMeta column_meta(i, *block_meta_);
+                BufferObj *buffer_obj = nullptr;
+                BufferObj *outline_buffer_obj = nullptr;
 
-            Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-            if (!status.ok()) {
-                return status;
-            }
-            buffer_obj->Save();
-            if (outline_buffer_obj) {
-                outline_buffer_obj->Save();
+                Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+                if (!status.ok()) {
+                    return status;
+                }
+                buffer_obj->Save();
+                if (outline_buffer_obj) {
+                    outline_buffer_obj->Save();
+                }
             }
         }
         block_meta_.reset();

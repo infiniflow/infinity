@@ -29,6 +29,7 @@ import base_table_ref;
 import wal_manager;
 import infinity_context;
 import infinity_exception;
+import compact_state_data;
 
 namespace infinity {
 
