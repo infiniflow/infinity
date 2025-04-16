@@ -5,14 +5,10 @@ statement ok
 CREATE TABLE test_knn_hnsw_l2(c1 INT, c2 EMBEDDING(FLOAT, 4));
 
 statement ok
-CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2, build_type = lsg, lsg_config = 'sample_raito=0.01,ls_k=10,alpha=1.0');
+COPY test_knn_hnsw_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 statement ok
-INSERT INTO test_knn_hnsw_l2 VALUES
-(2,[0.1, 0.2, 0.3, -0.2]),
-(4,[0.2, 0.1, 0.3, 0.4]),
-(6,[0.3, 0.2, 0.1, 0.4]),
-(8,[0.4, 0.3, 0.2, 0.1]);
+CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2, build_type = lsg, lsg_config = 'sample_raito=0.01,ls_k=10,alpha=1.0');
 
 statement ok
 INSERT INTO test_knn_hnsw_l2 VALUES (2, [0.1, 0.2, 0.3, -0.2]);

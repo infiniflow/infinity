@@ -1209,9 +1209,6 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     if (!status.ok()) {
         return status;
     }
-    if (!chunk_ids_ptr->empty()) {
-        return Status::NotSupport("Not implemented");
-    }
     SharedPtr<MemIndex> mem_index;
     status = segment_index_meta.GetMemIndex(mem_index);
     if (!status.ok()) {
@@ -1243,7 +1240,17 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     },
                     index);
             };
-
+            for (ChunkID chunk_id : *chunk_ids_ptr) {
+                ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+                BufferObj *index_buffer = nullptr;
+                status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                if (!status.ok()) {
+                    return status;
+                }
+                BufferHandle buffer_handle = index_buffer->Load();
+                auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
+                optimize_index(*abstract_bmp);
+            }
             if (mem_index && mem_index->memory_bmp_index_) {
                 optimize_index(mem_index->memory_bmp_index_->get());
             }
@@ -1285,7 +1292,17 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     },
                     *abstract_hnsw);
             };
-
+            for (ChunkID chunk_id : *chunk_ids_ptr) {
+                ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+                BufferObj *index_buffer = nullptr;
+                status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                if (!status.ok()) {
+                    return status;
+                }
+                BufferHandle buffer_handle = index_buffer->Load();
+                auto *abstract_hnsw = static_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
+                optimize_index(abstract_hnsw);
+            }
             if (mem_index && mem_index->memory_hnsw_index_) {
                 optimize_index(mem_index->memory_hnsw_index_->get_ptr());
             }
