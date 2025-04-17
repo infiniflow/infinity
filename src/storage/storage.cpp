@@ -365,6 +365,14 @@ Status Storage::AdminToWriter() {
         if (!status.ok()) {
             UnrecoverableError("Failed to commit txn for checkpoint");
         }
+
+        if (periodic_trigger_thread_ != nullptr) {
+            UnrecoverableError("periodic trigger was initialized before.");
+        }
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+        periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
     } else {
         if (periodic_trigger_thread_ != nullptr) {
             UnrecoverableError("periodic trigger was initialized before.");

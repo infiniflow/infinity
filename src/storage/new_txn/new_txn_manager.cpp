@@ -419,8 +419,14 @@ void NewTxnManager::PrintAllKeyValue() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-Status NewTxnManager::Cleanup() {
+Status NewTxnManager::Cleanup(TxnTimeStamp last_cleanup_ts, TxnTimeStamp *cur_cleanup_ts) {
     TxnTimeStamp cleanup_ts = this->GetCleanupScanTS1();
+    if (cur_cleanup_ts) {
+        *cur_cleanup_ts = cleanup_ts;
+    }
+    if (last_cleanup_ts >= cleanup_ts) {
+        return Status::OK();
+    }
 
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 

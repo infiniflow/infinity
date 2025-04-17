@@ -26,6 +26,9 @@ import catalog;
 import txn_manager;
 import third_party;
 
+import new_txn_manager;
+import infinity_context;
+
 namespace infinity {
 
 bool PeriodicTrigger::Check() {
@@ -69,6 +72,28 @@ void CleanupPeriodicTrigger::Trigger() {
         return;
     }
     bg_processor_->Submit(std::move(cleanup_task));
+}
+
+SharedPtr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+
+    TxnTimeStamp last_cleanup_ts = bg_processor->last_cleanup_ts();
+    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetCleanupScanTS1();
+    if (cur_cleanup_ts <= last_cleanup_ts) {
+        return nullptr;
+    }
+
+    return MakeShared<NewCleanupTask>();
+}
+
+void NewCleanupPeriodicTrigger::Trigger() {
+    auto cleanup_task = CreateNewCleanupTask();
+    if (!cleanup_task) {
+        return;
+    }
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    bg_processor->Submit(std::move(cleanup_task));
 }
 
 void CheckpointPeriodicTrigger::Trigger() {

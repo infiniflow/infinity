@@ -23,6 +23,7 @@ import catalog_delta_entry;
 import buffer_manager;
 import third_party;
 import global_resource_usage;
+import status;
 
 namespace infinity {
 
@@ -34,6 +35,7 @@ export enum class BGTaskType {
     kNotifyCompact,
     kNotifyOptimize,
     kCleanup,
+    kNewCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
     kDumpIndexByline,
@@ -158,6 +160,17 @@ private:
     const TxnTimeStamp visible_ts_;
 
     BufferManager *buffer_mgr_;
+};
+
+export class NewCleanupTask final : public BGTask {
+public:
+    NewCleanupTask() : BGTask(BGTaskType::kNewCleanup, false) {}
+
+    String ToString() const override { return "NewCleanupTask"; }
+
+    Status Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts);
+
+private:
 };
 
 export class NotifyCompactTask final : public BGTask {

@@ -31,6 +31,7 @@ import third_party;
 import buffer_manager;
 import periodic_trigger;
 import infinity_context;
+import status;
 
 namespace infinity {
 
@@ -166,6 +167,30 @@ void BGTaskProcessor::Process() {
                         }
                         task->Execute();
                         LOG_DEBUG("Cleanup in background done");
+                    }
+                    break;
+                }
+                case BGTaskType::kNewCleanup: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
+                    if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
+                        LOG_DEBUG("NewCleanup in background");
+
+                        auto task = static_cast<NewCleanupTask *>(bg_task.get());
+                        TxnTimeStamp last_cleanup_ts = this->last_cleanup_ts();
+                        TxnTimeStamp cur_cleanup_ts = 0;
+                        Status status = task->Execute(last_cleanup_ts, cur_cleanup_ts);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
+                        if (cur_cleanup_ts > last_cleanup_ts) {
+                            std::unique_lock lock(last_time_mtx_);
+                            last_cleanup_ts_ = cur_cleanup_ts;
+                        }
+
+                        LOG_DEBUG("NewCleanup in background done");
                     }
                     break;
                 }

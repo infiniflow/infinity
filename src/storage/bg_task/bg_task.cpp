@@ -22,6 +22,7 @@ import cleanup_scanner;
 import infinity_context;
 import storage;
 import new_txn;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -41,6 +42,15 @@ void CleanupTask::Execute() {
     auto *tracer = storage->cleanup_info_tracer();
     tracer->ResetInfo(visible_ts_);
     std::move(scanner).Cleanup(tracer);
+}
+
+Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts) {
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    Status status = new_txn_mgr->Cleanup(last_cleanup_ts, &cur_cleanup_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
 }
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}

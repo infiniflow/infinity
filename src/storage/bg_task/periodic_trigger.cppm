@@ -27,6 +27,7 @@ import global_resource_usage;
 namespace infinity {
 
 class CleanupTask;
+class NewCleanupTask;
 
 export class PeriodicTrigger {
 public:
@@ -72,6 +73,18 @@ private:
 
     std::mutex mtx_;
     TxnTimeStamp last_visible_ts_{0};
+};
+
+export class NewCleanupPeriodicTrigger final : public PeriodicTrigger {
+public:
+    NewCleanupPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
+
+    SharedPtr<NewCleanupTask> CreateNewCleanupTask();
+
+    virtual void Trigger() override;
+
+private:
+    //
 };
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
