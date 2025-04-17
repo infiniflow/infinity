@@ -72,6 +72,8 @@ public:
 
     QueryResult QueryStatement(const BaseStatement *statement);
 
+    QueryResult QueryStatementInternal(const BaseStatement *statement);
+
     bool ExecuteBGStatement(BaseStatement *statement, BGQueryState &state);
 
     bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback = false);
@@ -187,6 +189,11 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
+
+    //ling123
+    TransactionID txn_id;
+
+
 };
 
 } // namespace infinity

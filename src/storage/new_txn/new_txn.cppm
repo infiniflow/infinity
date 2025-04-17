@@ -143,7 +143,7 @@ public:
 
     Status PostReadTxnCommit();
 
-    bool CheckConflict1(NewTxn *check_txn, String &conflict_reason);
+    bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason);
 
     Status PrepareCommit();
 
@@ -645,6 +645,16 @@ private:
     SharedPtr<TxnContext> txn_context_ptr_{};
 
     friend class NewTxnTableStore;
+
+private:
+    void WaitForCompletion();
+    void SetCompletion();
+
+public:
+    SharedPtr<NewTxn> conflicted_txn_{};
+    std::mutex finished_mutex_{};
+    std::condition_variable finished_cv_{};
+    bool finished_{false};
 };
 
 } // namespace infinity

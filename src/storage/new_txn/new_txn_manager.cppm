@@ -70,6 +70,7 @@ public:
 
     bool Stopped();
 
+    //[[nodiscard]]
     Status CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr = nullptr);
 
     Status RollBackTxn(NewTxn *txn);
@@ -157,3 +158,5 @@ private:
 };
 
 } // namespace infinity
+
+

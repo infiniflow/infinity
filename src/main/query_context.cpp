@@ -128,10 +128,22 @@ QueryResult QueryContext::Query(const String &query) {
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
 
     QueryResult query_result = QueryStatement(base_statement);
+
     return query_result;
 }
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
+    QueryResult query_result = QueryStatementInternal(base_statement);
+    if (query_result.status_.code_ == ErrorCode::kTxnConflict ) {
+
+        query_result = QueryStatementInternal(base_statement);
+        if (query_result.status_.ok())
+            query_result.status_.msg_ = MakeUnique<String>("Query is successful after retry");
+    }
+    return query_result;
+}
+
+QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_statement) {
     QueryResult query_result;
 
     if (base_statement->Type() == StatementType::kAdmin) {
@@ -486,6 +498,7 @@ TxnTimeStamp QueryContext::CommitTxn() {
         }
         session_ptr_->SetNewTxn(nullptr);
         session_ptr_->IncreaseCommittedTxnCount();
+
         return commit_ts;
     }
     Txn *txn = session_ptr_->GetTxn();
@@ -503,12 +516,29 @@ void QueryContext::RollbackTxn() {
         if (!status.ok()) {
             RecoverableError(status);
         }
+        //ling123
+
+
+/*
+        if (status.status_.code_ == ErrorCode::kTxnConflict) {
+            NewTxn *txn = session_ptr_->GetNewTxn();
+            txn->conflicted_txn;
+
+            TransactionID txn_id = txn->TxnID();
+
+            txn->waitForCompletion(txn_id);
+        }
+        */
+
         session_ptr_->SetNewTxn(nullptr);
         session_ptr_->IncreaseRollbackedTxnCount();
         return;
     }
     Txn *txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
+    txn_id = txn->TxnID();
+    //ling123
+
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();
     storage_->txn_manager()->IncreaseRollbackedTxnCount();

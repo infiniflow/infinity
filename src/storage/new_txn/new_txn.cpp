@@ -1094,8 +1094,9 @@ Status NewTxn::Commit() {
             status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
         }
     }
+
     if (!status.ok()) {
-        this->SetTxnRollbacking(commit_ts);
+  //      this->SetTxnRollbacking(commit_ts);
 
         if (!this->IsReplay()) {
             // If prepare commit fail and not replay, rollback the transaction
@@ -1106,7 +1107,7 @@ Status NewTxn::Commit() {
             std::unique_lock<std::mutex> lk(commit_lock_);
             commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-            PostRollback(commit_ts);
+            //PostRollback(commit_ts);
         }
         return status;
     }
@@ -1871,61 +1872,43 @@ bool NewTxn::CheckConflictWithDelete(const String &db_name, const String &table_
     return false;
 }
 
-bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
+bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
+    bool conflict{false};
     for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
 
         switch (command_type) {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                bool conflict = CheckConflictWithAppend(append_cmd->db_name_, append_cmd->table_name_, check_txn, conflict_reason);
-                if (conflict) {
-                    return true;
-                }
+                conflict = CheckConflictWithAppend(append_cmd->db_name_, append_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
             case WalCommandType::IMPORT: {
                 auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                bool conflict = CheckConflictWithImport(import_cmd->db_name_, import_cmd->table_name_, check_txn, conflict_reason);
-                if (conflict) {
-                    return true;
-                }
+                conflict = CheckConflictWithImport(import_cmd->db_name_, import_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
             case WalCommandType::COMPACT: {
                 auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                bool conflict = CheckConflictWithCompact(compact_cmd->db_name_, compact_cmd->table_name_, check_txn, conflict_reason);
-                if (conflict) {
-                    return true;
-                }
+                conflict = CheckConflictWithCompact(compact_cmd->db_name_, compact_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
             case WalCommandType::CREATE_INDEX: {
                 auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
-                bool conflict = CheckConflictWithCreateIndex(create_index_cmd->db_name_, create_index_cmd->table_name_, check_txn, conflict_reason);
-                if (conflict) {
-                    return true;
-                }
+                conflict = CheckConflictWithCreateIndex(create_index_cmd->db_name_, create_index_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
             case WalCommandType::ADD_COLUMNS: {
                 auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
-                bool conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn, conflict_reason);
-                if (conflict) {
-                    return true;
-                }
+                conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
                 switch (dump_index_cmd->dump_cause_) {
                     case DumpIndexCause::kOptimizeIndex: {
-                        bool conflict =
-                            CheckConflictWithOptimizeIndex(dump_index_cmd->db_name_, dump_index_cmd->table_name_, check_txn, conflict_reason);
-                        if (conflict) {
-                            return true;
-                        }
+                        conflict = CheckConflictWithOptimizeIndex(dump_index_cmd->db_name_, dump_index_cmd->table_name_, check_txn.get(), conflict_reason);
                         break;
                     }
                     default: {
@@ -1936,15 +1919,17 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
             }
             case WalCommandType::DELETE: {
                 auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                bool conflict = CheckConflictWithDelete(delete_cmd->db_name_, delete_cmd->table_name_, check_txn, conflict_reason);
-                if (conflict) {
-                    return true;
-                }
+                conflict = CheckConflictWithDelete(delete_cmd->db_name_, delete_cmd->table_name_, check_txn.get(), conflict_reason);
+
                 break;
             }
             default: {
                 //
             }
+        }
+        if (conflict) {
+            conflicted_txn_ = check_txn;
+            return true;
         }
     }
     return false;
@@ -2084,6 +2069,8 @@ void NewTxn::PostCommit() {
             UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
         }
     }
+
+    SetCompletion();
 }
 
 void NewTxn::CancelCommitBottom() {
@@ -2208,6 +2195,13 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post rollback phase: {}", status.message()));
         }
     }
+
+    if (conflicted_txn_ != nullptr) {
+        // Wait for dependent transaction finished
+        conflicted_txn_->WaitForCompletion();
+    }
+
+    SetCompletion();
 
     return Status::OK();
 }
@@ -2632,6 +2626,23 @@ SizeT NewTxn::GetMemIndexReferenceCount(const String &table_key) {
 Status NewTxn::Dummy() {
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDummy>());
     return Status::OK();
+}
+
+void NewTxn::SetCompletion() {
+    std::unique_lock<std::mutex> lock(finished_mutex_);
+    finished_ = true;
+    finished_cv_.notify_all();
+}
+
+void NewTxn::WaitForCompletion() {
+    //std::unique_lock<std::mutex> lock(conflicted_txn_->finished_mutex_);
+    //finished_cv_.wait(lock, [this] { return conflicted_txn_->finished_; });
+
+    if (finished_ == false) {
+        std::unique_lock<std::mutex> lock(finished_mutex_);
+        finished_cv_.wait(lock, [this] { return finished_; });
+    }
+
 }
 
 } // namespace infinity

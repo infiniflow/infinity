@@ -178,7 +178,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason) {
 
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
-        if (txn->CheckConflict1(check_txn.get(), conflict_reason)) {
+        if (txn->CheckConflict1(check_txn, conflict_reason)) {
             return true;
         }
     }
@@ -261,8 +261,6 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
         this->CleanupTxn(txn, true);
-    } else {
-        this->CleanupTxn(txn, false);
     }
     return status;
 }

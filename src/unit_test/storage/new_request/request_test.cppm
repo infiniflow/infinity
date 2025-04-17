@@ -41,10 +41,28 @@ protected:
         }
 
         session_ = std::move(remote_session);
+
+        SharedPtr<RemoteSession> remote_session2 = session_manager->CreateRemoteSession();
+        if (remote_session2 == nullptr) {
+            throw std::runtime_error("remote session is null");
+        }
+
+        session2_ = std::move(remote_session2);
     }
 
     UniquePtr<QueryContext> MakeQueryContext() {
         UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+        query_context_ptr->Init(InfinityContext::instance().config(),
+                                InfinityContext::instance().task_scheduler(),
+                                InfinityContext::instance().storage(),
+                                InfinityContext::instance().resource_manager(),
+                                InfinityContext::instance().session_manager(),
+                                InfinityContext::instance().persistence_manager());
+        return query_context_ptr;
+    }
+
+    UniquePtr<QueryContext> MakeQueryContext2() {
+        UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session2_.get());
         query_context_ptr->Init(InfinityContext::instance().config(),
                                 InfinityContext::instance().task_scheduler(),
                                 InfinityContext::instance().storage(),
@@ -68,4 +86,5 @@ protected:
 
 protected:
     SharedPtr<RemoteSession> session_{};
+    SharedPtr<RemoteSession> session2_{};
 };
