@@ -27,6 +27,7 @@ class KVInstance;
 class SegmentMeta;
 struct BlockLock;
 class BufferObj;
+class FastRoughFilter;
 
 export class BlockMeta {
 public:
@@ -68,6 +69,10 @@ public:
     //
     // Tuple<Vector<BlockID> *, Status> GetBlockColumnIDs1();
 
+    Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
+
+    Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+
 private:
     // Status LoadRowCnt();
 
@@ -88,6 +93,7 @@ private:
     Optional<SizeT> row_cnt_;
 
     BufferObj *version_buffer_ = nullptr;
+    SharedPtr<FastRoughFilter> fast_rough_filter_;
 };
 
 } // namespace infinity

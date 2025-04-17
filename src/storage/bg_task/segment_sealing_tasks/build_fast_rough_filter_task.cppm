@@ -25,6 +25,8 @@ import logger;
 
 namespace infinity {
 
+class SegmentMeta;
+
 struct TotalRowCount {
     u32 total_row_count_read_{};
     u32 total_row_count_in_segment_{};
@@ -55,6 +57,21 @@ struct BuildFastRoughFilterArg {
           buffer_manager_(buffer_manager), begin_ts_(begin_ts), total_row_count_in_segment_(total_row_count_in_segment) {}
 };
 
+struct NewBuildFastRoughFilterArg {
+    UniquePtr<SegmentMeta> segment_meta_{};
+    ColumnID column_id_{};
+    UniquePtr<u64[]> &distinct_keys_;
+    UniquePtr<u64[]> &distinct_keys_backup_;
+    u32 distinct_count_{};
+
+    NewBuildFastRoughFilterArg(UniquePtr<SegmentMeta> segment_meta,
+                               ColumnID column_id,
+                               UniquePtr<u64[]> &distinct_keys,
+                               UniquePtr<u64[]> &distinct_keys_backup);
+
+    ~NewBuildFastRoughFilterArg();
+};
+
 export class BuildFastRoughFilterTask {
 public:
     static void ExecuteOnNewSealedSegment(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
@@ -75,8 +92,14 @@ private:
     template <CanBuildBloomFilter ValueType, bool CheckTS>
     static void BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg);
 
+    template <CanBuildBloomFilter ValueType, bool CheckTS>
+    static void BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &arg);
+
     template <CanBuildMinMaxFilter ValueType, bool CheckTS>
     static void BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg);
+
+    template <CanBuildMinMaxFilter ValueType, bool CheckTS>
+    static void BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg &arg);
 
     template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
     static void BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg &arg);

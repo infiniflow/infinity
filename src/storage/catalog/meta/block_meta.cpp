@@ -34,6 +34,7 @@ import buffer_handle;
 import meta_info;
 import column_def;
 import column_meta;
+import fast_rough_filter;
 
 namespace infinity {
 
@@ -133,6 +134,15 @@ Status BlockMeta::UninitSet() {
         Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
         if (!status.ok()) {
             return status;
+        }
+    }
+    {
+        String filter_key = GetBlockTag("fast_rough_filter");
+        Status status = kv_instance_.Delete(filter_key);
+        if (!status.ok()) {
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
         }
     }
 
@@ -294,6 +304,36 @@ Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID
         block_column_info->extra_file_names_.push_back(MakeShared<String>(file_path));
     }
     return {block_column_info, Status::OK()};
+}
+
+Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter) {
+    if (fast_rough_filter_) {
+        fast_rough_filter = fast_rough_filter_;
+        return Status::OK();
+    }
+
+    String filter_key = GetBlockTag("fast_rough_filter");
+    String filter_str;
+    Status status = kv_instance_.Get(filter_key, filter_str);
+    if (!status.ok()) {
+        return status;
+    }
+    fast_rough_filter_ = MakeShared<FastRoughFilter>();
+    fast_rough_filter_->DeserializeFromString(filter_str);
+    fast_rough_filter = fast_rough_filter_;
+
+    return Status::OK();
+}
+
+Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
+    String filter_key = GetBlockTag("fast_rough_filter");
+    String filter_str = fast_rough_filter_->SerializeToString();
+    Status status = kv_instance_.Put(filter_key, filter_str);
+    if (!status.ok()) {
+        return status;
+    }
+    fast_rough_filter_ = fast_rough_filter;
+    return Status::OK();
 }
 
 // Pair<ColumnID, Status> BlockMeta::AddBlockColumnID1(TxnTimeStamp commit_ts) {

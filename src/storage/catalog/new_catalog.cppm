@@ -223,7 +223,7 @@ private:
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 
 public:
-    Status AddSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
+    Status AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
     Status GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info);
     Status DropSegmentIndexFtInfoByKey(const String &segment_index_key);
 
@@ -232,7 +232,7 @@ private:
     HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
 
 public:
-    Status AddSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
+    Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
     Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
 

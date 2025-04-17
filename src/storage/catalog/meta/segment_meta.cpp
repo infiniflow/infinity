@@ -30,6 +30,7 @@ import block_meta;
 import meta_info;
 import segment_entry;
 import new_catalog;
+import fast_rough_filter;
 
 namespace infinity {
 
@@ -176,6 +177,15 @@ Status SegmentMeta::UninitSet() {
         Status status = kv_instance_.Delete(first_delete_ts_key);
         if (!status.ok()) {
             return status;
+        }
+    }
+    {
+        String filter_key = GetSegmentTag("fast_rough_filter");
+        Status status = kv_instance_.Delete(filter_key);
+        if (!status.ok()) {
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
         }
     }
     return Status::OK();
@@ -485,6 +495,36 @@ Tuple<SharedPtr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo() {
         segment_info->files_.insert(segment_info->files_.end(), file_paths.begin(), file_paths.end());
     }
     return {std::move(segment_info), Status::OK()};
+}
+
+Status SegmentMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter) {
+    if (fast_rough_filter_) {
+        fast_rough_filter = fast_rough_filter_;
+        return Status::OK();
+    }
+
+    String filter_key = GetSegmentTag("fast_rough_filter");
+    String filter_str;
+    Status status = kv_instance_.Get(filter_key, filter_str);
+    if (!status.ok()) {
+        return status;
+    }
+    fast_rough_filter_ = MakeShared<FastRoughFilter>();
+    fast_rough_filter_->DeserializeFromString(filter_str);
+    fast_rough_filter = fast_rough_filter_;
+
+    return Status::OK();
+}
+
+Status SegmentMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
+    String filter_key = GetSegmentTag("fast_rough_filter");
+    String filter_str = fast_rough_filter_->SerializeToString();
+    Status status = kv_instance_.Put(filter_key, filter_str);
+    if (!status.ok()) {
+        return status;
+    }
+    fast_rough_filter_ = fast_rough_filter;
+    return Status::OK();
 }
 
 } // namespace infinity

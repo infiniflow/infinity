@@ -26,6 +26,7 @@ class KVInstance;
 class ColumnDef;
 class TableMeeta;
 class SegmentInfo;
+class FastRoughFilter;
 
 export class SegmentMeta {
 public:
@@ -74,6 +75,10 @@ public:
 
     Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo();
 
+    Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
+
+    Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+
 private:
     // Status LoadBlockIDs();
 
@@ -102,6 +107,7 @@ private:
     Optional<SizeT> row_cnt_;
 
     Optional<TxnTimeStamp> first_delete_ts_;
+    SharedPtr<FastRoughFilter> fast_rough_filter_;
 };
 
 } // namespace infinity

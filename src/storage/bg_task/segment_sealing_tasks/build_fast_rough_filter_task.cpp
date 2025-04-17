@@ -36,6 +36,11 @@ import probabilistic_data_filter;
 import min_max_data_filter;
 import fast_rough_filter;
 import filter_value_type_classification;
+import new_catalog;
+import segment_meta;
+import block_meta;
+import column_meta;
+import default_values;
 
 template <>
 class std::numeric_limits<infinity::InnerMinMaxDataFilterVarcharType> {
@@ -137,6 +142,14 @@ inline void Advance(TotalRowCount &total_row_count_handler) {
     }
 }
 
+NewBuildFastRoughFilterArg::NewBuildFastRoughFilterArg(UniquePtr<SegmentMeta> segment_meta,
+                                                       ColumnID column_id,
+                                                       UniquePtr<u64[]> &distinct_keys,
+                                                       UniquePtr<u64[]> &distinct_keys_backup)
+    : segment_meta_(std::move(segment_meta)), column_id_(column_id), distinct_keys_(distinct_keys), distinct_keys_backup_(distinct_keys_backup) {}
+
+NewBuildFastRoughFilterArg::~NewBuildFastRoughFilterArg() = default;
+
 template <CanBuildBloomFilter ValueType, bool CheckTS>
 void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job begin for column: {}", arg.column_id_));
@@ -223,6 +236,105 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job end for column: {}", arg.column_id_));
 }
 
+template <CanBuildBloomFilter ValueType, bool CheckTS>
+void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &arg) {
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job begin for column: {}", arg.column_id_));
+    TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
+    auto [block_ids_ptr, status] = arg.segment_meta_->GetBlockIDs1();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    if (!arg.distinct_keys_) {
+        SizeT total_row_count_in_segment = block_ids_ptr->size() * DEFAULT_BLOCK_CAPACITY;
+        arg.distinct_keys_ = MakeUniqueForOverwrite<u64[]>(total_row_count_in_segment);
+        arg.distinct_keys_backup_ = MakeUniqueForOverwrite<u64[]>(total_row_count_in_segment);
+    }
+    Vector<u64> input_data; // for reuse
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, *arg.segment_meta_);
+        // check row count
+        auto [block_row_cnt, status] = block_meta.GetRowCnt1();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        if (block_row_cnt == 0) {
+            // skip empty block
+            continue;
+        }
+        ColumnMeta column_meta(arg.column_id_, block_meta);
+        ColumnVector column_vector;
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        // step 1. swap arg.distinct_keys_ and arg.distinct_keys_backup_
+        std::swap(arg.distinct_keys_, arg.distinct_keys_backup_);
+        // step 2. collect data in row
+        if constexpr (std::is_same_v<ValueType, BooleanT>) {
+            // for boolean, only 0 and 1
+            bool have_0 = false;
+            bool have_1 = false;
+            auto *u8_ptr = reinterpret_cast<const u8 *>(column_vector.data());
+            for (SizeT block_off = 0; block_off < block_row_cnt; ++block_off) {
+                if (!have_0 or !have_1) {
+                    // need to access data
+                    auto [byte_cnt, remain_cnt] = std::div(block_off, 8);
+                    bool val = u8_ptr[byte_cnt] & (u8(1) << remain_cnt);
+                    if (val) {
+                        have_1 = true;
+                    } else {
+                        have_0 = true;
+                    }
+                }
+            }
+            if (have_0) {
+                BooleanT false_val(false);
+                input_data.push_back(ConvertValueToU64(false_val));
+            }
+            if (have_1) {
+                BooleanT true_val(true);
+                input_data.push_back(ConvertValueToU64(true_val));
+            }
+        } else {
+            for (SizeT block_off = 0; block_off < block_row_cnt; ++block_off) {
+                if constexpr (std::is_same_v<ValueType, VarcharT>) {
+                    Value val = column_vector.GetValue(block_off);
+                    const String &str = val.GetVarchar();
+                    input_data.push_back(ConvertValueToU64(str));
+                } else {
+                    const auto &val = *static_cast<const ValueType *>(column_vector.GetValue(block_off));
+                    input_data.push_back(ConvertValueToU64(val));
+                }
+            }
+        }
+        // step 3. sort data and remove duplicate
+        std::sort(input_data.begin(), input_data.end());
+        u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
+        // step 4. build probabilistic_data_filter for block
+        auto block_filter = MakeShared<FastRoughFilter>();
+        block_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, input_data.data(), input_distinct_count);
+        status = block_meta.SetFastRoughFilter(block_filter);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        // step 5. merge u64 distinct key array
+        arg.distinct_count_ = std::set_union(arg.distinct_keys_backup_.get(),
+                                             arg.distinct_keys_backup_.get() + arg.distinct_count_,
+                                             input_data.begin(),
+                                             input_data.begin() + input_distinct_count,
+                                             arg.distinct_keys_.get()) -
+                              arg.distinct_keys_.get();
+    }
+    // finally, build probabilistic_data_filter for segment
+    auto segment_filter = MakeShared<FastRoughFilter>();
+    segment_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, arg.distinct_keys_.get(), arg.distinct_count_);
+    status = arg.segment_meta_->SetFastRoughFilter(segment_filter);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job end for column: {}", arg.column_id_));
+}
+
 template <CanBuildMinMaxFilter ValueType, bool CheckTS>
 void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job begin for column: {}", arg.column_id_));
@@ -269,6 +381,71 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &ar
                                                                                std::move(segment_min_value),
                                                                                std::move(segment_max_value));
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job end for column: {}", arg.column_id_));
+}
+
+template <CanBuildMinMaxFilter ValueType, bool CheckTS>
+void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg &arg) {
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job begin for column: {}", arg.column_id_));
+    using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
+    using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
+    // step 0. prepare min and max value
+    MinMaxInnerValueType segment_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
+    MinMaxInnerValueType segment_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
+    auto [block_ids_ptr, status] = arg.segment_meta_->GetBlockIDs1();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, *arg.segment_meta_);
+        // check row count
+        auto [block_row_cnt, status] = block_meta.GetRowCnt1();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        if (block_row_cnt == 0) {
+            // skip empty block
+            continue;
+        }
+        // step 1. update min and max value for block
+        MinMaxInnerValueType block_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
+        MinMaxInnerValueType block_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
+
+        ColumnMeta column_meta(arg.column_id_, block_meta);
+        ColumnVector column_vector;
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        for (SizeT block_off = 0; block_off < block_row_cnt; ++block_off) {
+            if constexpr (std::is_same_v<ValueType, VarcharT>) {
+                Value val = column_vector.GetValue(block_off);
+                const String &str = val.GetVarchar();
+                UpdateMin(block_min_value, str);
+                UpdateMax(block_max_value, str);
+            } else {
+                const auto &val = *static_cast<const ValueType *>(column_vector.GetValue(block_off));
+                UpdateMin(block_min_value, val);
+                UpdateMax(block_max_value, val);
+            }
+        }
+        // step 2. merge min, max for segment
+        UpdateMin(segment_min_value, block_min_value);
+        UpdateMax(segment_max_value, block_max_value);
+        // step 3. build min_max_data_filter for block
+        auto block_filter = MakeShared<FastRoughFilter>();
+        block_filter->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(block_min_value), std::move(block_max_value));
+        status = block_meta.SetFastRoughFilter(block_filter);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+    }
+    // finally, build min_max_data_filter for segment
+    auto segment_filter = MakeShared<FastRoughFilter>();
+    segment_filter->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(segment_min_value), std::move(segment_max_value));
+    status = arg.segment_meta_->SetFastRoughFilter(segment_filter);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 }
 
 template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>

@@ -860,7 +860,7 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cach
     return Status::OK();
 }
 
-Status NewCatalog::AddSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info) {
+Status NewCatalog::AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info) {
     bool insert_success = false;
     HashMap<String, SharedPtr<SegmentIndexFtInfo>>::iterator iter;
     {
@@ -899,7 +899,7 @@ Status NewCatalog::DropSegmentIndexFtInfoByKey(const String &segment_index_key) 
     return Status::OK();
 }
 
-Status NewCatalog::AddSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts) {
+Status NewCatalog::AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts) {
     bool insert_success = false;
     HashMap<String, SharedPtr<SegmentUpdateTS>>::iterator iter;
     {
