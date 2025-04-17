@@ -78,9 +78,15 @@ public:
         return last_cleanup_ts_;
     }
 
+    TxnTimeStamp last_checkpoint_ts() {
+        std::unique_lock lock(last_time_mtx_);
+        return last_checkpoint_ts_;
+    }
+
 private:
     std::mutex last_time_mtx_;
     TxnTimeStamp last_cleanup_ts_ = 0;
+    TxnTimeStamp last_checkpoint_ts_ = 0;
 };
 
 } // namespace infinity

@@ -47,6 +47,9 @@ import wal_manager;
 import global_resource_usage;
 import txn_state;
 
+import new_txn_manager;
+import new_txn;
+
 namespace infinity {
 
 CompactionProcessor::CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr) : catalog_(catalog), txn_mgr_(txn_mgr) {
@@ -174,6 +177,23 @@ void CompactionProcessor::ScanAndOptimize() {
     }
 }
 
+void CompactionProcessor::NewScanAndOptimize() {
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", new_txn->BeginTS()));
+
+    Status status = new_txn->OptimizeAllIndexes();
+    if (status.ok()) {
+        status = new_txn_mgr->CommitTxn(new_txn);
+    }
+    if (!status.ok()) {
+        status = new_txn_mgr->RollBackTxn(new_txn);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    }
+}
+
 void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
     Txn *dump_txn = dump_task->txn_;
     BaseMemIndex *mem_index = dump_task->mem_index_;
@@ -247,13 +267,20 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
+                    auto *optimize_task = static_cast<NotifyOptimizeTask *>(bg_task.get());
+
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
                         UnrecoverableError("Uninitialized storage mode");
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Optimize start.");
-                        ScanAndOptimize();
+
+                        if (!optimize_task->new_optimize_) {
+                            ScanAndOptimize();
+                        } else {
+                            NewScanAndOptimize();
+                        }
                         LOG_DEBUG("Optimize done.");
                     }
                     break;

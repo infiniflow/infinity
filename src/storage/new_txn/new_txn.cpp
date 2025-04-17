@@ -908,10 +908,17 @@ Status NewTxn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetViews"};
 }
 
-Status NewTxn::Checkpoint() {
+Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp *cur_ckp_ts) {
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
     CheckpointOption option{checkpoint_ts};
+
+    if (cur_ckp_ts) {
+        *cur_ckp_ts = checkpoint_ts;
+    }
+    if (last_ckp_ts >= checkpoint_ts) {
+        return Status::OK();
+    }
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);

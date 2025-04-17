@@ -78,6 +78,8 @@ private:
 
     void ScanAndOptimize();
 
+    void NewScanAndOptimize();
+
     void DoDump(DumpIndexTask *dump_task);
 
     void DoDumpByline(DumpIndexBylineTask *dump_task);

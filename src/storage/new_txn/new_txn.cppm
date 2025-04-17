@@ -234,6 +234,8 @@ public:
 
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
+    Status OptimizeAllIndexes();
+
     Status OptimizeTableIndexes(const String &db_name, const String &table_name);
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
@@ -321,7 +323,7 @@ public:
 
     // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
-    Status Checkpoint();
+    Status Checkpoint(TxnTimeStamp last_ckp_ts = 0, TxnTimeStamp *cur_ckp_ts = nullptr);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }

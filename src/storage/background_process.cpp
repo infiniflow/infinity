@@ -153,6 +153,34 @@ void BGTaskProcessor::Process() {
                     }
                     break;
                 }
+                case BGTaskType::kNewCheckpoint: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
+                    if (storage_mode == StorageMode::kWritable) {
+                        LOG_DEBUG("Checkpoint in background");
+
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = bg_task->ToString();
+                        }
+                        auto *checkpoint_task = static_cast<NewCheckpointTask *>(bg_task.get());
+                        TxnTimeStamp last_ckp_ts = this->last_checkpoint_ts();
+                        TxnTimeStamp cur_ckp_ts = 0;
+                        Status status = checkpoint_task->Execute(last_ckp_ts, cur_ckp_ts);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
+                        if (cur_ckp_ts > last_ckp_ts) {
+                            std::unique_lock lock(last_time_mtx_);
+                            last_checkpoint_ts_ = cur_ckp_ts;
+                        }
+
+                        LOG_DEBUG("Checkpoint in background done");
+                    }
+                    break;
+                }
                 case BGTaskType::kCleanup: {
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {

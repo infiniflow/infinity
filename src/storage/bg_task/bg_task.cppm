@@ -31,6 +31,7 @@ export enum class BGTaskType {
     kStopProcessor,
     kAddDeltaEntry,
     kCheckpoint,
+    kNewCheckpoint,
     kForceCheckpoint, // Manually triggered by PhysicalFlush
     kNotifyCompact,
     kNotifyOptimize,
@@ -121,6 +122,14 @@ export struct CheckpointTask final : public CheckpointTaskBase {
     bool is_full_checkpoint_{};
 };
 
+export struct NewCheckpointTask final : public CheckpointTaskBase {
+    NewCheckpointTask() : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false) {}
+
+    String ToString() const final { return "New catalog"; }
+
+    Status Execute(TxnTimeStamp last_ckp_ts, TxnTimeStamp &cur_ckp_ts);
+};
+
 export struct ForceCheckpointTask final : public CheckpointTaskBase {
     explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
     explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
@@ -184,11 +193,14 @@ public:
 
 export class NotifyOptimizeTask final : public BGTask {
 public:
-    NotifyOptimizeTask() : BGTask(BGTaskType::kNotifyOptimize, true) {}
+    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true), new_optimize_(new_optimize) {}
 
     ~NotifyOptimizeTask() override = default;
 
     String ToString() const override { return "NotifyOptimizeTask"; }
+
+public:
+    bool new_optimize_ = false;
 };
 
 export class DumpIndexTask final : public BGTask {

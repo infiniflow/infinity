@@ -25,6 +25,7 @@ import new_catalog;
 import chunk_index_meta;
 import segment_index_meta;
 import table_index_meeta;
+import catalog_meta;
 import db_meeta;
 import table_meeta;
 import segment_meta;
@@ -109,6 +110,40 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
         }
         return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::OptimizeAllIndexes() {
+    // TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    CatalogMeta catalog_meta(*kv_instance_);
+    Vector<String> *db_id_strs_ptr = nullptr;
+    Vector<String> *db_names_ptr = nullptr;
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (SizeT i = 0; i < db_id_strs_ptr->size(); ++i) {
+        const String &db_id_str = (*db_id_strs_ptr)[i];
+        const String &db_name = (*db_names_ptr)[i];
+
+        DBMeeta db_meta(db_id_str, *kv_instance_);
+        Vector<String> *table_id_strs_ptr = nullptr;
+        Vector<String> *table_names_ptr = nullptr;
+        status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
+            // const String &table_id_str = (*table_id_strs_ptr)[i];
+            const String &table_name = (*table_names_ptr)[i];
+            
+            status = this->OptimizeTableIndexes(db_name, table_name);
+            if (!status.ok()) {
+                return status;
+            }
+        }
     }
 
     return Status::OK();

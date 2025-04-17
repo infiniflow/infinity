@@ -373,6 +373,12 @@ Status Storage::AdminToWriter() {
 
         i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
         periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+
+        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
+
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+        periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
     } else {
         if (periodic_trigger_thread_ != nullptr) {
             UnrecoverableError("periodic trigger was initialized before.");
