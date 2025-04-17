@@ -122,13 +122,19 @@ void CheckpointPeriodicTrigger::Trigger() {
 
 void CompactSegmentPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
-    auto compact_task = MakeShared<NotifyCompactTask>();
-    compact_processor_->Submit(std::move(compact_task));
+    if (!new_compaction_) {
+        auto compact_task = MakeShared<NotifyCompactTask>();
+        compact_processor_->Submit(std::move(compact_task));
+    } else {
+        auto compact_task = MakeShared<NotifyCompactTask>(true);
+        auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
+        compact_processor->Submit(std::move(compact_task));
+    }
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
-    if (new_optimize_) {
+    if (!new_optimize_) {
         auto optimize_task = MakeShared<NotifyOptimizeTask>();
         compact_processor_->Submit(std::move(optimize_task));
     } else {

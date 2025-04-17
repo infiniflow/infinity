@@ -108,10 +108,13 @@ public:
     explicit CompactSegmentPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
+    explicit CompactSegmentPeriodicTrigger(i64 interval) : PeriodicTrigger(interval), new_compaction_(true) {}
+
     virtual void Trigger() override;
 
 private:
     CompactionProcessor *const compact_processor_{};
+    bool new_compaction_ = false;
 };
 
 export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {

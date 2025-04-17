@@ -27,6 +27,7 @@ namespace infinity {
 class Catalog;
 class TxnManager;
 class SessionManager;
+class NewTxn;
 
 class TestCommander {
 public:
@@ -63,6 +64,10 @@ public:
     void Submit(SharedPtr<BGTask> bg_task);
 
     void DoCompact();
+
+    void NewDoCompact();
+
+    void NewManualCompact(NewTxn *new_txn, const String &db_name, const String &table_name);
 
     u64 RunningTaskCount() const { return task_count_; }
 

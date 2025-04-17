@@ -31,7 +31,7 @@ namespace infinity {
 Status NewCheckpointTask::Execute(TxnTimeStamp last_ckp_ts, TxnTimeStamp &cur_ckp_ts) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-    
+
     Status status = new_txn->Checkpoint(last_ckp_ts, &cur_ckp_ts);
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn);
@@ -72,6 +72,9 @@ Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_c
     }
     return Status::OK();
 }
+
+NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_name)
+    : BGTask(BGTaskType::kNewCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}
 

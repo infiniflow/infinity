@@ -34,6 +34,7 @@ export enum class BGTaskType {
     kNewCheckpoint,
     kForceCheckpoint, // Manually triggered by PhysicalFlush
     kNotifyCompact,
+    kNewCompact,
     kNotifyOptimize,
     kCleanup,
     kNewCleanup,
@@ -184,11 +185,24 @@ private:
 
 export class NotifyCompactTask final : public BGTask {
 public:
-    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
+    NotifyCompactTask(bool new_compact = false) : BGTask(BGTaskType::kNotifyCompact, true), new_compact_(new_compact) {}
 
     ~NotifyCompactTask() override = default;
 
     String ToString() const override { return "NotifyCompactTask"; }
+
+    bool new_compact_ = false;
+};
+
+export class NewCompactTask final : public BGTask {
+public:
+    NewCompactTask(NewTxn *new_txn, String db_name, String table_name);
+
+    String ToString() const override { return "NewCompactTask"; }
+
+    NewTxn *new_txn_ = nullptr;
+    String db_name_;
+    String table_name_;
 };
 
 export class NotifyOptimizeTask final : public BGTask {

@@ -60,7 +60,6 @@ public:
 private:
     CompactStatementType compact_type_;
     Vector<Vector<SegmentEntry *>> compactible_segments_group_;
-    Vector<SegmentID> compactible_segment_ids_;
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

@@ -379,6 +379,8 @@ Status Storage::AdminToWriter() {
 
         i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
         periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
+
+        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
     } else {
         if (periodic_trigger_thread_ != nullptr) {
             UnrecoverableError("periodic trigger was initialized before.");
