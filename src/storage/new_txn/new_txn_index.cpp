@@ -1594,7 +1594,8 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
         if (!index_segment_ids_set.contains(segment_id)) {
-            LOG_WARN(fmt::format("Segment {} not in index {}", segment_id, table_index_meta.index_id_str()));
+            //            SharedPtr<String> error_msg = MakeShared<String>(fmt::format("Segment {} not in index {}", segment_id,
+            //            table_index_meta.index_id_str())); LOG_WARN(*error_msg); UnrecoverableError(*error_msg);//
             Optional<SegmentIndexMeta> segment_index_meta;
             status = NewCatalog::AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta);
             if (!status.ok()) {

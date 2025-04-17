@@ -102,7 +102,6 @@ export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
     // For new txn
     explicit NewTxn(NewTxnManager *txn_manager,
-                    BufferManager *buffer_manager,
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts,
                     UniquePtr<KVInstance> kv_instance,
@@ -119,12 +118,10 @@ public:
 
     virtual ~NewTxn();
 
-    static UniquePtr<NewTxn> NewReplayTxn(BufferManager *buffer_mgr,
-                                          NewTxnManager *txn_mgr,
-                                          TransactionID txn_id,
-                                          TxnTimeStamp begin_ts,
-                                          UniquePtr<KVInstance> kv_instance,
-                                          TransactionType txn_type);
+    static UniquePtr<NewTxn>
+    NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance);
+
+    static UniquePtr<NewTxn> NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts);
 
     // NewTxn steps:
     // 1. CreateTxn
@@ -140,6 +137,10 @@ public:
     //    void SetBeginTS(TxnTimeStamp begin_ts);
 
     Status Commit();
+
+    Status CommitReplay();
+
+    Status CommitRecovery();
 
     Status PostReadTxnCommit();
 
@@ -557,9 +558,7 @@ private:
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
 
-    void SetReplay(bool replay) { txn_context_ptr_->replay_ = replay; }
-
-    bool IsReplay() const { return txn_context_ptr_->replay_; }
+    bool IsReplay() const;
 
     Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
 

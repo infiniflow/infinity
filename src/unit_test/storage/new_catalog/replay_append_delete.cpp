@@ -338,7 +338,11 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
     }
 
+    new_txn_mgr->PrintAllKeyValue();
+
     RestartTxnMgr();
+
+    new_txn_mgr->PrintAllKeyValue();
 
     auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta,
                                    const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {

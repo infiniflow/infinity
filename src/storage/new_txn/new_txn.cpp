@@ -84,13 +84,12 @@ import segment_entry;
 namespace infinity {
 
 NewTxn::NewTxn(NewTxnManager *txn_manager,
-               BufferManager *buffer_manager,
                TransactionID txn_id,
                TxnTimeStamp begin_ts,
                UniquePtr<KVInstance> kv_instance,
                SharedPtr<String> txn_text,
                TransactionType txn_type)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
+    : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
@@ -123,15 +122,16 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
     txn_context_ptr_->txn_type_ = txn_type;
 }
 
-UniquePtr<NewTxn> NewTxn::NewReplayTxn(BufferManager *buffer_mgr,
-                                       NewTxnManager *txn_mgr,
-                                       TransactionID txn_id,
-                                       TxnTimeStamp begin_ts,
-                                       UniquePtr<KVInstance> kv_instance,
-                                       TransactionType txn_type) {
-    auto txn = MakeUnique<NewTxn>(buffer_mgr, txn_mgr, txn_id, begin_ts, std::move(kv_instance), txn_type);
-    txn->txn_context_ptr_->commit_ts_ = begin_ts;
-    txn->txn_context_ptr_->state_ = TxnState::kCommitted;
+UniquePtr<NewTxn>
+NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance) {
+    auto txn = MakeUnique<NewTxn>(txn_mgr, txn_id, begin_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
+    txn->txn_context_ptr_->commit_ts_ = commit_ts;
+    return txn;
+}
+
+UniquePtr<NewTxn> NewTxn::NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts) {
+    KVStore *kv_code = txn_mgr->kv_store();
+    UniquePtr<NewTxn> txn = MakeUnique<NewTxn>(txn_mgr, 0, begin_ts, kv_code->GetInstance(), nullptr, TransactionType::kRecovery);
     return txn;
 }
 
@@ -1068,7 +1068,7 @@ Status NewTxn::Commit() {
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts;
     if (this->IsReplay()) {
-        commit_ts = txn_mgr_->GetReplayWriteCommitTS(this);
+        commit_ts = this->CommitTS(); // Replayed from WAL
     } else {
         commit_ts = txn_mgr_->GetWriteCommitTS(shared_from_this());
     }
@@ -1080,6 +1080,8 @@ Status NewTxn::Commit() {
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
 
     Status status = this->PrepareCommit();
+
+    // For non-replay transaction
     if (status.ok()) {
         String conflict_reason;
         bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason);
@@ -1088,19 +1090,16 @@ Status NewTxn::Commit() {
         }
     }
     if (!status.ok()) {
+        // If prepare commit or conflict check failed, rollback the transaction
         this->SetTxnRollbacking(commit_ts);
 
-        if (!this->IsReplay()) {
-            // If prepare commit fail and not replay, rollback the transaction
+        txn_mgr_->SendToWAL(this);
 
-            txn_mgr_->SendToWAL(this);
+        // Wait until CommitTxnBottom is done.
+        std::unique_lock<std::mutex> lk(commit_lock_);
+        commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-            // Wait until CommitTxnBottom is done.
-            std::unique_lock<std::mutex> lk(commit_lock_);
-            commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
-
-            PostRollback(commit_ts);
-        }
+        PostRollback(commit_ts);
         return status;
     }
 
@@ -1109,19 +1108,47 @@ Status NewTxn::Commit() {
     if (!status.ok()) {
         return status;
     }
-    if (this->IsReplay()) {
-        this->CommitBottom();
-        PostCommit();
-    } else {
-        // Put wal entry to the manager in the same order as commit_ts.
-        wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
-        txn_mgr_->SendToWAL(this);
+    // Put wal entry to the manager in the same order as commit_ts.
+    wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
+    txn_mgr_->SendToWAL(this);
 
-        // Wait until CommitTxnBottom is done.
-        std::unique_lock<std::mutex> lk(commit_lock_);
-        commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
+    // Wait until CommitTxnBottom is done.
+    std::unique_lock<std::mutex> lk(commit_lock_);
+    commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-        PostCommit();
+    PostCommit();
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitReplay() {
+
+    TxnTimeStamp commit_ts = this->CommitTS(); // Replayed from WAL
+    LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
+
+    this->SetTxnCommitting(commit_ts);
+
+    txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
+    Status status = this->PrepareCommit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Replay transaction, prepare commit: {}", status.message()));
+    }
+
+    // Try to commit the transaction
+    status = kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Replay transaction, commit: {}", status.message()));
+    }
+    PostCommit();
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitRecovery() {
+    // Try to commit the rocksdb transaction
+    Status status = kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Replay transaction, commit: {}", status.message()));
     }
     return Status::OK();
 }
@@ -1154,7 +1181,7 @@ Status NewTxn::PostReadTxnCommit() {
 }
 
 Status NewTxn::PrepareCommit() {
-    //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
@@ -2345,6 +2372,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
 
     return Status::OK();
 }
+
+bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
 
 Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
     WalCommandType command_type = command->GetType();
