@@ -20,6 +20,7 @@ import stl;
 import logger;
 import infinity_exception;
 import background_process;
+import compaction_process;
 import bg_task;
 import catalog;
 import txn_manager;

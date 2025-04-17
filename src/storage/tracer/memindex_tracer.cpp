@@ -31,6 +31,8 @@ import table_entry;
 import table_index_entry;
 import txn_manager;
 import txn_state;
+import compaction_process;
+import storage;
 
 namespace infinity {
 
@@ -39,6 +41,16 @@ void MemIndexTracer::DecreaseMemUsed(SizeT mem_used) {
     if (old_index_memory < mem_used) {
         UnrecoverableException(fmt::format("Memindex memory {} is larger than current index memory {}", mem_used, old_index_memory));
     }
+}
+
+bool MemIndexTracer::TryTriggerDump() {
+    auto dump_task = MakeDumpTask();
+    if (!dump_task) {
+        return false;
+    }
+    LOG_TRACE(fmt::format("Dump triggered!"));
+    TriggerDump(std::move(dump_task));
+    return true;
 }
 
 void MemIndexTracer::DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index) {
@@ -121,6 +133,19 @@ SizeT MemIndexTracer::ChooseDump(const Vector<BaseMemIndex *> &mem_indexes) {
     }
     auto max_iter = std::max_element(info_vec.begin(), info_vec.end(), [](const auto &a, const auto &b) { return a.mem_used_ < b.mem_used_; });
     return std::distance(info_vec.begin(), max_iter);
+}
+
+BGMemIndexTracer::BGMemIndexTracer(SizeT index_memory_limit, Catalog *catalog, TxnManager *txn_mgr)
+    : MemIndexTracer(index_memory_limit), catalog_(catalog), txn_mgr_(txn_mgr) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("BGMemIndexTracer");
+#endif
+}
+
+BGMemIndexTracer::~BGMemIndexTracer() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("BGMemIndexTracer");
+#endif
 }
 
 void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {

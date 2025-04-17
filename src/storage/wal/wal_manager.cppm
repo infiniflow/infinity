@@ -17,7 +17,6 @@ module;
 export module wal_manager;
 
 import stl;
-import bg_task;
 import options;
 import catalog_delta_entry;
 import blocking_queue;
@@ -32,6 +31,8 @@ class Txn;
 class NewTxn;
 struct SegmentEntry;
 class Catalog;
+class CheckpointTaskBase;
+class ForceCheckpointTask;
 
 struct WalEntry;
 struct WalCmdCreateDatabase;

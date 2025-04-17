@@ -35,6 +35,7 @@ import defer_op;
 import infinity_context;
 import global_resource_usage;
 import bg_task;
+import background_process;
 
 namespace infinity {
 

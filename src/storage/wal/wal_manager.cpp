@@ -34,6 +34,7 @@ import txn_store;
 import data_access_state;
 import status;
 import bg_task;
+import background_process;
 import extra_ddl_info;
 
 import infinity_exception;

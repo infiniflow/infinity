@@ -50,6 +50,7 @@ import bg_task;
 import wal_manager;
 import result_cache_manager;
 import snapshot;
+import periodic_trigger_thread;
 
 namespace infinity {
 

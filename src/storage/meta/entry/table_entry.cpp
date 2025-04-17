@@ -69,6 +69,8 @@ import expression_evaluator;
 import column_vector;
 import expression_state;
 import snapshot_info;
+import background_process;
+import compaction_process;
 
 namespace infinity {
 

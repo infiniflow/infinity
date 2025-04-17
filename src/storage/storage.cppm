@@ -20,12 +20,8 @@ import catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;
-import background_process;
 import object_storage_process;
-import compaction_process;
-import periodic_trigger_thread;
 import log_file;
-import memindex_tracer;
 import persistence_manager;
 import virtual_store;
 import status;
@@ -40,6 +36,10 @@ class NewCatalog;
 class NewTxnManager;
 class KVStore;
 class KVInstance;
+class PeriodicTriggerThread;
+class CompactionProcessor;
+class BGTaskProcessor;
+class BGMemIndexTracer;
 
 export enum class ReaderInitPhase {
     kInvalid,
