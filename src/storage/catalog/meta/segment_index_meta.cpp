@@ -87,26 +87,12 @@ Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
-Tuple<ChunkID, Status> SegmentIndexMeta::AddChunkID1(TxnTimeStamp commit_ts) {
-    ChunkID chunk_id = 0;
-
-    auto [chunk_ids_ptr, status] = GetChunkIDs1();
-    if (!status.ok()) {
-        return {0, status};
-    }
-    chunk_id = chunk_ids_ptr->empty() ? 0 : chunk_ids_ptr->back() + 1;
-    chunk_ids_->push_back(chunk_id);
-
+Status SegmentIndexMeta::AddChunkID1(TxnTimeStamp commit_ts, ChunkID chunk_id) {
     TableMeeta &table_meta = table_index_meta_.table_meta();
-
     String chunk_id_key =
         KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_.Put(chunk_id_key, commit_ts_str);
-    if (!status.ok()) {
-        return {0, status};
-    }
-    return {chunk_id, Status::OK()};
+    return kv_instance_.Put(chunk_id_key, commit_ts_str);
 }
 
 Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {

@@ -129,9 +129,10 @@ NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp 
     return txn;
 }
 
-UniquePtr<NewTxn> NewTxn::NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts) {
+UniquePtr<NewTxn> NewTxn::NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     KVStore *kv_code = txn_mgr->kv_store();
     UniquePtr<NewTxn> txn = MakeUnique<NewTxn>(txn_mgr, 0, begin_ts, kv_code->GetInstance(), nullptr, TransactionType::kRecovery);
+    txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;
 }
 

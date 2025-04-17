@@ -70,7 +70,7 @@ public:
 
     Status AddChunkID(ChunkID chunk_id);
 
-    Tuple<ChunkID, Status> AddChunkID1(TxnTimeStamp commit_ts);
+    Status AddChunkID1(TxnTimeStamp commit_ts, ChunkID chunk_id);
 
     Status SetNextChunkID(ChunkID chunk_id);
 

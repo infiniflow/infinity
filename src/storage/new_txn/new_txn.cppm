@@ -121,7 +121,7 @@ public:
     static UniquePtr<NewTxn>
     NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance);
 
-    static UniquePtr<NewTxn> NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts);
+    static UniquePtr<NewTxn> NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     // NewTxn steps:
     // 1. CreateTxn

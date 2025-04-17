@@ -117,11 +117,7 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
 Status TableIndexMeeta::AddSegmentID1(SegmentID segment_id, TxnTimeStamp commit_ts) {
     String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    Status status = kv_instance_.Put(segment_id_key, commit_ts_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    return kv_instance_.Put(segment_id_key, commit_ts_str);
 }
 
 Status TableIndexMeeta::GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts) {
