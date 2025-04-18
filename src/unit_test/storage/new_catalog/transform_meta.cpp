@@ -34,6 +34,7 @@ import table_meeta;
 import table_index_meeta;
 import segment_meta;
 import block_meta;
+import segment_index_meta;
 
 using namespace infinity;
 
