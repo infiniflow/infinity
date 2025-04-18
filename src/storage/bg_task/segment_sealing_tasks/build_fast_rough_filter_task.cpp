@@ -144,11 +144,64 @@ inline void Advance(TotalRowCount &total_row_count_handler) {
     }
 }
 
+UniquePtr<BuildingSegmentFastFilters> BuildingSegmentFastFilters::Make(SegmentMeta *segment_meta) {
+    auto [block_ids_ptr, status] = segment_meta->GetBlockIDs1();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    auto segment_filters = MakeUnique<BuildingSegmentFastFilters>();
+    segment_filters->segment_meta_ = segment_meta;
+    segment_filters->segment_filter_ = MakeShared<FastRoughFilter>();
+    for (BlockID block_id : *block_ids_ptr) {
+        segment_filters->block_filters_.emplace(block_id, MakeShared<FastRoughFilter>());
+    }
+    return segment_filters;
+}
+
+BuildingSegmentFastFilters::~BuildingSegmentFastFilters() = default;
+
+void BuildingSegmentFastFilters::ApplyToAllFastRoughFilterInSegment(std::invocable<FastRoughFilter *> auto func) {
+    for (auto &[block_id, block_filter] : block_filters_) {
+        func(block_filter.get());
+    }
+    func(segment_filter_.get());
+}
+
+void BuildingSegmentFastFilters::CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask() {
+    TxnTimeStamp begin_ts = segment_meta_->begin_ts();
+    ApplyToAllFastRoughFilterInSegment([begin_ts](FastRoughFilter *filter) { filter->SetHaveStartedMinMaxFilterBuildTask(begin_ts); });
+}
+
+void BuildingSegmentFastFilters::SetSegmentBeginBuildMinMaxFilterTask(u32 column_count) {
+    ApplyToAllFastRoughFilterInSegment([column_count](FastRoughFilter *filter) { filter->BeginBuildMinMaxFilterTask(column_count); });
+}
+
+void BuildingSegmentFastFilters::SetSegmentFinishBuildMinMaxFilterTask() {
+    ApplyToAllFastRoughFilterInSegment([](FastRoughFilter *filter) { filter->FinishBuildMinMaxFilterTask(); });
+}
+
+void BuildingSegmentFastFilters::SetFilter() {
+    for (auto &[block_id, block_filter] : block_filters_) {
+        BlockMeta block_meta(block_id, *segment_meta_);
+        Status status = block_meta.SetFastRoughFilter(block_filter);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+    }
+    Status status = segment_meta_->SetFastRoughFilter(segment_filter_);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
 NewBuildFastRoughFilterArg::NewBuildFastRoughFilterArg(SegmentMeta *segment_meta,
                                                        ColumnID column_id,
                                                        UniquePtr<u64[]> &distinct_keys,
-                                                       UniquePtr<u64[]> &distinct_keys_backup)
-    : segment_meta_(segment_meta), column_id_(column_id), distinct_keys_(distinct_keys), distinct_keys_backup_(distinct_keys_backup) {}
+                                                       UniquePtr<u64[]> &distinct_keys_backup,
+                                                       BuildingSegmentFastFilters *segment_filters)
+    : segment_meta_(segment_meta), column_id_(column_id), distinct_keys_(distinct_keys), distinct_keys_backup_(distinct_keys_backup),
+      segment_filters_(segment_filters) {}
 
 NewBuildFastRoughFilterArg::~NewBuildFastRoughFilterArg() = default;
 
@@ -321,12 +374,8 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
         std::sort(input_data.begin(), input_data.end());
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter for block
-        auto block_filter = MakeShared<FastRoughFilter>();
+        auto block_filter = arg.segment_filters_->block_filters_[block_id];
         block_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, input_data.data(), input_distinct_count);
-        status = block_meta.SetFastRoughFilter(block_filter);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
         // step 5. merge u64 distinct key array
         arg.distinct_count_ = std::set_union(arg.distinct_keys_backup_.get(),
                                              arg.distinct_keys_backup_.get() + arg.distinct_count_,
@@ -336,12 +385,8 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
                               arg.distinct_keys_.get();
     }
     // finally, build probabilistic_data_filter for segment
-    auto segment_filter = MakeShared<FastRoughFilter>();
+    auto segment_filter = arg.segment_filters_->segment_filter_;
     segment_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, arg.distinct_keys_.get(), arg.distinct_count_);
-    status = arg.segment_meta_->SetFastRoughFilter(segment_filter);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job end for column: {}", arg.column_id_));
 }
 
@@ -450,20 +495,12 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
         UpdateMin(segment_min_value, block_min_value);
         UpdateMax(segment_max_value, block_max_value);
         // step 3. build min_max_data_filter for block
-        auto block_filter = MakeShared<FastRoughFilter>();
+        auto block_filter = arg.segment_filters_->block_filters_[block_id];
         block_filter->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(block_min_value), std::move(block_max_value));
-        status = block_meta.SetFastRoughFilter(block_filter);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
     }
     // finally, build min_max_data_filter for segment
-    auto segment_filter = MakeShared<FastRoughFilter>();
+    auto segment_filter = arg.segment_filters_->segment_filter_;
     segment_filter->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(segment_min_value), std::move(segment_max_value));
-    status = arg.segment_meta_->SetFastRoughFilter(segment_filter);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
 }
 
 template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
@@ -611,13 +648,9 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         std::sort(input_data.begin(), input_data.end());
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter and min_max_data_filter for block
-        auto block_filter = MakeShared<FastRoughFilter>();
+        auto block_filter = arg.segment_filters_->block_filters_[block_id];
         block_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, input_data.data(), input_distinct_count);
         block_filter->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(block_min_value), std::move(block_max_value));
-        status = block_meta.SetFastRoughFilter(block_filter);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
         // step 5. merge u64 distinct key array
         arg.distinct_count_ = std::set_union(arg.distinct_keys_backup_.get(),
                                              arg.distinct_keys_backup_.get() + arg.distinct_count_,
@@ -627,13 +660,9 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
                               arg.distinct_keys_.get();
     }
     // finally, build probabilistic_data_filter and min_max_data_filter for segment
-    auto segment_filter = MakeShared<FastRoughFilter>();
+    auto segment_filter = arg.segment_filters_->segment_filter_;
     segment_filter->BuildProbabilisticDataFilter(begin_ts, arg.column_id_, arg.distinct_keys_.get(), arg.distinct_count_);
     segment_filter->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(segment_min_value), std::move(segment_max_value));
-    status = arg.segment_meta_->SetFastRoughFilter(segment_filter);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildMinMaxAndBloomFilter job end for column: {}", arg.column_id_));
 }
 
@@ -657,43 +686,6 @@ void BuildFastRoughFilterTask::SetSegmentBeginBuildMinMaxFilterTask(SegmentEntry
 
 void BuildFastRoughFilterTask::SetSegmentFinishBuildMinMaxFilterTask(SegmentEntry *segment) {
     ApplyToAllFastRoughFilterInSegment(segment, [](FastRoughFilter *filter) { filter->FinishBuildMinMaxFilterTask(); });
-}
-
-void ApplyToAllFastRoughFilterInSegment(SegmentMeta *segment_meta, std::invocable<FastRoughFilter *> auto func) {
-    // first, apply to block_entry
-    auto [block_ids_ptr, status] = segment_meta->GetBlockIDs1();
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    for (BlockID block_id : *block_ids_ptr) {
-        BlockMeta block_meta(block_id, *segment_meta);
-        auto block_filter = MakeShared<FastRoughFilter>();
-        Status status = block_meta.GetFastRoughFilter(block_filter);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        func(block_filter.get());
-    }
-    // then, apply to segment_entry
-    auto segment_filter = MakeShared<FastRoughFilter>();
-    status = segment_meta->GetFastRoughFilter(segment_filter);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    func(segment_filter.get());
-}
-
-void BuildFastRoughFilterTask::CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(SegmentMeta *segment_meta) {
-    TxnTimeStamp begin_ts = segment_meta->begin_ts();
-    ApplyToAllFastRoughFilterInSegment(segment_meta, [begin_ts](FastRoughFilter *filter) { filter->SetHaveStartedMinMaxFilterBuildTask(begin_ts); });
-}
-
-void BuildFastRoughFilterTask::SetSegmentBeginBuildMinMaxFilterTask(SegmentMeta *segment_meta, u32 column_count) {
-    ApplyToAllFastRoughFilterInSegment(segment_meta, [column_count](FastRoughFilter *filter) { filter->BeginBuildMinMaxFilterTask(column_count); });
-}
-
-void BuildFastRoughFilterTask::SetSegmentFinishBuildMinMaxFilterTask(SegmentMeta *segment_meta) {
-    ApplyToAllFastRoughFilterInSegment(segment_meta, [](FastRoughFilter *filter) { filter->FinishBuildMinMaxFilterTask(); });
 }
 
 // deprecate except this
@@ -744,8 +736,10 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentEntry *segment_e
 // deprecate except this
 void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_meta) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job begin.", segment_meta->segment_id()));
+
+    auto segment_filters = BuildingSegmentFastFilters::Make(segment_meta);
     // step 1. when build minmax, set timestamp
-    CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(segment_meta);
+    segment_filters->CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask();
     // step2. when build minmax, init filters to size of column_count
     u32 column_count = 0;
     {
@@ -755,12 +749,14 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
         }
         column_count = column_defs->size();
     }
-    SetSegmentBeginBuildMinMaxFilterTask(segment_meta, column_count);
+    segment_filters->SetSegmentBeginBuildMinMaxFilterTask(column_count);
     // step 3. build filter
-    ExecuteInner(segment_meta);
+    ExecuteInner(segment_meta, segment_filters.get());
     // step 4. set finish build MinMax atomic flag
-    SetSegmentFinishBuildMinMaxFilterTask(segment_meta);
+    segment_filters->SetSegmentFinishBuildMinMaxFilterTask();
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job end.", segment_meta->segment_id()));
+
+    segment_filters->SetFilter();
 }
 
 void BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts) {}
@@ -866,7 +862,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentEntry *segment_entry, BufferM
     }
 }
 
-void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta) {
+void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingSegmentFastFilters *segment_filters) {
     UniquePtr<u64[]> distinct_keys = nullptr;
     UniquePtr<u64[]> distinct_keys_backup = nullptr;
     auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs();
@@ -891,7 +887,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta) {
             continue;
         }
         // step 2.2. collect distinct data from blocks and build probabilistic_data_filter for blocks and segment
-        NewBuildFastRoughFilterArg arg(segment_meta, column_id, distinct_keys, distinct_keys_backup);
+        NewBuildFastRoughFilterArg arg(segment_meta, column_id, distinct_keys, distinct_keys_backup, segment_filters);
         switch (data_type_ptr->type()) {
             case LogicalType::kBoolean: {
                 BuildFilter<BooleanT>(arg, build_min_max_filter, build_bloom_filter);

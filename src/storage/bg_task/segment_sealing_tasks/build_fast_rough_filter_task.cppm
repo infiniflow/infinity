@@ -26,6 +26,27 @@ import logger;
 namespace infinity {
 
 class SegmentMeta;
+class FastRoughFilter;
+
+export struct BuildingSegmentFastFilters {
+    SegmentMeta *segment_meta_ = nullptr;
+    SharedPtr<FastRoughFilter> segment_filter_;
+    HashMap<BlockID, SharedPtr<FastRoughFilter>> block_filters_;
+
+    static UniquePtr<BuildingSegmentFastFilters> Make(SegmentMeta *segment_meta);
+
+    ~BuildingSegmentFastFilters();
+
+    void ApplyToAllFastRoughFilterInSegment(std::invocable<FastRoughFilter *> auto func);
+
+    void CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask();
+
+    void SetSegmentBeginBuildMinMaxFilterTask(u32 column_count);
+
+    void SetSegmentFinishBuildMinMaxFilterTask();
+
+    void SetFilter();
+};
 
 struct TotalRowCount {
     u32 total_row_count_read_{};
@@ -63,11 +84,13 @@ struct NewBuildFastRoughFilterArg {
     UniquePtr<u64[]> &distinct_keys_;
     UniquePtr<u64[]> &distinct_keys_backup_;
     u32 distinct_count_{};
+    BuildingSegmentFastFilters *segment_filters_{};
 
     NewBuildFastRoughFilterArg(SegmentMeta *segment_meta,
                                ColumnID column_id,
                                UniquePtr<u64[]> &distinct_keys,
-                               UniquePtr<u64[]> &distinct_keys_backup);
+                               UniquePtr<u64[]> &distinct_keys_backup,
+                               BuildingSegmentFastFilters *segment_filters);
 
     ~NewBuildFastRoughFilterArg();
 };
@@ -87,17 +110,11 @@ private:
 
     static void SetSegmentFinishBuildMinMaxFilterTask(SegmentEntry *segment);
 
-    static void CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(SegmentMeta *segment_meta);
-
-    static void SetSegmentBeginBuildMinMaxFilterTask(SegmentMeta *segment_meta, u32 column_count);
-
-    static void SetSegmentFinishBuildMinMaxFilterTask(SegmentMeta *segment_meta);
-
 private:
     template <bool CheckTS>
     static void ExecuteInner(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
 
-    static void ExecuteInner(SegmentMeta *sement_meta);
+    static void ExecuteInner(SegmentMeta *sement_meta, BuildingSegmentFastFilters *segment_filters);
 
     template <CanBuildBloomFilter ValueType, bool CheckTS>
     static void BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg);

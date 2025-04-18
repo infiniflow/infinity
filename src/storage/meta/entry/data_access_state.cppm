@@ -67,6 +67,7 @@ export struct AppendState {
     u16 current_block_offset_{};
 
     Vector<AppendRange> append_ranges_{};
+    Vector<SegmentID> sealed_segments_;
 
     bool Finished() const { return current_count_ == total_count_; }
 };

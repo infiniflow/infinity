@@ -222,6 +222,21 @@ void BGTaskProcessor::Process() {
                     }
                     break;
                 }
+                case BGTaskType::kBuildFastRoughFilter: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
+                    if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
+                        LOG_DEBUG("Update segment bloom filter");
+
+                        auto *task = static_cast<BGBuildFastRoughFilterTask *>(bg_task.get());
+                        task->Execute();
+
+                        LOG_DEBUG("Update segment bloom filter done");
+                    }
+                    break;
+                }
                 case BGTaskType::kUpdateSegmentBloomFilterData: {
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {

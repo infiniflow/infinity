@@ -327,7 +327,7 @@ Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filt
 
 Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
     String filter_key = GetBlockTag("fast_rough_filter");
-    String filter_str = fast_rough_filter_->SerializeToString();
+    String filter_str = fast_rough_filter->SerializeToString();
     Status status = kv_instance_.Put(filter_key, filter_str);
     if (!status.ok()) {
         return status;

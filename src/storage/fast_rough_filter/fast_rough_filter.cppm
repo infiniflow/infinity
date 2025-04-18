@@ -37,6 +37,7 @@ export class FastRoughFilter {
 private:
     friend class BuildFastRoughFilterTask;
     friend class FastRoughFilterEvaluator;
+    friend struct BuildingSegmentFastFilters;
     static constexpr std::string_view JsonTagBuildTime = "fast_rough_filter_build_time";
 
     // in minmax build task, first set build_time_ to be the begin_ts of the task txn

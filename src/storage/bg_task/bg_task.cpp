@@ -88,4 +88,20 @@ DumpIndexBylineTask::DumpIndexBylineTask(SharedPtr<String> db_name,
 
 TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
+void BGBuildFastRoughFilterTask::Execute() {
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("build filter"), TransactionType::kNormal);
+
+    Status status = new_txn->BuildFastRoughFilter(db_name_, table_name_, segment_ids_);
+    if (status.ok()) {
+        status = new_txn_mgr->CommitTxn(new_txn);
+    }
+    if (!status.ok()) {
+        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+        if (!rollback_status.ok()) {
+            UnrecoverableError(rollback_status.message());
+        }
+    }
+}
+
 } // namespace infinity

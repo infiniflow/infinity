@@ -44,6 +44,7 @@ import segment_index_meta;
 import new_catalog;
 import meta_key;
 import db_meeta;
+import build_fast_rough_filter_task;
 
 import base_expression;
 import cast_expression;
@@ -692,6 +693,28 @@ Status NewTxn::CheckTableIfDelete(const String &db_name, const String &table_nam
     status = NewCatalog::CheckTableIfDelete(*table_meta, begin_ts, has_delete);
     if (!status.ok()) {
         return status;
+    }
+    return Status::OK();
+}
+
+Status NewTxn::BuildFastRoughFilter(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<SegmentID> *segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : segment_ids) {
+        if (auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id); iter == segment_ids_ptr->end()) {
+            continue;
+        }
+        SegmentMeta segment_meta(segment_id, *table_meta);
+        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
     }
     return Status::OK();
 }
@@ -1443,6 +1466,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             break;
         }
         if (segment_full) {
+            append_state->sealed_segments_.push_back(segment_meta->segment_id());
             // SegmentID next_segment_id = 0;
             // status = table_meta.GetNextSegmentID(next_segment_id);
             // if (!status.ok()) {

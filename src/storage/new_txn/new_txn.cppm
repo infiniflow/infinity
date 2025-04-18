@@ -314,6 +314,8 @@ public:
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
+    Status BuildFastRoughFilter(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
+
 private:
     Status ReplayCompact(WalCmdCompact *compact_cmd);
 

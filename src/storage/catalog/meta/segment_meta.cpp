@@ -518,7 +518,7 @@ Status SegmentMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_fi
 
 Status SegmentMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
     String filter_key = GetSegmentTag("fast_rough_filter");
-    String filter_str = fast_rough_filter_->SerializeToString();
+    String filter_str = fast_rough_filter->SerializeToString();
     Status status = kv_instance_.Put(filter_key, filter_str);
     if (!status.ok()) {
         return status;
