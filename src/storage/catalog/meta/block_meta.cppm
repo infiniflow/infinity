@@ -67,7 +67,9 @@ public:
 
     // Pair<ColumnID, Status> AddBlockColumnID1(TxnTimeStamp commit_ts);
     //
-    // Tuple<Vector<BlockID> *, Status> GetBlockColumnIDs1();
+    Tuple<Vector<ColumnID> *, Status> GetBlockColumnIDs1();
+
+    String GetBlockTag(const String &tag) const;
 
     Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
 
@@ -78,16 +80,14 @@ private:
 
     Status LoadVersionBuffer();
 
-    String GetBlockTag(const String &tag) const;
-
-    // Status LoadBlockColumnIDs1();
+    Status LoadBlockColumnIDs1();
 
 private:
     TxnTimeStamp begin_ts_ = 0;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;
-    // Optional<Vector<ColumnID>> column_ids1_;
+    Optional<Vector<ColumnID>> column_ids1_;
 
     SharedPtr<String> block_dir_;
     Optional<SizeT> row_cnt_;

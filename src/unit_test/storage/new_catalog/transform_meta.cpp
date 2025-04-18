@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <boost/asio/detail/socket_ops.hpp>
 #include <gtest/gtest.h>
+#include <numeric>
 
 import base_test;
 import stl;
@@ -32,6 +32,8 @@ import new_txn;
 import extra_ddl_info;
 import table_meeta;
 import table_index_meeta;
+import segment_meta;
+import block_meta;
 
 using namespace infinity;
 
@@ -95,6 +97,9 @@ TEST_P(TransformMeta, db_meta_transform_00) {
 
     Init();
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
 
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
@@ -135,8 +140,10 @@ TEST_P(TransformMeta, db_meta_transform_01) {
     new_catalog_ptr.reset();
 
     Init();
-
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
         Optional<DBMeeta> db_meta;
@@ -176,8 +183,10 @@ TEST_P(TransformMeta, db_meta_transform_02) {
     new_catalog_ptr.reset();
 
     Init();
-
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
         Optional<DBMeeta> db_meta;
@@ -217,8 +226,10 @@ TEST_P(TransformMeta, table_meta_transform_00) {
     new_catalog_ptr.reset();
 
     Init();
-
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
         Optional<DBMeeta> db_meta;
@@ -255,6 +266,9 @@ TEST_P(TransformMeta, table_index_transform_00) {
     Init();
 
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
         Optional<DBMeeta> db_meta;
@@ -296,20 +310,28 @@ TEST_P(TransformMeta, segment_transform_00) {
     Init();
 
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
+
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
+    auto [table_info, get_status] = txn->GetTableInfo("db1", "test_table");
+    EXPECT_TRUE(get_status.ok());
+
+    UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
+    TableMeeta table_meta{table_info->db_id_, table_info->table_id_, *kv_instance, txn->BeginTS()};
+
     {
-        auto [segment_p_s, status] = txn->GetSegmentsInfo("db1", "test_table");
-        EXPECT_TRUE(status.ok());
-        for (auto &segment_p : segment_p_s) {
-            auto segment_id = segment_p->segment_id_;
-            auto [_, status] = txn->GetSegmentInfo("db1", "test_table", segment_id);
-            EXPECT_TRUE(status.ok());
-        }
+        auto [segment_ids_ptr, segment_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(segment_status.ok());
+        EXPECT_EQ(segment_ids_ptr->size(), 1);
+        EXPECT_EQ(segment_ids_ptr->at(0), 0);
     }
 
-    status = new_txn_mgr->CommitTxn(txn);
+    new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
+    kv_instance->Commit();
     UnInit();
 }
 
@@ -335,27 +357,46 @@ TEST_P(TransformMeta, block_transform_00) {
     Init();
 
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    new_txn_mgr->PrintAllKeyValue();
+
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
+    auto [table_info, get_status] = txn->GetTableInfo("db1", "test_table");
+    EXPECT_TRUE(get_status.ok());
+
+    UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
+    TableMeeta table_meta{table_info->db_id_, table_info->table_id_, *kv_instance, txn->BeginTS()};
+
     {
-        auto [segment_p_s, status] = txn->GetSegmentsInfo("db1", "test_table");
-        EXPECT_TRUE(status.ok());
-        for (auto &segment_p : segment_p_s) {
-            auto segment_id = segment_p->segment_id_;
-            auto [block_p_s, status] = txn->GetBlocksInfo("db1", "test_table", segment_id);
-            EXPECT_TRUE(status.ok());
-            for (auto &block_p : block_p_s) {
-                auto block_id = block_p->block_id_;
-                auto [_, status] = txn->GetBlockInfo("db1", "test_table", segment_id, block_id);
-                EXPECT_TRUE(status.ok());
+        auto [segment_ids_ptr, segment_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(segment_status.ok());
+        EXPECT_EQ(segment_ids_ptr->size(), 1);
+        EXPECT_EQ(segment_ids_ptr->at(0), 0);
+        {
+            SegmentMeta segment_meta(0, table_meta);
+            {
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
+                EXPECT_TRUE(block_status.ok());
+                EXPECT_EQ(blocks->size(), 1);
+                EXPECT_EQ(blocks->at(0), 0);
+
+                BlockMeta block_meta{0, segment_meta};
+                {
+                    auto [block_columns, block_column_status] = block_meta.GetBlockColumnIDs1();
+                    EXPECT_TRUE(block_column_status.ok());
+                    EXPECT_EQ(block_columns->size(), 2);
+                    EXPECT_EQ(block_columns->at(0), 0);
+                    EXPECT_EQ(block_columns->at(1), 1);
+                }
             }
         }
     }
-    // Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id);
-    //
-    // Tuple<Vector<SharedPtr<BlockInfo>>, Status> GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id);
-    status = new_txn_mgr->CommitTxn(txn);
+
+    new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
+    kv_instance->Commit();
     UnInit();
 }
 
@@ -381,25 +422,23 @@ TEST_P(TransformMeta, block_column_transform_00) {
     Init();
 
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
-        auto [segment_p_s, status] = txn->GetSegmentsInfo("db1", "test_table");
-        EXPECT_TRUE(status.ok());
-        for (auto &segment_p : segment_p_s) {
-            auto segment_id = segment_p->segment_id_;
-            auto [block_p_s, status] = txn->GetBlocksInfo("db1", "test_table", segment_id);
+        {
+            auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", 0, 0, 0);
             EXPECT_TRUE(status.ok());
-            for (auto &block_p : block_p_s) {
-                auto block_id = block_p->block_id_;
-                {
-                    auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", segment_id, block_id, 0);
-                    EXPECT_TRUE(status.ok());
-                }
-                {
-                    auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", segment_id, block_id, 1);
-                    EXPECT_TRUE(status.ok());
-                }
-            }
+        }
+        {
+            auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", 0, 0, 1);
+            EXPECT_TRUE(status.ok());
+        }
+
+        {
+            auto [_, status] = txn->GetBlockColumnInfo("db1", "test_table", 0, 0, 11451);
+            EXPECT_FALSE(status.ok());
         }
     }
     //     Tuple<SharedPtr<BlockColumnInfo>, Status>
@@ -408,5 +447,149 @@ TEST_P(TransformMeta, block_column_transform_00) {
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
+    UnInit();
+}
+
+TEST_P(TransformMeta, block_column_transform_01) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = "/home/inf/Downloads/FULL.2000764.json";
+
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
+
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
+    auto [table_info, get_status] = txn->GetTableInfo("default_db", "my_table");
+    EXPECT_TRUE(get_status.ok());
+
+    UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
+    TableMeeta table_meta{table_info->db_id_, table_info->table_id_, *kv_instance, txn->BeginTS()};
+
+    {
+        auto [segment_ids_ptr, segment_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(segment_status.ok());
+        EXPECT_EQ(segment_ids_ptr->size(), 2);
+        EXPECT_EQ(segment_ids_ptr->at(0), 0);
+        EXPECT_EQ(segment_ids_ptr->at(1), 1);
+        {
+            SegmentMeta segment_meta{0, table_meta};
+            {
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
+                EXPECT_TRUE(block_status.ok());
+                EXPECT_EQ(blocks->size(), 1024);
+                EXPECT_EQ(blocks->at(0), 0);
+
+                BlockMeta block_meta{0, segment_meta};
+                {
+                    auto [block_columns, block_column_status] = block_meta.GetBlockColumnIDs1();
+                    EXPECT_TRUE(block_column_status.ok());
+                    EXPECT_EQ(block_columns->size(), 4);
+
+                    EXPECT_EQ(block_columns->at(0), 0);
+                    EXPECT_EQ(block_columns->at(1), 1);
+                    EXPECT_EQ(block_columns->at(2), 2);
+                    EXPECT_EQ(block_columns->at(3), 3);
+                }
+            }
+        }
+    }
+
+    new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    kv_instance->Commit();
+    UnInit();
+}
+
+TEST_P(TransformMeta, block_column_transform_02) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = "/home/inf/Downloads/FULL.52.json";
+
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_mgr->SetNewSystemTS(
+        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
+    // new_txn_mgr->PrintAllKeyValue();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    auto [table_info, get_status] = txn->GetTableInfo("default_db", "my_table_1");
+    EXPECT_TRUE(get_status.ok());
+
+    UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
+    TableMeeta table_meta{table_info->db_id_, table_info->table_id_, *kv_instance, txn->BeginTS()};
+
+    {
+        auto [segment_ids_ptr, segment_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(segment_status.ok());
+        EXPECT_EQ(segment_ids_ptr->size(), 1);
+        EXPECT_EQ(segment_ids_ptr->at(0), 0);
+        {
+            SegmentMeta segment_meta{0, table_meta};
+            {
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
+                EXPECT_TRUE(block_status.ok());
+                EXPECT_EQ(blocks->size(), 1);
+                EXPECT_EQ(blocks->at(0), 0);
+
+                BlockMeta block_meta{0, segment_meta};
+                {
+                    auto [block_columns, block_column_status] = block_meta.GetBlockColumnIDs1();
+                    EXPECT_TRUE(block_column_status.ok());
+                    EXPECT_EQ(block_columns->size(), 10);
+
+                    EXPECT_EQ(block_columns->at(0), 0);
+                    EXPECT_EQ(block_columns->at(1), 1);
+                    EXPECT_EQ(block_columns->at(2), 2);
+                    EXPECT_EQ(block_columns->at(3), 3);
+                    EXPECT_EQ(block_columns->at(4), 4);
+                    EXPECT_EQ(block_columns->at(5), 5);
+                    EXPECT_EQ(block_columns->at(6), 6);
+                    EXPECT_EQ(block_columns->at(7), 7);
+                    EXPECT_EQ(block_columns->at(8), 8);
+                    EXPECT_EQ(block_columns->at(9), 9);
+                }
+            }
+        }
+    }
+
+    new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    kv_instance->Commit();
     UnInit();
 }

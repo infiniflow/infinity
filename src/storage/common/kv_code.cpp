@@ -213,13 +213,13 @@ String KeyEncode::CatalogTableSegmentBlockColumnKey(const String &db_id,
                                                     TxnTimeStamp ts) {
     return fmt::format("catalog|blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, ts);
 }
-// String KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const String &db_id,
-//                                                     const String &table_id,
-//                                                     SegmentID segment_id,
-//                                                     BlockID block_id,
-//                                                     ColumnID column_id) {
-//     return fmt::format("catalog|blk_col|{}|{}|{}|{}|{}|", db_id, table_id, segment_id, block_id, column_id);
-// }
+String KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(const String &db_id,
+                                                          const String &table_id,
+                                                          SegmentID segment_id,
+                                                          BlockID block_id/*,
+                                                          ColumnID column_id*/) {
+    return fmt::format("catalog|blk_col|{}|{}|{}|{}|", db_id, table_id, segment_id, block_id);
+}
 String KeyEncode::CatalogTableSegmentBlockColumnTagKey(const String &db_id,
                                                        const String &table_id,
                                                        SegmentID segment_id,

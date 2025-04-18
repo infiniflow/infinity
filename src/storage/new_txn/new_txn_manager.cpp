@@ -324,6 +324,11 @@ Vector<SharedPtr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
     return txn_context_histories;
 }
 
+void NewTxnManager::SetNewSystemTS(TxnTimeStamp new_system_ts) {
+    current_ts_ = new_system_ts;
+    prepare_commit_ts_ = new_system_ts;
+}
+
 TxnTimeStamp NewTxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {

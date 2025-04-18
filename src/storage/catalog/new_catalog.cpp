@@ -263,36 +263,6 @@ Status NewCatalog::TransformCatalogSegment(TableMeeta &table_meta, const nlohman
 }
 
 Status NewCatalog::TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json) {
-    // Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
-    //     Status status;
-    //
-    //     BlockID block_id;
-    //     std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    //     block_meta.emplace(block_id, segment_meta);
-    //     status = block_meta->InitSet();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    //     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-    //     {
-    //         TableMeeta &table_meta = segment_meta.table_meta();
-    //         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-    //     for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
-    //         ColumnMeta column_meta(column_idx, *block_meta);
-    //         status = column_meta.InitSet();
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-    //     return Status::OK();
-    // }
     TxnTimeStamp block_commit_ts = block_entry_json["commit_ts"];
     Optional<BlockMeta> block_meta;
     Status status = NewCatalog::AddNewBlockForTransform(segment_meta, block_commit_ts, block_meta);

@@ -35,6 +35,7 @@ import meta_info;
 import column_def;
 import column_meta;
 import fast_rough_filter;
+import kv_code;
 
 namespace infinity {
 
@@ -203,6 +204,16 @@ Status BlockMeta::LoadVersionBuffer() {
     }
 
     return Status::OK();
+}
+
+Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
+    if (!column_ids1_) {
+        Status status = LoadBlockColumnIDs1();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {&*column_ids1_, Status::OK()};
 }
 
 String BlockMeta::GetBlockTag(const String &tag) const {
@@ -427,25 +438,29 @@ Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filte
 //     return {&*column_ids1_, Status::OK()};
 // }
 //
-// Status BlockMeta::LoadBlockColumnIDs1() {
-//     column_ids1_ = Vector<ColumnID>();
-//     Vector<ColumnID> &column_ids = *column_ids1_;
-//
-//     String block_column_id_prefix = KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(),
-//     segment_id_, block_id_, ); auto iter = kv_instance_.GetIterator(); iter->Seek(block_column_id_prefix); while (iter->Valid() &&
-//     iter->Key().starts_with(block_column_id_prefix)) {
-//         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-//         if (commit_ts > begin_ts_) {
-//             iter->Next();
-//             continue;
-//         }
-//         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_column_id_prefix.size()));
-//         column_ids.push_back(block_id);
-//         iter->Next();
-//     }
-//
-//     std::sort(column_ids.begin(), column_ids.end());
-//     return Status::OK();
-// }
+Status BlockMeta::LoadBlockColumnIDs1() {
+    column_ids1_ = Vector<ColumnID>();
+    Vector<ColumnID> &column_ids = *column_ids1_;
+
+    auto &table_meta = segment_meta_.table_meta();
+
+    String block_column_id_prefix =
+        KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(block_column_id_prefix);
+    while (iter->Valid() && iter->Key().starts_with(block_column_id_prefix)) {
+        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+        if (commit_ts > begin_ts_) {
+            iter->Next();
+            continue;
+        }
+        BlockID block_id = std::stoull(iter->Key().ToString().substr(block_column_id_prefix.size()));
+        column_ids.push_back(block_id);
+        iter->Next();
+    }
+
+    std::sort(column_ids.begin(), column_ids.end());
+    return Status::OK();
+}
 
 } // namespace infinity

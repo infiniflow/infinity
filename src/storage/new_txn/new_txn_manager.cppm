@@ -82,6 +82,9 @@ public:
 
     Vector<SharedPtr<TxnContext>> GetTxnContextHistories() const;
 
+    // This function is only used for unit test.
+    void SetNewSystemTS(TxnTimeStamp new_system_ts);
+
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
