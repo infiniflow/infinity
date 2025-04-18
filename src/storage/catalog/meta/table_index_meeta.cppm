@@ -69,7 +69,11 @@ public:
 
     Status InitSet(const SharedPtr<IndexBase> &index_base);
 
+    Status InitSet1(const SharedPtr<IndexBase> &index_base);
+
     Status UninitSet();
+
+    Status UninitSet1();
 
 private:
     Status LoadIndexDef();

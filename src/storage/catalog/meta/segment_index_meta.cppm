@@ -67,9 +67,13 @@ public:
 
     Status InitSet();
 
+    Status InitSet1();
+
     Status LoadSet();
 
     Status UninitSet();
+
+    Status UninitSet1();
 
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 

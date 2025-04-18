@@ -235,6 +235,43 @@ Status SegmentIndexMeta::InitSet() {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::InitSet1() {
+    {
+        Status status = SetNextChunkID(0);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = SetNoMemIndex();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        auto [index_base, status] = table_index_meta_.GetIndexBase();
+        if (!status.ok()) {
+            return status;
+        }
+        if (index_base->index_type_ == IndexType::kFullText) {
+            auto ft_info = MakeShared<SegmentIndexFtInfo>();
+            Status status = this->SetFtInfo(ft_info);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::LoadSet() {
     {
         String mem_index_key = GetSegmentIndexTag("mem_index");
@@ -287,6 +324,59 @@ Status SegmentIndexMeta::UninitSet() {
         has_mem_index_.reset();
     }
     {
+        String ft_info_key = GetSegmentIndexTag("ft_info");
+        Status status = kv_instance_.Delete(ft_info_key);
+        if (!status.ok()) {
+            return status;
+        }
+        ft_info_.reset();
+    }
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::UninitSet1() {
+    {
+        // Remove all chunk ids
+        TableMeeta &table_meta = table_index_meta_.table_meta();
+        String chunk_id_prefix =
+            KeyEncode::CatalogIdxChunkPrefix(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_);
+        auto iter = kv_instance_.GetIterator();
+        iter->Seek(chunk_id_prefix);
+        while (iter->Valid() && iter->Key().starts_with(chunk_id_prefix)) {
+            kv_instance_.Delete(iter->Key().ToString());
+            iter->Next();
+        }
+        chunk_ids_.reset();
+    }
+    {
+        // Remove next chunk id
+        String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+        Status status = kv_instance_.Delete(next_chunk_id_key);
+        if (!status.ok()) {
+            return status;
+        }
+        next_chunk_id_.reset();
+    }
+    {
+        // Remove mem index
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        // Remove mem index indicator
+        String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        Status status = kv_instance_.Delete(has_mem_index_key);
+        if (!status.ok()) {
+            return status;
+        }
+        has_mem_index_.reset();
+    }
+    {
+        // Remove ft_info tag
         String ft_info_key = GetSegmentIndexTag("ft_info");
         Status status = kv_instance_.Delete(ft_info_key);
         if (!status.ok()) {
@@ -400,7 +490,7 @@ Status SegmentIndexMeta::LoadChunkIDs() {
 
 Status SegmentIndexMeta::LoadChunkIDs1() {
     chunk_ids_ = Vector<ChunkID>();
-    Vector<SegmentID> &chunk_ids = *chunk_ids_;
+    Vector<ChunkID> &chunk_ids = *chunk_ids_;
     TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
 
     TableMeeta &table_meta = table_index_meta_.table_meta();

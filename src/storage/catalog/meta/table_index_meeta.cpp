@@ -193,6 +193,25 @@ Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
     return Status::OK();
 }
 
+Status TableIndexMeeta::InitSet1(const SharedPtr<IndexBase> &index_base) {
+    {
+        Status status = SetIndexBase(index_base);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+        auto segment_update_ts = MakeShared<SegmentUpdateTS>();
+        Status status = new_catalog->AddSegmentUpdateTS(segment_update_ts_key, segment_update_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status TableIndexMeeta::UninitSet() {
     Status status;
 
@@ -221,6 +240,47 @@ Status TableIndexMeeta::UninitSet() {
         return status;
     }
 
+    String index_def_key = GetTableIndexTag("index_base");
+    status = kv_instance_.Delete(index_def_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status TableIndexMeeta::UninitSet1() {
+    Status status;
+
+    SharedPtr<IndexBase> index_base;
+    std::tie(index_base, status) = GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        status = table_meta_.RemoveFtIndexCache();
+        if (!status.ok()) {
+            return status;
+        }
+
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+        status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    // Remove all segment index ids
+    String segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(segment_id_prefix);
+    while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
+        kv_instance_.Delete(iter->Key().ToString());
+        iter->Next();
+    }
+
+    // Remove index definition
     String index_def_key = GetTableIndexTag("index_base");
     status = kv_instance_.Delete(index_def_key);
     if (!status.ok()) {
