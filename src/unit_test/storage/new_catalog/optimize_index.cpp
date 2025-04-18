@@ -644,7 +644,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
     };

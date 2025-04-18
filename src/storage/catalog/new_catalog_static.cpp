@@ -153,9 +153,8 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
 
-        Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
-        if (!status.ok()) {
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs();
+        if (!chunk_status.ok()) {
             return status;
         }
         for (ChunkID chunk_id : *chunk_ids_ptr) {
@@ -819,10 +818,8 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 }
 
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
-    Status status;
 
-    Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
     if (!status.ok()) {
         return status;
     }
@@ -1165,8 +1162,7 @@ Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vec
 }
 
 Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths) {
-    Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
     if (!status.ok()) {
         return status;
     }

@@ -179,20 +179,16 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                                   const String &table_name,
                                   const String &db_name,
                                   const String &table_key) {
-    Status status;
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     TableMeeta &table_meta = table_index_meta.table_meta();
     SegmentID segment_id = segment_index_meta.segment_id();
 
-    Vector<ChunkID> *old_chunk_ids_ptr = nullptr;
-    {
-        status = segment_index_meta.GetChunkIDs(old_chunk_ids_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-        if (old_chunk_ids_ptr->size() <= 1) {
-            return Status::OK();
-        }
+    auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    if (old_chunk_ids_ptr->size() <= 1) {
+        return Status::OK();
     }
     RowID base_rowid;
     u32 row_cnt = 0;
@@ -719,8 +715,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     }
     Vector<ChunkID> old_chunk_ids;
     {
-        Vector<ChunkID> *old_chunk_ids_ptr = nullptr;
-        Status status = segment_index_meta->GetChunkIDs(old_chunk_ids_ptr);
+        auto [old_chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs();
         if (!status.ok()) {
             return status;
         }
@@ -835,7 +830,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     {
         HashSet<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
         if (!status.ok()) {
             return status;
         }
@@ -1054,8 +1049,7 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
 
     Vector<ChunkID> chunk_ids;
     {
-        Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
         if (!status.ok()) {
             return status;
         }
@@ -1206,7 +1200,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
         return status;
     }
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
     if (!status.ok()) {
         return status;
     }
@@ -1507,7 +1501,7 @@ Status NewTxn::AddChunkWal(const String &db_name,
 Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges) {
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
     if (!status.ok()) {
         return status;
     }

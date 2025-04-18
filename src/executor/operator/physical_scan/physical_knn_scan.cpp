@@ -798,8 +798,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         }
 
         auto get_chunks = [&segment_index_meta] {
-            Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            Status status = segment_index_meta->GetChunkIDs(chunk_ids_ptr);
+            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs();
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

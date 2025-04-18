@@ -41,7 +41,7 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Status GetChunkIDs(Vector<ChunkID> *&chunk_ids);
+    Tuple<Vector<ChunkID> *, Status> GetChunkIDs();
 
     Status GetNextChunkID(ChunkID &chunk_id);
 

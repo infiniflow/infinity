@@ -271,7 +271,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
         ChunkID chunk_id = 0;
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
             chunk_id = (*chunk_ids_ptr)[0];

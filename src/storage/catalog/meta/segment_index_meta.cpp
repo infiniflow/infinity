@@ -43,15 +43,14 @@ SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_
 
 SegmentIndexMeta::~SegmentIndexMeta() = default;
 
-Status SegmentIndexMeta::GetChunkIDs(Vector<ChunkID> *&chunk_ids) {
+Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs() {
     if (!chunk_ids_) {
         Status status = LoadChunkIDs();
         if (!status.ok()) {
-            return status;
+            return {nullptr, status};
         }
     }
-    chunk_ids = &chunk_ids_.value();
-    return Status::OK();
+    return {&*chunk_ids_, Status::OK()};
 }
 
 Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
