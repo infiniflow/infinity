@@ -70,6 +70,7 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
         return true;
     }
 
+    auto *table_info = base_table_ref_->table_info_.get();
     bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     if (use_new_catalog) {
         NewTxn *new_txn = query_context->GetNewTxn();
@@ -85,7 +86,6 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
     }
 
     auto *txn = query_context->GetTxn();
-    auto *table_info = base_table_ref_->table_info_.get();
     auto [table_entry, get_table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
     if (!get_table_status.ok()) {
         operator_state->status_ = get_table_status;
