@@ -146,7 +146,7 @@ public:
 
     bool CheckConflict1(NewTxn *check_txn, String &conflict_reason);
 
-    Status PrepareCommit();
+    Status PrepareCommit(TxnTimeStamp commit_ts);
 
     void CommitBottom();
 
@@ -386,6 +386,8 @@ public:
     KVInstance *kv_instance() const { return kv_instance_.get(); }
 
     Status PrintVersion(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool ignore_invisible);
+
+    void AddMetaKeyForCommit(const String &key);
 
 private:
     void CheckTxnStatus();
@@ -635,6 +637,8 @@ private:
 
     // ADMIN command which allowed in follower and learner
     bool allowed_in_reader_{false};
+
+    Vector<String> keys_wait_for_commit_{};
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};

@@ -123,10 +123,14 @@ Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
 
 Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
 
+    TableMeeta &table_meta = table_index_meta_.table_meta();
+    String chunk_id_key =
+        KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
     String commit_ts_str;
     switch (new_txn->GetTxnState()) {
         case TxnState::kStarted: {
             commit_ts_str = "-1"; // Wait for commit
+            new_txn->AddMetaKeyForCommit(chunk_id_key);
             break;
         }
         case TxnState::kCommitting:
@@ -138,9 +142,6 @@ Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
             UnrecoverableError(fmt::format("Invalid transaction state: {}", TxnState2Str(new_txn->GetTxnState())));
         }
     }
-    TableMeeta &table_meta = table_index_meta_.table_meta();
-    String chunk_id_key =
-        KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
 }
 

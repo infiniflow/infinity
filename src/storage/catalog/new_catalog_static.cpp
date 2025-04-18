@@ -887,7 +887,7 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
         }
     }
     {
-        Status status = segment_index_meta.AddChunkID(chunk_id);
+        Status status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
         if (!status.ok()) {
             return status;
         }

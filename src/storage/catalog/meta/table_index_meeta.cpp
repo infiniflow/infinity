@@ -119,10 +119,12 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
 
 Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn) {
 
+    String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
     String commit_ts_str;
     switch (new_txn->GetTxnState()) {
         case TxnState::kStarted: {
             commit_ts_str = "-1"; // Wait for commit
+            new_txn->AddMetaKeyForCommit(segment_id_key);
             break;
         }
         case TxnState::kCommitting:
@@ -135,7 +137,6 @@ Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn
         }
     }
 
-    String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
     return kv_instance_.Put(segment_id_key, commit_ts_str);
 }
 

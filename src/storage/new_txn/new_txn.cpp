@@ -977,6 +977,8 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
     return Status::OK();
 }
 
+void NewTxn::AddMetaKeyForCommit(const String &key) { keys_wait_for_commit_.push_back(key); }
+
 TxnTimeStamp NewTxn::CommitTS() const {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
     return txn_context_ptr_->commit_ts_;
@@ -1080,7 +1082,7 @@ Status NewTxn::Commit() {
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
 
-    Status status = this->PrepareCommit();
+    Status status = this->PrepareCommit(commit_ts);
 
     // For non-replay transaction
     if (status.ok()) {
@@ -1130,7 +1132,7 @@ Status NewTxn::CommitReplay() {
     this->SetTxnCommitting(commit_ts);
 
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
-    Status status = this->PrepareCommit();
+    Status status = this->PrepareCommit(commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Replay transaction, prepare commit: {}", status.message()));
     }
@@ -1181,7 +1183,7 @@ Status NewTxn::PostReadTxnCommit() {
     return Status::OK();
 }
 
-Status NewTxn::PrepareCommit() {
+Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
     // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
@@ -1365,6 +1367,11 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
         }
+    }
+
+    String commit_ts_str = std::to_string(commit_ts);
+    for (const String &meta_key : keys_wait_for_commit_) {
+        kv_instance_->Put(meta_key, commit_ts_str);
     }
     return Status::OK();
 }
