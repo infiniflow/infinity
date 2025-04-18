@@ -1736,7 +1736,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
     Optional<TableIndexMeeta> table_index_meta_opt;
-    status = NewCatalog::AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
+    status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
         return status;
     }

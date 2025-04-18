@@ -152,7 +152,7 @@ Status TableIndexMeeta::UpdateFulltextSegmentTS(TxnTimeStamp ts) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
+Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog) {
     {
         Status status = SetSegmentIDs({});
         if (!status.ok()) {
@@ -166,7 +166,6 @@ Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
         }
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
         auto segment_update_ts = MakeShared<SegmentUpdateTS>();
         Status status = new_catalog->AddSegmentUpdateTS(segment_update_ts_key, segment_update_ts);

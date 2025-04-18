@@ -266,20 +266,78 @@ TEST_P(TransformMeta, table_index_transform_00) {
     Init();
 
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    new_txn_mgr->SetNewSystemTS(
-        std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
-    // new_txn_mgr->PrintAllKeyValue();
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
     {
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        status = txn->GetTableMeta("db1", "test_table", db_meta, table_meta);
+        status = txn->GetTableMeta("default_db", "student", db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-
+        // // Status GetTableMeta(const String &db_name,
+        // //                     const String &table_name,
+        // //                     Optional<DBMeeta> &db_meta,
+        // //                     Optional<TableMeeta> &table_meta,
+        // //                     String *table_key = nullptr);
         Optional<TableIndexMeeta> table_index_meta;
 
-        status = txn->GetTableIndexMeta("idx_test_table_age", table_meta.value(), table_index_meta);
+        status = txn->GetTableIndexMeta("idx_student_name", table_meta.value(), table_index_meta);
         EXPECT_TRUE(status.ok());
+        // if (table_meta.has_value()) {
+        status = txn->GetTableIndexMeta("idx_student_id", table_meta.value(), table_index_meta);
+        EXPECT_TRUE(status.ok());
+        // }
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
+}
+
+TEST_P(TransformMeta, table_index_transform_01) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/table_index_01.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    status = kv_store_ptr->Flush();
+    EXPECT_TRUE(status.ok());
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn->GetTableMeta("default_db", "my_table", db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+        status = txn->GetTableMeta("default_db", "my_table", db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+        Optional<TableIndexMeeta> table_index_meta;
+
+        status = txn->GetTableIndexMeta("age_secondary_index", table_meta.value(), table_index_meta);
+        EXPECT_TRUE(status.ok());
+        status = txn->GetTableIndexMeta("sparse_vector_bmp_index", table_meta.value(), table_index_meta);
+        EXPECT_TRUE(status.ok());
+        status = txn->GetTableIndexMeta("vector_ivf_index", table_meta.value(), table_index_meta);
+        EXPECT_TRUE(status.ok());
+        status = txn->GetTableIndexMeta("doc_fulltext_index", table_meta.value(), table_index_meta);
+        EXPECT_TRUE(status.ok());
+        status = txn->GetTableIndexMeta("vector_hnsw_index", table_meta.value(), table_index_meta);
+        EXPECT_TRUE(status.ok());
+        auto segmentindexmeta = SegmentIndexMeta(0, table_index_meta.value());
+        txn->GetSegmentIndexInfo("default_db", "my_table", "age_secondary_index", 0);
+        txn->GetChunkIndexInfo("default_db", "my_table", "age_secondary_index", 0, 0);
     }
 
     status = new_txn_mgr->CommitTxn(txn);
@@ -586,6 +644,8 @@ TEST_P(TransformMeta, block_column_transform_02) {
             }
         }
     }
+    //     Tuple<SharedPtr<BlockColumnInfo>, Status>
+    // GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
 
     new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
