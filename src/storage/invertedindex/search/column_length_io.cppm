@@ -21,7 +21,6 @@ export module column_length_io;
 import stl;
 import index_defines;
 import internal_types;
-import chunk_index_entry;
 import memory_indexer;
 import buffer_obj;
 import buffer_handle;
@@ -29,10 +28,13 @@ import column_index_reader;
 
 namespace infinity {
 class FileSystem;
+class ColumnReaderChunkInfo;
 
 export class FullTextColumnLengthReader {
 public:
     explicit FullTextColumnLengthReader(ColumnIndexReader *reader);
+
+    ~FullTextColumnLengthReader();
 
     inline u32 GetColumnLength(RowID row_id) {
         if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) [[likely]] {
@@ -55,7 +57,9 @@ public:
 private:
     u32 SeekFile(RowID row_id);
     const String &index_dir_;
-    const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; // must in ascending order
+    // const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; 
+    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_; // must in ascending order
+
     SharedPtr<MemoryIndexer> memory_indexer_;
     u64 total_df_;
     float avg_column_len_;

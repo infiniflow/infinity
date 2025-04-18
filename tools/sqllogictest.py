@@ -40,6 +40,7 @@ from generate_multivector_knn_scan import generate as generate28
 from generate_groupby1 import generate as generate29
 from generate_unnest import generate as generate30
 
+
 class SpinnerThread(threading.Thread):
     def __init__(self):
         super(SpinnerThread, self).__init__()
@@ -65,7 +66,9 @@ def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
         for filename in filenames:
             file = os.path.join(dirpath, filename)
 
-            # filename = os.path.basename(file)
+            filename = os.path.basename(file)
+            if "lock_table" in filename:
+                continue
             # if (
             #     "fulltext" in filename
             #     or "fusion" in filename

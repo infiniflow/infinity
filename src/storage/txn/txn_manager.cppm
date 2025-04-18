@@ -20,7 +20,6 @@ import stl;
 import txn;
 import buffer_manager;
 import txn_state;
-import wal_entry;
 import default_values;
 import txn_context;
 

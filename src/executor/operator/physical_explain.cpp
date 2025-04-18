@@ -19,7 +19,6 @@ module;
 module physical_explain;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;

@@ -27,12 +27,15 @@ import status;
 import parsed_expr;
 import function_expr;
 import constant_expr;
+import block_index;
 
 namespace infinity {
 
 FilterFulltextExpression::FilterFulltextExpression(String fields, String matching_text, String options_text)
     : BaseExpression(ExpressionType::kFilterFullText, Vector<SharedPtr<BaseExpression>>()), fields_(std::move(fields)),
       matching_text_(std::move(matching_text)), options_text_(std::move(options_text)) {}
+
+FilterFulltextExpression::~FilterFulltextExpression() = default;
 
 String FilterFulltextExpression::ToString() const {
     if (!alias_.empty()) {

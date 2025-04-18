@@ -28,11 +28,9 @@ import roaring_bitmap;
 import internal_types;
 import base_entry;
 import block_column_entry;
-import block_version;
 import fast_rough_filter;
 import value;
 import buffer_obj;
-import wal_entry;
 import column_def;
 import txn_store;
 import cleanup_scanner;
@@ -47,6 +45,7 @@ class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
+struct WalBlockInfo;
 
 /// class BlockEntry
 export struct BlockEntry final : public BaseEntry {
@@ -186,7 +185,7 @@ public:
 
     i32 GetAvailableCapacity();
 
-    String VersionFilePath() { return VirtualStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
+    String VersionFilePath();
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 

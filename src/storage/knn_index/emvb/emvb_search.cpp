@@ -32,7 +32,6 @@ import emvb_product_quantization;
 import emvb_shared_vec;
 import infinity_exception;
 import roaring_bitmap;
-import segment_entry;
 import block_index;
 import knn_filter;
 
@@ -380,7 +379,6 @@ Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>
                                                                                                  const f32 thresh_query,
                                                                                                  Bitmask &bitmask,
                                                                                                  const u32 start_segment_offset,
-                                                                                                 const SegmentEntry *segment_entry,
                                                                                                  const BlockIndex *block_index,
                                                                                                  const TxnTimeStamp begin_ts) const {
     assert(n_centroids_ % 8 == 0);

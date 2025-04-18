@@ -17,7 +17,6 @@ module;
 export module memindex_tracer;
 
 import stl;
-import bg_task;
 import third_party;
 import logger;
 import global_resource_usage;
@@ -28,6 +27,7 @@ class BaseMemIndex;
 class Txn;
 struct Catalog;
 class TxnManager;
+class DumpIndexTask;
 
 export struct MemIndexTracerInfo {
 public:
@@ -51,6 +51,10 @@ public:
 
     void IncreaseMemoryUsage(SizeT usage);
 
+private:
+    bool TryTriggerDump();
+
+public:
     void DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index);
 
     void DumpFail(BaseMemIndex *mem_index);
@@ -93,29 +97,16 @@ inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
     if (SizeT new_index_memory = old_index_memory + add; new_index_memory > index_memory_limit_) {
         if (new_index_memory > index_memory_limit_ + acc_proposed_dump_.load()) {
             LOG_TRACE(fmt::format("acc_proposed_dump_ = {}", acc_proposed_dump_.load()));
-            auto dump_task = MakeDumpTask();
-            if (dump_task.get() != nullptr) {
-                LOG_TRACE(fmt::format("Dump triggered!"));
-                TriggerDump(std::move(dump_task));
-            }
+            TryTriggerDump();
         }
     }
 }
 
 export class BGMemIndexTracer : public MemIndexTracer {
 public:
-    BGMemIndexTracer(SizeT index_memory_limit, Catalog *catalog, TxnManager *txn_mgr)
-        : MemIndexTracer(index_memory_limit), catalog_(catalog), txn_mgr_(txn_mgr) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("BGMemIndexTracer");
-#endif
-    }
+    BGMemIndexTracer(SizeT index_memory_limit, Catalog *catalog, TxnManager *txn_mgr);
 
-    ~BGMemIndexTracer() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("BGMemIndexTracer");
-#endif
-    }
+    ~BGMemIndexTracer();
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override;
 

@@ -26,7 +26,7 @@ import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-
+import block_index;
 import status;
 import infinity_exception;
 import index_base;
@@ -42,6 +42,7 @@ import wal_manager;
 import infinity_context;
 import table_entry;
 import table_index_entry;
+import new_txn;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
@@ -69,9 +70,22 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
         return true;
     }
 
-    auto *txn = query_context->GetTxn();
     auto *table_info = base_table_ref_->table_info_.get();
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
 
+        Status status = new_txn->CreateIndex(*table_info->db_name_, *table_info->table_name_, index_def_ptr_, conflict_type_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            return false;
+        }
+
+        operator_state->SetComplete();
+        return true;
+    }
+
+    auto *txn = query_context->GetTxn();
     auto [table_entry, get_table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
     if (!get_table_status.ok()) {
         operator_state->status_ = get_table_status;

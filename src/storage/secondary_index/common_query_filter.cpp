@@ -49,6 +49,13 @@ import logger;
 import index_defines;
 import logger;
 
+import new_txn;
+import status;
+import segment_meta;
+import block_meta;
+import column_meta;
+import new_catalog;
+
 namespace infinity {
 
 void ReadDataBlock(DataBlock *output,
@@ -65,6 +72,33 @@ void ReadDataBlock(DataBlock *output,
             output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else if (column_should_load[i]) {
             ColumnVector column_vector = current_block_entry->GetConstColumnVector(buffer_mgr, column_id);
+            output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
+        } else {
+            // no need to load this column
+            output->column_vectors[i]->Finalize(row_count);
+        }
+    }
+    output->Finalize();
+}
+
+void ReadDataBlock(DataBlock *output,
+                   const SizeT row_count,
+                   BlockMeta &block_meta,
+                   const Vector<SizeT> &column_ids,
+                   const Vector<bool> &column_should_load) {
+    const BlockID block_id = block_meta.block_id();
+    const SegmentID segment_id = block_meta.segment_meta().segment_id();
+    for (SizeT i = 0; i < column_ids.size(); ++i) {
+        if (const SizeT column_id = column_ids[i]; column_id == COLUMN_IDENTIFIER_ROW_ID) {
+            const u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+            output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
+        } else if (column_should_load[i]) {
+            ColumnMeta column_meta(column_id, block_meta);
+            ColumnVector column_vector;
+            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, column_vector);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
             output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
         } else {
             // no need to load this column
@@ -135,7 +169,36 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
     }
 }
 
+CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, NewTxn *new_txn)
+    : txn_ptr_(nullptr), new_txn_ptr_(new_txn), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
+    const auto &segment_index = base_table_ref_->block_index_->new_segment_block_index_;
+    if (segment_index.empty()) {
+        finish_build_.test_and_set(std::memory_order_release);
+    } else {
+        tasks_.reserve(segment_index.size());
+        for (const auto &[segment_id, _] : segment_index) {
+            tasks_.push_back(segment_id);
+        }
+        total_task_num_ = tasks_.size();
+    }
+
+    bool has_delete = false;
+    Status status = new_txn->CheckTableIfDelete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_, has_delete);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Check table has delete error: {}", status.message()));
+    }
+    always_true_ = original_filter_ == nullptr && !has_delete;
+
+    if (always_true_) {
+        finish_build_.test_and_set(std::memory_order_release);
+    }
+}
+
 void CommonQueryFilter::BuildFilter(u32 task_id) {
+    if (txn_ptr_ == nullptr) {
+        NewBuildFilter(task_id);
+        return;
+    }
     auto *buffer_mgr = txn_ptr_->buffer_mgr();
     TxnTimeStamp begin_ts = txn_ptr_->BeginTS();
     const auto &segment_index = base_table_ref_->block_index_->segment_block_index_;
@@ -200,6 +263,96 @@ void CommonQueryFilter::BuildFilter(u32 task_id) {
     }
     // Remove deleted rows from the result
     segment_entry->CheckRowsVisible(result_elem, begin_ts);
+    result_elem.RunOptimize();
+    if (const auto result_count = result_elem.CountTrue(); result_count) {
+        std::lock_guard lock(result_mutex_);
+        filter_result_count_ += result_count;
+        filter_result_.emplace(segment_id, std::move(result_elem));
+    }
+}
+
+void CommonQueryFilter::NewBuildFilter(u32 task_id) {
+    const auto &segment_index = base_table_ref_->block_index_->new_segment_block_index_;
+    const SegmentID segment_id = tasks_[task_id];
+    SegmentMeta *segment_meta = segment_index.at(segment_id).segment_meta_.get();
+    TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
+    {
+        SharedPtr<FastRoughFilter> segment_filter;
+        Status status = segment_meta->GetFastRoughFilter(segment_filter);
+        if (status.ok()) {
+            if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
+                // skip this segment
+                return;
+            }
+        }
+    }
+
+    SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
+    if (result_elem.CountTrue() == 0) {
+        // empty result
+        return;
+    }
+    if (result_elem.count() != segment_row_count) {
+        UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count: {}, result_elem.count(): {}",
+                                       segment_id,
+                                       segment_row_count,
+                                       result_elem.count()));
+    }
+    if (leftover_filter_) {
+        SizeT segment_row_count_read = 0;
+        auto filter_state = ExpressionState::CreateState(leftover_filter_);
+        auto db_for_filter_p = MakeUnique<DataBlock>();
+        auto db_for_filter = db_for_filter_p.get();
+        Vector<SharedPtr<DataType>> read_column_types = *(base_table_ref_->column_types_);
+        Vector<SizeT> column_ids = base_table_ref_->column_ids_;
+        if (read_column_types.empty() || read_column_types.back()->type() != LogicalType::kRowID) {
+            read_column_types.push_back(MakeShared<DataType>(LogicalType::kRowID));
+            column_ids.push_back(COLUMN_IDENTIFIER_ROW_ID);
+        }
+        // collect the base_table_ref columns used in filter
+        Vector<bool> column_should_load(column_ids.size(), false);
+        CollectUsedColumnRef(leftover_filter_.get(), column_should_load);
+        db_for_filter->Init(read_column_types);
+        auto bool_column = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean));
+        // filter and build bitmask, if filter_expression_ != nullptr
+        ExpressionEvaluator expr_evaluator;
+
+        auto [block_ids_ptr, status] = segment_meta->GetBlockIDs1();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, *segment_meta);
+
+            auto [block_row_count, status] = block_meta.GetRowCnt1();
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            const auto row_count = std::min<SizeT>(segment_row_count - segment_row_count_read, block_row_count);
+            db_for_filter->Reset(row_count);
+            ReadDataBlock(db_for_filter, row_count, block_meta, column_ids, column_should_load);
+            bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
+            expr_evaluator.Init(db_for_filter);
+            expr_evaluator.Execute(leftover_filter_, filter_state, bool_column);
+            const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
+            SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
+            MergeFalseIntoBitmask(bool_column_buffer, null_mask, row_count, result_elem, segment_row_count_read);
+            segment_row_count_read += row_count;
+            bool_column->Reset();
+        }
+        if (segment_row_count_read < segment_row_count) {
+            UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_read: {}, segment_row_count: {}",
+                                           segment_id,
+                                           segment_row_count_read,
+                                           segment_row_count));
+        }
+    }
+    // Remove deleted rows from the result
+    Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, result_elem);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     result_elem.RunOptimize();
     if (const auto result_count = result_elem.CountTrue(); result_count) {
         std::lock_guard lock(result_mutex_);

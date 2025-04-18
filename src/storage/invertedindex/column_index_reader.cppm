@@ -25,18 +25,35 @@ import index_defines;
 // import memory_indexer;
 import internal_types;
 import segment_index_entry;
-import chunk_index_entry;
 import logger;
+import status;
 
 namespace infinity {
 struct TableEntry;
 class TermDocIterator;
 class Txn;
+class NewTxn;
 class MemoryIndexer;
+class TableIndexMeeta;
+class BufferObj;
+struct SegmentIndexFtInfo;
+
+struct ColumnReaderChunkInfo {
+    BufferObj *index_buffer_ = nullptr;
+    RowID base_rowid_{};
+    u32 row_count_{};
+
+    SegmentID segment_id_ = 0;
+    ChunkID chunk_id_ = 0;
+};
 
 export class ColumnIndexReader {
 public:
+    ~ColumnIndexReader();
+
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn);
+
+    Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
 
     UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
 
@@ -58,6 +75,8 @@ private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
+    Map<SegmentID, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_infos_;
+
     u64 total_df_ = 0;
     float avg_column_length_ = 0.0f;
 
@@ -66,8 +85,9 @@ public:
     String analyzer_;
     // for loading column length files
     String index_dir_;
-    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_;
     SharedPtr<MemoryIndexer> memory_indexer_{nullptr};
+
+    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_;
 };
 
 namespace detail {
@@ -117,7 +137,11 @@ export class TableIndexReaderCache {
 public:
     inline explicit TableIndexReaderCache(TableEntry *table_entry_ptr) : table_entry_ptr_(table_entry_ptr) {}
 
+    TableIndexReaderCache(String db_id_str, String table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+
     void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
+
+    SharedPtr<IndexReader> GetIndexReader(NewTxn *txn);
 
     SharedPtr<IndexReader> GetIndexReader(Txn *txn);
 
@@ -133,6 +157,9 @@ public:
 private:
     std::mutex mutex_;
     TableEntry *table_entry_ptr_ = nullptr;
+    String db_id_str_;
+    String table_id_str_;
+
     TxnTimeStamp first_known_update_ts_ = 0;
     TxnTimeStamp last_known_update_ts_ = 0;
     TxnTimeStamp cache_ts_ = 0;

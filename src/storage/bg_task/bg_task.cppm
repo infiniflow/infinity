@@ -23,6 +23,7 @@ import catalog_delta_entry;
 import buffer_manager;
 import third_party;
 import global_resource_usage;
+import status;
 
 namespace infinity {
 
@@ -30,10 +31,14 @@ export enum class BGTaskType {
     kStopProcessor,
     kAddDeltaEntry,
     kCheckpoint,
+    kNewCheckpoint,
     kForceCheckpoint, // Manually triggered by PhysicalFlush
     kNotifyCompact,
+    kNewCompact,
     kNotifyOptimize,
     kCleanup,
+    kNewCleanup,
+    kBuildFastRoughFilter,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
     kDumpIndexByline,
@@ -43,6 +48,7 @@ export enum class BGTaskType {
 
 class BaseMemIndex;
 struct ChunkIndexEntry;
+class NewTxn;
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {
@@ -118,11 +124,19 @@ export struct CheckpointTask final : public CheckpointTaskBase {
     bool is_full_checkpoint_{};
 };
 
-export struct ForceCheckpointTask final : public CheckpointTaskBase {
-    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0)
-        : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
+export struct NewCheckpointTask final : public CheckpointTaskBase {
+    NewCheckpointTask() : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false) {}
 
-    ~ForceCheckpointTask() = default;
+    String ToString() const final { return "New catalog"; }
+
+    Status Execute(TxnTimeStamp last_ckp_ts, TxnTimeStamp &cur_ckp_ts);
+};
+
+export struct ForceCheckpointTask final : public CheckpointTaskBase {
+    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
+    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
+
+    ~ForceCheckpointTask();
 
     String ToString() const override {
         if (is_full_checkpoint_) {
@@ -133,6 +147,7 @@ export struct ForceCheckpointTask final : public CheckpointTaskBase {
     }
 
     Txn *txn_{};
+    NewTxn *new_txn_{};
     bool is_full_checkpoint_{};
     TxnTimeStamp cleanup_ts_ = 0;
 };
@@ -158,22 +173,49 @@ private:
     BufferManager *buffer_mgr_;
 };
 
+export class NewCleanupTask final : public BGTask {
+public:
+    NewCleanupTask() : BGTask(BGTaskType::kNewCleanup, false) {}
+
+    String ToString() const override { return "NewCleanupTask"; }
+
+    Status Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts);
+
+private:
+};
+
 export class NotifyCompactTask final : public BGTask {
 public:
-    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
+    NotifyCompactTask(bool new_compact = false) : BGTask(BGTaskType::kNotifyCompact, true), new_compact_(new_compact) {}
 
     ~NotifyCompactTask() override = default;
 
     String ToString() const override { return "NotifyCompactTask"; }
+
+    bool new_compact_ = false;
+};
+
+export class NewCompactTask final : public BGTask {
+public:
+    NewCompactTask(NewTxn *new_txn, String db_name, String table_name);
+
+    String ToString() const override { return "NewCompactTask"; }
+
+    NewTxn *new_txn_ = nullptr;
+    String db_name_;
+    String table_name_;
 };
 
 export class NotifyOptimizeTask final : public BGTask {
 public:
-    NotifyOptimizeTask() : BGTask(BGTaskType::kNotifyOptimize, true) {}
+    NotifyOptimizeTask(bool new_optimize = false) : BGTask(BGTaskType::kNotifyOptimize, true), new_optimize_(new_optimize) {}
 
     ~NotifyOptimizeTask() override = default;
 
     String ToString() const override { return "NotifyOptimizeTask"; }
+
+public:
+    bool new_optimize_ = false;
 };
 
 export class DumpIndexTask final : public BGTask {
@@ -219,6 +261,22 @@ public:
 
 public:
     String command_content_{};
+};
+
+export class BGBuildFastRoughFilterTask : public BGTask {
+public:
+    BGBuildFastRoughFilterTask(String db_name, String table_name, Vector<SegmentID> segment_ids)
+        : BGTask(BGTaskType::kBuildFastRoughFilter, false), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
+          segment_ids_(std::move(segment_ids)) {}
+
+    String ToString() const override { return "BGBuildFastRoughFilterTask"; }
+
+    void Execute();
+
+private:
+    String db_name_;
+    String table_name_;
+    Vector<SegmentID> segment_ids_;
 };
 
 } // namespace infinity

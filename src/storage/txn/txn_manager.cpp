@@ -23,7 +23,7 @@ import txn;
 import txn_state;
 import stl;
 import third_party;
-
+import wal_entry;
 import infinity_exception;
 import logger;
 import buffer_manager;
@@ -35,6 +35,7 @@ import defer_op;
 import infinity_context;
 import global_resource_usage;
 import bg_task;
+import background_process;
 
 namespace infinity {
 

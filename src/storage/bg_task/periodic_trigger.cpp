@@ -20,10 +20,14 @@ import stl;
 import logger;
 import infinity_exception;
 import background_process;
+import compaction_process;
 import bg_task;
 import catalog;
 import txn_manager;
 import third_party;
+
+import new_txn_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -70,26 +74,74 @@ void CleanupPeriodicTrigger::Trigger() {
     bg_processor_->Submit(std::move(cleanup_task));
 }
 
+SharedPtr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+
+    TxnTimeStamp last_cleanup_ts = bg_processor->last_cleanup_ts();
+    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetCleanupScanTS1();
+    if (cur_cleanup_ts <= last_cleanup_ts) {
+        return nullptr;
+    }
+
+    return MakeShared<NewCleanupTask>();
+}
+
+void NewCleanupPeriodicTrigger::Trigger() {
+    auto cleanup_task = CreateNewCleanupTask();
+    if (!cleanup_task) {
+        return;
+    }
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    bg_processor->Submit(std::move(cleanup_task));
+}
+
 void CheckpointPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint, after {} seconds", is_full_checkpoint_ ? "FULL" : "DELTA", duration_.load()));
-    auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
-    // LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
-    if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
-        LOG_TRACE(
-            fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+
+    if (new_checkpoint_) {
+        auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+        auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+
+        TxnTimeStamp last_ckp_ts = bg_processor->last_checkpoint_ts();
+        TxnTimeStamp cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
+        if (cur_ckp_ts <= last_ckp_ts) {
+            return;
+        }
+        auto checkpoint_task = MakeShared<NewCheckpointTask>();
+        bg_processor->Submit(std::move(checkpoint_task));
+    } else {
+        auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
+        // LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+        if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
+            LOG_TRACE(
+                fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+        }
     }
 }
 
 void CompactSegmentPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
-    auto compact_task = MakeShared<NotifyCompactTask>();
-    compact_processor_->Submit(std::move(compact_task));
+    if (!new_compaction_) {
+        auto compact_task = MakeShared<NotifyCompactTask>();
+        compact_processor_->Submit(std::move(compact_task));
+    } else {
+        auto compact_task = MakeShared<NotifyCompactTask>(true);
+        auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
+        compact_processor->Submit(std::move(compact_task));
+    }
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
-    auto optimize_task = MakeShared<NotifyOptimizeTask>();
-    compact_processor_->Submit(std::move(optimize_task));
+    if (!new_optimize_) {
+        auto optimize_task = MakeShared<NotifyOptimizeTask>();
+        compact_processor_->Submit(std::move(optimize_task));
+    } else {
+        auto optimize_task = MakeShared<NotifyOptimizeTask>(true);
+        auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
+        compact_processor->Submit(std::move(optimize_task));
+    }
 }
 
 } // namespace infinity

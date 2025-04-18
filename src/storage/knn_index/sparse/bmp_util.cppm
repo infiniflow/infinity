@@ -70,6 +70,8 @@ public:
 
     const T &operator[](SizeT idx) const { return ptr_[idx]; }
 
+    SizeT size() const { return size_; }
+
 private:
     const T *ptr_ = nullptr;
     SizeT size_ = 0;

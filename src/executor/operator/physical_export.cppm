@@ -28,7 +28,6 @@ import internal_types;
 import statement_common;
 import data_type;
 import meta_info;
-import block_index;
 import logger;
 import third_party;
 import column_def;
@@ -37,10 +36,12 @@ import knn_filter;
 
 namespace infinity {
 
+class BlockIndex;
+
 export class PhysicalExport : public PhysicalOperator {
 public:
     explicit PhysicalExport(u64 id,
-                            const SharedPtr<TableInfo>& table_info,
+                            const SharedPtr<TableInfo> &table_info,
                             String schema_name,
                             String table_name,
                             String file_path,
@@ -52,15 +53,11 @@ public:
                             SizeT row_limit,
                             Vector<u64> column_idx_array,
                             SharedPtr<BlockIndex> block_index,
-                            SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), table_info_(table_info), file_type_(type),
-          file_path_(std::move(file_path)), table_name_(std::move(table_name)), schema_name_(std::move(schema_name)), header_(header),
-          delimiter_(delimiter), offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)),
-          block_index_(std::move(block_index)) {}
+                            SharedPtr<Vector<LoadMeta>> load_metas);
 
-    ~PhysicalExport() override = default;
+    ~PhysicalExport() override;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -71,6 +68,8 @@ public:
     SizeT ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state);
 
     SizeT ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state);
+
+    SizeT ExportToFileInner(QueryContext *query_context, ExportOperatorState *export_op_state, std::function<String(const Vector<ColumnVector> &, SizeT)> line_to_string);
 
     SizeT ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state);
 

@@ -20,10 +20,29 @@ module logical_export;
 
 import stl;
 import column_binding;
-
+import block_index;
 import internal_types;
 
 namespace infinity {
+
+LogicalExport::LogicalExport(u64 node_id,
+                             const SharedPtr<TableInfo> &table_info,
+                             String schema_name,
+                             String table_name,
+                             String file_path,
+                             bool header,
+                             char delimiter,
+                             CopyFileType type,
+                             SizeT offset,
+                             SizeT limit,
+                             SizeT row_limit,
+                             Vector<u64> column_idx_array,
+                             SharedPtr<BlockIndex> block_index)
+    : LogicalNode(node_id, LogicalNodeType::kExport), table_info_(table_info), schema_name_(std::move(schema_name)),
+      table_name_(std::move(table_name)), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type), offset_(offset),
+      limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)), block_index_(std::move(block_index)) {}
+
+LogicalExport::~LogicalExport() = default;
 
 Vector<ColumnBinding> LogicalExport::GetColumnBindings() const { return {}; }
 

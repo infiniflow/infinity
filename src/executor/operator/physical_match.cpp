@@ -71,6 +71,7 @@ import result_cache_manager;
 import cached_match;
 import filter_iterator;
 import score_threshold_iterator;
+import new_txn;
 
 namespace infinity {
 
@@ -407,9 +408,18 @@ String PhysicalMatch::ToString(i64 &space) const {
 }
 
 void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
-    Txn *txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = 0;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        begin_ts = new_txn->BeginTS();
+    } else {
+        Txn *txn = query_context->GetTxn();
+        begin_ts = txn->BeginTS();
+    }
+
     TableInfo *table_info = base_table_ref_->table_info_.get();
-    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_info->max_commit_ts_);
+    TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);
     Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
     for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();
@@ -417,9 +427,9 @@ void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *ca
     auto cached_node = MakeUnique<CachedMatch>(query_ts, this);
     bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
     if (!success) {
-        LOG_WARN(fmt::format("Add cache failed for query: {}", txn->BeginTS()));
+        LOG_WARN(fmt::format("Add cache failed for query: {}", begin_ts));
     } else {
-        LOG_INFO(fmt::format("Add cache success for query: {}", txn->BeginTS()));
+        LOG_INFO(fmt::format("Add cache success for query: {}", begin_ts));
     }
 }
 

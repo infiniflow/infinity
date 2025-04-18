@@ -175,6 +175,10 @@ CastTable::CastTable() {
     matrix_[to_underlying_val(LogicalType::kEmbedding)][to_underlying_val(LogicalType::kEmbedding)] = 0;
     matrix_[to_underlying_val(LogicalType::kEmbedding)][to_underlying_val(LogicalType::kVarchar)] = 101;
 
+    // From sparse to other type
+    matrix_[to_underlying_val(LogicalType::kSparse)][to_underlying_val(LogicalType::kSparse)] = 0;
+    matrix_[to_underlying_val(LogicalType::kSparse)][to_underlying_val(LogicalType::kVarchar)] = 101;
+
     // From row_id to other type
     matrix_[to_underlying_val(LogicalType::kRowID)][to_underlying_val(LogicalType::kRowID)] = 0;
     matrix_[to_underlying_val(LogicalType::kRowID)][to_underlying_val(LogicalType::kVarchar)] = 101;

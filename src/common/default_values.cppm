@@ -24,6 +24,8 @@ export {
     // infinity related constants
     constexpr u64 MAX_IDENTIFIER_NAME_LENGTH = 65536;
 
+    constexpr u64 INVALID_COLUMN_ID = std::numeric_limits<u64>::max();
+
     // hidden columns' id
     constexpr ColumnID COLUMN_IDENTIFIER_ROW_ID = (ColumnID)(std::numeric_limits<u64>::max() - 1);
     constexpr ColumnID COLUMN_IDENTIFIER_CREATE = (ColumnID)(std::numeric_limits<u64>::max() - 2);
@@ -49,7 +51,7 @@ export {
     constexpr u64 BLOCK_OFFSET_SHIFT = 13;    // it should be adjusted together with DEFAULT_BLOCK_CAPACITY
     constexpr u64 BLOCK_OFFSET_MASK = 0x1FFF; // it should be adjusted together with DEFAULT_BLOCK_CAPACITY
     constexpr i64 MIN_BLOCK_CAPACITY = 8192;
-    constexpr i16 INVALID_BLOCK_ID = std::numeric_limits<i16>::max();
+    constexpr i16 INVALID_BLOCK_ID = std::numeric_limits<u16>::max();
     constexpr i64 MAX_BLOCK_COUNT_IN_SEGMENT = 65536L;
 
     // column vector related constants
@@ -206,8 +208,8 @@ export {
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence";
-    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB";   // 128MB
-    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;    // 128MB
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB"; // 128MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;  // 128MB
 
     constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
@@ -257,6 +259,8 @@ export {
     constexpr std::string_view LOG_LEVEL_OPTION_NAME = "log_level";
 
     constexpr std::string_view DATA_DIR_OPTION_NAME = "data_dir";
+    constexpr std::string_view CATALOG_DIR_OPTION_NAME = "catalog_dir";
+    constexpr std::string_view SNAPSHOT_DIR_OPTION_NAME = "snapshot_dir";
     constexpr std::string_view CLEANUP_INTERVAL_OPTION_NAME = "cleanup_interval";
     constexpr std::string_view COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
     constexpr std::string_view OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
@@ -296,8 +300,9 @@ export {
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
+    constexpr std::string_view USE_NEW_CATALOG_OPTION_NAME = "use_new_catalog";
+    constexpr std::string_view REPLAY_WAL_OPTION_NAME = "replay_wal";
 
-    constexpr std::string_view SNAPSHOT_DIR_OPTION_NAME = "snapshot_dir";
     // Variable name
     constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";                         // global and session
     constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";                     // global
@@ -326,6 +331,15 @@ export {
     constexpr std::string_view MEMORY_CACHE_MISS_VAR_NAME = "memory_cache_miss";             // global
     constexpr std::string_view DISK_CACHE_MISS_VAR_NAME = "disk_cache_miss";                 // global
     constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "profile";                          // global
+
+    // Use for meta key encoding
+    constexpr std::string_view LATEST_DATABASE_ID = "latest_database_id";
+    constexpr std::string_view LATEST_TABLE_ID = "latest_table_id";
+    constexpr std::string_view LATEST_COLUMN_ID = "latest_column_id";
+    constexpr std::string_view LATEST_INDEX_ID = "latest_index_id";
+    constexpr std::string_view LATEST_SEGMENT_ID = "latest_segment_id";
+    constexpr std::string_view LATEST_BLOCK_ID = "latest_block_id";
+    constexpr std::string_view LATEST_CHUNK_ID = "latest_chunk_id";
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;

@@ -37,6 +37,10 @@ struct BlockIndex;
 struct BlockColumnEntry;
 struct SegmentIndexEntry;
 
+class BlockMeta;
+class TableIndexMeeta;
+class SegmentIndexMeta;
+
 export class PhysicalMatchTensorScan final : public PhysicalFilterScanBase {
 public:
     explicit PhysicalMatchTensorScan(u64 id,
@@ -48,6 +52,8 @@ public:
                                      Optional<f32> knn_threshold,
                                      const SharedPtr<MatchTensorScanIndexOptions> &index_options,
                                      SharedPtr<Vector<LoadMeta>> load_metas);
+
+    ~PhysicalMatchTensorScan() override;
 
     void Init(QueryContext* query_context) override;
 
@@ -99,6 +105,11 @@ private:
 
     Vector<SegmentIndexEntry *> index_entries_;
     Vector<BlockColumnEntry *> block_column_entries_;
+
+    UniquePtr<Vector<BlockMeta *>> block_metas_{};
+    UniquePtr<TableIndexMeeta> table_index_meta_{};
+    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
+
     mutable atomic_u32 task_executed_ = 0;
 
     void ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const;

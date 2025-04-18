@@ -172,7 +172,10 @@ export enum class GlobalOptionIndex : i8 {
     kSparseIndexBuildingWorker = 54,
     kFulltextIndexBuildingWorker = 55,
     kSnapshotDir = 56,
-    kInvalid = 57,
+    kCatalogDir = 57,
+    kUseNewCatalog = 58,
+    kReplayWal = 59,
+    kInvalid = 60,
 };
 
 export struct GlobalOptions {

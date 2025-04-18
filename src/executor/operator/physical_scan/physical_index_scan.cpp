@@ -39,6 +39,12 @@ import roaring_bitmap;
 import filter_value_type_classification;
 import physical_scan_base;
 import result_cache_manager;
+import block_index;
+
+import status;
+import new_catalog;
+import new_txn;
+import segment_meta;
 
 namespace infinity {
 
@@ -93,7 +99,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
     return result;
 }
 
-void PhysicalIndexScan::Init(QueryContext* query_context) {
+void PhysicalIndexScan::Init(QueryContext *query_context) {
     // check add_row_id_
     if (!add_row_id_) {
         String error_message = "ExecuteInternal(): add_row_id_ should be true.";
@@ -108,9 +114,20 @@ bool PhysicalIndexScan::Execute(QueryContext *query_context, OperatorState *oper
     return true;
 }
 
+SizeT PhysicalIndexScan::TaskletCount() { return base_table_ref_->block_index_->SegmentCount(); }
+
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
-    Txn *txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+
+    Txn *txn = nullptr;
+    TxnTimeStamp begin_ts;
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        begin_ts = new_txn->BeginTS();
+    } else {
+        txn = query_context->GetTxn();
+        begin_ts = txn->BeginTS();
+    }
 
     auto &output_data_blocks = index_scan_operator_state->data_block_array_;
     auto &segment_ids = *(index_scan_operator_state->segment_ids_);
@@ -127,17 +144,8 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     // get the segment id to solve
     auto segment_id = segment_ids[next_idx];
 
-    SegmentEntry *segment_entry = nullptr;
-    SegmentOffset segment_row_count = 0; // count of rows in segment, include deleted rows
-    const auto &segment_block_index_ = base_table_ref_->block_index_->segment_block_index_;
-    if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
-        UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
-    } else {
-        segment_entry = iter->second.segment_entry_;
-        segment_row_count = iter->second.segment_offset_;
-    }
     // output result
-    auto OutputBitmaskResult = [&](const Bitmask &result) {
+    auto OutputBitmaskResult = [&](const Bitmask &result, SegmentOffset segment_row_count) {
         Vector<SharedPtr<DataType>> output_types;
         output_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
         constexpr u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
@@ -190,6 +198,61 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
             AddCache(query_context, cache_mgr, output_data_blocks);
         }
     };
+
+    if (use_new_catalog) {
+        SegmentMeta *segment_meta = nullptr;
+        SegmentOffset segment_row_count = 0;
+        const auto &segment_block_index_ = base_table_ref_->block_index_->new_segment_block_index_;
+        if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
+            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+        } else {
+            segment_meta = iter->second.segment_meta_.get();
+            segment_row_count = iter->second.segment_offset_;
+        }
+
+        // check FastRoughFilter
+        SharedPtr<FastRoughFilter> segment_filter;
+        Status status = segment_meta->GetFastRoughFilter(segment_filter);
+        if (status.ok()) {
+            if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
+                // skip this segment
+                LOG_TRACE(
+                    fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
+                Bitmask result_empty(segment_row_count);
+                result_empty.SetAllFalse();
+                OutputBitmaskResult(result_empty, segment_row_count);
+                return;
+            }
+        }
+
+        LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
+
+        Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn);
+        if (result_elem.CountTrue() > 0) {
+            // Remove deleted rows from the result
+            // segment_entry->CheckRowsVisible(result_elem, begin_ts);
+            Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, result_elem);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+        }
+        // output
+        OutputBitmaskResult(result_elem, segment_row_count);
+        LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));
+
+        return;
+    }
+
+    SegmentEntry *segment_entry = nullptr;
+    SegmentOffset segment_row_count = 0; // count of rows in segment, include deleted rows
+    const auto &segment_block_index_ = base_table_ref_->block_index_->segment_block_index_;
+    if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
+        UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+    } else {
+        segment_entry = iter->second.segment_entry_;
+        segment_row_count = iter->second.segment_offset_;
+    }
+
     // check FastRoughFilter
     const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();
     if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
@@ -197,7 +260,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
         LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
         Bitmask result_empty(segment_row_count);
         result_empty.SetAllFalse();
-        OutputBitmaskResult(result_empty);
+        OutputBitmaskResult(result_empty, segment_row_count);
         return;
     }
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
@@ -208,7 +271,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
         segment_entry->CheckRowsVisible(result_elem, begin_ts);
     }
     // output
-    OutputBitmaskResult(result_elem);
+    OutputBitmaskResult(result_elem, segment_row_count);
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));
 }
 

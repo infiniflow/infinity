@@ -1003,7 +1003,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                             logical_operator->load_metas());
     match_tensor_scan_op->CheckColumn();
     match_tensor_scan_op->PlanWithIndex(query_context_ptr_);
-    if (match_tensor_scan_op->TaskletCount() == 1) {
+    if (match_tensor_scan_op->TaskletCount() <= 1) {
         match_tensor_scan_op->SetCacheResult(true);
         return match_tensor_scan_op;
     } else {
@@ -1029,7 +1029,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                             std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
                                             logical_match_sparse->common_query_filter_,
                                             logical_operator->load_metas());
-    if (match_sparse_scan_op->GetTaskletCount(query_context_ptr_) == 1) {
+    match_sparse_scan_op->PlanWithIndex(query_context_ptr_);
+    if (match_sparse_scan_op->TaskletCount() <= 1) {
         match_sparse_scan_op->SetCacheResult(true);
         return match_sparse_scan_op;
     }

@@ -48,6 +48,11 @@ import physical_index_scan;
 import meta_info;
 import result_cache_manager;
 
+import table_meeta;
+import segment_meta;
+import block_meta;
+import new_txn;
+
 namespace infinity {
 
 Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 parallel_count) const {
@@ -59,9 +64,17 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
 
     Vector<GlobalBlockID> global_blocks;
     global_blocks.reserve(all_block_count);
-    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
-        for (const auto *block_entry : segment_info.block_map_) {
-            global_blocks.emplace_back(segment_id, block_entry->block_id());
+    if (!block_index->table_meta_) {
+        for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+            for (const auto *block_entry : segment_info.block_map_) {
+                global_blocks.emplace_back(segment_id, block_entry->block_id());
+            }
+        }
+    } else {
+        for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
+            for (auto &block_meta : segment_info.block_map_) {
+                global_blocks.emplace_back(segment_id, block_meta->block_id());
+            }
         }
     }
     Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
@@ -152,9 +165,18 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
 void PhysicalScanBase::AddCache(QueryContext *query_context,
                                 ResultCacheManager *cache_mgr,
                                 const Vector<UniquePtr<DataBlock>> &output_data_blocks) const {
-    Txn *txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = 0;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        begin_ts = new_txn->BeginTS();
+    } else {
+        Txn *txn = query_context->GetTxn();
+        begin_ts = txn->BeginTS();
+    }
+    
     auto *table_info = base_table_ref_->table_info_.get();
-    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_info->max_commit_ts_);
+    TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);
     Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
     for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();
@@ -195,9 +217,9 @@ void PhysicalScanBase::AddCache(QueryContext *query_context,
     }
     bool success = cache_mgr->AddCache(std::move(cached_node), std::move(data_blocks));
     if (!success) {
-        LOG_WARN(fmt::format("Add cache failed for query: {}", txn->BeginTS()));
+        LOG_WARN(fmt::format("Add cache failed for query: {}", begin_ts));
     } else {
-        LOG_INFO(fmt::format("Add cache success for query: {}", txn->BeginTS()));
+        LOG_INFO(fmt::format("Add cache success for query: {}", begin_ts));
     }
 }
 

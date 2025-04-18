@@ -80,6 +80,14 @@ HnswBuildType StringToHnswBuildType(const String &str) {
     }
 }
 
+void TrimSpace(std::string_view &str) {
+    if (str.empty()) {
+        return;
+    }
+    str.remove_prefix(str.find_first_not_of(' '));
+    str.remove_suffix(str.size() - str.find_last_not_of(' ') - 1);
+}
+
 LSGConfig LSGConfig::FromString(const String &str) {
     // example: "sample_raito=0.01,ls_k=10,alpha=1.0"
     LSGConfig lsg_config;
@@ -102,8 +110,10 @@ LSGConfig LSGConfig::FromString(const String &str) {
         }
         auto key = kv.substr(0, pos);
         auto value = kv.substr(pos + 1);
+        TrimSpace(key);
+        TrimSpace(value);
         if (key == "sample_raito") {
-            lsg_config.sample_raito_ = std::stof(String(value));
+            lsg_config.sample_ratio_ = std::stof(String(value));
         } else if (key == "ls_k") {
             lsg_config.ls_k_ = std::stoi(String(value));
         } else if (key == "alpha") {
@@ -118,21 +128,21 @@ LSGConfig LSGConfig::FromString(const String &str) {
 
 SizeT LSGConfig::GetSizeInBytes() const {
     SizeT size = 0;
-    size += sizeof(sample_raito_);
+    size += sizeof(sample_ratio_);
     size += sizeof(ls_k_);
     size += sizeof(alpha_);
     return size;
 }
 
 void LSGConfig::WriteAdv(char *&ptr) const {
-    WriteBufAdv<float>(ptr, sample_raito_);
+    WriteBufAdv<float>(ptr, sample_ratio_);
     WriteBufAdv<SizeT>(ptr, ls_k_);
     WriteBufAdv<float>(ptr, alpha_);
 }
 
 LSGConfig LSGConfig::ReadAdv(const char *&ptr) {
     LSGConfig lsg_config;
-    lsg_config.sample_raito_ = ReadBufAdv<float>(ptr);
+    lsg_config.sample_ratio_ = ReadBufAdv<float>(ptr);
     lsg_config.ls_k_ = ReadBufAdv<SizeT>(ptr);
     lsg_config.alpha_ = ReadBufAdv<float>(ptr);
     return lsg_config;
@@ -140,7 +150,7 @@ LSGConfig LSGConfig::ReadAdv(const char *&ptr) {
 
 String LSGConfig::ToString() const {
     std::stringstream ss;
-    ss << "sample_raito = " << sample_raito_ << ", ls_k = " << ls_k_ << ", alpha = " << alpha_;
+    ss << "sample_raito = " << sample_ratio_ << ", ls_k = " << ls_k_ << ", alpha = " << alpha_;
     return ss.str();
 }
 

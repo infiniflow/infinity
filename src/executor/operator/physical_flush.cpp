@@ -18,6 +18,7 @@ module physical_flush;
 
 import stl;
 import txn;
+import new_txn;
 import query_context;
 import table_def;
 import data_table;
@@ -69,7 +70,15 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     // full checkpoint here
 
     bool is_full_checkpoint = flush_type_ == FlushType::kData;
-    auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), is_full_checkpoint);
+    SharedPtr<ForceCheckpointTask> force_ckp_task = nullptr;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        auto *new_txn = query_context->GetNewTxn();
+        force_ckp_task = MakeShared<ForceCheckpointTask>(new_txn, is_full_checkpoint);
+    } else {
+        auto *txn = query_context->GetTxn();
+        force_ckp_task = MakeShared<ForceCheckpointTask>(txn, is_full_checkpoint);
+    }
     auto *wal_mgr = query_context->storage()->wal_manager();
     if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));

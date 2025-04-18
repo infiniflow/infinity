@@ -56,6 +56,14 @@ import search_driver;
 import status;
 import parse_fulltext_options;
 import table_entry;
+import block_index;
+
+import new_txn;
+import table_index_meeta;
+import segment_index_meta;
+import table_meeta;
+import db_meeta;
+import kv_store;
 
 namespace infinity {
 
@@ -85,6 +93,8 @@ struct ExpressionIndexScanInfo {
 
     // for index scan
     HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
+    TableMeeta *table_meta_ = nullptr;
+    HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
 
     inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
         const TransactionID txn_id = txn->TxnID();
@@ -117,6 +127,48 @@ struct ExpressionIndexScanInfo {
         }
     }
 
+    inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
+        Status status;
+        if (!base_table_ref->block_index_->table_meta_) {
+            base_table_ref->block_index_->table_meta_ =
+                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS());
+        }
+        table_meta_ = base_table_ref->block_index_->table_meta_.get();
+
+        Vector<String> *index_id_strs_ptr = nullptr;
+        status = table_meta_->GetIndexIDs(index_id_strs_ptr);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        if (!base_table_ref->index_index_) {
+            base_table_ref->index_index_ = MakeShared<IndexIndex>();
+        }
+        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const String &index_id_str = (*index_id_strs_ptr)[i];
+            auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
+
+            SharedPtr<IndexBase> index_base;
+            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            if (index_base->index_type_ != IndexType::kSecondary) {
+                continue;
+            }
+            auto column_name = index_base->column_name();
+            ColumnID column_id = 0;
+            std::tie(column_id, status) = table_meta_->GetColumnIDByColumnName(column_name);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            if (new_candidate_column_index_map_.contains(column_id)) {
+                LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
+            } else {
+                new_candidate_column_index_map_.emplace(column_id, table_index_meta);
+            }
+        }
+    }
+
     ExpressionInfoTree<ExpressionIndexScanInfo> BuildTree(const SharedPtr<BaseExpression> &expression, const u32 depth = 0) const {
         ExpressionInfoTree<ExpressionIndexScanInfo> tree;
         tree.src_ptr = &expression;
@@ -129,6 +181,9 @@ struct ExpressionIndexScanInfo {
                 auto *column_expression = static_cast<const ColumnExpression *>(expression.get());
                 const ColumnID column_id = column_expression->binding().column_idx;
                 if (candidate_column_index_map_.contains(column_id)) {
+                    tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
+                                                                                          : Enum::kSecondaryIndexColumnExprOrAfterCast;
+                } else if (new_candidate_column_index_map_.contains(column_id)) {
                     tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
                                                                                           : Enum::kSecondaryIndexColumnExprOrAfterCast;
                 }
@@ -250,9 +305,16 @@ public:
         const auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
-        if (base_table_ref_ptr_) {
-            table_info_ = base_table_ref_ptr_->table_info_.get();
-            tree_info_.InitColumnIndexEntries(table_info_, query_context_->GetTxn());
+        if (query_context_->global_config()->UseNewCatalog()) {
+            if (base_table_ref_ptr_) {
+                table_info_ = base_table_ref_ptr_->table_info_.get();
+                tree_info_.NewInitColumnIndexEntries(table_info_, query_context_->GetNewTxn(), const_cast<BaseTableRef *>(base_table_ref_ptr_));
+            }
+        } else {
+            if (base_table_ref_ptr_) {
+                table_info_ = base_table_ref_ptr_->table_info_.get();
+                tree_info_.InitColumnIndexEntries(table_info_, query_context_->GetTxn());
+            }
         }
     }
 
@@ -431,8 +493,24 @@ private:
                         case FilterCompareType::kEqual:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
-                            const auto *secondary_index = tree_info_.candidate_column_index_map_.at(column_id);
-                            return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
+                            bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
+                            if (use_new_catalog) {
+                                SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
+                                return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                           column_id,
+                                                                           nullptr,
+                                                                           secondary_index,
+                                                                           compare_type,
+                                                                           value);
+                            } else {
+                                const auto *secondary_index = tree_info_.candidate_column_index_map_.at(column_id);
+                                return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                           column_id,
+                                                                           secondary_index,
+                                                                           nullptr,
+                                                                           compare_type,
+                                                                           value);
+                            }
                         }
                         case FilterCompareType::kAlwaysTrue: {
                             return MakeUnique<IndexFilterEvaluatorAllTrue>();
@@ -466,7 +544,17 @@ private:
             }
             case Enum::kFilterFulltextExpr: {
                 auto *filter_fulltext_expr = static_cast<const FilterFulltextExpression *>(index_filter_tree_node.src_ptr->get());
-                auto index_reader = query_context_->GetTxn()->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_);
+                bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
+                SharedPtr<IndexReader> index_reader;
+                if (use_new_catalog) {
+                    NewTxn *new_txn = query_context_->GetNewTxn();
+                    Status status = new_txn->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_, index_reader);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
+                    }
+                } else {
+                    index_reader = query_context_->GetTxn()->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_);
+                }
 
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kAuto;
                 UniquePtr<QueryNode> query_tree;

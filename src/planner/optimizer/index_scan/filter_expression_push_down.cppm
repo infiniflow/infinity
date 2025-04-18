@@ -27,6 +27,8 @@ import txn;
 
 namespace infinity {
 
+class NewTxn;
+
 // TODO: equivalent expression rewrite optimization
 
 // TODO: now do not support "not" expression in index scan

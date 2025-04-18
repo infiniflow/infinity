@@ -218,4 +218,37 @@ private:
     void ExecuteRender(std::stringstream &ss) const;
 };
 
+export class ProfileHistory {
+private:
+    mutable std::mutex lock_{};
+    Deque<SharedPtr<QueryProfiler>> deque_{};
+    SizeT max_size_{};
+
+public:
+    explicit ProfileHistory(SizeT size) {
+        std::unique_lock<std::mutex> lk(lock_);
+        max_size_ = size;
+    }
+
+    SizeT HistoryCapacity() const {
+        std::unique_lock<std::mutex> lk(lock_);
+        return max_size_;
+    }
+
+    void Resize(SizeT new_size);
+
+    void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
+        std::unique_lock<std::mutex> lk(lock_);
+        if (deque_.size() >= max_size_) {
+            deque_.pop_back();
+        }
+
+        deque_.emplace_front(profiler);
+    }
+
+    QueryProfiler *GetElement(SizeT index);
+
+    Vector<SharedPtr<QueryProfiler>> GetElements();
+};
+
 } // namespace infinity
