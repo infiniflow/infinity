@@ -53,6 +53,7 @@ import block_index;
 import wal_manager;
 import compaction_process;
 import txn_state;
+import background_process;
 
 using namespace infinity;
 

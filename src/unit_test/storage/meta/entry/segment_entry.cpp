@@ -42,6 +42,7 @@ import table_entry_type;
 import segment_entry;
 import block_entry;
 import txn_state;
+import compact_state_data;
 
 using namespace infinity;
 
