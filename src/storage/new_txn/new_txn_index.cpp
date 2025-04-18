@@ -138,7 +138,7 @@ Status NewTxn::OptimizeAllIndexes() {
         for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
             // const String &table_id_str = (*table_id_strs_ptr)[i];
             const String &table_name = (*table_names_ptr)[i];
-            
+
             status = this->OptimizeTableIndexes(db_name, table_name);
             if (!status.ok()) {
                 return status;
@@ -639,10 +639,11 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                         mem_index->memory_indexer_->InsertGap(base_row_id - exp_begin_row_id);
                     }
                 }
+                auto col_ptr = MakeShared<ColumnVector>(std::move(col));
                 if (index_fulltext->IsRealtime()) {
-                    UnrecoverableError("Not implemented yet");
+                    UniquePtr<std::binary_semaphore> sema = mem_index->memory_indexer_->AsyncInsert(col_ptr, offset, row_cnt);
+                    txn_store()->AddSemaphore(std::move(sema));
                 } else {
-                    auto col_ptr = MakeShared<ColumnVector>(std::move(col));
                     mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                 }
             }

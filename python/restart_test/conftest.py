@@ -9,6 +9,11 @@ def pytest_addoption(parser):
         default="./build/Debug/src/infinity",
     )
     parser.addoption(
+        "--config_path",
+        action="store",
+        default="./conf/infinity_conf.toml",
+    )
+    parser.addoption(
         "--builder_container",
         action="store",
     )
@@ -17,7 +22,9 @@ def pytest_addoption(parser):
 def pytest_generate_tests(metafunc):
     if "infinity_runner" in metafunc.fixturenames:
         infinity_path = metafunc.config.getoption("infinity_path")
-        runner = InfinityRunner(infinity_path)
+        config_path = metafunc.config.getoption("config_path")
+
+        runner = InfinityRunner(infinity_path, config_path)
         metafunc.parametrize("infinity_runner", [runner])
 
 
