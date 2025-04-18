@@ -28,6 +28,9 @@ import meta_info;
 import create_index_info;
 import new_catalog;
 import infinity_context;
+import new_txn;
+import txn_state;
+import infinity_exception;
 
 namespace infinity {
 
@@ -114,9 +117,25 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::AddSegmentID1(SegmentID segment_id, TxnTimeStamp commit_ts) {
+Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn) {
+
+    String commit_ts_str;
+    switch (new_txn->GetTxnState()) {
+        case TxnState::kStarted: {
+            commit_ts_str = "-1"; // Wait for commit
+            break;
+        }
+        case TxnState::kCommitting:
+        case TxnState::kCommitted: {
+            commit_ts_str = fmt::format("{}", new_txn->CommitTS());
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Invalid transaction state: {}", TxnState2Str(new_txn->GetTxnState())));
+        }
+    }
+
     String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
-    String commit_ts_str = fmt::format("{}", commit_ts);
     return kv_instance_.Put(segment_id_key, commit_ts_str);
 }
 

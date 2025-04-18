@@ -801,10 +801,11 @@ Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, Segment
 }
 
 Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                       NewTxn *new_txn,
                                        SegmentID segment_id,
                                        TxnTimeStamp commit_ts,
                                        Optional<SegmentIndexMeta> &segment_index_meta) {
-    Status status = table_index_meta.AddSegmentID1(segment_id, commit_ts);
+    Status status = table_index_meta.AddSegmentIndexID1(segment_id, new_txn);
     if (!status.ok()) {
         return status;
     }
@@ -847,6 +848,35 @@ Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                     const String &base_name,
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta) {
+    ChunkIndexMetaInfo chunk_info;
+    chunk_info.base_name_ = base_name;
+    chunk_info.base_row_id_ = base_row_id;
+    chunk_info.row_cnt_ = row_count;
+    chunk_info.index_size_ = index_size;
+    {
+        chunk_index_meta.emplace(chunk_id, segment_index_meta);
+        Status status = chunk_index_meta->InitSet(chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = segment_index_meta.AddChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                     NewTxn *new_txn,
+                                     ChunkID chunk_id,
+                                     RowID base_row_id,
+                                     SizeT row_count,
+                                     const String &base_name,
+                                     SizeT index_size,
+                                     Optional<ChunkIndexMeta> &chunk_index_meta) {
     ChunkIndexMetaInfo chunk_info;
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;

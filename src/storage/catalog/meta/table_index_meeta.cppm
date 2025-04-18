@@ -27,6 +27,7 @@ class KVInstance;
 class TableMeeta;
 class IndexBase;
 struct SegmentUpdateTS;
+class NewTxn;
 
 export class TableIndexMeeta {
 public:
@@ -58,7 +59,7 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status AddSegmentID1(SegmentID segment_id, TxnTimeStamp commit_ts);
+    Status AddSegmentIndexID1(SegmentID segment_id, NewTxn* new_txn);
 
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);

@@ -30,6 +30,9 @@ import index_base;
 import create_index_info;
 import meta_info;
 import chunk_index_meta;
+import new_txn;
+import txn_state;
+import infinity_exception;
 
 namespace infinity {
 
@@ -39,6 +42,38 @@ SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_
 }
 
 SegmentIndexMeta::~SegmentIndexMeta() = default;
+
+Status SegmentIndexMeta::GetChunkIDs(Vector<ChunkID> *&chunk_ids) {
+    if (!chunk_ids_) {
+        Status status = LoadChunkIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    chunk_ids = &chunk_ids_.value();
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
+    if (!next_chunk_id_) {
+        Status status = LoadNextChunkID();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    chunk_id = *next_chunk_id_;
+    return Status::OK();
+}
+
+Tuple<ChunkID, Status> SegmentIndexMeta::GetNextChunkID1() {
+    if (!next_chunk_id_) {
+        Status status = LoadNextChunkID();
+        if (!status.ok()) {
+            return {std::numeric_limits<ChunkID>::max(), status};
+        }
+    }
+    return {*next_chunk_id_, Status::OK()};
+}
 
 Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
     if (!chunk_ids_) {
@@ -87,11 +122,26 @@ Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::AddChunkID1(TxnTimeStamp commit_ts, ChunkID chunk_id) {
+Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
+
+    String commit_ts_str;
+    switch (new_txn->GetTxnState()) {
+        case TxnState::kStarted: {
+            commit_ts_str = "-1"; // Wait for commit
+            break;
+        }
+        case TxnState::kCommitting:
+        case TxnState::kCommitted: {
+            commit_ts_str = fmt::format("{}", new_txn->CommitTS());
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Invalid transaction state: {}", TxnState2Str(new_txn->GetTxnState())));
+        }
+    }
     TableMeeta &table_meta = table_index_meta_.table_meta();
     String chunk_id_key =
         KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
-    String commit_ts_str = fmt::format("{}", commit_ts);
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
 }
 
