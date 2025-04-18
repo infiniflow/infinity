@@ -303,4 +303,8 @@ String KeyEncode::PMObjectKey(const String &key) { return fmt::format("pm|object
 
 String KeyEncode::PMObjectStatKey(const String &key) { return fmt::format("pm|object_stat|{}", key); }
 
+String KeyEncode::PMObjectPathKeyPrefix() { return "pm|path|"; }
+
+String KeyEncode::PMObjectPathKey(const String &path) { return fmt::format("pm|path|{}", path); }
+
 } // namespace infinity
