@@ -276,11 +276,17 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     const SegmentID segment_id = tasks_[task_id];
     SegmentMeta *segment_meta = segment_index.at(segment_id).segment_meta_.get();
     TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
-    // TODO
-    // if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_entry->GetFastRoughFilter())) {
-    //     // skip this segment
-    //     return;
-    // }
+    {
+        SharedPtr<FastRoughFilter> segment_filter;
+        Status status = segment_meta->GetFastRoughFilter(segment_filter);
+        if (status.ok()) {
+            if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
+                // skip this segment
+                return;
+            }
+        }
+    }
+
     SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
     Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
     if (result_elem.CountTrue() == 0) {

@@ -498,6 +498,7 @@ Tuple<SharedPtr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo() {
 }
 
 Status SegmentMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter) {
+    fast_rough_filter.reset();
     if (fast_rough_filter_) {
         fast_rough_filter = fast_rough_filter_;
         return Status::OK();

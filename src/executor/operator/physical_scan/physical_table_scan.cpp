@@ -145,24 +145,6 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         if (use_new_catalog) {
             BlockMeta *current_block_meta = block_index->GetBlockMeta(segment_id, block_id);
 
-            // TODO
-            // if (read_offset == 0) {
-            //     // new block, check FastRoughFilter
-            //     const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
-            //     if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
-            //         // skip this block
-            //         LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
-            //                               block_ids_idx,
-            //                               block_ids_count));
-            //         ++block_ids_idx;
-            //         continue;
-            //     } else {
-            //         LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
-            //                               block_ids_idx,
-            //                               block_ids_count));
-            //     }
-            // }
-
             Optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
             if (!range_state) {
                 // TODO
@@ -170,6 +152,24 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                 Status status = NewCatalog::GetBlockVisibleRange(*current_block_meta, begin_ts, *range_state);
                 if (!status.ok()) {
                     RecoverableError(status);
+                }
+
+                // new block, check FastRoughFilter
+                SharedPtr<FastRoughFilter> block_filter;
+                status = current_block_meta->GetFastRoughFilter(block_filter);
+                if (status.ok()) {
+                    if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *block_filter)) {
+                        // skip this block
+                        LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
+                                              block_ids_idx,
+                                              block_ids_count));
+                        ++block_ids_idx;
+                        continue;
+                    } else {
+                        LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
+                                              block_ids_idx,
+                                              block_ids_count));
+                    }
                 }
             }
 
@@ -196,14 +196,20 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                         break;
                     }
                     case COLUMN_IDENTIFIER_CREATE: {
-                        Status status = NewCatalog::GetCreateTSVector(*current_block_meta, visible_range.first, write_size, *output_ptr->column_vectors[output_column_id]);
+                        Status status = NewCatalog::GetCreateTSVector(*current_block_meta,
+                                                                      visible_range.first,
+                                                                      write_size,
+                                                                      *output_ptr->column_vectors[output_column_id]);
                         if (!status.ok()) {
                             RecoverableError(status);
                         }
                         break;
                     }
                     case COLUMN_IDENTIFIER_DELETE: {
-                        Status status = NewCatalog::GetDeleteTSVector(*current_block_meta, visible_range.first, write_size, *output_ptr->column_vectors[output_column_id]);
+                        Status status = NewCatalog::GetDeleteTSVector(*current_block_meta,
+                                                                      visible_range.first,
+                                                                      write_size,
+                                                                      *output_ptr->column_vectors[output_column_id]);
                         if (!status.ok()) {
                             RecoverableError(status);
                         }

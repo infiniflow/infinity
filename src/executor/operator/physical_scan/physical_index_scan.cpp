@@ -210,18 +210,22 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
             segment_row_count = iter->second.segment_offset_;
         }
 
-        // TODO
-        // // check FastRoughFilter
-        // const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();
-        // if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
-        //     // skip this segment
-        //     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
-        //     Bitmask result_empty(segment_row_count);
-        //     result_empty.SetAllFalse();
-        //     OutputBitmaskResult(result_empty, segment_row_count);
-        //     return;
-        // }
-        // LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
+        // check FastRoughFilter
+        SharedPtr<FastRoughFilter> segment_filter;
+        Status status = segment_meta->GetFastRoughFilter(segment_filter);
+        if (status.ok()) {
+            if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
+                // skip this segment
+                LOG_TRACE(
+                    fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
+                Bitmask result_empty(segment_row_count);
+                result_empty.SetAllFalse();
+                OutputBitmaskResult(result_empty, segment_row_count);
+                return;
+            }
+        }
+
+        LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
 
         Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn);
         if (result_elem.CountTrue() > 0) {
