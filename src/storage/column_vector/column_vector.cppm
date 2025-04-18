@@ -366,6 +366,8 @@ public:
 
     Span<const char> GetVarchar(SizeT index) const;
 
+    ptr_t GetRawPtr(SizeT index);
+
 private:
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);

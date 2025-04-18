@@ -86,6 +86,21 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     return block_offset_begin < row_idx;
 }
 
+Optional<BlockOffset> NewTxnBlockVisitor::Next() {
+    if (end_) {
+        return None;
+    }
+    while (cur_ >= visible_range_.second) {
+        bool has_next = visit_state_->Next(visible_range_.second, visible_range_);
+        if (!has_next) {
+            end_ = true;
+            return None;
+        }
+        cur_ = visible_range_.first;
+    }
+    return cur_++;
+}
+
 Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
     Status status;
 

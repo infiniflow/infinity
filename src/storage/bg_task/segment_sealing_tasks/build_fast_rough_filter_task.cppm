@@ -58,13 +58,13 @@ struct BuildFastRoughFilterArg {
 };
 
 struct NewBuildFastRoughFilterArg {
-    UniquePtr<SegmentMeta> segment_meta_{};
+    SegmentMeta *segment_meta_{};
     ColumnID column_id_{};
     UniquePtr<u64[]> &distinct_keys_;
     UniquePtr<u64[]> &distinct_keys_backup_;
     u32 distinct_count_{};
 
-    NewBuildFastRoughFilterArg(UniquePtr<SegmentMeta> segment_meta,
+    NewBuildFastRoughFilterArg(SegmentMeta *segment_meta,
                                ColumnID column_id,
                                UniquePtr<u64[]> &distinct_keys,
                                UniquePtr<u64[]> &distinct_keys_backup);
@@ -76,6 +76,8 @@ export class BuildFastRoughFilterTask {
 public:
     static void ExecuteOnNewSealedSegment(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
 
+    static void ExecuteOnNewSealedSegment(SegmentMeta *segment_meta);
+
     static void ExecuteUpdateSegmentBloomFilter(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
 
 private:
@@ -85,24 +87,35 @@ private:
 
     static void SetSegmentFinishBuildMinMaxFilterTask(SegmentEntry *segment);
 
+    static void CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(SegmentMeta *segment_meta);
+
+    static void SetSegmentBeginBuildMinMaxFilterTask(SegmentMeta *segment_meta, u32 column_count);
+
+    static void SetSegmentFinishBuildMinMaxFilterTask(SegmentMeta *segment_meta);
+
 private:
     template <bool CheckTS>
     static void ExecuteInner(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
 
+    static void ExecuteInner(SegmentMeta *sement_meta);
+
     template <CanBuildBloomFilter ValueType, bool CheckTS>
     static void BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg);
 
-    template <CanBuildBloomFilter ValueType, bool CheckTS>
+    template <CanBuildBloomFilter ValueType>
     static void BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &arg);
 
     template <CanBuildMinMaxFilter ValueType, bool CheckTS>
     static void BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg);
 
-    template <CanBuildMinMaxFilter ValueType, bool CheckTS>
+    template <CanBuildMinMaxFilter ValueType>
     static void BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg &arg);
 
     template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
     static void BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg &arg);
+
+    template <CanBuildMinMaxFilterAndBloomFilter ValueType>
+    static void BuildMinMaxAndBloomFilter(NewBuildFastRoughFilterArg &arg);
 
     template <typename ValueType, bool CheckTS>
     static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter);
@@ -139,6 +152,44 @@ private:
         }
         if (build_bloom_filter) {
             BuildOnlyBloomFilter<ValueType, CheckTS>(arg);
+        }
+    }
+
+    template <typename ValueType>
+    static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter);
+
+    template <CanBuildMinMaxFilterAndBloomFilter ValueType>
+    static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
+        if (build_min_max_filter and build_bloom_filter) {
+            BuildMinMaxAndBloomFilter<ValueType>(arg);
+        } else if (build_min_max_filter) {
+            // TODO: now only use this branch
+            BuildOnlyMinMaxFilter<ValueType>(arg);
+        } else if (build_bloom_filter) {
+            BuildOnlyBloomFilter<ValueType>(arg);
+        }
+    }
+
+    template <CanOnlyBuildMinMaxFilter ValueType>
+    static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
+        if (build_bloom_filter) [[unlikely]] {
+            String error_message = "BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter";
+            UnrecoverableError(error_message);
+        }
+        if (build_min_max_filter) {
+            // TODO: now only use this branch
+            BuildOnlyMinMaxFilter<ValueType>(arg);
+        }
+    }
+
+    template <CanOnlyBuildBloomFilter ValueType>
+    static void BuildFilter(NewBuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
+        if (build_min_max_filter) [[unlikely]] {
+            String error_message = "BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter";
+            UnrecoverableError(error_message);
+        }
+        if (build_bloom_filter) {
+            BuildOnlyBloomFilter<ValueType>(arg);
         }
     }
 };

@@ -224,7 +224,6 @@ void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer
     }
 }
 
-
 void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
     ColumnVectorType vector_type = other.vector_type_;
     Initialize(vector_type, vector_type == ColumnVectorType::kConstant ? other.capacity() : DEFAULT_VECTOR_SIZE);
@@ -1317,6 +1316,8 @@ void ColumnVector::Finalize(SizeT index) {
     }
     tail_index_ = index;
 }
+
+ptr_t ColumnVector::GetRawPtr(SizeT index) { return data_ptr_ + index * data_type_->Size(); }
 
 void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     if (!initialized) {

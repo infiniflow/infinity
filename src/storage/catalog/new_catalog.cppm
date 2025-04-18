@@ -115,6 +115,21 @@ private:
     BlockOffset block_offset_end_ = 0;
 };
 
+export class NewTxnBlockVisitor {
+public:
+    NewTxnBlockVisitor(NewTxnGetVisibleRangeState *visit_state) : visit_state_(visit_state) {}
+
+    Optional<BlockOffset> Next();
+
+    BlockOffset cur() const { return cur_; }
+
+private:
+    NewTxnGetVisibleRangeState *visit_state_ = nullptr;
+    Pair<BlockOffset, BlockOffset> visible_range_ = {0, 0};
+    BlockOffset cur_ = 0;
+    bool end_ = false;
+};
+
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
