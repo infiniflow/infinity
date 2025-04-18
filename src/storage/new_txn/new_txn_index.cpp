@@ -695,6 +695,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
                              SizeT segment_row_cnt,
                              DumpIndexCause dump_index_cause,
                              WalCmdCreateIndex *create_index_cmd_ptr) {
+    // PopulateIndex is used in create index / import and compact
     Optional<SegmentIndexMeta> segment_index_meta;
     {
         Status status = NewCatalog::AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);

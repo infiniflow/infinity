@@ -279,6 +279,9 @@ Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
 }
 
 Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
+    // Check has mem index key, if no, set the key.
+    // Clear mem index if no such key
+    // This function is used by populate index and append index (used by append or recover mem index)
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
 
     String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
@@ -313,7 +316,8 @@ Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
         }
     }
     if (!has_mem_index) {
-        // Clear here because dump mem index may not clear after commit.
+        // Clear here because dump mem index may not clear after commit. Dump index might be conflict with AppendIndex, this is to clear the mem index
+        // before new append data is construct to new index
         mem_index->ClearMemIndex();
     }
     return Status::OK();
