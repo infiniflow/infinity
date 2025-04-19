@@ -100,7 +100,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     {
         Status status;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -112,7 +112,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
             return status;
         }

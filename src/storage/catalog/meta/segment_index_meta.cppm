@@ -53,6 +53,8 @@ public:
 
     Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
 
+    Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
+
     Status AddChunkID(ChunkID chunk_id);
 
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);

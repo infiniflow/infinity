@@ -53,13 +53,15 @@ public:
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs();
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1();
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status AddSegmentIndexID1(SegmentID segment_id, NewTxn* new_txn);
+    Status AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn);
+
+    Status RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids);
 
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);

@@ -346,7 +346,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
 
     auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta,
                                    const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
 
@@ -371,7 +371,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIDs();
+        std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
 

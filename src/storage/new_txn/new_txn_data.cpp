@@ -1691,7 +1691,7 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
         for (const String &index_id_str : *index_id_strs_ptr) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
+            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
             if (!status.ok()) {
                 return status;
             }
@@ -1701,10 +1701,14 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
                     new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
             }
-            status = table_index_meta.SetSegmentIDs(new_segment_ids);
+            status = table_index_meta.RemoveSegmentIndexIDs(*segment_ids_ptr);
             if (!status.ok()) {
                 return status;
             }
+            //  status = table_index_meta.SetSegmentIDs(new_segment_ids);
+            //  if (!status.ok()) {
+            //      return status;
+            //  }
         }
     }
     return Status::OK();

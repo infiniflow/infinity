@@ -768,7 +768,7 @@ Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, Co
             trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, memory_secondary_index));
         }
     } else {
-        auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs();
+        auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

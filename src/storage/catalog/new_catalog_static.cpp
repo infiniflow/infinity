@@ -153,7 +153,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
 
-        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs();
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
         if (!chunk_status.ok()) {
             return status;
         }
@@ -169,7 +169,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -477,7 +477,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     }
 
     table_index_meta.emplace(index_id_str, table_meta);
-    status = table_index_meta->InitSet(index_base);
+    status = table_index_meta->InitSet1(index_base);
     if (!status.ok()) {
         return status;
     }
@@ -486,7 +486,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
 
 Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
 
-    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIDs();
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -498,7 +498,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
         }
     }
 
-    status = table_index_meta.UninitSet();
+    status = table_index_meta.UninitSet1();
     if (!status.ok()) {
         return status;
     }
@@ -800,7 +800,6 @@ Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, Segment
 Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
                                        NewTxn *new_txn,
                                        SegmentID segment_id,
-                                       TxnTimeStamp commit_ts,
                                        Optional<SegmentIndexMeta> &segment_index_meta) {
     Status status = table_index_meta.AddSegmentIndexID1(segment_id, new_txn);
     if (!status.ok()) {
@@ -808,7 +807,7 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
     }
 
     segment_index_meta.emplace(segment_id, table_index_meta);
-    status = segment_index_meta->InitSet();
+    status = segment_index_meta->InitSet1();
     if (!status.ok()) {
         return status;
     }
@@ -817,7 +816,7 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
 
-    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -828,7 +827,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
             return status;
         }
     }
-    status = segment_index_meta.UninitSet();
+    status = segment_index_meta.UninitSet1();
     if (!status.ok()) {
         return status;
     }
@@ -1191,7 +1190,7 @@ Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_m
 
 Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths) {
 
-    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIDs();
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -1206,7 +1205,7 @@ Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vec
 }
 
 Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths) {
-    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }

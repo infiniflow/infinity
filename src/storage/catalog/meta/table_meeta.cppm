@@ -98,7 +98,7 @@ public:
 
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
     SharedPtr<String> GetTableDir();
-    // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
+    // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIndexIDs1();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
     Status CheckSegments(const Vector<SegmentID> &segment_ids);

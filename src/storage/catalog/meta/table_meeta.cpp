@@ -129,10 +129,11 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
         if (segment_ids_set.contains(segment_id)) {
-            if (commit_ts > begin_ts_) {
+            if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 UnrecoverableError(
                     fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}, begin_ts: {}", segment_id, commit_ts, begin_ts_));
             }
+            // the key is committed before the txn or the key isn't committed
             delete_keys.push_back(iter->Key().ToString());
         }
         iter->Next();
@@ -547,10 +548,11 @@ Status TableMeeta::LoadSegmentIDs1() {
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts_) {
+        if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
             iter->Next();
             continue;
         }
+        // the key is committed before the txn or the key isn't committed
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
         segment_ids.push_back(segment_id);
         iter->Next();
@@ -654,7 +656,7 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
 
 SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_)}; }
 
-// Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
+// Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIndexIDs1() {
 //     if (!segment_ids_) {
 //         auto status = LoadSegmentIDs();
 //         if (!status.ok()) {

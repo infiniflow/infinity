@@ -45,4 +45,7 @@ String CalcMD5(const char* input_str, SizeT length);
 
 String CalcMD5(const String& filename);
 
+Tuple<u64, bool> ExtractU64FromStringSuffix(const String& src, SizeT offset);
+
+
 } // namespace infinity

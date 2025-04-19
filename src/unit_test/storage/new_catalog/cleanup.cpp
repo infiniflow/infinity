@@ -414,7 +414,7 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
-
+    new_txn_mgr->PrintAllKeyValue();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         Status status;
@@ -427,10 +427,12 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
     {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
     this->CheckFilePaths();
 
     {
@@ -445,6 +447,7 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
     {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());

@@ -474,7 +474,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             // Fill the segment with index
             if (table_index_meta_) {
                 Vector<SegmentID> *segment_ids_ptr = nullptr;
-                std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIDs();
+                std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
@@ -798,7 +798,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         }
 
         auto get_chunks = [&segment_index_meta] {
-            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs();
+            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

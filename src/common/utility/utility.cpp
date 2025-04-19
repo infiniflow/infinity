@@ -153,4 +153,18 @@ String CalcMD5(const String& input_file) {
     return md5;
 }
 
+Tuple<u64, bool> ExtractU64FromStringSuffix(const String& src, SizeT offset) {
+    SizeT len = src.size();
+    SizeT res = 0;
+    for(SizeT i = offset; i < len; ++ i) {
+        char ch = src[i];
+        if(std::isalnum(ch)) {
+            res += res * 10 + (ch - '0');
+        } else{
+            return {std::numeric_limits<u64>::max(), false};
+        }
+    }
+    return {res, true};
+}
+
 } // namespace infinity

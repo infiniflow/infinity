@@ -33,6 +33,7 @@ import chunk_index_meta;
 import new_txn;
 import txn_state;
 import infinity_exception;
+import utility;
 
 namespace infinity {
 
@@ -106,6 +107,19 @@ Status SegmentIndexMeta::SetChunkIDs(const Vector<ChunkID> &chunk_ids) {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
+    TableMeeta &table_meta = table_index_meta_.table_meta();
+    for (ChunkID chunk_id : chunk_ids) {
+        String chunk_id_key =
+            KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
+        Status status = kv_instance_.Delete(chunk_id_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
     if (!chunk_ids_) {
         Status status = LoadChunkIDs();
@@ -142,6 +156,10 @@ Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
             UnrecoverableError(fmt::format("Invalid transaction state: {}", TxnState2Str(new_txn->GetTxnState())));
         }
     }
+    if (!chunk_ids_) {
+        chunk_ids_ = Vector<ChunkID>();
+    }
+    chunk_ids_->push_back(chunk_id);
     return kv_instance_.Put(chunk_id_key, commit_ts_str);
 }
 
@@ -499,13 +517,17 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
     auto iter = kv_instance_.GetIterator();
     iter->Seek(chunk_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(chunk_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts) {
-            iter->Next();
-            continue;
+        String key = iter->Key().ToString();
+        auto [chunk_id, is_chunk_id] = ExtractU64FromStringSuffix(key, chunk_id_prefix.size());
+        if (is_chunk_id) {
+            TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+                iter->Next();
+                continue;
+            }
+            // the key is committed before the txn or the key isn't committed
+            chunk_ids.push_back(chunk_id);
         }
-        ChunkID chunk_id = std::stoull(iter->Key().ToString().substr(chunk_id_prefix.size()));
-        chunk_ids.push_back(chunk_id);
         iter->Next();
     }
 

@@ -182,7 +182,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -241,7 +241,7 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -491,7 +491,7 @@ TEST_P(TestTxnIndexInternal, test_index) {
         // }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -583,7 +583,7 @@ TEST_P(TestTxnIndexInternal, test_index) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -761,7 +761,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
 
         ChunkID chunk_id = 0;
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
             chunk_id = (*chunk_ids)[0];
@@ -990,7 +990,7 @@ TEST_P(TestTxnIndexInternal, test_populate_index) {
 
         ChunkID chunk_id = 0;
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_ids->size(), 1);
             chunk_id = chunk_ids->at(0);

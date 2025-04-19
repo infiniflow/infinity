@@ -723,7 +723,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                     }
                 }
             } else {
-                auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs();
+                auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }

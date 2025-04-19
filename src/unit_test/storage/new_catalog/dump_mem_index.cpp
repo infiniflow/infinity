@@ -218,7 +218,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -269,7 +269,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -740,7 +740,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -791,7 +791,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -1289,7 +1289,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -1340,7 +1340,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -1896,7 +1896,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -1947,7 +1947,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -2507,7 +2507,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -2558,7 +2558,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -3073,7 +3073,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -3124,7 +3124,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -3357,7 +3357,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -3408,7 +3408,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -3930,7 +3930,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -3981,7 +3981,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -4033,7 +4033,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -4084,7 +4084,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -4702,7 +4702,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -4753,7 +4753,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -4799,7 +4799,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
         check_mem_index(mem_index);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({}));
         }
@@ -4832,7 +4832,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
         check_mem_index(mem_index);
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -5348,7 +5348,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -5962,7 +5962,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_lock_table) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -6013,7 +6013,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_lock_table) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -6064,7 +6064,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_lock_table) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({}));
         }
@@ -6652,7 +6652,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         //        }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -6703,7 +6703,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         }
 
         {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs();
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
@@ -7089,13 +7089,13 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIDs();
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, chunk_ids);
     };
@@ -7466,13 +7466,13 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIDs();
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[dump_segment_id], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, chunk_ids);
     };

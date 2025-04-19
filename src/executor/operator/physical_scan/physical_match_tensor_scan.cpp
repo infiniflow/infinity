@@ -271,7 +271,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
             // Fill the segment with index
             if (table_index_meta_) {
                 Vector<SegmentID> *segment_ids_ptr = nullptr;
-                std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIDs();
+                std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
@@ -488,7 +488,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                     fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
                 // TODO: now only have EMVB index
                 // const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
-                auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs();
+                auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }

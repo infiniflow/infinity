@@ -31,6 +31,7 @@ import infinity_context;
 import new_txn;
 import txn_state;
 import infinity_exception;
+import utility;
 
 namespace infinity {
 
@@ -81,9 +82,9 @@ Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIDs() {
     return {&*segment_ids_, Status::OK()};
 }
 
-Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIDs1() {
+Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
     if (!segment_ids_) {
-        auto status = LoadSegmentIDs();
+        auto status = LoadSegmentIDs1();
         if (!status.ok()) {
             return {nullptr, status};
         }
@@ -135,8 +136,23 @@ Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn
             UnrecoverableError(fmt::format("Invalid transaction state: {}", TxnState2Str(new_txn->GetTxnState())));
         }
     }
-
+    if (!segment_ids_) {
+        segment_ids_ = Vector<SegmentID>();
+    }
+    segment_ids_->push_back(segment_id);
     return kv_instance_.Put(segment_id_key, commit_ts_str);
+}
+
+Status TableIndexMeeta::RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids) {
+
+    for(SegmentID segment_id: segment_ids) {
+        String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
+        Status status = kv_instance_.Delete(segment_id_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 Status TableIndexMeeta::GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts) {
@@ -323,13 +339,17 @@ Status TableIndexMeeta::LoadSegmentIDs1() {
     auto iter = kv_instance_.GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts) {
-            iter->Next();
-            continue;
+        String key = iter->Key().ToString();
+        auto [segment_id, is_segment_id] = ExtractU64FromStringSuffix(key, segment_id_prefix.size());
+        if (is_segment_id) {
+            TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+                iter->Next();
+                continue;
+            }
+            // the key is committed before the txn or the key isn't committed
+            segment_ids.push_back(segment_id);
         }
-        SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
-        segment_ids.push_back(segment_id);
         iter->Next();
     }
 

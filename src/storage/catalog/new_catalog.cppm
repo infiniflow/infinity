@@ -331,7 +331,6 @@ public:
     static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
                                       NewTxn *new_txn,
                                       SegmentID segment_id,
-                                      TxnTimeStamp commit_ts,
                                       Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
