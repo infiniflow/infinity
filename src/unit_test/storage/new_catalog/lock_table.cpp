@@ -3310,7 +3310,7 @@ TEST_P(TestTxnLockTable, lock_table_and_compact) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIDs();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
     };
@@ -3662,7 +3662,7 @@ TEST_P(TestTxnLockTable, test_lock_table_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIDs();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 
@@ -3703,7 +3703,7 @@ TEST_P(TestTxnLockTable, test_lock_table_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIDs();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 

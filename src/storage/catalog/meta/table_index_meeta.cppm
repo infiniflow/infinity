@@ -51,7 +51,7 @@ public:
 
     Status GetTableIndexInfo(TableIndexInfo &table_index_info);
 
-    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
 

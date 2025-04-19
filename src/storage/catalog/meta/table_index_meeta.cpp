@@ -71,15 +71,14 @@ Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
     return table_meta_.GetColumnDefByColumnName(index_base->column_name());
 }
 
-Status TableIndexMeeta::GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
+Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIDs() {
     if (!segment_ids_) {
-        Status status = LoadSegmentIDs();
+        auto status = LoadSegmentIDs();
         if (!status.ok()) {
-            return status;
+            return {nullptr, status};
         }
     }
-    segment_ids = &segment_ids_.value();
-    return Status::OK();
+    return {&*segment_ids_, Status::OK()};
 }
 
 Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIDs1() {

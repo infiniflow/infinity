@@ -1691,7 +1691,7 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
         for (const String &index_id_str : *index_id_strs_ptr) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+            std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
             if (!status.ok()) {
                 return status;
             }

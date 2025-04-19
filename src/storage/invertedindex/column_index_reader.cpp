@@ -99,7 +99,8 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     {
-        Status status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+        Status status;
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
         if (!status.ok()) {
             return status;
         }

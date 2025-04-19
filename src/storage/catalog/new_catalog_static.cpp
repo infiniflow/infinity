@@ -169,7 +169,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
         if (!status.ok()) {
             return status;
         }
@@ -485,10 +485,8 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
 }
 
 Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
-    Status status;
 
-    Vector<SegmentID> *segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIDs();
     if (!status.ok()) {
         return status;
     }
@@ -1192,9 +1190,8 @@ Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_m
 }
 
 Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths) {
-    Status status;
-    Vector<SegmentID> *segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIDs();
     if (!status.ok()) {
         return status;
     }

@@ -135,7 +135,7 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
         TableIndexMeeta table_index_meta(index_id_str, *table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
         if (!status.ok()) {
             return status;
         }
@@ -409,7 +409,7 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
         return Status::OK();
     }
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+    std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
     if (!status.ok()) {
         return status;
     }
@@ -495,8 +495,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
             segment_meta.emplace(range.segment_id_, table_index_meta.table_meta());
 
             {
-                Vector<SegmentID> *segment_ids_ptr = nullptr;
-                Status status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+                auto [segment_ids_ptr, status]= table_index_meta.GetSegmentIDs();
                 if (!status.ok()) {
                     return status;
                 }
@@ -809,8 +808,7 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     SegmentID segment_id = dump_index_cmd->segment_id_;
     Optional<SegmentIndexMeta> segment_index_meta_opt;
     {
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        Status status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+        auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIDs();
         if (!status.ok()) {
             return status;
         }
@@ -1579,7 +1577,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
         return status;
     }
     Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
+    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
     if (!status.ok()) {
         return status;
     }
@@ -1629,7 +1627,7 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     }
 
     Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
+    std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIDs();
     if (!status.ok()) {
         return status;
     }
