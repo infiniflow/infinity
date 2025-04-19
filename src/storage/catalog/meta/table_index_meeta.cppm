@@ -27,6 +27,7 @@ class KVInstance;
 class TableMeeta;
 class IndexBase;
 struct SegmentUpdateTS;
+class NewCatalog;
 
 export class TableIndexMeeta {
 public:
@@ -66,7 +67,7 @@ private:
 public:
     Status UpdateFulltextSegmentTS(TxnTimeStamp ts);
 
-    Status InitSet(const SharedPtr<IndexBase> &index_base);
+    Status InitSet(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
     Status UninitSet();
 

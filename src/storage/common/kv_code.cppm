@@ -206,6 +206,10 @@ public:
     static String PMObjectKey(const String &key);
 
     static String PMObjectStatKey(const String &key);
+
+    static String PMObjectPathKeyPrefix();
+
+    static String PMObjectPathKey(const String &path);
 };
 
 } // namespace infinity

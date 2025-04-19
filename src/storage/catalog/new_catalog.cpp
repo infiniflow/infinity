@@ -14,6 +14,8 @@
 
 module;
 
+#include <network/infinity_thrift/infinity_types.h>
+#include <statement/extra/create_index_info.h>
 #include <string>
 
 module new_catalog;
@@ -41,6 +43,14 @@ import table_meeta;
 import segment_meta;
 import block_meta;
 import column_meta;
+import table_index_entry;
+import table_index_meeta;
+import index_secondary;
+import index_ivf;
+import index_hnsw;
+import index_full_text;
+import index_bmp;
+import index_emvb;
 
 namespace infinity {
 
@@ -231,7 +241,7 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json 
 
             if (table_entry_json.contains("table_indexes")) {
                 for (auto &index_json : table_entry_json["table_indexes"]) {
-                    status = TransformCatalogTableIndex(index_json, &kv_instance);
+                    status = TransformCatalogTableIndex(table_meta.value(), index_json);
                     if (!status.ok()) {
                         return status;
                     }
@@ -283,7 +293,109 @@ Status NewCatalog::TransformCatalogBlockColumn(BlockMeta &block_meta, const nloh
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogTableIndex(const nlohmann::json &table_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json) {
+    String index_id_str;
+    auto &kv_instance = table_meta.kv_instance();
+    Status status = IncrLatestID(&kv_instance, index_id_str, LATEST_INDEX_ID);
+    if (!status.ok()) {
+        return status;
+    }
+    auto &entries = table_index_entry_json["index_entries"];
+    TxnTimeStamp index_commit_ts;
+    for (const auto &index_entry_json : entries) {
+        index_commit_ts = index_entry_json["commit_ts"];
+        Optional<TableIndexMeeta> table_index_meta;
+
+        auto index_name_str = index_entry_json["index_base"]["index_name"];
+        SharedPtr<String> index_name_ptr = MakeShared<String>(index_name_str);
+
+        auto index_comment_str = index_entry_json["index_base"]["index_comment"];
+        SharedPtr<String> index_comment_ptr = MakeShared<String>(index_comment_str);
+
+        const String file_name = index_entry_json["index_base"]["file_name"];
+
+        // auto index_base_ptr = MakeShared<IndexBase>(index_name_ptr);
+        // status = AddNewTableIndex(table_meta, index_id_str, index_commit_ts, index_base_ptr, table_index_meta);
+
+        Vector<String> column_names;
+        for (auto column_name : index_entry_json["index_base"]["column_names"]) {
+            column_names.push_back(column_name);
+        }
+
+        SharedPtr<IndexBase> index_base;
+
+        const auto &type = IndexInfo::StringToIndexType(index_entry_json["index_base"]["index_type"].get<std::string>());
+
+        Vector<InitParameter *> index_param_list;
+
+        switch (type) {
+            case IndexType::kSecondary:
+                index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
+                break;
+
+            case IndexType::kIVF:
+                index_param_list = {new InitParameter{"metric", "l2"},
+                                    new InitParameter{"scalar_quantization_bits", "4"},
+                                    new InitParameter{"centroids_num_ratio", "0.33"},
+                                    new InitParameter{"storage_type", "scalar_quantization"}};
+                index_base = IndexIVF::Make(index_name_ptr, index_comment_ptr, file_name, column_names, index_param_list);
+                break;
+
+            case IndexType::kHnsw:
+                index_param_list = {new InitParameter{"metric", "l2"},
+                                    new InitParameter{"encode", "plain"},
+                                    new InitParameter{"m", "16"},
+                                    new InitParameter{"ef_construction", "200"}};
+                index_base = IndexHnsw::Make(index_name_ptr, index_comment_ptr, file_name, column_names, index_param_list);
+                break;
+
+            case IndexType::kFullText:
+                // index_param_list.emplace_back(new InitParameter("analyzer", "chinese"));
+                index_base = IndexFullText::Make(index_name_ptr, index_comment_ptr, file_name, column_names, index_param_list);
+                break;
+
+            case IndexType::kBMP:
+                index_param_list = {new InitParameter{"block_size", "16"}, new InitParameter{"compress_type", "compress"}};
+                index_base = IndexBMP::Make(index_name_ptr, index_comment_ptr, file_name, column_names, index_param_list);
+                break;
+
+            case IndexType::kEMVB:
+                index_param_list = {new InitParameter{"pq_subspace_num", "32"}, new InitParameter{"pq_subspace_bits", "8"}};
+                index_base = IndexEMVB::Make(index_name_ptr, index_comment_ptr, file_name, column_names, index_param_list);
+                break;
+
+            default:
+                throw std::runtime_error("Unsupported index type: " + IndexInfo::IndexTypeToString(type));
+        }
+
+        for (auto *param : index_param_list) {
+            delete param;
+        }
+
+        // MakeShared<IndexBase>(IndexBase(index_type,index_name_ptr,index_comment_ptr,file_name,column_names));
+
+        status = AddNewTableIndex(table_meta, index_id_str, index_commit_ts, index_base, table_index_meta);
+
+        // explicit IndexBase(IndexType index_type,
+        //               SharedPtr<String> index_name,
+        //              SharedPtr<String> index_comment,
+        //               const String &file_name,
+        //               Vector<String> column_names)
+        //: index_type_(index_type), index_name_(std::move(index_name)), index_comment_(std::move(index_comment)), file_name_(file_name),
+        //  column_names_(std::move(column_names))
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    // TxnTimeStamp index_commit_ts = entries["commit_ts"];
+    //  Optional<TableIndexMeeta> table_index_meta;
+    //  auto index_name_str = table_index_entry_json["index_name"];
+    //  SharedPtr<String> index_name_ptr = MakeShared<String>(index_name_str);
+    //  auto index_base_ptr = MakeShared<IndexBase>(index_name_ptr);
+    //  status = AddNewTableIndex(table_meta, index_id_str, index_commit_ts, index_base_ptr, table_index_meta);
+    return Status::OK();
+}
+
 Status NewCatalog::TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
 Status NewCatalog::TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
 

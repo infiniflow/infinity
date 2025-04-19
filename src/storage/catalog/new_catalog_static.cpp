@@ -40,6 +40,7 @@ import table_meeta;
 import segment_meta;
 import block_meta;
 import column_meta;
+import table_index_meta;
 import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
@@ -479,7 +480,7 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts) {
 }
 
 Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
-                                    const String &index_id_str,
+                                    String &index_id_str,
                                     TxnTimeStamp commit_ts,
                                     const SharedPtr<IndexBase> &index_base,
                                     Optional<TableIndexMeeta> &table_index_meta) {
@@ -493,7 +494,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     }
 
     table_index_meta.emplace(index_id_str, table_meta);
-    status = table_index_meta->InitSet(index_base);
+    status = table_index_meta->InitSet(index_base, this);
     if (!status.ok()) {
         return status;
     }
@@ -679,6 +680,13 @@ Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeSta
     // }
     return Status::OK();
 }
+//
+// Status NewCatalog::AddNewTableIndexForTransform(TableMeeta &table_meta,TxnTimeStamp commit_ts,Optional<TableIndexMeta> &table_index_meta) {
+//     Status status;
+//     BlockID block_id;
+//     std::tie(block_id, status) = table_meta.AddBlockID1(commit_ts);
+//     return Status::OK();
+// }
 
 Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
     Status status;

@@ -146,7 +146,7 @@ private:
     Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json);
     Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json);
     Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json);
-    Status TransformCatalogTableIndex(const nlohmann::json &table_index_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
     Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
     Status TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance);
     // // Database related functions
@@ -309,11 +309,11 @@ public:
 
     static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts);
 
-    static Status AddNewTableIndex(TableMeeta &table_meta,
-                                   const String &index_id_str,
-                                   TxnTimeStamp commit_ts,
-                                   const SharedPtr<IndexBase> &index_base,
-                                   Optional<TableIndexMeeta> &table_index_meta);
+    Status AddNewTableIndex(TableMeeta &table_meta,
+                            String &index_id_str,
+                            TxnTimeStamp commit_ts,
+                            const SharedPtr<IndexBase> &index_base,
+                            Optional<TableIndexMeeta> &table_index_meta);
 
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta);
 
