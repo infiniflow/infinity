@@ -189,11 +189,6 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
-
-    //ling123
-    TransactionID txn_id;
-
-
 };
 
 } // namespace infinity

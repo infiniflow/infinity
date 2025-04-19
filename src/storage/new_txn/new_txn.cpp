@@ -1096,7 +1096,7 @@ Status NewTxn::Commit() {
     }
 
     if (!status.ok()) {
-  //      this->SetTxnRollbacking(commit_ts);
+        this->SetTxnRollbacking(commit_ts);
 
         if (!this->IsReplay()) {
             // If prepare commit fail and not replay, rollback the transaction
@@ -1107,7 +1107,7 @@ Status NewTxn::Commit() {
             std::unique_lock<std::mutex> lk(commit_lock_);
             commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-            //PostRollback(commit_ts);
+            PostRollback(commit_ts);
         }
         return status;
     }
@@ -2109,7 +2109,31 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case WalCommandType::CREATE_INDEX: {
-                //                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                Optional<DBMeeta> db_meta;
+                Optional<TableMeeta> table_meta;
+                Optional<TableIndexMeeta> table_index_meta;
+                String table_key;
+                String index_key;
+                Status status = GetTableIndexMeta(cmd->db_name_,
+                                                  cmd->table_name_,
+                                                  *cmd->index_base_->index_name_,
+                                                  db_meta,
+                                                  table_meta,
+                                                  table_index_meta,
+                                                  &table_key,
+                                                  &index_key);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                status = NewCatalog::CleanTableIndex(*table_index_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+                buffer_mgr->RemoveClean();
                 break;
             }
             case WalCommandType::DROP_INDEX: {
@@ -2635,14 +2659,8 @@ void NewTxn::SetCompletion() {
 }
 
 void NewTxn::WaitForCompletion() {
-    //std::unique_lock<std::mutex> lock(conflicted_txn_->finished_mutex_);
-    //finished_cv_.wait(lock, [this] { return conflicted_txn_->finished_; });
-
-    if (finished_ == false) {
-        std::unique_lock<std::mutex> lock(finished_mutex_);
-        finished_cv_.wait(lock, [this] { return finished_; });
-    }
-
+    std::unique_lock<std::mutex> lock(finished_mutex_);
+    finished_cv_.wait(lock, [this] { return finished_; });
 }
 
 } // namespace infinity

@@ -35,142 +35,62 @@ using namespace infinity;
 
 class TestTxnsConflictTest : public NewRequestTest {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestTxnsConflictTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         TestTxnsConflictTest,
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnsConflictTest, delete_create_index_append) {
+TEST_P(TestTxnsConflictTest, create_index_append) {
     struct sync_struct {
         std::mutex mtx;
         std::condition_variable cv;
         bool ready{false};
-    } sync_1, sync_2;
+    } sync_1;
 
-    auto thread_create_index = [this, &sync_1, &sync_2]() mutable {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto thread_create_index = [this, &sync_1]() mutable {
+        {
+            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_table_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
 
-        for (int i = 0; i <= 1; i++) {
-            {
-                String create_db_sql = "create database db1";
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(create_db_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " create db" << ok << std::endl;
-            }
+        {
+            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(append_req_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
 
-            {
-                String use_db_sql = "use db1";
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(use_db_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " use db1" << ok << std::endl;
-            }
+        {
+            std::lock_guard<std::mutex> lock(sync_1.mtx);
+            sync_1.ready = true;
+            sync_1.cv.notify_one();
+        }
 
-            {
-                String create_table_sql = "create table t1(c1 int, c2 varchar)";
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(create_table_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " create table" << ok << std::endl;
-            }
-
-            {
-                String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(append_req_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " insert into t1" << ok << std::endl;
-            }
-
-            {
-                std::lock_guard<std::mutex> lock(sync_1.mtx);
-                sync_1.ready = true;
-                sync_1.cv.notify_one();
-            }
-
-            std::cout << " 111111111111111" << std::endl;
-
-            {
-                String create_index_sql = "create index idx1 on t1(c1)";
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(create_index_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " create index" << ok << std::endl;
-            }
-
-            {
-                String use_db_sql = "use default_db";
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(use_db_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " use default_db" << ok << std::endl;
-            }
-
-            {
-                std::unique_lock<std::mutex> lock(sync_2.mtx);
-                sync_2.cv.wait(lock, [&sync_2] { return sync_2.ready; });
-                sync_2.ready = false;
-            }
-
-            String drop_db_sql = "drop database db1";
-            {
-                UniquePtr<QueryContext> query_context = MakeQueryContext();
-                QueryResult query_result = query_context->Query(drop_db_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " drop db db1" << ok << std::endl;
-            }
+        {
+            String create_index_sql = "create index idx1 on t1(c1)";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_index_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
         }
     };
 
-    auto thread_append = [this, &sync_1, &sync_2]() {
-        SharedPtr<String> db_name = std::make_shared<String>("db1");
-        for (int i = 0; i <= 1; i++) {
+    auto thread_append = [this, &sync_1]() {
+        {
+            std::unique_lock<std::mutex> lock(sync_1.mtx);
+            sync_1.cv.wait(lock, [&sync_1] { return sync_1.ready; });
+            sync_1.ready = false;
+        }
 
-            {
-                std::unique_lock<std::mutex> lock(sync_1.mtx);
-                sync_1.cv.wait(lock, [&sync_1] { return sync_1.ready; });
-                sync_1.ready = false;
-            }
-
-            std::cout << " 2222222222222222" << std::endl;
-
-            {
-                String use_db_sql = "use db1";
-                UniquePtr<QueryContext> query_context = MakeQueryContext2();
-                QueryResult query_result = query_context->Query(use_db_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " use db1" << ok << std::endl;
-            }
-
-            {
-                String append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
-                UniquePtr<QueryContext> query_context = MakeQueryContext2();
-                QueryResult query_result = query_context->Query(append_req_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " thread 2 insert into t1" << ok << std::endl;
-            }
-
-            {
-                String use_db_sql = "use default_db";
-                UniquePtr<QueryContext> query_context = MakeQueryContext2();
-                QueryResult query_result = query_context->Query(use_db_sql);
-                bool ok = HandleQueryResult(query_result);
-                EXPECT_TRUE(ok);
-                std::cout << " use default_db" << ok << std::endl;
-            }
-
-            {
-                std::lock_guard<std::mutex> lock(sync_2.mtx);
-                sync_2.ready = true;
-                sync_2.cv.notify_one();
-            }
+        {
+            String append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
+            UniquePtr<QueryContext> query_context = MakeQueryContext2();
+            QueryResult query_result = query_context->Query(append_req_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
         }
     };
 

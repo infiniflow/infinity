@@ -261,6 +261,8 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
         this->CleanupTxn(txn, true);
+    } else {
+        this->CleanupTxn(txn, false);
     }
     return status;
 }

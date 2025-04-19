@@ -133,13 +133,11 @@ QueryResult QueryContext::Query(const String &query) {
 }
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
-    QueryResult query_result = QueryStatementInternal(base_statement);
-    if (query_result.status_.code_ == ErrorCode::kTxnConflict ) {
-
+    QueryResult query_result;
+    do {
         query_result = QueryStatementInternal(base_statement);
-        if (query_result.status_.ok())
-            query_result.status_.msg_ = MakeUnique<String>("Query is successful after retry");
-    }
+    } while (!query_result.status_.ok() && query_result.status_.code_ == ErrorCode::kTxnConflict);
+
     return query_result;
 }
 
@@ -290,10 +288,13 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
 
     } catch (RecoverableException &e) {
 
-        StopProfile();
-        StartProfile(QueryPhase::kRollback);
-        this->RollbackTxn();
-        StopProfile(QueryPhase::kRollback);
+        // If txn has been rollbacked, do not rollback again here.
+        if (GetTxn() != nullptr) {
+            StopProfile();
+            StartProfile(QueryPhase::kRollback);
+            this->RollbackTxn();
+            StopProfile(QueryPhase::kRollback);
+        }
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());
 
@@ -516,29 +517,12 @@ void QueryContext::RollbackTxn() {
         if (!status.ok()) {
             RecoverableError(status);
         }
-        //ling123
-
-
-/*
-        if (status.status_.code_ == ErrorCode::kTxnConflict) {
-            NewTxn *txn = session_ptr_->GetNewTxn();
-            txn->conflicted_txn;
-
-            TransactionID txn_id = txn->TxnID();
-
-            txn->waitForCompletion(txn_id);
-        }
-        */
-
         session_ptr_->SetNewTxn(nullptr);
         session_ptr_->IncreaseRollbackedTxnCount();
         return;
     }
     Txn *txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
-    txn_id = txn->TxnID();
-    //ling123
-
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();
     storage_->txn_manager()->IncreaseRollbackedTxnCount();
