@@ -25,7 +25,6 @@ import log_file;
 import persistence_manager;
 import virtual_store;
 import status;
-import background_process;
 
 export module storage;
 
@@ -39,7 +38,7 @@ class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
 class CompactionProcessor;
-//class BGTaskProcessor;
+class BGTaskProcessor;
 class BGMemIndexTracer;
 
 export enum class ReaderInitPhase {
