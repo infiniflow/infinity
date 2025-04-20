@@ -1956,7 +1956,7 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
             }
             case WalCommandType::DROP_COLUMNS: {
                 auto *drop_columns_cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
-                bool conflict = CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn, conflict_reason);
+                bool conflict = CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn.get(), conflict_reason);
                 if (conflict) {
                     return true;
                 }
