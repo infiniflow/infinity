@@ -28,6 +28,7 @@ class TableMeeta;
 class IndexBase;
 struct SegmentUpdateTS;
 class NewCatalog;
+class NewTxn;
 
 export class TableIndexMeeta {
 public:
@@ -51,15 +52,17 @@ public:
 
     Status GetTableIndexInfo(TableIndexInfo &table_index_info);
 
-    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs();
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1();
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status AddSegmentID1(SegmentID segment_id, TxnTimeStamp commit_ts);
+    Status AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn);
+
+    Status RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids);
 
 private:
     Status GetSegmentUpdateTS(SharedPtr<SegmentUpdateTS> &segment_update_ts);
@@ -69,7 +72,11 @@ public:
 
     Status InitSet(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
+    Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
+
     Status UninitSet();
+
+    Status UninitSet1();
 
 private:
     Status LoadIndexDef();

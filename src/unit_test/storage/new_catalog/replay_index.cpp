@@ -263,7 +263,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
 
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
         }
@@ -371,8 +371,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         }
 
         {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
@@ -633,8 +632,7 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
 
         ChunkID chunk_id = 0;
         {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_ids->size(), 1);
             chunk_id = chunk_ids->at(0);

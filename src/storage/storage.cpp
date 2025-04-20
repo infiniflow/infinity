@@ -887,13 +887,22 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
 }
 
 void Storage::RecoverMemIndex() {
-    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("recover mem index"), TransactionType::kNormal);
-    txn->SetReplay(true);
-    Status status = NewCatalog::MemIndexRecover(txn);
+    //    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("recover mem index"), TransactionType::kNormal);
+    //    txn->SetReplay(true);
+    //    Status status = NewCatalog::MemIndexRecover(txn);
+    //    if (!status.ok()) {
+    //        UnrecoverableError("Failed to recover mem index in new catalog");
+    //    }
+    //    status = new_txn_mgr_->CommitTxn(txn);
+    //    if (!status.ok()) {
+    //        UnrecoverableError("Failed to commit mem index in new catalog");
+    //    }
+    UniquePtr<NewTxn> recovery_txn = new_txn_mgr_->BeginRecoveryTxn();
+    Status status = NewCatalog::MemIndexRecover(recovery_txn.get());
     if (!status.ok()) {
         UnrecoverableError("Failed to recover mem index in new catalog");
     }
-    status = new_txn_mgr_->CommitTxn(txn);
+    status = recovery_txn->CommitRecovery();
     if (!status.ok()) {
         UnrecoverableError("Failed to commit mem index in new catalog");
     }

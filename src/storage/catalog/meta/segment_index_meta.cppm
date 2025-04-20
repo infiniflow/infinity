@@ -27,6 +27,7 @@ class KVInstance;
 class TableIndexMeeta;
 class MemIndex;
 struct SegmentIndexFtInfo;
+class NewTxn;
 
 export class SegmentIndexMeta {
 public:
@@ -40,37 +41,23 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Status GetChunkIDs(Vector<ChunkID> *&chunk_ids) {
-        if (!chunk_ids_) {
-            Status status = LoadChunkIDs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_ids = &chunk_ids_.value();
-        return Status::OK();
-    }
+    Tuple<Vector<ChunkID> *, Status> GetChunkIDs();
+
+    Status GetNextChunkID(ChunkID &chunk_id);
+
+    Tuple<ChunkID, Status> GetNextChunkID1();
 
     Tuple<Vector<ChunkID> *, Status> GetChunkIDs1();
-
-    Status GetNextChunkID(ChunkID &chunk_id) {
-        if (!next_chunk_id_) {
-            Status status = LoadNextChunkID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_id = *next_chunk_id_;
-        return Status::OK();
-    }
 
     Status GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info);
 
     Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
 
+    Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
+
     Status AddChunkID(ChunkID chunk_id);
 
-    Tuple<ChunkID, Status> AddChunkID1(TxnTimeStamp commit_ts);
+    Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
 
     Status SetNextChunkID(ChunkID chunk_id);
 
@@ -82,9 +69,13 @@ public:
 
     Status InitSet();
 
+    Status InitSet1();
+
     Status LoadSet();
 
     Status UninitSet();
+
+    Status UninitSet1();
 
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 

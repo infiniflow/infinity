@@ -31,6 +31,7 @@ class WalManager;
 class CatalogDeltaEntry;
 class NewTxn;
 class KVStore;
+struct WalEntry;
 
 export class NewTxnManager {
 public:
@@ -39,6 +40,8 @@ public:
     ~NewTxnManager();
 
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
+    UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
+    UniquePtr<NewTxn> BeginRecoveryTxn();
 
     NewTxn *GetTxn(TransactionID txn_id) const;
 
@@ -72,6 +75,7 @@ public:
 
     //[[nodiscard]]
     Status CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr = nullptr);
+    void CommitReplayTxn(NewTxn *txn);
 
     Status RollBackTxn(NewTxn *txn);
 

@@ -456,8 +456,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }

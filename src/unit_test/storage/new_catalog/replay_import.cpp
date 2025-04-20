@@ -265,8 +265,7 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
     };
 
     auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta) {
-        Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
 
@@ -288,8 +287,7 @@ TEST_P(TestTxnReplayImport, test_import_with_index) {
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-
-        status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+        std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0, 1}));
 

@@ -102,7 +102,6 @@ export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
     // For new txn
     explicit NewTxn(NewTxnManager *txn_manager,
-                    BufferManager *buffer_manager,
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts,
                     UniquePtr<KVInstance> kv_instance,
@@ -119,12 +118,10 @@ public:
 
     virtual ~NewTxn();
 
-    static UniquePtr<NewTxn> NewReplayTxn(BufferManager *buffer_mgr,
-                                          NewTxnManager *txn_mgr,
-                                          TransactionID txn_id,
-                                          TxnTimeStamp begin_ts,
-                                          UniquePtr<KVInstance> kv_instance,
-                                          TransactionType txn_type);
+    static UniquePtr<NewTxn>
+    NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance);
+
+    static UniquePtr<NewTxn> NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     // NewTxn steps:
     // 1. CreateTxn
@@ -141,11 +138,15 @@ public:
 
     Status Commit();
 
+    Status CommitReplay();
+
+    Status CommitRecovery();
+
     Status PostReadTxnCommit();
 
     bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason);
 
-    Status PrepareCommit();
+    Status PrepareCommit(TxnTimeStamp commit_ts);
 
     void CommitBottom();
 
@@ -390,6 +391,8 @@ public:
 
     Status PrintVersion(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool ignore_invisible);
 
+    void AddMetaKeyForCommit(const String &key);
+
 private:
     void CheckTxnStatus();
 
@@ -562,9 +565,7 @@ private:
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
 
-    void SetReplay(bool replay) { txn_context_ptr_->replay_ = replay; }
-
-    bool IsReplay() const { return txn_context_ptr_->replay_; }
+    bool IsReplay() const;
 
     Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
 
@@ -642,6 +643,8 @@ private:
     // ADMIN command which allowed in follower and learner
     bool allowed_in_reader_{false};
 
+    Vector<String> keys_wait_for_commit_{};
+    Vector<String> mem_index_names_{};
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
 

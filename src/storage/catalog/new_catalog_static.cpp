@@ -169,9 +169,8 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
 
-        Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
-        if (!status.ok()) {
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+        if (!chunk_status.ok()) {
             return status;
         }
         for (ChunkID chunk_id : *chunk_ids_ptr) {
@@ -186,7 +185,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -494,7 +493,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     }
 
     table_index_meta.emplace(index_id_str, table_meta);
-    status = table_index_meta->InitSet(index_base, this);
+    status = table_index_meta->InitSet1(index_base, this);
     if (!status.ok()) {
         return status;
     }
@@ -502,10 +501,8 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
 }
 
 Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
-    Status status;
 
-    Vector<SegmentID> *segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -517,7 +514,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
         }
     }
 
-    status = table_index_meta.UninitSet();
+    status = table_index_meta.UninitSet1();
     if (!status.ok()) {
         return status;
     }
@@ -824,16 +821,16 @@ Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, Segment
 }
 
 Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                       NewTxn *new_txn,
                                        SegmentID segment_id,
-                                       TxnTimeStamp commit_ts,
                                        Optional<SegmentIndexMeta> &segment_index_meta) {
-    Status status = table_index_meta.AddSegmentID1(segment_id, commit_ts);
+    Status status = table_index_meta.AddSegmentIndexID1(segment_id, new_txn);
     if (!status.ok()) {
         return status;
     }
 
     segment_index_meta.emplace(segment_id, table_index_meta);
-    status = segment_index_meta->InitSet();
+    status = segment_index_meta->InitSet1();
     if (!status.ok()) {
         return status;
     }
@@ -841,10 +838,8 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 }
 
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
-    Status status;
 
-    Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -855,7 +850,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
             return status;
         }
     }
-    status = segment_index_meta.UninitSet();
+    status = segment_index_meta.UninitSet1();
     if (!status.ok()) {
         return status;
     }
@@ -891,6 +886,35 @@ Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
+Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                     NewTxn *new_txn,
+                                     ChunkID chunk_id,
+                                     RowID base_row_id,
+                                     SizeT row_count,
+                                     const String &base_name,
+                                     SizeT index_size,
+                                     Optional<ChunkIndexMeta> &chunk_index_meta) {
+    ChunkIndexMetaInfo chunk_info;
+    chunk_info.base_name_ = base_name;
+    chunk_info.base_row_id_ = base_row_id;
+    chunk_info.row_cnt_ = row_count;
+    chunk_info.index_size_ = index_size;
+    {
+        chunk_index_meta.emplace(chunk_id, segment_index_meta);
+        Status status = chunk_index_meta->InitSet(chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info) {
     Status status;
 
@@ -913,6 +937,53 @@ Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, c
             return status;
         }
         status = segment_index_meta.AddChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+
+    ChunkIndexMetaInfo chunk_meta_info;
+    {
+        chunk_meta_info.base_name_ = chunk_info.base_name_;
+        chunk_meta_info.base_row_id_ = chunk_info.base_rowid_;
+        chunk_meta_info.row_cnt_ = chunk_info.row_count_;
+        chunk_meta_info.index_size_ = 0;
+    }
+    status = chunk_index_meta.SetChunkInfo(chunk_meta_info);
+    if (!status.ok()) {
+        return status;
+    }
+    status = chunk_index_meta.LoadSet();
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
+    Status status;
+
+    auto *pm = InfinityContext::instance().persistence_manager();
+    if (pm) {
+        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
+    }
+
+    ChunkID chunk_id = 0;
+    {
+        status = segment_index_meta.GetNextChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        if (chunk_id != chunk_info.chunk_id_) {
+            UnrecoverableError(fmt::format("Chunk id mismatch, expect: {}, actual: {}", chunk_id, chunk_info.chunk_id_));
+        }
+        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
         if (!status.ok()) {
             return status;
         }
@@ -1152,9 +1223,8 @@ Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_m
 }
 
 Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths) {
-    Status status;
-    Vector<SegmentID> *segment_ids_ptr = nullptr;
-    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+
+    auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -1169,8 +1239,7 @@ Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vec
 }
 
 Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths) {
-    Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }

@@ -638,13 +638,13 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta->GetSegmentIDs(index_segment_ids_ptr);
+        std::tie(index_segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
 
         SegmentIndexMeta segment_index_meta((*index_segment_ids_ptr)[0], *table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({2}));
     };

@@ -344,8 +344,8 @@ public:
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                      NewTxn *new_txn,
                                       SegmentID segment_id,
-                                      TxnTimeStamp commit_ts,
                                       Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
@@ -358,7 +358,18 @@ public:
                                    SizeT index_size,
                                    Optional<ChunkIndexMeta> &chunk_index_meta);
 
+    static Status AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                    NewTxn *new_txn,
+                                    ChunkID chunk_id,
+                                    RowID base_row_id,
+                                    SizeT row_count,
+                                    const String &base_name,
+                                    SizeT index_size,
+                                    Optional<ChunkIndexMeta> &chunk_index_meta);
+
     static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
+
+    static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta);
 

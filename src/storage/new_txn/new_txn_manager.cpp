@@ -111,13 +111,46 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
     }
 
     // Create txn instance
-    auto new_txn = MakeShared<NewTxn>(this, buffer_mgr_, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
+    auto new_txn = MakeShared<NewTxn>(this, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
     begin_txns_.emplace(begin_ts, new_txn_id);
 
     return new_txn.get();
+}
+
+UniquePtr<NewTxn> NewTxnManager::BeginReplayTxn(const SharedPtr<WalEntry> &wal_entry) {
+    // Check if the is_running_ is true
+    if (is_running_.load() == false) {
+        String error_message = "NewTxnManager is not running, cannot replay txn";
+        UnrecoverableError(error_message);
+    }
+
+    TxnTimeStamp txn_id = wal_entry->txn_id_;
+    TxnTimeStamp commit_ts = wal_entry->commit_ts_;
+    TxnTimeStamp begin_ts = commit_ts - 1;
+
+    // Create txn instance
+    UniquePtr<NewTxn> replay_txn = NewTxn::NewReplayTxn(this, txn_id, begin_ts, commit_ts, kv_store_->GetInstance());
+    return replay_txn;
+}
+
+UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
+    // Check if the is_running_ is true
+    if (is_running_.load() == false) {
+        String error_message = "NewTxnManager is not running, cannot replay txn";
+        UnrecoverableError(error_message);
+    }
+
+    current_ts_ += 2;
+    prepare_commit_ts_ = current_ts_;
+    TxnTimeStamp commit_ts = current_ts_;
+    TxnTimeStamp begin_ts = current_ts_ - 1; // current_ts_ > 0
+
+    // Create txn instance
+    UniquePtr<NewTxn> recovery_txn = NewTxn::NewRecoveryTxn(this, begin_ts, commit_ts);
+    return recovery_txn;
 }
 
 NewTxn *NewTxnManager::GetTxn(TransactionID txn_id) const {
@@ -257,7 +290,7 @@ bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
     Status status = txn->Commit();
-    if (commit_ts_ptr) {
+    if (commit_ts_ptr != nullptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
@@ -270,6 +303,16 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         this->CleanupTxn(txn, false);
     }
     return status;
+}
+
+void NewTxnManager::CommitReplayTxn(NewTxn *txn) {
+    Status status = txn->CommitReplay();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to commit replay txn: {}", status.message()));
+    }
+
+    current_ts_ = txn->CommitTS();
+    prepare_commit_ts_ = txn->CommitTS();
 }
 
 Status NewTxnManager::RollBackTxn(NewTxn *txn) {

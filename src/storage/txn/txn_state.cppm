@@ -64,7 +64,9 @@ export inline String TxnState2Str(TxnState txn_state) {
 export enum class TransactionType {
     kCheckpoint, // Develop know it's a checkpoint txn
     kRead,       // Developer know it's a read txn
-    kNormal      // Developer doesn't know what type is this txn
+    kNormal,     // Developer doesn't know what type is this txn
+    kReplay,
+    kRecovery,
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -77,6 +79,12 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kNormal: {
             return "Normal";
+        }
+        case TransactionType::kReplay: {
+            return "Replay";
+        }
+        case TransactionType::kRecovery: {
+            return "Recovery";
         }
     }
     return "Normal";

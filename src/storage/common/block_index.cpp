@@ -204,8 +204,7 @@ SharedPtr<NewIndexSnapshot> IndexIndex::Insert(const String &index_name, SharedP
     auto index_snapshot = MakeShared<NewIndexSnapshot>();
     index_snapshot->table_index_meta_ = table_index_meta;
 
-    Vector<SegmentID> *segment_ids_ptr = nullptr;
-    Status status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+    auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
     if (!status.ok()) {
         RecoverableError(status);
     }

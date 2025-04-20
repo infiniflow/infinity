@@ -260,8 +260,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
 
         SegmentID segment_id = 0;
         {
-            Vector<SegmentID> *segment_ids_ptr = nullptr;
-            Status status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+            auto[segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
             segment_id = (*segment_ids_ptr)[0];
@@ -271,7 +270,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
         ChunkID chunk_id = 0;
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+            std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
             chunk_id = (*chunk_ids_ptr)[0];

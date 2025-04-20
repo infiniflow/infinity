@@ -1291,7 +1291,7 @@ TEST_P(TestTxnCompact, compact_and_create_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
+        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
 
@@ -1503,7 +1503,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         EXPECT_EQ(*index_base->index_name_, *index_name1);
 
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
+        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
 

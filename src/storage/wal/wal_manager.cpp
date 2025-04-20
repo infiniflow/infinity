@@ -1216,20 +1216,18 @@ void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entr
         LOG_DEBUG(replay_entry->ToString());
         // ReplayWalOptions options{.on_startup_ = false, .is_replay_ = true, .sync_from_leader_ = false};
 
-        NewTxn *replay_txn = txn_mgr->BeginTxn(nullptr, TransactionType::kNormal);
-        replay_txn->SetReplay(true);
+        UniquePtr<NewTxn> replay_txn = txn_mgr->BeginReplayTxn(replay_entry);
         for (const auto &cmd : replay_entry->cmds_) {
-            LOG_INFO(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), replay_entry->commit_ts_));
+            LOG_INFO(
+                fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), replay_entry->commit_ts_));
 
             Status status = replay_txn->ReplayWalCmd(cmd);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));
             }
         }
-        Status status = txn_mgr->CommitTxn(replay_txn);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));
-        }
+
+        txn_mgr->CommitReplayTxn(replay_txn.get());
     }
 
     // LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));

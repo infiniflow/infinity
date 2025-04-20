@@ -99,7 +99,8 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     {
-        Status status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+        Status status;
+        std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -111,18 +112,16 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        Vector<ChunkID> *chunk_ids_ptr = nullptr;
-        {
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
-            if (!status.ok()) {
-                return status;
-            }
+        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+        if (!status.ok()) {
+            return status;
         }
+
         for (ChunkID chunk_id : *chunk_ids_ptr) {
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             {
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+                status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
                 if (!status.ok()) {
                     return status;
                 }
@@ -132,7 +131,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             segment_readers_.push_back(std::move(segment_reader));
 
             BufferObj *index_buffer = nullptr;
-            Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+            status = chunk_index_meta.GetIndexBuffer(index_buffer);
             if (!status.ok()) {
                 return status;
             }

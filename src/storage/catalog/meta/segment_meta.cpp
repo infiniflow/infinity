@@ -139,7 +139,7 @@ Status SegmentMeta::UninitSet() {
         Vector<String> delete_keys;
         while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
             TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-            if (commit_ts > begin_ts_) {
+            if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
                 UnrecoverableError(fmt::format("Block id: {}.{} is not allowed to be removed. commit_ts: {}, begin_ts: {}",
                                                segment_id_,
@@ -147,6 +147,7 @@ Status SegmentMeta::UninitSet() {
                                                commit_ts,
                                                begin_ts_));
             }
+            // the key is committed before the txn or the key isn't committed
             delete_keys.push_back(iter->Key().ToString());
             iter->Next();
         }
@@ -211,10 +212,11 @@ Status SegmentMeta::LoadBlockIDs1() {
     iter->Seek(block_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts_) {
+        if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
             iter->Next();
             continue;
         }
+        // the key is committed before the txn or the key isn't committed
         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
         block_ids.push_back(block_id);
         iter->Next();
