@@ -1956,7 +1956,8 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
             }
             case WalCommandType::DROP_COLUMNS: {
                 auto *drop_columns_cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
-                bool conflict = CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn.get(), conflict_reason);
+                bool conflict =
+                    CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn.get(), conflict_reason);
                 if (conflict) {
                     return true;
                 }
@@ -1966,7 +1967,8 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
                 switch (dump_index_cmd->dump_cause_) {
                     case DumpIndexCause::kOptimizeIndex: {
-                        conflict = CheckConflictWithOptimizeIndex(dump_index_cmd->db_name_, dump_index_cmd->table_name_, check_txn.get(), conflict_reason);
+                        conflict =
+                            CheckConflictWithOptimizeIndex(dump_index_cmd->db_name_, dump_index_cmd->table_name_, check_txn.get(), conflict_reason);
                         break;
                     }
                     default: {
@@ -2018,23 +2020,24 @@ void NewTxn::PostCommit() {
     }
 
     // auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    //    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(cmd->db_id_str_, cmd->table_id_str_);
-                const AppendState *append_state = txn_table_store->append_state();
-                auto build_filter_task = MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_, append_state->sealed_segments_);
-                bg_processor->Submit(build_filter_task);
+                //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                //                NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(cmd->db_id_str_, cmd->table_id_str_);
+                //                const AppendState *append_state = txn_table_store->append_state();
+                //                auto build_filter_task = MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_,
+                //                append_state->sealed_segments_); bg_processor->Submit(build_filter_task);
                 break;
             }
             case WalCommandType::IMPORT: {
-                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                auto build_filter_task =
-                    MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_, Vector<SegmentID>({cmd->segment_info_.segment_id_}));
-                bg_processor->Submit(build_filter_task);
+                //                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+                //                auto build_filter_task =
+                //                    MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_,
+                //                    Vector<SegmentID>({cmd->segment_info_.segment_id_}));
+                //                bg_processor->Submit(build_filter_task);
                 break;
             }
             case WalCommandType::DELETE: {
@@ -2093,13 +2096,13 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::COMPACT: {
-                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                Vector<SegmentID> segment_ids;
-                for (const auto &segment_info : cmd->new_segment_infos_) {
-                    segment_ids.push_back(segment_info.segment_id_);
-                }
-                auto build_filter_task = MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_, std::move(segment_ids));
-                bg_processor->Submit(build_filter_task);
+                //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                //                Vector<SegmentID> segment_ids;
+                //                for (const auto &segment_info : cmd->new_segment_infos_) {
+                //                    segment_ids.push_back(segment_info.segment_id_);
+                //                }
+                //                auto build_filter_task = MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_,
+                //                std::move(segment_ids)); bg_processor->Submit(build_filter_task);
                 break;
             }
             default: {

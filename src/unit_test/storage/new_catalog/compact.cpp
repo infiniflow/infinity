@@ -647,7 +647,6 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   add column    commit
-
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
@@ -673,7 +672,6 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   add column    commit
-
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
         status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
         EXPECT_TRUE(status.ok());
@@ -788,8 +786,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 
-        sleep(1);
-
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
@@ -815,8 +811,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-
-        sleep(1);
 
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
@@ -863,8 +857,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
-        sleep(1);
-
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
@@ -888,7 +880,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop column    commit
-        sleep(1);
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
@@ -913,7 +904,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         //                             |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop column    commit
-        sleep(1);
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
