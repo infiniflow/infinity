@@ -104,7 +104,11 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
         }
     }
 
-    LOG_INFO(fmt::format("NewTxn: {} is Begin. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+    if (txn_text == nullptr) {
+        LOG_INFO(fmt::format("NewTxn: {} is Begin. begin ts: {}, No command text", new_txn_id, begin_ts));
+    } else {
+        LOG_INFO(fmt::format("NewTxn: {} is Begin. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+    }
 
     // Create txn instance
     auto new_txn = MakeShared<NewTxn>(this, buffer_mgr_, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
