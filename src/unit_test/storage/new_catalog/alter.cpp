@@ -136,6 +136,8 @@ TEST_P(TestTxnAlter, add_column0) {
         EXPECT_TRUE(status.ok());
     }
     {
+        new_txn_mgr->PrintAllKeyValue();
+
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 

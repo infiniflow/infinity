@@ -1158,6 +1158,27 @@ Status NewTxn::PostReadTxnCommit() {
         }
     }
 
+    // Restore the table write reference count
+    for (const auto &ref_cnt_pair : table_write_reference_count_) {
+        const auto &table_key = ref_cnt_pair.first;
+        const auto &ref_cnt = ref_cnt_pair.second;
+        //        LOG_INFO(fmt::format("DecreaseTableReferenceCount (commit): txn_id: {}, table_key: {}", this->TxnID(), table_key));
+        Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+        }
+    }
+
+    // Restore the mem index reference count
+    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
+        const auto &table_key = ref_cnt_pair.first;
+        const auto &ref_cnt = ref_cnt_pair.second;
+        Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
+        }
+    }
+
     return Status::OK();
 }
 
@@ -1741,6 +1762,27 @@ bool NewTxn::CheckConflictWithAddColumns(const String &db_name, const String &ta
     return false;
 }
 
+bool NewTxn::CheckConflictWithDropColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Compact table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
 bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
@@ -1759,6 +1801,14 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
                 auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
                 if (add_columns_cmd->db_name_ == db_name && add_columns_cmd->table_name_ == table_name) {
                     cause = fmt::format("Add columns on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+                if (drop_columns_cmd->db_name_ == db_name && drop_columns_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Drop columns on table {} in database {}.", table_name, db_name);
                     return true;
                 }
                 break;
@@ -1902,6 +1952,14 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
             case WalCommandType::ADD_COLUMNS: {
                 auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
                 conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn.get(), conflict_reason);
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+                bool conflict = CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn, conflict_reason);
+                if (conflict) {
+                    return true;
+                }
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
@@ -2054,6 +2112,7 @@ void NewTxn::PostCommit() {
     for (const auto &ref_cnt_pair : table_write_reference_count_) {
         const auto &table_key = ref_cnt_pair.first;
         const auto &ref_cnt = ref_cnt_pair.second;
+        //        LOG_INFO(fmt::format("DecreaseTableReferenceCount (commit): txn_id: {}, table_key: {}", this->TxnID(), table_key));
         Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
         if (!status.ok()) {
             UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
@@ -2204,6 +2263,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     for (const auto &ref_cnt_pair : table_write_reference_count_) {
         const auto &table_key = ref_cnt_pair.first;
         const auto &ref_cnt = ref_cnt_pair.second;
+        //        LOG_INFO(fmt::format("DecreaseTableReferenceCount (rollback): txn_id: {}, table_key: {}", this->TxnID(), table_key));
         status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
         if (!status.ok()) {
             UnrecoverableError(fmt::format("Fail to decrease table write count on post rollback phase: {}", status.message()));
@@ -2618,6 +2678,7 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
 }
 
 Status NewTxn::IncreaseTableReferenceCount(const String &table_key) {
+    //    LOG_INFO(fmt::format("IncreaseTableReferenceCount: txn_id: {}, table_key: {}", this->TxnID(), table_key));
     Status status = new_catalog_->IncreaseTableWriteCount(table_key);
     if (status.ok()) {
         ++table_write_reference_count_[table_key];

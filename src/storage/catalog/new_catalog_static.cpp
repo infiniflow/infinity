@@ -949,14 +949,25 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta) {
 }
 
 Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector) {
-    const ColumnDef *col_def = nullptr;
+    SharedPtr<DataType> column_type{};
     {
         TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
         auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
         }
-        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
+        //        ColumnDef *col_def = nullptr;
+        ColumnDef *col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
+        column_type = col_def->type();
+        //        for (const auto &column_def_ptr : *column_defs_ptr) {
+        //            if (column_def_ptr->id() == i64(column_meta.column_idx())) {
+        //                column_type = column_def_ptr->type();
+        //                break;
+        //            }
+        //        }
+        //        if (column_type == nullptr) {
+        //            UnrecoverableError("Null ptr of column type");
+        //        }
     }
 
     BufferObj *buffer_obj = nullptr;
@@ -966,7 +977,7 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, con
         return status;
     }
 
-    column_vector = ColumnVector(col_def->type());
+    column_vector = ColumnVector(column_type);
     column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
     return Status::OK();
 }

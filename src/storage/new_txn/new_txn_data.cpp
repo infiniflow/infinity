@@ -700,10 +700,17 @@ Status NewTxn::CheckTableIfDelete(const String &db_name, const String &table_nam
 Status NewTxn::BuildFastRoughFilter(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
+
+    status = this->IncreaseTableReferenceCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     Vector<SegmentID> *segment_ids_ptr;
     std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
     if (!status.ok()) {

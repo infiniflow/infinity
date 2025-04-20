@@ -555,6 +555,7 @@ private:
     bool CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithAddColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictWithDropColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithOptimizeIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithDelete(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
 

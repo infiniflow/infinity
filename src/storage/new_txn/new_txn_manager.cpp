@@ -104,6 +104,8 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
         }
     }
 
+    LOG_INFO(fmt::format("NewTxn: {} is Begin. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+
     // Create txn instance
     auto new_txn = MakeShared<NewTxn>(this, buffer_mgr_, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
@@ -111,7 +113,6 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
     txn_map_[new_txn_id] = new_txn;
     begin_txns_.emplace(begin_ts, new_txn_id);
 
-    // LOG_INFO(fmt::format("NewTxn: {} is Begin. begin ts: {}", new_txn_id, begin_ts));
     return new_txn.get();
 }
 
@@ -349,6 +350,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
     bool is_write_transaction = txn->IsWriteTransaction();
     TxnTimeStamp begin_ts = txn->BeginTS();
     TransactionID txn_id = txn->TxnID();
+    LOG_INFO(fmt::format("Cleanup txn, id: {}, begin_ts: {}", txn_id, begin_ts));
     if (is_write_transaction) {
         // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
         TxnState txn_state = txn->GetTxnState();

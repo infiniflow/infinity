@@ -170,6 +170,7 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    sleep(1); // Fix can't clean up issue
     {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
@@ -445,6 +446,7 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    sleep(1); // Fix can't clean up issue
     {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
