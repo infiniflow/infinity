@@ -70,6 +70,7 @@ import constant_expr;
 // import virtual_store;
 // import default_values;
 // import parsed_expr;
+import logger;
 
 using namespace infinity;
 
@@ -127,10 +128,14 @@ TEST_P(TestTxnAlter, add_column0) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    sleep(1);
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
         auto column_defs = Vector<SharedPtr<ColumnDef>>({column_def2});
         Status status = txn->AddColumns(*db_name, *table_name, column_defs);
+        if (!status.ok()) {
+            LOG_INFO(status.message());
+        }
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
