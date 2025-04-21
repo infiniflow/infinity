@@ -27,6 +27,7 @@ class TableDef;
 class TableInfo;
 class TableIndexReaderCache;
 struct SegmentUpdateTS;
+struct TableDetail;
 
 export class TableMeeta {
 public:
@@ -107,6 +108,8 @@ public:
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name, SizeT *column_idx = nullptr);
 
     Status GetTableInfo(TableInfo &table_info);
+
+    Status GetTableDetail(TableDetail &table_detail, const String &db_name, const String &table_name);
 
     Status AddColumn(const ColumnDef &column_def);
 

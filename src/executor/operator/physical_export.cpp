@@ -299,10 +299,30 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                 for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                     ColumnID select_column_idx = select_columns[block_column_idx];
                     switch (select_column_idx) {
-                        case COLUMN_IDENTIFIER_ROW_ID:
-                        case COLUMN_IDENTIFIER_CREATE:
+                        case COLUMN_IDENTIFIER_ROW_ID: {
+                            column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
+                            column_vectors[block_column_idx].Initialize();
+                            BlockID block_id = block_meta->block_id();
+                            u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+                            column_vectors[block_column_idx].AppendWith(RowID(segment_id, segment_offset), block_row_count);
+                            break;
+                        }
+                        case COLUMN_IDENTIFIER_CREATE: {
+                            column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+                            column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
+                            Status status = NewCatalog::GetCreateTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
+                            if (!status.ok()) {
+                                RecoverableError(status);
+                            }
+                            break;
+                        }
                         case COLUMN_IDENTIFIER_DELETE: {
-                            UnrecoverableError("Not implemented");
+                            column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+                            column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
+                            Status status = NewCatalog::GetDeleteTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
+                            if (!status.ok()) {
+                                RecoverableError(status);
+                            }
                             break;
                         }
                         default: {

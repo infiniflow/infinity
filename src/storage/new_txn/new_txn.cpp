@@ -267,7 +267,25 @@ Status NewTxn::ListDatabase(Vector<String> &db_names) {
 Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
     this->CheckTxn(db_name);
 
-    return catalog_->GetTables(db_name, output_table_array, nullptr);
+    Vector<String> table_names;
+    Status status = this->ListTable(db_name, table_names);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &table_name : table_names) {
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        output_table_array.push_back(TableDetail{});
+        status = table_meta->GetTableDetail(output_table_array.back(), db_name, table_name);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
