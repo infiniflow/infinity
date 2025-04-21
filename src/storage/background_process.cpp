@@ -32,6 +32,7 @@ import buffer_manager;
 import periodic_trigger;
 import infinity_context;
 import status;
+import new_txn;
 
 namespace infinity {
 
@@ -81,6 +82,22 @@ void BGTaskProcessor::Process() {
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Force checkpoint in background");
                         ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
+
+                        if (force_ckp_task->txn_ == nullptr) {
+                            TxnTimeStamp last_ckp_ts = this->last_checkpoint_ts();
+                            TxnTimeStamp cur_ckp_ts = 0;
+                            Status status = force_ckp_task->new_txn_->Checkpoint(last_ckp_ts, &cur_ckp_ts);
+                            if (!status.ok()) {
+                                RecoverableError(status);
+                            }
+                            if (cur_ckp_ts > last_ckp_ts) {
+                                std::unique_lock lock(last_time_mtx_);
+                                last_checkpoint_ts_ = cur_ckp_ts;
+                            }
+                            LOG_DEBUG("Force checkpoint in background done");
+                            break;
+                        }
+
                         if (cleanup_trigger_.get() != nullptr && force_ckp_task->is_full_checkpoint_) {
                             LOG_INFO("Do cleanup before force checkpoint");
                             auto cleanup_task = cleanup_trigger_->CreateCleanupTask(force_ckp_task->cleanup_ts_);

@@ -1133,14 +1133,21 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
     if (!status.ok()) {
         return status;
     }
-
+    SizeT old_column_cnt = 0;
+    {
+        auto [all_column_defs, status] = block_meta.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        old_column_cnt = all_column_defs->size() - column_defs.size();
+    }
     for (SizeT i = 0; i < column_defs.size(); ++i) {
-        const SharedPtr<ColumnDef> &column_def = column_defs[i];
+        SizeT column_idx = old_column_cnt + i;
+        // const SharedPtr<ColumnDef> &column_def = column_defs[column_idx];
         const Value &default_value = default_values[i];
 
-        ColumnID column_id = column_def->id();
         Optional<ColumnMeta> column_meta;
-        status = NewCatalog::AddNewBlockColumn(block_meta, column_id, column_meta);
+        status = NewCatalog::AddNewBlockColumn(block_meta, column_idx, column_meta);
         if (!status.ok()) {
             return status;
         }
