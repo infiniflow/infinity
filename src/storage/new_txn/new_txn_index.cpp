@@ -467,7 +467,13 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
         }
     }
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimize>(db_name, table_name, index_name, std::move(raw_params));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimizeV2>(db_name,
+                                                                 db_meta->db_id_str(),
+                                                                 table_name,
+                                                                 table_meta_opt->table_id_str(),
+                                                                 index_name,
+                                                                 table_index_meta_opt->index_id_str(),
+                                                                 std::move(raw_params));
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -728,7 +734,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
                              SegmentMeta &segment_meta,
                              SizeT segment_row_cnt,
                              DumpIndexCause dump_index_cause,
-                             WalCmdCreateIndex *create_index_cmd_ptr) {
+                             WalCmdCreateIndexV2 *create_index_cmd_ptr) {
     // PopulateIndex is used in create index / import and compact
     Optional<SegmentIndexMeta> segment_index_meta;
     {
@@ -807,7 +813,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, *segment_index_meta);
     if (create_index_cmd_ptr) {
-        WalCmdCreateIndex &create_index_cmd = *create_index_cmd_ptr;
+        WalCmdCreateIndexV2 &create_index_cmd = *create_index_cmd_ptr;
         Vector<WalChunkIndexInfo> chunk_infos;
         chunk_infos.emplace_back(chunk_index_meta);
 
@@ -821,7 +827,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
+Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     Status status;
 
     Optional<DBMeeta> db_meta;
@@ -840,9 +846,6 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     if (!status.ok()) {
         return status;
     }
-    dump_index_cmd->db_id_str_ = db_meta->db_id_str();
-    dump_index_cmd->table_id_str_ = table_meta->table_id_str();
-    dump_index_cmd->index_id_str_ = table_index_meta->index_id_str();
 
     SegmentID segment_id = dump_index_cmd->segment_id_;
     Optional<SegmentIndexMeta> segment_index_meta_opt;
@@ -1361,7 +1364,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     return Status::OK();
 }
 
-Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimize *optimize_cmd) {
+Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
     return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
 }
 
@@ -1536,13 +1539,18 @@ Status NewTxn::AddChunkWal(const String &db_name,
     Vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(chunk_index_meta);
     SegmentID segment_id = segment_index_meta.segment_id();
-    auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), deprecate_ids);
+    auto dump_cmd = MakeShared<WalCmdDumpIndexV2>(db_name,
+                                                  segment_index_meta.table_index_meta().table_meta().db_id_str(),
+                                                  table_name,
+                                                  segment_index_meta.table_index_meta().table_meta().table_id_str(),
+                                                  index_name,
+                                                  segment_index_meta.table_index_meta().index_id_str(),
+                                                  segment_id,
+                                                  std::move(chunk_infos),
+                                                  deprecate_ids);
     if (dump_index_cause == DumpIndexCause::kDumpMemIndex) {
         dump_cmd->clear_mem_index_ = true;
     }
-    dump_cmd->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
-    dump_cmd->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
-    dump_cmd->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     dump_cmd->table_key_ = table_key;
     dump_cmd->dump_cause_ = dump_index_cause;
 
@@ -1730,27 +1738,21 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
+Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    const String &db_name = create_index_cmd->db_name_;
-    const String &table_name = create_index_cmd->table_name_;
-    const String &index_name = *create_index_cmd->index_base_->index_name_;
-    const String &db_id_str = create_index_cmd->db_id_;
-    const String &table_id_str = create_index_cmd->table_id_;
-    const String &table_key = create_index_cmd->table_key_;
-
-    // Get latest index id and lock the id
-    String index_id_str;
-    Status status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
-    if (!status.ok()) {
-        return status;
-    }
+    String db_name = create_index_cmd->db_name_;
+    String table_name = create_index_cmd->table_name_;
+    String index_name = *create_index_cmd->index_base_->index_name_;
+    String db_id_str = create_index_cmd->db_id_;
+    String table_id_str = create_index_cmd->table_id_;
+    String table_key = create_index_cmd->table_key_;
+    String index_id_str = create_index_cmd->index_id_;
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
     Optional<TableIndexMeeta> table_index_meta_opt;
-    status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
+    Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
         return status;
     }
@@ -1763,7 +1765,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     }
 
     if (this->IsReplay()) {
-        WalCmdDumpIndex dump_index_cmd(db_name, table_name, index_name, 0);
+        WalCmdDumpIndexV2 dump_index_cmd(db_name, db_id_str, table_name, table_id_str, index_name, index_id_str, 0);
         dump_index_cmd.dump_cause_ = DumpIndexCause::kReplayCreateIndex;
         for (const WalSegmentIndexInfo &segment_index_info : create_index_cmd->segment_index_infos_) {
             dump_index_cmd.segment_id_ = segment_index_info.segment_id_;
@@ -1810,7 +1812,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
+Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     const String &db_id_str = drop_index_cmd->db_id_;
     const String &table_id_str = drop_index_cmd->table_id_;
@@ -1840,11 +1842,11 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInstance *kv_instance) {
+Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    const String &db_id_str = dump_index_cmd->db_id_str_;
-    const String &table_id_str = dump_index_cmd->table_id_str_;
-    const String &index_id_str = dump_index_cmd->index_id_str_;
+    const String &db_id_str = dump_index_cmd->db_id_;
+    const String &table_id_str = dump_index_cmd->table_id_;
+    const String &index_id_str = dump_index_cmd->index_id_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
     //    const String &table_key = dump_index_cmd->table_key_;
@@ -1859,7 +1861,7 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
 
-    const String &index_id_str_ = dump_index_cmd->index_id_str_;
+    const String &index_id_str_ = dump_index_cmd->index_id_;
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);
     if (dump_index_cmd->clear_mem_index_) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);

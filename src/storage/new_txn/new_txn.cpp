@@ -188,10 +188,13 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
         return status;
     }
 
-    SharedPtr<String> db_dir = DetermineRandomString(InfinityContext::instance().config()->DataDir(), fmt::format("db_{}", db_name));
-    String path_tail = NewCatalog::GetPathNameTail(*db_dir);
+    String db_id;
+    status = IncrLatestID(db_id, LATEST_DATABASE_ID);
+    if (!status.ok()) {
+        return status;
+    }
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabase>(db_name, path_tail, *comment);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name, db_id, *comment);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
@@ -219,7 +222,7 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
         return status;
     }
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabase>(db_name);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabaseV2>(db_name, db_meta->db_id_str());
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
@@ -319,8 +322,14 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return status;
     }
 
+    String table_id;
+    status = IncrLatestID(table_id, LATEST_TABLE_ID);
+    if (!status.ok()) {
+        return status;
+    }
+
     SharedPtr<String> local_table_dir = DetermineRandomPath(*table_def->table_name());
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTable>(db_name, *local_table_dir, table_def);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id, table_def);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -371,7 +380,7 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     }
 
     // Generate add column cmd
-    SharedPtr<WalCmdAddColumns> wal_command = MakeShared<WalCmdAddColumns>(db_name, table_name, column_defs);
+    auto wal_command = MakeShared<WalCmdAddColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_defs);
     wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
@@ -439,10 +448,9 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         }
     }
 
-    SharedPtr<WalCmdDropColumns> wal_command = MakeShared<WalCmdDropColumns>(db_name, table_name, column_names);
+    auto wal_command =
+        MakeShared<WalCmdDropColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_names, column_ids);
     wal_command->table_key_ = table_key;
-    wal_command->column_ids_ = std::move(column_ids);
-
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -483,10 +491,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
         return status;
     }
 
-    SharedPtr<WalCmdDropTable> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
-    wal_command->db_id_ = db_meta->db_id_str();
-    wal_command->table_id_ = table_id_str;
-    wal_command->table_key_ = table_key;
+    auto wal_command = MakeShared<WalCmdDropTableV2>(db_name, db_meta->db_id_str(), table_name, table_id_str);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -529,10 +534,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         return status;
     }
 
-    SharedPtr<WalCmdRenameTable> wal_command = MakeShared<WalCmdRenameTable>(db_name, old_table_name, new_table_name);
+    auto wal_command = MakeShared<WalCmdRenameTableV2>(db_name, db_meta->db_id_str(), old_table_name, table_id_str, new_table_name);
     wal_command->old_table_key_ = table_key;
-    wal_command->old_table_id_ = table_id_str;
-    wal_command->old_db_id_ = db_meta->db_id_str();
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -632,10 +635,16 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
-    SharedPtr<WalCmdCreateIndex> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_base);
-    wal_command->db_id_ = db_meta->db_id_str();
-    wal_command->table_id_ = table_meta->table_id_str();
-    wal_command->table_key_ = std::move(table_key);
+    // Get latest index id and lock the id
+    String index_id_str;
+    status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto wal_command =
+        MakeShared<WalCmdCreateIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_id_str, index_base);
+    wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -702,12 +711,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         }
     }
 
-    SharedPtr<WalCmdDropIndex> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
-    wal_command->db_id_ = std::move(db_meta->db_id_str());
-    wal_command->table_id_ = std::move(table_meta->table_id_str());
-    wal_command->index_id_ = std::move(index_id);
-    wal_command->index_key_ = std::move(index_key);
-    wal_command->table_key_ = std::move(table_key);
+    auto wal_command = MakeShared<WalCmdDropIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_name, index_id);
+    wal_command->index_key_ = index_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -991,10 +996,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return status;
     }
 
-    bool is_full_checkpoint = true;
-    String catalog_path;
-    String catalog_name;
-    auto checkpoint_cmd = MakeShared<WalCmdCheckpoint>(option.checkpoint_ts_, is_full_checkpoint, catalog_path, catalog_name);
+    auto checkpoint_cmd = MakeShared<WalCmdCheckpointV2>(option.checkpoint_ts_);
     wal_entry_->cmds_.push_back(checkpoint_cmd);
     txn_context_ptr_->AddOperation(MakeShared<String>(checkpoint_cmd->ToString()));
 
@@ -1264,89 +1266,89 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
             case WalCommandType::DUMMY: {
                 break;
             }
-            case WalCommandType::CREATE_DATABASE: {
-                auto *create_db_cmd = static_cast<WalCmdCreateDatabase *>(command.get());
+            case WalCommandType::CREATE_DATABASE_V2: {
+                auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
                 Status status = CommitCreateDB(create_db_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::DROP_DATABASE: {
-                auto *drop_db_cmd = static_cast<WalCmdDropDatabase *>(command.get());
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
                 Status status = CommitDropDB(drop_db_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::CREATE_TABLE: {
-                auto *create_table_cmd = static_cast<WalCmdCreateTable *>(command.get());
+            case WalCommandType::CREATE_TABLE_V2: {
+                auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
                 Status status = CommitCreateTable(create_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::DROP_TABLE: {
-                auto *drop_table_cmd = static_cast<WalCmdDropTable *>(command.get());
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
                 Status status = CommitDropTable(drop_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::RENAME_TABLE: {
-                auto *rename_table_cmd = static_cast<WalCmdRenameTable *>(command.get());
+            case WalCommandType::RENAME_TABLE_V2: {
+                auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
                 Status status = CommitRenameTable(rename_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::ADD_COLUMNS: {
-                auto *add_column_cmd = static_cast<WalCmdAddColumns *>(command.get());
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
                 Status status = CommitAddColumns(add_column_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::DROP_COLUMNS: {
-                auto *drop_column_cmd = static_cast<WalCmdDropColumns *>(command.get());
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
                 Status status = CommitDropColumns(drop_column_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::CREATE_INDEX: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(command.get());
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
                 Status status = CommitCreateIndex(create_index_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::DROP_INDEX: {
-                auto *drop_index_cmd = static_cast<WalCmdDropIndex *>(command.get());
+            case WalCommandType::DROP_INDEX_V2: {
+                auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
                 Status status = CommitDropIndex(drop_index_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::DUMP_INDEX: {
+            case WalCommandType::DUMP_INDEX_V2: {
                 // TODO: move follow to post commit
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
                 Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::APPEND: {
-                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
 
                 /* Not retry now */
 
@@ -1398,8 +1400,8 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
                 }
                 break;
             }
-            case WalCommandType::DELETE: {
-                auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
+            case WalCommandType::DELETE_V2: {
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
 
                 Status status = PrepareCommitDelete(delete_cmd, kv_instance_.get());
                 if (!status.ok()) {
@@ -1407,32 +1409,32 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
                 }
                 break;
             }
-            case WalCommandType::IMPORT: {
-                auto *import_cmd = static_cast<WalCmdImport *>(command.get());
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
                 Status status = CommitImport(import_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(command.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
                 Status status = CommitCompact(compact_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
-            case WalCommandType::CHECKPOINT: {
-                auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(command.get());
+            case WalCommandType::CHECKPOINT_V2: {
+                auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
                 Status status = CommitCheckpoint(checkpoint_cmd);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to checkpoint");
                 }
                 break;
             }
-            case WalCommandType::OPTIMIZE: {
-                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimize *>(command.get());
+            case WalCommandType::OPTIMIZE_V2: {
+                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
                 break;
             }
             default: {
@@ -1535,26 +1537,19 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
+Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
-    // Get the latest database id of system
-    String db_id_str;
-    Status status = IncrLatestID(db_id_str, LATEST_DATABASE_ID);
-    if (!status.ok()) {
-        return status;
-    }
 
     Optional<DBMeeta> db_meta;
     const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
-    status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
+    Status status = NewCatalog::AddNewDB(kv_instance_.get(), create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
     if (!status.ok()) {
         return status;
     }
 
     return Status::OK();
 }
-Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
+Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     String db_key;
     Optional<DBMeeta> db_meta;
     Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, &db_key);
@@ -1574,7 +1569,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
+Status NewTxn::CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1587,15 +1582,8 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
-    // Get latest table id and increase the id
-    String table_id_str;
-    status = IncrLatestID(table_id_str, LATEST_TABLE_ID);
-    if (!status.ok()) {
-        return status;
-    }
-
     Optional<TableMeeta> table_meta;
-    status = NewCatalog::AddNewTable(*db_meta, table_id_str, begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
+    status = NewCatalog::AddNewTable(*db_meta, create_table_cmd->table_id_, begin_ts, commit_ts, create_table_cmd->table_def_, table_meta);
     if (!status.ok()) {
         return status;
     }
@@ -1603,12 +1591,12 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
+Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_id_str = drop_table_cmd->db_id_;
     const String &table_id_str = drop_table_cmd->table_id_;
-    const String &table_key = drop_table_cmd->table_key_;
+    String table_key = KeyEncode::CatalogTableKey(db_id_str, table_id_str, txn_context_ptr_->commit_ts_);
 
     // delete table key
     Status status = kv_instance_->Delete(table_key);
@@ -1622,11 +1610,11 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitRenameTable(const WalCmdRenameTable *rename_table_cmd) {
+Status NewTxn::CommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &old_table_key = rename_table_cmd->old_table_key_;
-    const String &table_id = rename_table_cmd->old_table_id_;
-    const String &db_id = rename_table_cmd->old_db_id_;
+    const String &table_id = rename_table_cmd->table_id_;
+    const String &db_id = rename_table_cmd->db_id_;
     // delete table key
     Status status = kv_instance_->Delete(old_table_key);
     if (!status.ok()) {
@@ -1642,7 +1630,7 @@ Status NewTxn::CommitRenameTable(const WalCmdRenameTable *rename_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
+Status NewTxn::CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
     const String &db_name = add_columns_cmd->db_name_;
     const String &table_name = add_columns_cmd->table_name_;
 
@@ -1677,7 +1665,7 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
+Status NewTxn::CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
     const String &db_name = drop_columns_cmd->db_name_;
     const String &table_name = drop_columns_cmd->table_name_;
 
@@ -1702,7 +1690,7 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd) {
+Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
@@ -1719,7 +1707,7 @@ Status NewTxn::CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *checkpoint_cmd) {
+Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
@@ -1736,7 +1724,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *chec
     return Status::OK();
 }
 
-Status NewTxn::CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpoint *checkpoint_cmd) {
+Status NewTxn::CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     TxnTimeStamp checkpoint_ts = checkpoint_cmd->max_commit_ts_;
     Status status = CommitCheckpointTableData(table_meta, checkpoint_ts);
     if (!status.ok()) {
@@ -1763,8 +1751,8 @@ bool NewTxn::CheckConflictWithAppend(const String &db_name, const String &table_
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::CREATE_INDEX: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
                 if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
                     cause =
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
@@ -1785,8 +1773,8 @@ bool NewTxn::CheckConflictWithImport(const String &db_name, const String &table_
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::CREATE_INDEX: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
                 if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
                     cause =
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
@@ -1807,8 +1795,8 @@ bool NewTxn::CheckConflictWithAddColumns(const String &db_name, const String &ta
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
                     cause = fmt::format("Compact table {} in database {}.", table_name, db_name);
                     return true;
@@ -1828,8 +1816,8 @@ bool NewTxn::CheckConflictWithDropColumns(const String &db_name, const String &t
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
                     cause = fmt::format("Compact table {} in database {}.", table_name, db_name);
                     return true;
@@ -1849,8 +1837,8 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::CREATE_INDEX: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
                 if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
                     cause =
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
@@ -1858,32 +1846,32 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
                 }
                 break;
             }
-            case WalCommandType::ADD_COLUMNS: {
-                auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_columns_cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
                 if (add_columns_cmd->db_name_ == db_name && add_columns_cmd->table_name_ == table_name) {
                     cause = fmt::format("Add columns on table {} in database {}.", table_name, db_name);
                     return true;
                 }
                 break;
             }
-            case WalCommandType::DROP_COLUMNS: {
-                auto *drop_columns_cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
                 if (drop_columns_cmd->db_name_ == db_name && drop_columns_cmd->table_name_ == table_name) {
                     cause = fmt::format("Drop columns on table {} in database {}.", table_name, db_name);
                     return true;
                 }
                 break;
             }
-            case WalCommandType::DELETE: {
-                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+            case WalCommandType::DELETE_V2: {
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(wal_cmd.get());
                 if (delete_cmd->db_name_ == db_name && delete_cmd->table_name_ == table_name) {
                     cause = fmt::format("Delete on table {} in database {}.", table_name, db_name);
                     return true;
                 }
                 break;
             }
-            case WalCommandType::DUMP_INDEX: {
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 switch (dump_index_cmd->dump_cause_) {
                     case DumpIndexCause::kOptimizeIndex: {
                         // Compact table conflicts with optimize index
@@ -1911,24 +1899,24 @@ bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &t
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::APPEND: {
-                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
                 if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
                     cause = fmt::format("Append on table {} in database {}.", table_name, db_name);
                     return true;
                 }
                 break;
             }
-            case WalCommandType::IMPORT: {
-                auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(wal_cmd.get());
                 if (import_cmd->db_name_ == db_name && import_cmd->table_name_ == table_name) {
                     cause = fmt::format("Import on table {} in database {}.", table_name, db_name);
                     return true;
                 }
                 break;
             }
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
                     cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
                     return true;
@@ -1947,8 +1935,8 @@ bool NewTxn::CheckConflictWithOptimizeIndex(const String &db_name, const String 
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
                     cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
                     return true;
@@ -1967,8 +1955,8 @@ bool NewTxn::CheckConflictWithDelete(const String &db_name, const String &table_
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
                     cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
                     return true;
@@ -1990,33 +1978,33 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
         WalCommandType command_type = wal_cmd->GetType();
 
         switch (command_type) {
-            case WalCommandType::APPEND: {
-                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
                 conflict = CheckConflictWithAppend(append_cmd->db_name_, append_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
-            case WalCommandType::IMPORT: {
-                auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(wal_cmd.get());
                 conflict = CheckConflictWithImport(import_cmd->db_name_, import_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
-            case WalCommandType::COMPACT: {
-                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 conflict = CheckConflictWithCompact(compact_cmd->db_name_, compact_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
-            case WalCommandType::CREATE_INDEX: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
                 conflict = CheckConflictWithCreateIndex(create_index_cmd->db_name_, create_index_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
-            case WalCommandType::ADD_COLUMNS: {
-                auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_columns_cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
                 conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn.get(), conflict_reason);
                 break;
             }
-            case WalCommandType::DROP_COLUMNS: {
-                auto *drop_columns_cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
                 bool conflict =
                     CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn.get(), conflict_reason);
                 if (conflict) {
@@ -2024,8 +2012,8 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
                 }
                 break;
             }
-            case WalCommandType::DUMP_INDEX: {
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 switch (dump_index_cmd->dump_cause_) {
                     case DumpIndexCause::kOptimizeIndex: {
                         conflict =
@@ -2038,8 +2026,8 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
                 }
                 break;
             }
-            case WalCommandType::DELETE: {
-                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+            case WalCommandType::DELETE_V2: {
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(wal_cmd.get());
                 conflict = CheckConflictWithDelete(delete_cmd->db_name_, delete_cmd->table_name_, check_txn.get(), conflict_reason);
 
                 break;
@@ -2085,19 +2073,19 @@ void NewTxn::PostCommit() {
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::APPEND: {
+            case WalCommandType::APPEND_V2: {
                 // auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::IMPORT: {
+            case WalCommandType::IMPORT_V2: {
                 // auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::DELETE: {
+            case WalCommandType::DELETE_V2: {
                 //                auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::CHECKPOINT: {
+            case WalCommandType::CHECKPOINT_V2: {
                 // auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
                 // if (checkpoint_cmd->is_full_checkpoint_) {
                 //     wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
@@ -2106,24 +2094,24 @@ void NewTxn::PostCommit() {
                 // }
                 break;
             }
-            case WalCommandType::DROP_TABLE: {
+            case WalCommandType::DROP_TABLE_V2: {
                 //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::RENAME_TABLE: {
+            case WalCommandType::RENAME_TABLE_V2: {
                 //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::CREATE_INDEX: {
+            case WalCommandType::CREATE_INDEX_V2: {
                 //                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::DROP_INDEX: {
+            case WalCommandType::DROP_INDEX_V2: {
                 //                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::ADD_COLUMNS: {
-                auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
                 if (!IsReplay()) {
                     Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                     if (!status.ok()) {
@@ -2132,8 +2120,8 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
-            case WalCommandType::DROP_COLUMNS: {
-                auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
                 if (!IsReplay()) {
                     Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                     if (!status.ok()) {
@@ -2142,8 +2130,8 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
-            case WalCommandType::DUMP_INDEX: {
-                auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
                     Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
                     if (!mem_index_status.ok()) {
@@ -2152,7 +2140,7 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
-            case WalCommandType::COMPACT: {
+            case WalCommandType::COMPACT_V2: {
                 // auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 break;
             }
@@ -2204,32 +2192,32 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            case WalCommandType::ADD_COLUMNS: {
-                auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
-            case WalCommandType::DROP_COLUMNS: {
-                auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
-            case WalCommandType::DROP_TABLE: {
+            case WalCommandType::DROP_TABLE_V2: {
                 //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::RENAME_TABLE: {
+            case WalCommandType::RENAME_TABLE_V2: {
                 //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::CREATE_INDEX: {
-                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
                 Optional<DBMeeta> db_meta;
                 Optional<TableMeeta> table_meta;
                 Optional<TableIndexMeeta> table_index_meta;
@@ -2267,28 +2255,28 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
                 break;
             }
-            case WalCommandType::DROP_INDEX: {
+            case WalCommandType::DROP_INDEX_V2: {
                 //                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::APPEND: {
+            case WalCommandType::APPEND_V2: {
                 //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::DELETE: {
-                auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+            case WalCommandType::DELETE_V2: {
+                auto *cmd = static_cast<WalCmdDeleteV2 *>(wal_cmd.get());
                 Status status = RollbackDelete(cmd, kv_instance_.get());
                 if (!status.ok()) {
                     UnrecoverableError("Fail to rollback delete operation");
                 }
                 break;
             }
-            case WalCommandType::IMPORT: {
+            case WalCommandType::IMPORT_V2: {
                 //                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 break;
             }
-            case WalCommandType::DUMP_INDEX: {
-                auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
                     Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
                     if (!mem_index_status.ok()) {
@@ -2300,7 +2288,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 UnrecoverableError("Not implemented");
                 break;
             }
-            case WalCommandType::COMPACT: {
+            case WalCommandType::COMPACT_V2: {
                 //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 break;
             }
@@ -2388,12 +2376,7 @@ Status NewTxn::Rollback() {
 // the max_commit_ts is determined by the max commit ts of flushed delta entry
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
 bool NewTxn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts) {
-    String delta_path, delta_name;
-    // only save the catalog delta entry
-    if (!catalog_->SaveDeltaCatalog(last_ckp_ts, max_commit_ts, delta_path, delta_name)) {
-        return false;
-    }
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -2406,7 +2389,7 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
 
     catalog_->SaveFullCatalog(max_commit_ts, full_path, full_name);
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 }
@@ -2524,8 +2507,8 @@ bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == Transactio
 Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
     WalCommandType command_type = command->GetType();
     switch (command_type) {
-        case WalCommandType::CREATE_INDEX: {
-            auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(command.get());
+        case WalCommandType::CREATE_INDEX_V2: {
+            auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -2539,8 +2522,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             create_index_cmd->table_key_ = std::move(table_key);
             break;
         }
-        case WalCommandType::APPEND: {
-            auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+        case WalCommandType::APPEND_V2: {
+            auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -2549,13 +2532,12 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            append_cmd->db_id_str_ = db_meta->db_id_str();
-            append_cmd->table_id_str_ = table_meta->table_id_str();
-            append_cmd->table_key_ = std::move(table_key);
+            append_cmd->db_id_ = db_meta->db_id_str();
+            append_cmd->table_id_ = table_meta->table_id_str();
             break;
         }
-        case WalCommandType::DELETE: {
-            auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
+        case WalCommandType::DELETE_V2: {
+            auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -2563,12 +2545,12 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            delete_cmd->db_id_str_ = db_meta->db_id_str();
-            delete_cmd->table_id_str_ = table_meta->table_id_str();
+            delete_cmd->db_id_ = db_meta->db_id_str();
+            delete_cmd->table_id_ = table_meta->table_id_str();
             break;
         }
-        case WalCommandType::IMPORT: {
-            auto *import_cmd = static_cast<WalCmdImport *>(command.get());
+        case WalCommandType::IMPORT_V2: {
+            auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
 
             Status status = ReplayImport(import_cmd);
             if (!status.ok()) {
@@ -2576,8 +2558,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             }
             break;
         }
-        case WalCommandType::DUMP_INDEX: {
-            auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
+        case WalCommandType::DUMP_INDEX_V2: {
+            auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
 
             Status status = ReplayDumpIndex(dump_index_cmd);
             if (!status.ok()) {
@@ -2585,8 +2567,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             }
             break;
         }
-        case WalCommandType::COMPACT: {
-            auto *compact_cmd = static_cast<WalCmdCompact *>(command.get());
+        case WalCommandType::COMPACT_V2: {
+            auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
 
             Status status = ReplayCompact(compact_cmd);
             if (!status.ok()) {
@@ -2594,8 +2576,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             }
             break;
         }
-        case WalCommandType::OPTIMIZE: {
-            auto *optimize_cmd = static_cast<WalCmdOptimize *>(command.get());
+        case WalCommandType::OPTIMIZE_V2: {
+            auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
 
             Status status = ReplayOptimizeIndeByParams(optimize_cmd);
             if (!status.ok()) {

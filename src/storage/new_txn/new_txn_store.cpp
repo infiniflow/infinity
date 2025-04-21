@@ -743,10 +743,10 @@ void NewTxnStore::PrepareCommit1() {
     Vector<WalSegmentInfo *> segment_infos;
     for (auto &cmd : wal_entry->cmds_) {
         if (cmd->GetType() == WalCommandType::IMPORT) {
-            auto *import_cmd = static_cast<WalCmdImport *>(cmd.get());
+            auto *import_cmd = static_cast<WalCmdImportV2 *>(cmd.get());
             segment_infos.emplace_back(&import_cmd->segment_info_);
         } else if (cmd->GetType() == WalCommandType::COMPACT) {
-            auto *compact_cmd = static_cast<WalCmdCompact *>(cmd.get());
+            auto *compact_cmd = static_cast<WalCmdCompactV2 *>(cmd.get());
             for (auto &segment_info : compact_cmd->new_segment_infos_) {
                 segment_infos.emplace_back(&segment_info);
             }
@@ -842,7 +842,7 @@ void NewTxnStore::SetCompacting(TableEntry *table_entry) { GetNewTxnTableStore(*
 
 void NewTxnStore::SetCreatingIndex(TableEntry *table_entry) { GetNewTxnTableStore(*table_entry->GetTableName())->SetCreatingIndex(); }
 
-WalCmdDumpIndex *NewTxnStore::GetDumpIndexCmd(const String &idx_segment_key) {
+WalCmdDumpIndexV2 *NewTxnStore::GetDumpIndexCmd(const String &idx_segment_key) {
     std::unique_lock lock(mtx_);
     auto iter = dump_index_cmds_.find(idx_segment_key);
     if (iter != dump_index_cmds_.end()) {
@@ -851,7 +851,7 @@ WalCmdDumpIndex *NewTxnStore::GetDumpIndexCmd(const String &idx_segment_key) {
     return nullptr;
 }
 
-bool NewTxnStore::AddDumpIndexCmd(String idx_segment_key, WalCmdDumpIndex *dump_index_cmd) {
+bool NewTxnStore::AddDumpIndexCmd(String idx_segment_key, WalCmdDumpIndexV2 *dump_index_cmd) {
     std::unique_lock lock(mtx_);
     bool add_success = dump_index_cmds_.emplace(std::move(idx_segment_key), dump_index_cmd).second;
     return add_success;

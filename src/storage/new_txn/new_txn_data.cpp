@@ -295,7 +295,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     // }
 
     { // Add import wal;
-        auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta, begin_ts));
+        auto import_command =
+            MakeShared<WalCmdImportV2>(db_name, db_meta->db_id_str(), table_name, table_meta.table_id_str(), WalSegmentInfo(*segment_meta, begin_ts));
         if (block_row_cnts.size() != import_command->segment_info_.block_infos_.size()) {
             UnrecoverableError("Block row count mismatch");
         }
@@ -306,9 +307,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
-        import_command->db_id_str_ = db_meta->db_id_str();
-        import_command->table_id_str_ = table_meta.table_id_str();
-        import_command->table_key_ = table_key;
 
         status = this->AddSegmentVersion(import_command->segment_info_, *segment_meta);
         if (!status.ok()) {
@@ -344,7 +342,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     return Status::OK();
 }
 
-Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
+Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
     Status status;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
@@ -355,9 +353,6 @@ Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
         return status;
     }
     TableMeeta &table_meta = *table_meta_opt;
-
-    import_cmd->db_id_str_ = db_meta->db_id_str();
-    import_cmd->table_id_str_ = table_meta.table_id_str();
 
     const WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
@@ -418,12 +413,8 @@ Status NewTxn::AppendInner(const String &db_name,
                            TableMeeta &table_meta,
                            const SharedPtr<DataBlock> &input_block) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
-    {
-        append_command->db_id_str_ = table_meta.db_id_str();
-        append_command->table_id_str_ = table_meta.table_id_str();
-        append_command->table_key_ = table_key;
-    }
+    Vector<Pair<RowID, u64>> row_ranges;
+    auto append_command = MakeShared<WalCmdAppendV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ranges, input_block);
 
     // Read col definition in new rocksdb transaction
     KVStore *kv_store = txn_mgr_->kv_store();
@@ -505,14 +496,7 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
-    const String &db_id_str = db_meta->db_id_str();
-    const String &table_id_str = table_meta_opt->table_id_str();
-
-    delete_command->db_id_str_ = db_id_str;
-    delete_command->table_id_str_ = table_id_str;
-    delete_command->table_key_ = table_key;
-
+    auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, db_meta->db_id_str(), table_name, table_meta_opt->table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(delete_command->ToString()));
@@ -641,10 +625,12 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
                 block_info.row_count_ = compact_state.block_row_cnts_[i];
             }
         }
-        auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
-        compact_command->db_id_str_ = db_meta->db_id_str();
-        compact_command->table_id_str_ = table_meta.table_id_str();
-        compact_command->table_key_ = table_key;
+        auto compact_command = MakeShared<WalCmdCompactV2>(db_name,
+                                                           db_meta->db_id_str(),
+                                                           table_name,
+                                                           table_meta.table_id_str(),
+                                                           std::move(segment_infos),
+                                                           std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
 
@@ -697,7 +683,7 @@ Status NewTxn::CheckTableIfDelete(const String &db_name, const String &table_nam
     return Status::OK();
 }
 
-Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
+Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
@@ -708,9 +694,6 @@ Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
         return status;
     }
     TableMeeta &table_meta = *table_meta_opt;
-
-    compact_cmd->db_id_str_ = db_meta->db_id_str();
-    compact_cmd->table_id_str_ = table_meta.table_id_str();
 
     for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
         SegmentID segment_id = 0;
@@ -1293,13 +1276,13 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
     return Status::OK();
 }
 
-Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
+Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    const String &db_id_str = import_cmd->db_id_str_;
-    const String &table_id_str = import_cmd->table_id_str_;
+    const String &db_id_str = import_cmd->db_id_;
+    const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
@@ -1343,13 +1326,13 @@ Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
+Status NewTxn::CommitAppend(WalCmdAppendV2 *append_cmd, KVInstance *kv_instance) {
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    const String &db_id_str = append_cmd->db_id_str_;
-    const String &table_id_str = append_cmd->table_id_str_;
+    const String &db_id_str = append_cmd->db_id_;
+    const String &table_id_str = append_cmd->table_id_;
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     AppendState *append_state = txn_table_store->append_state();
@@ -1508,15 +1491,19 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             }
         }
     }
-
+    for (const AppendRange &range : append_state->append_ranges_) {
+        RowID row_id(range.segment_id_, (((u32)range.block_id_) << BLOCK_OFFSET_SHIFT) + range.start_offset_);
+        u64 row_count = range.row_count_;
+        append_cmd->row_ranges_.push_back({row_id, row_count});
+    }
     return Status::OK();
 }
 
-Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
+Status NewTxn::PostCommitAppend(const WalCmdAppendV2 *append_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     Status status = Status::OK();
-    const String &db_id_str = append_cmd->db_id_str_;
-    const String &table_id_str = append_cmd->table_id_str_;
+    const String &db_id_str = append_cmd->db_id_;
+    const String &table_id_str = append_cmd->table_id_;
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     const AppendState *append_state = txn_table_store->append_state();
@@ -1568,12 +1555,12 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
     return Status::OK();
 }
 
-Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
+Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    const String &db_id_str = delete_cmd->db_id_str_;
-    const String &table_id_str = delete_cmd->table_id_str_;
+    const String &db_id_str = delete_cmd->db_id_;
+    const String &table_id_str = delete_cmd->table_id_;
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
 
@@ -1622,10 +1609,10 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *k
     return Status::OK();
 }
 
-Status NewTxn::RollbackDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
+Status NewTxn::RollbackDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    const String &db_id_str = delete_cmd->db_id_str_;
-    const String &table_id_str = delete_cmd->table_id_str_;
+    const String &db_id_str = delete_cmd->db_id_;
+    const String &table_id_str = delete_cmd->table_id_;
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
 
@@ -1655,10 +1642,10 @@ Status NewTxn::RollbackDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_ins
     return Status::OK();
 }
 
-Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
+Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
-    const String &db_id_str = compact_cmd->db_id_str_;
-    const String &table_id_str = compact_cmd->table_id_str_;
+    const String &db_id_str = compact_cmd->db_id_;
+    const String &table_id_str = compact_cmd->table_id_;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 

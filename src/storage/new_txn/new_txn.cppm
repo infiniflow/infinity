@@ -49,24 +49,24 @@ struct TableIndexEntry;
 struct SegmentEntry;
 struct WalEntry;
 struct WalCmd;
-struct WalCmdCreateDatabase;
-struct WalCmdDropDatabase;
-struct WalCmdCreateTable;
-struct WalCmdDropTable;
-struct WalCmdRenameTable;
-struct WalCmdAddColumns;
-struct WalCmdDropColumns;
-struct WalCmdCreateIndex;
-struct WalCmdDropIndex;
-struct WalCmdImport;
-struct WalCmdAppend;
-struct WalCmdDelete;
-struct WalCmdCompact;
-struct WalCmdDumpIndex;
+struct WalCmdCreateDatabaseV2;
+struct WalCmdDropDatabaseV2;
+struct WalCmdCreateTableV2;
+struct WalCmdDropTableV2;
+struct WalCmdRenameTableV2;
+struct WalCmdAddColumnsV2;
+struct WalCmdDropColumnsV2;
+struct WalCmdCreateIndexV2;
+struct WalCmdDropIndexV2;
+struct WalCmdImportV2;
+struct WalCmdAppendV2;
+struct WalCmdDeleteV2;
+struct WalCmdCompactV2;
+struct WalCmdDumpIndexV2;
 struct WalChunkIndexInfo;
 struct WalSegmentInfo;
-struct WalCmdCheckpoint;
-struct WalCmdOptimize;
+struct WalCmdCheckpointV2;
+struct WalCmdOptimizeV2;
 
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
@@ -297,7 +297,7 @@ public:
     Status Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks);
 
 private:
-    Status ReplayImport(WalCmdImport *import_cmd);
+    Status ReplayImport(WalCmdImportV2 *import_cmd);
 
 public:
     // Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
@@ -323,7 +323,7 @@ public:
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
 private:
-    Status ReplayCompact(WalCmdCompact *compact_cmd);
+    Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
 public:
     // Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType
@@ -467,9 +467,9 @@ private:
                          SegmentMeta &segment_meta,
                          SizeT segment_row_cnt,
                          DumpIndexCause dump_index_cause,
-                         WalCmdCreateIndex *create_index_cmd_ptr = nullptr);
+                         WalCmdCreateIndexV2 *create_index_cmd_ptr = nullptr);
 
-    Status ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd);
+    Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd);
 
     Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt);
 
@@ -502,7 +502,7 @@ private:
 
     Status OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const Vector<UniquePtr<InitParameter>> &params);
 
-    Status ReplayOptimizeIndeByParams(WalCmdOptimize *optimize_cmd);
+    Status ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd);
 
     Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
 
@@ -530,25 +530,25 @@ public:
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
 private:
-    Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
-    Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
-    Status CommitCreateTable(const WalCmdCreateTable *create_table_cmd);
-    Status CommitDropTable(const WalCmdDropTable *drop_table_cmd);
-    Status CommitRenameTable(const WalCmdRenameTable *create_table_cmd);
-    Status CommitAddColumns(const WalCmdAddColumns *add_columns_cmd);
-    Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
-    Status CommitCreateIndex(WalCmdCreateIndex *create_index_cmd);
-    Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
-    Status CommitImport(WalCmdImport *import_cmd);
-    Status CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
-    Status PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
-    Status PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
-    Status RollbackDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
-    Status CommitCompact(WalCmdCompact *compact_cmd);
-    Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInstance *kv_instance);
-    Status CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd);
-    Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *checkpoint_cmd);
-    Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpoint *checkpoint_cmd);
+    Status CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
+    Status CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
+    Status CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
+    Status CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd);
+    Status CommitRenameTable(const WalCmdRenameTableV2 *create_table_cmd);
+    Status CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd);
+    Status CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd);
+    Status CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
+    Status CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
+    Status CommitImport(WalCmdImportV2 *import_cmd);
+    Status CommitAppend(WalCmdAppendV2 *append_cmd, KVInstance *kv_instance);
+    Status PostCommitAppend(const WalCmdAppendV2 *append_cmd, KVInstance *kv_instance);
+    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
+    Status RollbackDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
+    Status CommitCompact(WalCmdCompactV2 *compact_cmd);
+    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
+    Status CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
+    Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
+    Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
