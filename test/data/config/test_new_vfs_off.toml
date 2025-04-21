@@ -11,6 +11,7 @@ log_dir                  = "/var/infinity/log"
 
 [storage]
 use_new_catalog          = true
+data_dir                 = "/var/infinity/data"
 optimize_interval        = "0s"
 compact_interval         = "0s"
 cleanup_interval         = "0s"
