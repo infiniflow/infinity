@@ -2098,17 +2098,21 @@ void NewTxn::PostCommit() {
             }
             case WalCommandType::ADD_COLUMNS: {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
-                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                if (!IsReplay()) {
+                    Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                    }
                 }
                 break;
             }
             case WalCommandType::DROP_COLUMNS: {
                 auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
-                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                if (!IsReplay()) {
+                    Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                    }
                 }
                 break;
             }

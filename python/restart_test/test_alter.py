@@ -59,7 +59,11 @@ class TestAlter:
             pd.testing.assert_frame_equal(
                 res,
                 pd.DataFrame(
-                    {"c1": [1, 2], "c3": ["test", "test"], "c4": ["default", "test2"]}
+                    {
+                        "c1": [1, 2],
+                        "c3": ["test", "test"],
+                        "c4": ["default", "test2"],
+                    }
                 ).astype(
                     {
                         "c1": dtype("int32"),
@@ -262,7 +266,7 @@ class TestAlter:
             table_obj.drop_columns(["c3"])
 
             infinity_obj.flush_delta()
-        
+
         part1()
 
         @decorator
