@@ -939,6 +939,13 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return Status::OK();
     }
 
+    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+    if (!wal_manager->SetCheckpointing()) {
+        // Checkpointing
+        return Status::OK();
+    }
+    DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
+
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
@@ -2177,6 +2184,7 @@ void NewTxn::PostCommit() {
 
     TransactionType txn_type = GetTxnType();
     if (txn_type == TransactionType::kNewCheckpoint) {
+        // TODO: Shouldn't set the ckp ts if checkpoint is skipped.
         wal_manager->SetLastCheckpointTS(current_ckp_ts_);
     }
 

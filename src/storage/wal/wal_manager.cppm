@@ -113,6 +113,9 @@ public:
 
     bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
 
+    bool SetCheckpointing();
+    bool UnsetCheckpoint();
+
     void Checkpoint(bool is_full_checkpoint);
 
     void Checkpoint(ForceCheckpointTask *ckp_task);

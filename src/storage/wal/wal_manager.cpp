@@ -630,6 +630,22 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
     return false;
 }
 
+bool WalManager::SetCheckpointing() {
+    bool expect = false;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
+        return true;
+    }
+    return false;
+}
+
+bool WalManager::UnsetCheckpoint() {
+    bool expect = true;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, false)) {
+        return true;
+    }
+    return false;
+}
+
 /*****************************************************************************
  * CHECKPOINT WAL FILE
  *****************************************************************************/
