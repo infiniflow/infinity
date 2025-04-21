@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-#include <numeric>
 
 import base_test;
 import stl;
@@ -371,10 +370,12 @@ TEST_P(TransformMeta, segment_transform_00) {
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     new_txn_mgr->SetNewSystemTS(
         std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
-    // new_txn_mgr->PrintAllKeyValue();
+    new_txn_mgr->PrintAllKeyValue();
 
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
     auto [table_info, get_status] = txn->GetTableInfo("db1", "test_table");
+    std::cout << "---------------------" << table_info->db_id_ << std::endl;
+    std::cout << "---------------------" << table_info->table_id_ << std::endl;
     EXPECT_TRUE(get_status.ok());
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();

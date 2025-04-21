@@ -14,6 +14,7 @@
 
 module;
 
+#include <filesystem>
 #include <network/infinity_thrift/infinity_types.h>
 #include <statement/extra/create_index_info.h>
 #include <string>
@@ -51,6 +52,7 @@ import index_hnsw;
 import index_full_text;
 import index_bmp;
 import index_emvb;
+import kv_code;
 
 namespace infinity {
 
@@ -106,11 +108,134 @@ Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_p
         UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_path);
     }
 
+    auto partition = [](const std::string &text, char delimiter) {
+        std::vector<std::string> parts;
+        std::string tmp_str;
+        for (auto c : text) {
+            if (c == '/') {
+                parts.emplace_back(tmp_str);
+                tmp_str.clear();
+                continue;
+            }
+            tmp_str += c;
+        }
+        parts.emplace_back(tmp_str);
+        return parts;
+    };
+
+    std::set<String> delete_set;
+    for (auto &some : (*full_ckp_json)["obj_addr_map"]["obj_addr_array"]) {
+        std::string path_key = some["local_path"];
+
+        auto somes = partition(std::move(path_key), '/');
+        assert(somes.size() >= 2);
+
+        auto &db_str = somes[0];
+        auto &tbl_str = somes[1];
+
+        auto db_name = db_str.substr(14);
+
+        auto db_key = "yee|" + db_name;
+        std::string db_id_str = "kkkkkk";
+        Status status = kv_instance->Get(db_key, db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        std::cout << "db_name: " << db_name <<  "    db_id: " << db_id_str <<  '\n';
+        delete_set.insert(db_key);
+
+        auto tbl_name = tbl_str.substr(17);
+        std::string tbl_id_str = "kkkkkk";
+        auto tbl_key = "yee|" + tbl_name;
+        status = kv_instance->Get(tbl_key, tbl_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        std::cout << "tbl_name: " << tbl_name << "    tbl_id: " << tbl_id_str << '\n';
+        delete_set.insert(tbl_key);
+
+        db_str = "db_" + db_id_str;
+        tbl_str = "tbl_" + tbl_id_str;
+
+        auto concat = [](const std::vector<std::string>& v) {
+            std::string ret;
+            for (const auto &s : v) {
+                ret += (s + "/");
+            }
+            ret.pop_back();
+            return ret;
+        };
+
+        auto some_str = concat(somes);
+        std::cout << "some_str: " << some_str << '\n';
+        auto some_key = KeyEncode::PMObjectPathKey(some_str);
+        nlohmann::json &some_json = some["obj_addr"];
+        kv_instance->Put(some_key, some_json.dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    for (auto& element:delete_set) {
+        kv_instance->Delete(element);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     status = kv_instance->Commit();
     if (!status.ok()) {
         return status;
     }
+
     // Rename the old meta filename
+    auto TransformData = [&] {
+        std::string data_path{"/home/inf/Downloads/new_infinity_vfs_off/data"};
+        // TransformCatalog();
+        std::string old_prefix = "/home/inf/Downloads/new_infinity_vfs_off/old_data";
+        if (std::filesystem::exists(old_prefix)) {
+            std::filesystem::remove_all(old_prefix);
+        }
+        std::filesystem::create_directory(old_prefix);
+        const auto options = std::filesystem::copy_options::recursive;
+        std::filesystem::copy(data_path, old_prefix, options);
+        for (auto const &db_entry : std::filesystem::directory_iterator{data_path}) {
+            std::string db_path = db_entry.path().string();
+            std::string db_path_prefix = db_path.substr(0, db_path.find_last_of('/') + 1);
+            std::string db_path_suffix = db_path.substr(db_path.find_last_of('/') + 1);
+            if (db_path_suffix == "catalog") {
+                continue;
+            }
+            for (auto const &table_entry : std::filesystem::directory_iterator{db_path}) {
+                std::string table_path = table_entry.path();
+                std::string table_path_prefix = table_path.substr(0, table_path.find_last_of('/') + 1);
+                std::string table_path_suffix = table_path.substr(table_path.find_last_of('/') + 1);
+                auto pos = table_path_suffix.find("_tbl_");
+                if (pos == std::string::npos) {
+                    continue;
+                }
+                auto new_table_path_suffix = table_path_suffix.substr(pos + 1);
+                std::filesystem::rename(table_path, table_path_prefix + new_table_path_suffix);
+            }
+            auto pos = db_path_suffix.find("_db_");
+            if (pos == std::string::npos) {
+                continue;
+            }
+            auto new_db_path_suffix = db_path_suffix.substr(pos + 1);
+            std::filesystem::rename(db_path, db_path_prefix + new_db_path_suffix);
+        }
+    };
+    TransformData();
+
+    auto RenameCatalog = [&] {
+        std::string full_ckp_path_prefix = full_ckp_path.substr(0, full_ckp_path.find_last_of('/') + 1);
+        std::string full_ckp_path_suffix = full_ckp_path.substr(full_ckp_path.find_last_of('/') + 1);
+        std::string old_full_ckp_path = full_ckp_path_prefix + "old_" + full_ckp_path_suffix;
+        std::filesystem::rename(full_ckp_path, old_full_ckp_path);
+    };
+    if (false) {
+        RenameCatalog();
+    }
     return Status::OK();
 }
 
@@ -143,7 +268,10 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
                 if (!status.ok()) {
                     return status;
                 }
-
+                kv_instance->Put("yee|" + db_name, db_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
                 Optional<DBMeeta> db_meta;
                 status = NewCatalog::AddNewDB(kv_instance, db_id_str, max_commit_ts, db_name, db_comment.get(), db_meta);
                 if (!status.ok()) {
@@ -177,6 +305,11 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json 
 
             String table_id_str;
             Status status = IncrLatestID(&kv_instance, table_id_str, LATEST_TABLE_ID);
+            if (!status.ok()) {
+                return status;
+            }
+            // If thera is another table which has the same table_name, throw ec!!!!!!
+            kv_instance.Put("yee|" + table_name, table_id_str);
             if (!status.ok()) {
                 return status;
             }
