@@ -73,6 +73,9 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     SharedPtr<ForceCheckpointTask> force_ckp_task = nullptr;
     bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     if (use_new_catalog) {
+        if (!is_full_checkpoint) {
+            LOG_WARN("Delta checkpoint is not supported in new catalog");
+        }
         auto *new_txn = query_context->GetNewTxn();
         force_ckp_task = MakeShared<ForceCheckpointTask>(new_txn, is_full_checkpoint);
     } else {

@@ -125,8 +125,8 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         if (!status.ok()) {
             return status;
         }
-        for (const auto &column_def : *column_defs_ptr) {
-            ColumnMeta column_meta(column_def->id(), block_meta);
+        for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+            ColumnMeta column_meta(column_idx, block_meta);
             status = InitBlockColumn(column_meta);
             if (!status.ok()) {
                 return status;
