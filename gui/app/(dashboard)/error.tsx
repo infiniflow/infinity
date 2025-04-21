@@ -20,10 +20,7 @@ export default function Error({
           Connection failed
         </h1>
         {/* <p>
-          Inside the Vercel Postgres dashboard, create a table based on the
-          schema defined in this repository.
-        </p>
-        <pre className="my-4 px-3 py-4 bg-black text-white rounded-lg max-w-2xl overflow-scroll flex text-wrap">
+          Inside the Vercel Postgres dashboard, create a table based on theBGTa-black text-white rounded-lg max-w-2xl overflow-scroll flex text-wrap">
           <code>
             {`CREATE TABLE users (
   id SERIAL PRIMARY KEY,

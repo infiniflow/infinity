@@ -181,8 +181,16 @@ void WalManager::SubmitTxn(Vector<NewTxn *> &txn_array) {
 }
 
 TxnTimeStamp WalManager::LastCheckpointTS() const {
-    const TxnTimeStamp last_ckp_ts = last_ckp_ts_;
-    return last_ckp_ts == UNCOMMIT_TS ? 0 : last_ckp_ts;
+    std::lock_guard guard(last_ckp_ts_mutex_);
+    return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_;
+}
+
+void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
+    std::lock_guard guard(last_ckp_ts_mutex_);
+    if (new_last_ckp_ts > last_ckp_ts_) {
+        last_ckp_ts_ = new_last_ckp_ts;
+    }
+    return;
 }
 
 Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
@@ -617,6 +625,22 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
     bool expect = false;
     if (checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
         storage_->bg_processor()->Submit(ckp_task);
+        return true;
+    }
+    return false;
+}
+
+bool WalManager::SetCheckpointing() {
+    bool expect = false;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
+        return true;
+    }
+    return false;
+}
+
+bool WalManager::UnsetCheckpoint() {
+    bool expect = true;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, false)) {
         return true;
     }
     return false;

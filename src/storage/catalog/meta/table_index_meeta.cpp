@@ -364,7 +364,7 @@ String TableIndexMeeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_ca
 Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     Status status;
     if (!segment_ids_) {
-        status = LoadSegmentIDs();
+        status = LoadSegmentIDs1();
         if (!status.ok()) {
             return status;
         }

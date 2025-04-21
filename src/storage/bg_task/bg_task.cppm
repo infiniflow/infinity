@@ -128,7 +128,10 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
 
     String ToString() const final { return "New catalog"; }
 
-    Status Execute(TxnTimeStamp last_ckp_ts, TxnTimeStamp &cur_ckp_ts);
+    Status ExecuteWithinTxn();
+    Status ExecuteWithNewTxn();
+
+    NewTxn *new_txn_{};
 };
 
 export struct ForceCheckpointTask final : public CheckpointTaskBase {

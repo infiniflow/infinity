@@ -324,7 +324,7 @@ public:
 
     // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
-    Status Checkpoint(TxnTimeStamp last_ckp_ts = 0, TxnTimeStamp *cur_ckp_ts = nullptr);
+    Status Checkpoint(TxnTimeStamp last_ckp_ts);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -390,6 +390,8 @@ public:
     Status PrintVersion(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool ignore_invisible);
 
     void AddMetaKeyForCommit(const String &key);
+
+    TxnTimeStamp GetCurrentCkpTS() const;
 
 private:
     void CheckTxnStatus();
@@ -642,7 +644,9 @@ private:
     bool allowed_in_reader_{false};
 
     Vector<String> keys_wait_for_commit_{};
-    Vector<String> mem_index_names_{};
+
+    // Used for new checkpoint
+    TxnTimeStamp current_ckp_ts_{};
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};

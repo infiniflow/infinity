@@ -30,10 +30,11 @@ import bg_task;
 import third_party;
 import status;
 import infinity_context;
+import background_process;
 
 namespace infinity {
 
-void PhysicalFlush::Init(QueryContext* query_context) {}
+void PhysicalFlush::Init(QueryContext *query_context) {}
 
 bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -50,7 +51,7 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     switch (flush_type_) {
         case FlushType::kDelta:
         case FlushType::kData: {
-            FlushData(query_context, operator_state);
+            FlushData1(query_context, operator_state);
             break;
         }
         case FlushType::kLog: {
@@ -66,6 +67,15 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     return true;
 }
 
+void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *operator_state) {
+    auto checkpoint_task = MakeShared<NewCheckpointTask>();
+    checkpoint_task->new_txn_ = query_context->GetNewTxn();
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    bg_processor->Submit(std::move(checkpoint_task));
+    checkpoint_task->Wait();
+    return;
+}
+
 void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     // full checkpoint here
 
@@ -73,6 +83,9 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     SharedPtr<ForceCheckpointTask> force_ckp_task = nullptr;
     bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     if (use_new_catalog) {
+        if (!is_full_checkpoint) {
+            LOG_WARN("Delta checkpoint is not supported in new catalog");
+        }
         auto *new_txn = query_context->GetNewTxn();
         force_ckp_task = MakeShared<ForceCheckpointTask>(new_txn, is_full_checkpoint);
     } else {

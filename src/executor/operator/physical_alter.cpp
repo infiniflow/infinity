@@ -64,6 +64,11 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
         status = txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
     } else {
         NewTxn *new_txn = query_context->GetNewTxn();
+        for (auto &column_def : column_defs_) {
+            if (column_def->id() != -1) {
+                column_def->id_ = -1;
+            }
+        }
         status = new_txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
     }
     if (!status.ok()) {

@@ -28,22 +28,28 @@ import txn_state;
 
 namespace infinity {
 
-Status NewCheckpointTask::Execute(TxnTimeStamp last_ckp_ts, TxnTimeStamp &cur_ckp_ts) {
-    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+Status NewCheckpointTask::ExecuteWithinTxn() {
+    TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    Status status = new_txn_->Checkpoint(last_checkpoint_ts);
+    return status;
+}
 
-    Status status = new_txn->Checkpoint(last_ckp_ts, &cur_ckp_ts);
+Status NewCheckpointTask::ExecuteWithNewTxn() {
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+    Status status = new_txn->Checkpoint(last_checkpoint_ts);
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn);
     }
-    if (!status.ok()) {
-        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
-        if (!rollback_status.ok()) {
-            RecoverableError(rollback_status);
-        }
-        return status;
-    }
-    return Status::OK();
+    //    if (!status.ok()) {
+    //        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+    //        if (!rollback_status.ok()) {
+    //            RecoverableError(rollback_status);
+    //        }
+    //        return status;
+    //    }
+    return status;
 }
 
 ForceCheckpointTask::ForceCheckpointTask(Txn *txn, bool full_checkpoint, TxnTimeStamp cleanup_ts)

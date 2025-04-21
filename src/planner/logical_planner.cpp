@@ -1441,6 +1441,20 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
+            if (use_new_catalog) {
+                auto *new_txn = query_context_ptr_->GetNewTxn();
+                Optional<DBMeeta> db_meta;
+                Optional<TableMeeta> table_meta;
+                Status status = new_txn->GetTableMeta(query_context_ptr_->schema_name(), check_table->table_name(), db_meta, table_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+                this->logical_plan_ = logical_command;
+                break;
+            }
             auto [table_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =

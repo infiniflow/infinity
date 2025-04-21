@@ -135,8 +135,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
     append();
 
     auto checkpoint = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-        Status status = txn->Checkpoint();
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

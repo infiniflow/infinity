@@ -30,6 +30,9 @@ def make_new_config(filepath: str):
     new_filename = filename.split(".")[0] + "_new.toml"
     new_filepath = file_dir + "/" + new_filename
 
+    if os.path.exists(new_filepath):
+        return new_filepath
+
     with open(filepath, "r") as f:
         lines = f.readlines()
     with open(new_filepath, "w") as f:

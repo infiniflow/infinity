@@ -32,6 +32,7 @@ import buffer_manager;
 import periodic_trigger;
 import infinity_context;
 import status;
+import new_txn;
 
 namespace infinity {
 
@@ -73,33 +74,49 @@ void BGTaskProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kForceCheckpoint: {
-                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-                    if (storage_mode == StorageMode::kUnInitialized) {
-                        UnrecoverableError("Uninitialized storage mode");
-                    }
-                    if (storage_mode == StorageMode::kWritable) {
-                        LOG_DEBUG("Force checkpoint in background");
-                        ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
-                        if (cleanup_trigger_.get() != nullptr && force_ckp_task->is_full_checkpoint_) {
-                            LOG_INFO("Do cleanup before force checkpoint");
-                            auto cleanup_task = cleanup_trigger_->CreateCleanupTask(force_ckp_task->cleanup_ts_);
-                            if (cleanup_task.get() != nullptr) {
-                                cleanup_task->Execute();
-                                LOG_DEBUG("Cleanup before force checkpoint done");
-                            } else {
-                                LOG_DEBUG("Skip cleanup before force checkpoint");
-                            }
-                        }
-                        {
-                            std::unique_lock<std::mutex> locker(task_mutex_);
-                            task_text_ = force_ckp_task->ToString();
-                        }
-                        wal_manager_->Checkpoint(force_ckp_task);
-                        LOG_DEBUG("Force checkpoint in background done");
-                    }
-                    break;
-                }
+                    //                case BGTaskType::kForceCheckpoint: {
+                    //                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    //                    if (storage_mode == StorageMode::kUnInitialized) {
+                    //                        UnrecoverableError("Uninitialized storage mode");
+                    //                    }
+                    //                    if (storage_mode == StorageMode::kWritable) {
+                    //                        LOG_DEBUG("Force checkpoint in background");
+                    //                        ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
+                    //
+                    //                        if (force_ckp_task->txn_ == nullptr) {
+                    //                            TxnTimeStamp last_ckp_ts = this->last_checkpoint_ts();
+                    //                            TxnTimeStamp cur_ckp_ts = 0;
+                    //                            Status status = force_ckp_task->new_txn_->Checkpoint(last_ckp_ts, &cur_ckp_ts);
+                    //                            if (!status.ok()) {
+                    //                                RecoverableError(status);
+                    //                            }
+                    //                            if (cur_ckp_ts > last_ckp_ts) {
+                    //                                std::unique_lock lock(last_time_mtx_);
+                    //                                last_checkpoint_ts_ = cur_ckp_ts;
+                    //                            }
+                    //                            LOG_DEBUG("Force checkpoint in background done");
+                    //                            break;
+                    //                        }
+                    //
+                    //                        if (cleanup_trigger_.get() != nullptr && force_ckp_task->is_full_checkpoint_) {
+                    //                            LOG_INFO("Do cleanup before force checkpoint");
+                    //                            auto cleanup_task = cleanup_trigger_->CreateCleanupTask(force_ckp_task->cleanup_ts_);
+                    //                            if (cleanup_task.get() != nullptr) {
+                    //                                cleanup_task->Execute();
+                    //                                LOG_DEBUG("Cleanup before force checkpoint done");
+                    //                            } else {
+                    //                                LOG_DEBUG("Skip cleanup before force checkpoint");
+                    //                            }
+                    //                        }
+                    //                        {
+                    //                            std::unique_lock<std::mutex> locker(task_mutex_);
+                    //                            task_text_ = force_ckp_task->ToString();
+                    //                        }
+                    //                        wal_manager_->Checkpoint(force_ckp_task);
+                    //                        LOG_DEBUG("Force checkpoint in background done");
+                    //                    }
+                    //                    break;
+                    //                }
                 case BGTaskType::kAddDeltaEntry: {
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
@@ -165,18 +182,17 @@ void BGTaskProcessor::Process() {
                             std::unique_lock<std::mutex> locker(task_mutex_);
                             task_text_ = bg_task->ToString();
                         }
-                        auto *checkpoint_task = static_cast<NewCheckpointTask *>(bg_task.get());
-                        TxnTimeStamp last_ckp_ts = this->last_checkpoint_ts();
-                        TxnTimeStamp cur_ckp_ts = 0;
-                        Status status = checkpoint_task->Execute(last_ckp_ts, cur_ckp_ts);
-                        if (!status.ok()) {
-                            RecoverableError(status);
-                        }
-                        if (cur_ckp_ts > last_ckp_ts) {
-                            std::unique_lock lock(last_time_mtx_);
-                            last_checkpoint_ts_ = cur_ckp_ts;
-                        }
 
+                        Status status = Status::OK();
+                        auto *checkpoint_task = static_cast<NewCheckpointTask *>(bg_task.get());
+                        if (checkpoint_task->new_txn_ == nullptr) {
+                            status = checkpoint_task->ExecuteWithNewTxn();
+                        } else {
+                            status = checkpoint_task->ExecuteWithinTxn();
+                        }
+                        if (!status.ok()) {
+                            UnrecoverableError(fmt::format("Fail to checkpoint"));
+                        }
                         LOG_DEBUG("Checkpoint in background done");
                     }
                     break;

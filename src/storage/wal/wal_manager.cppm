@@ -113,6 +113,9 @@ public:
 
     bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
 
+    bool SetCheckpointing();
+    bool UnsetCheckpoint();
+
     void Checkpoint(bool is_full_checkpoint);
 
     void Checkpoint(ForceCheckpointTask *ckp_task);
@@ -134,6 +137,7 @@ public:
     void ReplayWalEntry(const WalEntry &entry, ReplayWalOptions options);
 
     TxnTimeStamp LastCheckpointTS() const;
+    void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
     Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
@@ -216,7 +220,8 @@ private:
     Atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint/Cleanup thread access following members
-    Atomic<TxnTimeStamp> last_ckp_ts_{};
+    mutable std::mutex last_ckp_ts_mutex_{};
+    TxnTimeStamp last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
 };
 
