@@ -181,8 +181,16 @@ void WalManager::SubmitTxn(Vector<NewTxn *> &txn_array) {
 }
 
 TxnTimeStamp WalManager::LastCheckpointTS() const {
-    const TxnTimeStamp last_ckp_ts = last_ckp_ts_;
-    return last_ckp_ts == UNCOMMIT_TS ? 0 : last_ckp_ts;
+    std::lock_guard guard(last_ckp_ts_mutex_);
+    return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_;
+}
+
+void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
+    std::lock_guard guard(last_ckp_ts_mutex_);
+    if (new_last_ckp_ts > last_ckp_ts_) {
+        last_ckp_ts_ = new_last_ckp_ts;
+    }
+    return;
 }
 
 Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {

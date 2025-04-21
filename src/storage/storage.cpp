@@ -355,9 +355,9 @@ Status Storage::AdminToWriter() {
     if (new_txn_mgr_) {
         this->RecoverMemIndex();
 
-        auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+        auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
-        Status status = new_txn->Checkpoint();
+        Status status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
         if (!status.ok()) {
             UnrecoverableError("Failed to checkpoint");
         }

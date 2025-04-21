@@ -101,11 +101,13 @@ void CheckpointPeriodicTrigger::Trigger() {
 
     if (new_checkpoint_) {
         auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+        auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
         auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-        TxnTimeStamp last_ckp_ts = bg_processor->last_checkpoint_ts();
+        TxnTimeStamp last_ckp_ts = wal_manager->LastCheckpointTS();
         TxnTimeStamp cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
         if (cur_ckp_ts <= last_ckp_ts) {
+            LOG_DEBUG("No write txn after last checkpoint");
             return;
         }
         auto checkpoint_task = MakeShared<NewCheckpointTask>();

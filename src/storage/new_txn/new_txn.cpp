@@ -909,14 +909,32 @@ Status NewTxn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetViews"};
 }
 
-Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp *cur_ckp_ts) {
+TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
+    TransactionType txn_type = GetTxnType();
+    if (txn_type != TransactionType::kNewCheckpoint) {
+        UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
+    }
+
+    TxnState txn_state = NewTxn::GetTxnState();
+    if (txn_state != TxnState::kCommitted) {
+        UnrecoverableError(fmt::format("Expected transaction state is 'committed'."));
+    }
+
+    return current_ckp_ts_;
+}
+
+Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
+    TransactionType txn_type = GetTxnType();
+    if (txn_type != TransactionType::kNewCheckpoint) {
+        UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
+    }
+
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
     CheckpointOption option{checkpoint_ts};
 
-    if (cur_ckp_ts) {
-        *cur_ckp_ts = checkpoint_ts;
-    }
+    current_ckp_ts_ = checkpoint_ts;
+
     if (last_ckp_ts >= checkpoint_ts) {
         return Status::OK();
     }
@@ -2054,7 +2072,7 @@ void NewTxn::PostCommit() {
         sema->acquire();
     }
 
-    // auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     //    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -2155,6 +2173,11 @@ void NewTxn::PostCommit() {
         if (!status.ok()) {
             UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
         }
+    }
+
+    TransactionType txn_type = GetTxnType();
+    if (txn_type == TransactionType::kNewCheckpoint) {
+        wal_manager->SetLastCheckpointTS(current_ckp_ts_);
     }
 
     SetCompletion();

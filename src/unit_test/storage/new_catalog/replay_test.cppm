@@ -22,6 +22,7 @@ import base_test;
 import stl;
 import new_txn_manager;
 import infinity_context;
+import wal_manager;
 
 using namespace infinity;
 
@@ -34,6 +35,7 @@ protected:
         InfinityContext::instance().InitPhase1(this->config_path);
         InfinityContext::instance().InitPhase2();
         new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
 
         new_txn_mgr->PrintAllKeyValue();
     }
@@ -48,12 +50,15 @@ protected:
         InfinityContext::instance().InitPhase1(this->config_path);
         InfinityContext::instance().InitPhase2();
         new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
     }
 
     void SetUp() override {
         BaseTestParamStr::SetUp();
         new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
     }
 
-    NewTxnManager *new_txn_mgr = nullptr;
+    WalManager *wal_manager_{};
+    NewTxnManager *new_txn_mgr{};
 };
