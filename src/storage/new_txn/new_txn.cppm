@@ -315,8 +315,6 @@ public:
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
-    Status BuildFastRoughFilter(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
-
 private:
     Status ReplayCompact(WalCmdCompact *compact_cmd);
 
@@ -645,6 +643,7 @@ private:
 
     Vector<String> keys_wait_for_commit_{};
     Vector<String> mem_index_names_{};
+
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
 

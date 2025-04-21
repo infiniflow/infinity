@@ -38,7 +38,6 @@ export enum class BGTaskType {
     kNotifyOptimize,
     kCleanup,
     kNewCleanup,
-    kBuildFastRoughFilter,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
     kDumpIndexByline,
@@ -261,22 +260,6 @@ public:
 
 public:
     String command_content_{};
-};
-
-export class BGBuildFastRoughFilterTask : public BGTask {
-public:
-    BGBuildFastRoughFilterTask(String db_name, String table_name, Vector<SegmentID> segment_ids)
-        : BGTask(BGTaskType::kBuildFastRoughFilter, false), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          segment_ids_(std::move(segment_ids)) {}
-
-    String ToString() const override { return "BGBuildFastRoughFilterTask"; }
-
-    void Execute();
-
-private:
-    String db_name_;
-    String table_name_;
-    Vector<SegmentID> segment_ids_;
 };
 
 } // namespace infinity

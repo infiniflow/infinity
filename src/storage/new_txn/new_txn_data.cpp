@@ -697,35 +697,6 @@ Status NewTxn::CheckTableIfDelete(const String &db_name, const String &table_nam
     return Status::OK();
 }
 
-Status NewTxn::BuildFastRoughFilter(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    Vector<SegmentID> *segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-    for (SegmentID segment_id : segment_ids) {
-        if (auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id); iter == segment_ids_ptr->end()) {
-            continue;
-        }
-        SegmentMeta segment_meta(segment_id, *table_meta);
-        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
-    }
-    return Status::OK();
-}
-
 Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
     Status status;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
@@ -1360,6 +1331,8 @@ Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
         return status;
     }
 
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
+
     return Status::OK();
 }
 
@@ -1580,6 +1553,11 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
         }
     }
 
+    for (SegmentID segment_id : append_state->sealed_segments_) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
+    }
+
     return Status::OK();
 }
 
@@ -1706,6 +1684,8 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
     if (!status.ok()) {
         return status;
     }
+
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     const Vector<SegmentID> &deprecated_ids = compact_cmd->deprecated_segment_ids_;
