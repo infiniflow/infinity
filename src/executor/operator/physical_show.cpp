@@ -4051,6 +4051,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
     GlobalVariable global_var = VarUtil::GetGlobalVarByName(*object_name_);
     Config *config = query_context->global_config();
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     switch (global_var) {
         case GlobalVariable::kResultCache: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
@@ -4351,8 +4353,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            TxnManager *txn_manager = query_context->storage()->txn_manager();
-            Value value = Value::MakeBigInt(txn_manager->ActiveTxnCount());
+            SizeT active_txn_count = 0;
+            if (!use_new_catalog) {
+                TxnManager *txn_manager = query_context->storage()->txn_manager();
+                active_txn_count = txn_manager->ActiveTxnCount();
+            } else {
+                NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                active_txn_count = new_txn_mgr->ActiveTxnCount();
+            }
+            Value value = Value::MakeBigInt(active_txn_count);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4372,8 +4381,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            TxnManager *txn_manager = query_context->storage()->txn_manager();
-            Value value = Value::MakeBigInt(txn_manager->CurrentTS());
+            TxnTimeStamp current_ts = 0;
+            if (!use_new_catalog) {
+                TxnManager *txn_manager = query_context->storage()->txn_manager();
+                current_ts = txn_manager->CurrentTS();
+            } else {
+                NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                current_ts = new_txn_mgr->CurrentTS();
+            }
+            Value value = Value::MakeBigInt(current_ts);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4393,8 +4409,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            TxnManager *txn_manager = query_context->storage()->txn_manager();
-            Value value = Value::MakeBigInt(txn_manager->total_committed_txn_count());
+            u64 total_committed_txn_count = 0;
+            if (!use_new_catalog) {
+                TxnManager *txn_manager = query_context->storage()->txn_manager();
+                total_committed_txn_count = txn_manager->total_committed_txn_count();
+            } else {
+                NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                total_committed_txn_count = new_txn_mgr->total_committed_txn_count();
+            }
+            Value value = Value::MakeBigInt(total_committed_txn_count);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4414,8 +4437,15 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            TxnManager *txn_manager = query_context->storage()->txn_manager();
-            Value value = Value::MakeBigInt(txn_manager->total_rollbacked_txn_count());
+            u64 total_rollbacked_txn_count = 0;
+            if (!use_new_catalog) {
+                TxnManager *txn_manager = query_context->storage()->txn_manager();
+                total_rollbacked_txn_count = txn_manager->total_rollbacked_txn_count();
+            } else {
+                NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                total_rollbacked_txn_count = new_txn_mgr->total_rollbacked_txn_count();
+            }
+            Value value = Value::MakeBigInt(total_rollbacked_txn_count);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4682,6 +4712,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
     };
 
     output_block_ptr->Init(column_types);
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
 
     for (auto &global_var_pair : VarUtil::global_name_map_) {
         const String &var_name = global_var_pair.first;
@@ -4998,8 +5029,15 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    TxnManager *txn_manager = query_context->storage()->txn_manager();
-                    Value value = Value::MakeVarchar(std::to_string(txn_manager->ActiveTxnCount()));
+                    SizeT active_txn_count = 0;
+                    if (!use_new_catalog) {
+                        TxnManager *txn_manager = query_context->storage()->txn_manager();
+                        active_txn_count = txn_manager->ActiveTxnCount();
+                    } else {
+                        NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                        active_txn_count = new_txn_mgr->ActiveTxnCount();
+                    }
+                    Value value = Value::MakeVarchar(std::to_string(active_txn_count));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
@@ -5020,8 +5058,15 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    TxnManager *txn_manager = query_context->storage()->txn_manager();
-                    Value value = Value::MakeVarchar(std::to_string(txn_manager->CurrentTS()));
+                    TxnTimeStamp current_ts = 0;
+                    if (!use_new_catalog) {
+                        TxnManager *txn_manager = query_context->storage()->txn_manager();
+                        current_ts = txn_manager->CurrentTS();
+                    } else {
+                        NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                        current_ts = new_txn_mgr->CurrentTS();
+                    }
+                    Value value = Value::MakeVarchar(std::to_string(current_ts));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
@@ -5042,8 +5087,15 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    TxnManager *txn_manager = query_context->storage()->txn_manager();
-                    Value value = Value::MakeVarchar(std::to_string(txn_manager->total_committed_txn_count()));
+                    u64 total_committed_txn_count = 0;
+                    if (!use_new_catalog) {
+                        TxnManager *txn_manager = query_context->storage()->txn_manager();
+                        total_committed_txn_count = txn_manager->total_committed_txn_count();
+                    } else {
+                        NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                        total_committed_txn_count = new_txn_mgr->total_committed_txn_count();
+                    }
+                    Value value = Value::MakeVarchar(std::to_string(total_committed_txn_count));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
@@ -5064,8 +5116,15 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    TxnManager *txn_manager = query_context->storage()->txn_manager();
-                    Value value = Value::MakeVarchar(std::to_string(txn_manager->total_rollbacked_txn_count()));
+                    u64 total_rollbacked_txn_count = 0;
+                    if (!use_new_catalog) {
+                        TxnManager *txn_manager = query_context->storage()->txn_manager();
+                        total_rollbacked_txn_count = txn_manager->total_rollbacked_txn_count();
+                    } else {
+                        NewTxnManager *new_txn_mgr = query_context->storage()->new_txn_manager();
+                        total_rollbacked_txn_count = new_txn_mgr->total_rollbacked_txn_count();
+                    }
+                    Value value = Value::MakeVarchar(std::to_string(total_rollbacked_txn_count));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
