@@ -51,7 +51,6 @@ import new_txn;
 import new_txn_store;
 import buffer_obj;
 import buffer_handle;
-import secondary_index_in_mem;
 import secondary_index_data;
 import segment_meta;
 import block_meta;
@@ -67,6 +66,12 @@ import roaring_bitmap;
 import index_filter_evaluators;
 import index_emvb;
 import constant_expr;
+import secondary_index_in_mem;
+import ivf_index_data_in_mem;
+import emvb_index_in_mem;
+import memory_indexer;
+import abstract_hnsw;
+import abstract_bmp;
 
 class TestTxnReplayIndex : public NewReplayTest {
 public:

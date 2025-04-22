@@ -44,6 +44,7 @@ import table_index_meta;
 import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
+import mem_index;
 
 import logical_type;
 import data_type;
@@ -352,6 +353,71 @@ Status NewCatalog::MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts
     for (const String &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, *kv_instance);
         status = IndexCommitDB(db_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<SharedPtr<MemIndex>> &mem_indexes) {
+    auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta) {
+        auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        for (SegmentID segment_id : *index_segment_ids_ptr) {
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+
+            SharedPtr<MemIndex> mem_index;
+            Status status = segment_index_meta.GetMemIndex(mem_index);
+            if (!status.ok()) {
+                return status;
+            }
+
+            mem_indexes.push_back(mem_index);
+        }
+        return Status::OK();
+    };
+    auto TraverseTable = [&](TableMeeta &table_meta) {
+        Vector<String> *index_id_strs_ptr = nullptr;
+        Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &index_id_str : *index_id_strs_ptr) {
+            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+            status = TraverseTableIndex(table_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+    auto TraverseDB = [&](DBMeeta &db_meta) {
+        Vector<String> *table_id_strs_ptr = nullptr;
+        Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &table_id_str : *table_id_strs_ptr) {
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
+            status = TraverseTable(table_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+    Vector<String> *db_id_strs_ptr;
+    CatalogMeta catalog_meta(*kv_instance);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &db_id_str : *db_id_strs_ptr) {
+        DBMeeta db_meta(db_id_str, *kv_instance);
+        Status status = TraverseDB(db_meta);
         if (!status.ok()) {
             return status;
         }

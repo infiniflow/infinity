@@ -17,26 +17,23 @@ module;
 export module mem_index;
 
 import stl;
-import secondary_index_in_mem;
-import ivf_index_data_in_mem;
-import emvb_index_in_mem;
-import memory_indexer;
-import abstract_hnsw;
-import abstract_bmp;
 
 namespace infinity {
 
-export struct MemIndex {
-    void ClearMemIndex() {
-        std::unique_lock<std::mutex> lock(mtx_);
+class BaseMemIndex;
+class HnswIndexInMem;
+class IVFIndexInMem;
+class MemoryIndexer;
+class SecondaryIndexInMem;
+class EMVBIndexInMem;
+class BMPIndexInMem;
 
-        memory_hnsw_index_.reset();
-        memory_ivf_index_.reset();
-        memory_indexer_.reset();
-        memory_secondary_index_.reset();
-        memory_emvb_index_.reset();
-        memory_bmp_index_.reset();
-    }
+export struct MemIndex {
+    ~MemIndex();
+
+    void ClearMemIndex();
+
+    BaseMemIndex *GetBaseMemIndex();
 
     std::mutex mtx_; // Used by append / mem index dump / clear
 

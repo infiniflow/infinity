@@ -23,6 +23,7 @@ import third_party;
 import logger;
 import txn;
 import table_index_entry;
+import new_txn;
 
 using namespace infinity;
 
@@ -162,6 +163,8 @@ public:
     Txn *GetTxn() override { return nullptr; }
 
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override { return catalog_.GetMemIndexes(); }
+
+    Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override { return {}; }
 
     void HandleDump(UniquePtr<DumpIndexTask> task);
 

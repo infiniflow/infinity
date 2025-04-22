@@ -53,6 +53,7 @@ import index_full_text;
 import index_bmp;
 import index_emvb;
 import kv_code;
+import config;
 
 namespace infinity {
 

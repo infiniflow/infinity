@@ -51,6 +51,8 @@ import statement_common;
 import mem_index;
 import index_base;
 import buffer_obj;
+import secondary_index_in_mem;
+import memory_indexer;
 
 class TestTxnReplayAppend : public NewReplayTest {
 public:
