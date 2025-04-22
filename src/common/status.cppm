@@ -197,6 +197,7 @@ export enum class ErrorCode : long {
     kCantSwitchRole = 7026,
     kTooManyFollower = 7027,
     kTooManyLearner = 7028,
+    kCheckpointing = 7029,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -388,6 +389,7 @@ public:
     static Status CantSwitchRole(const String &detailed_info);
     static Status TooManyFollower(u8 follower_limit);
     static Status TooManyLearner();
+    static Status Checkpointing();
 
     // meta
     static Status InvalidEntry();

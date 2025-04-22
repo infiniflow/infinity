@@ -2253,12 +2253,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
                 Vector<String> object_paths;
                 object_paths.reserve(chunk_infos_.size());
-                const String &data_dir = InfinityContext::instance().config()->DataDir();
-                const String &file_dir = *table_index_meta->GetTableIndexDir().get();
+                String data_dir = InfinityContext::instance().config()->DataDir();
+                SharedPtr<String> file_dir = table_index_meta->GetTableIndexDir();
                 for (auto &chunk_info : chunk_infos_) {
                     if (chunk_info.db_id_ == cmd->db_id_ && chunk_info.table_id_ == cmd->table_id_) {
-                        const String object_name = fmt::format("seg{}_chunk{}.idx", chunk_info.segment_id_, chunk_info.chunk_id_);
-                        const String object_path = Path(data_dir) / file_dir / object_name;
+                        String object_path =
+                            fmt::format("{}/{}/seg{}_chunk{}.idx", data_dir, *file_dir, chunk_info.segment_id_, chunk_info.chunk_id_);
                         object_paths.push_back(object_path);
                     }
                 }

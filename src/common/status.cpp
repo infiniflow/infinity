@@ -652,6 +652,8 @@ Status Status::TooManyFollower(infinity::u8 follower_limit) {
 
 Status Status::TooManyLearner() { return Status(ErrorCode::kTooManyLearner, MakeUnique<String>("Too many learner, limit: 255")); }
 
+Status Status::Checkpointing() { return Status(ErrorCode::kCheckpointing, MakeUnique<String>("Checkpointing")); }
+
 // meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 

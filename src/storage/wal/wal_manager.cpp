@@ -560,12 +560,16 @@ void WalManager::NewFlush() {
         // Check if total wal is too large, do delta checkpoint
         i64 last_ckp_wal_size = GetLastCkpWalSize();
         if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
-            LOG_DEBUG(fmt::format("Reach the WAL limit trigger the checkpoint: {} - {} > {}",
+            LOG_INFO(fmt::format("Reach the WAL limit trigger the checkpoint: {} - {} > {}",
                                  wal_size_,
                                  last_ckp_wal_size,
                                  cfg_delta_checkpoint_interval_wal_bytes_));
-            auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size_);
-            storage_->bg_processor()->Submit(std::move(checkpoint_task));
+            if (IsCheckpointing()) {
+                LOG_INFO("There is a running checkpoint task, skip this checkpoint triggered by WAL size");
+            } else {
+                auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size_);
+                storage_->bg_processor()->Submit(std::move(checkpoint_task));
+            }
         }
         LOG_TRACE("WAL flush is finished.");
     }
@@ -646,6 +650,8 @@ bool WalManager::UnsetCheckpoint() {
     }
     return false;
 }
+
+bool WalManager::IsCheckpointing() const { return checkpoint_in_progress_; }
 
 /*****************************************************************************
  * CHECKPOINT WAL FILE

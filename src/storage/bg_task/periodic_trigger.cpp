@@ -108,6 +108,10 @@ void CheckpointPeriodicTrigger::Trigger() {
         LOG_DEBUG("No write txn after last checkpoint");
         return;
     }
+    if (wal_manager->IsCheckpointing()) {
+        LOG_INFO("There is a running checkpoint task, skip this checkpoint triggered by periodic timer");
+        return;
+    }
     TxnTimeStamp max_commit_ts{};
     i64 wal_size{};
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();

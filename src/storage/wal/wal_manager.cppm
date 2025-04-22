@@ -115,6 +115,7 @@ public:
 
     bool SetCheckpointing();
     bool UnsetCheckpoint();
+    bool IsCheckpointing() const;
 
     void Checkpoint(bool is_full_checkpoint);
 
@@ -155,6 +156,7 @@ public:
 
     Tuple<TxnTimeStamp, i64> GetCommitState();
     void SetLastCkpWalSize(i64 wal_size);
+
 private:
     i64 GetLastCkpWalSize();
 
