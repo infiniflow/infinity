@@ -31,12 +31,14 @@ namespace infinity {
 Status NewCheckpointTask::ExecuteWithinTxn() {
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     Status status = new_txn_->Checkpoint(last_checkpoint_ts);
+    new_txn_->SetWalSize(wal_size_);
     return status;
 }
 
 Status NewCheckpointTask::ExecuteWithNewTxn() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    new_txn->SetWalSize(wal_size_);
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     Status status = new_txn->Checkpoint(last_checkpoint_ts);
     if (status.ok()) {

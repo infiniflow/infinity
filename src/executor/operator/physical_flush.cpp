@@ -68,7 +68,12 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
 }
 
 void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *operator_state) {
-    auto checkpoint_task = MakeShared<NewCheckpointTask>();
+    auto *wal_manager = query_context->storage()->wal_manager();
+    TxnTimeStamp max_commit_ts{};
+    i64 wal_size{};
+    std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+    LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+    auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
     checkpoint_task->new_txn_ = query_context->GetNewTxn();
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     bg_processor->Submit(std::move(checkpoint_task));

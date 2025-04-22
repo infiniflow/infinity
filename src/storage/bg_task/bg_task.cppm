@@ -124,7 +124,7 @@ export struct CheckpointTask final : public CheckpointTaskBase {
 };
 
 export struct NewCheckpointTask final : public CheckpointTaskBase {
-    NewCheckpointTask() : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false) {}
+    NewCheckpointTask(i64 wal_size) : CheckpointTaskBase(BGTaskType::kNewCheckpoint, false), wal_size_(wal_size) {}
 
     String ToString() const final { return "New catalog"; }
 
@@ -132,6 +132,7 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
     Status ExecuteWithNewTxn();
 
     NewTxn *new_txn_{};
+    i64 wal_size_{};
 };
 
 export struct ForceCheckpointTask final : public CheckpointTaskBase {

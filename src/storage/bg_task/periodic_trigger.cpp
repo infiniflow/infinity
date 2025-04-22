@@ -97,29 +97,22 @@ void NewCleanupPeriodicTrigger::Trigger() {
 }
 
 void CheckpointPeriodicTrigger::Trigger() {
-    LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint, after {} seconds", is_full_checkpoint_ ? "FULL" : "DELTA", duration_.load()));
+    LOG_INFO(fmt::format("Trigger {} periodic checkpoint, after {} seconds", is_full_checkpoint_ ? "FULL" : "DELTA", duration_.load()));
 
-    if (new_checkpoint_) {
-        auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-        auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-        auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-
-        TxnTimeStamp last_ckp_ts = wal_manager->LastCheckpointTS();
-        TxnTimeStamp cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
-        if (cur_ckp_ts <= last_ckp_ts) {
-            LOG_DEBUG("No write txn after last checkpoint");
-            return;
-        }
-        auto checkpoint_task = MakeShared<NewCheckpointTask>();
-        bg_processor->Submit(std::move(checkpoint_task));
-    } else {
-        auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
-        // LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
-        if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
-            LOG_TRACE(
-                fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
-        }
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    TxnTimeStamp last_ckp_ts = wal_manager->LastCheckpointTS();
+    TxnTimeStamp cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
+    if (cur_ckp_ts <= last_ckp_ts) {
+        LOG_DEBUG("No write txn after last checkpoint");
+        return;
     }
+    TxnTimeStamp max_commit_ts{};
+    i64 wal_size{};
+    std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+    auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+    bg_processor->Submit(std::move(checkpoint_task));
 }
 
 void CompactSegmentPeriodicTrigger::Trigger() {

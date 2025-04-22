@@ -153,10 +153,10 @@ public:
     void CommitFullCheckpoint(TxnTimeStamp max_commit_ts);
     void CommitDeltaCheckpoint(TxnTimeStamp max_commit_ts);
 
-private:
     Tuple<TxnTimeStamp, i64> GetCommitState();
-    i64 GetLastCkpWalSize();
     void SetLastCkpWalSize(i64 wal_size);
+private:
+    i64 GetLastCkpWalSize();
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);

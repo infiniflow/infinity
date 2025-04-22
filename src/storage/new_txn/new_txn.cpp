@@ -2186,6 +2186,7 @@ void NewTxn::PostCommit() {
     if (txn_type == TransactionType::kNewCheckpoint) {
         // TODO: Shouldn't set the ckp ts if checkpoint is skipped.
         wal_manager->SetLastCheckpointTS(current_ckp_ts_);
+        wal_manager->SetLastCkpWalSize(wal_size_); // Update last checkpoint wal size
     }
 
     SetCompletion();
@@ -2783,6 +2784,14 @@ SizeT NewTxn::GetMemIndexReferenceCount(const String &table_key) {
 Status NewTxn::Dummy() {
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDummy>());
     return Status::OK();
+}
+
+void NewTxn::SetWalSize(i64 wal_size) {
+    TransactionType txn_type = GetTxnType();
+    if (txn_type != TransactionType::kNewCheckpoint) {
+        UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
+    }
+    wal_size_ = wal_size;
 }
 
 void NewTxn::SetCompletion() {
