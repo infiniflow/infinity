@@ -296,4 +296,64 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
     };
 
     check_db();
+
+    auto check_block = [&](BlockMeta &block_meta) {
+        Value v1 = Value::MakeInt(1);
+        Value v2 = Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz");
+
+        Status status;
+
+        SizeT row_count = 0;
+        // std::tie(row_count, status) = block_meta.GetRowCnt();
+        std::tie(row_count, status) = block_meta.GetRowCnt1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(row_count, block_row_cnt);
+
+        auto check_column = [&](ColumnID column_id, const Value &v) {
+            ColumnMeta column_meta(column_id, block_meta);
+            ColumnVector col1;
+            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col1);
+            EXPECT_TRUE(status.ok());
+
+            for (u32 i = 0; i < row_count; ++i) {
+                EXPECT_EQ(col1.GetValue(i), v);
+            }
+        };
+
+        check_column(0, v1);
+        check_column(1, v2);
+    };
+
+    auto check_segment = [&](SegmentMeta &segment_meta) {
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        Status status;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        EXPECT_TRUE(status.ok());
+
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+            check_block(block_meta);
+        }
+    };
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        Status status;Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn->GetDBMeta(*db_name, db_meta);
+        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0, 1}));
+        SegmentID segment_id = (*segment_ids_ptr)[0];
+        SegmentMeta segment_meta(segment_id, *table_meta);
+        check_segment(segment_meta);
+    }
+}
+
+TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
+
 }
