@@ -33,7 +33,7 @@ export constexpr std::string_view log_level = "log_level";
 
 export struct DefaultConfig {
     LogLevel default_log_level_{LogLevel::kInfo};
-    bool default_use_new_catalog_{false};
+    bool default_use_new_catalog_{true};
     bool default_log_to_stdout_{false};
     String default_log_dir_ = "/var/infinity/log";
     String default_catalog_dir_ = "/var/infinity/catalog";

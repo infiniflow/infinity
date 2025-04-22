@@ -61,7 +61,6 @@ void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_z
     parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
 }
 
-
 Status Config::ParseByteSize(const String &byte_size_str, i64 &byte_size) {
 
     HashMap<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
@@ -386,7 +385,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // Use new catalog
-        bool use_new_catalog = false;
+        bool use_new_catalog = true;
         if (default_config != nullptr) {
             use_new_catalog = default_config->default_use_new_catalog_;
         }
@@ -661,6 +660,14 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
         UniquePtr<StringOption> resource_dir_option = MakeUnique<StringOption>("resource_dir", resource_dir);
         status = global_options_.AddOption(std::move(resource_dir_option));
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Replay WAL
+        bool replay_wal = true;
+        UniquePtr<BooleanOption> replay_wal_option = MakeUnique<BooleanOption>(REPLAY_WAL_OPTION_NAME, replay_wal);
+        status = global_options_.AddOption(std::move(replay_wal_option));
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -1544,14 +1551,13 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     switch (option_index) {
                         case GlobalOptionIndex::kUseNewCatalog: {
                             // Use new catalog
-                            bool use_new_catalog = false;
+                            bool use_new_catalog = true;
                             if (elem.second.is_boolean()) {
                                 use_new_catalog = elem.second.value_or(use_new_catalog);
                             } else {
                                 return Status::InvalidConfig("'use_new_catalog' field isn't boolean.");
                             }
-                            UniquePtr<BooleanOption> use_new_catalog_option =
-                                MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+                            UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
                             Status status = global_options_.AddOption(std::move(use_new_catalog_option));
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
@@ -1944,7 +1950,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kUseNewCatalog) == nullptr) {
                     // Use new catalog
-                    bool use_new_catalog = false;
+                    bool use_new_catalog = true;
                     UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
                     Status status = global_options_.AddOption(std::move(use_new_catalog_option));
                     if (!status.ok()) {
@@ -3017,7 +3023,6 @@ void Config::SetTimeZone(const String &value) {
     return;
 }
 
-
 void Config::SetTimeZoneBias(i64 bias) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias);
@@ -3029,7 +3034,6 @@ void Config::SetTimeZoneBias(i64 bias) {
     time_zone_bias_option->value_ = bias;
     return;
 }
-
 
 //// Profiler
 // bool enable_profiler() const { return system_option_.enable_profiler; }

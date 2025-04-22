@@ -405,12 +405,18 @@ Status Storage::AdminToWriter() {
             MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
         bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
-        auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-        bg_processor_->Submit(force_ckp_task);
-        force_ckp_task->Wait();
-        txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
+        if (wal_mgr_->IsCheckpointing()) {
+            UnrecoverableError("There is a running checkpoint task at start phase");
+        }
+
+        TxnTimeStamp max_commit_ts{};
+        i64 wal_size{};
+        std::tie(max_commit_ts, wal_size) = wal_mgr_->GetCommitState();
+        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("Checkpoint"), TransactionType::kNewCheckpoint);
         txn->SetReaderAllowed(true);
+        bg_processor_->Submit(checkpoint_task);
+        checkpoint_task->Wait();
         txn_mgr_->CommitTxn(txn);
 
         periodic_trigger_thread_->Start();
