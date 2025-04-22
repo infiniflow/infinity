@@ -98,6 +98,13 @@ export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
 };
 
+export struct ChunkInfoForCreateIndex {
+    String db_id_{};
+    String table_id_{};
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+};
+
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
     // For new txn
@@ -662,6 +669,9 @@ public:
     std::mutex finished_mutex_{};
     std::condition_variable finished_cv_{};
     bool finished_{false};
+
+private:
+    Vector<ChunkInfoForCreateIndex> chunk_infos_; // For cleanup when create index is rollbacked
 };
 
 } // namespace infinity

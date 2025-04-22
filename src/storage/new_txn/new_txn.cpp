@@ -2245,13 +2245,24 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                     return status;
                 }
 
-                status = NewCatalog::CleanTableIndex(*table_index_meta);
+                status = NewCatalog::CleanTableIndex(*table_index_meta, chunk_infos_);
                 if (!status.ok()) {
                     return status;
                 }
 
-                BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-                buffer_mgr->RemoveClean();
+                Vector<String> object_paths;
+                object_paths.reserve(chunk_infos_.size());
+                const String &data_dir = InfinityContext::instance().config()->DataDir();
+                const String &file_dir = *table_index_meta->GetTableIndexDir().get();
+                for (auto &chunk_info : chunk_infos_) {
+                    if (chunk_info.db_id_ == cmd->db_id_ && chunk_info.table_id_ == cmd->table_id_) {
+                        const String object_name = fmt::format("seg{}_chunk{}.idx", chunk_info.segment_id_, chunk_info.chunk_id_);
+                        const String object_path = Path(data_dir) / file_dir / object_name;
+                        object_paths.push_back(object_path);
+                    }
+                }
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+
                 break;
             }
             case WalCommandType::DROP_INDEX: {

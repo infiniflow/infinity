@@ -522,6 +522,25 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
     return Status::OK();
 }
 
+Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Vector<ChunkInfoForCreateIndex> &meta_infos) {
+    for (auto iter = meta_infos.begin(); iter != meta_infos.end(); iter++) {
+        if (table_index_meta.table_meta().db_id_str() == iter->db_id_ && table_index_meta.table_meta().table_id_str() == iter->table_id_) {
+            SegmentIndexMeta segment_index_meta(iter->segment_id_, table_index_meta);
+            Status status = NewCatalog::CleanSegmentIndex(segment_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+
+    Status status = table_index_meta.UninitSet1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 // Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
 //     {
 //         Status status = table_meta.AddSegmentID(segment_id);

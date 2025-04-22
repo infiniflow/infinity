@@ -340,4 +340,16 @@ UniquePtr<BufferObj> BufferManager::MakeBufferObj(UniquePtr<FileWorker> file_wor
     return ret;
 }
 
+void BufferManager::RemoveBufferObjects(const Vector<String> &object_paths) {
+    std::unique_lock lock(w_locker_);
+    size_t erase_object = 0;
+    for (auto &object_path : object_paths) {
+        erase_object = buffer_map_.erase(object_path);
+        if (erase_object != 1) {
+            String error_message = fmt::format("BufferManager::RemoveBufferObjects: object {} not found.", object_path);
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
 } // namespace infinity
