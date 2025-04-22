@@ -646,9 +646,6 @@ TEST_P(TransformMeta, block_column_transform_02) {
             }
         }
     }
-    //     Tuple<SharedPtr<BlockColumnInfo>, Status>
-    // GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
-
     new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
