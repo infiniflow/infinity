@@ -873,7 +873,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingS
     for (SizeT column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
         // step 2.1. check data type
         auto *column_def = (*column_defs)[column_idx].get();
-        ColumnID column_id = column_def->id();
+        // ColumnID column_id = column_def->id();
 
         auto &data_type_ptr = column_def->type();
         bool can_build_min_max_data_filter = data_type_ptr->SupportMinMaxFilter();
@@ -887,7 +887,7 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentMeta *segment_meta, BuildingS
             continue;
         }
         // step 2.2. collect distinct data from blocks and build probabilistic_data_filter for blocks and segment
-        NewBuildFastRoughFilterArg arg(segment_meta, column_id, distinct_keys, distinct_keys_backup, segment_filters);
+        NewBuildFastRoughFilterArg arg(segment_meta, column_idx, distinct_keys, distinct_keys_backup, segment_filters);
         switch (data_type_ptr->type()) {
             case LogicalType::kBoolean: {
                 BuildFilter<BooleanT>(arg, build_min_max_filter, build_bloom_filter);

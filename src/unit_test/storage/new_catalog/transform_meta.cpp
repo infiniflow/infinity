@@ -518,7 +518,7 @@ TEST_P(TransformMeta, block_column_transform_01) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = "/home/inf/Downloads/FULL.2000764.json";
+    String full_ckp_path = "/home/infiniflow/Downloads/FULL.2000764.json";
 
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
@@ -588,7 +588,7 @@ TEST_P(TransformMeta, block_column_transform_02) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = "/home/inf/Downloads/FULL.52.json";
+    String full_ckp_path = "/home/infiniflow/Downloads/FULL.52.json";
 
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);

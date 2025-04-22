@@ -2060,19 +2060,11 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-                //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                //                NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(cmd->db_id_str_, cmd->table_id_str_);
-                //                const AppendState *append_state = txn_table_store->append_state();
-                //                auto build_filter_task = MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_,
-                //                append_state->sealed_segments_); bg_processor->Submit(build_filter_task);
+                // auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::IMPORT: {
-                //                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                //                auto build_filter_task =
-                //                    MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_,
-                //                    Vector<SegmentID>({cmd->segment_info_.segment_id_}));
-                //                bg_processor->Submit(build_filter_task);
+                // auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DELETE: {
@@ -2131,13 +2123,7 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::COMPACT: {
-                //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                //                Vector<SegmentID> segment_ids;
-                //                for (const auto &segment_info : cmd->new_segment_infos_) {
-                //                    segment_ids.push_back(segment_info.segment_id_);
-                //                }
-                //                auto build_filter_task = MakeShared<BGBuildFastRoughFilterTask>(cmd->db_name_, cmd->table_name_,
-                //                std::move(segment_ids)); bg_processor->Submit(build_filter_task);
+                // auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 break;
             }
             default: {

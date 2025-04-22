@@ -59,7 +59,11 @@ public:
 
     static constexpr const char *NEW_CONFIG_PATH = "test/data/config/test_new.toml";
 
-    static constexpr const char *NEW_VFS_OFF_CONFIG_PATH = "test/data/config/test_vfs_off_new.toml";
+    static constexpr const char *NEW_VFS_OFF_CONFIG_PATH = "test/data/config/test_new_vfs_off.toml";
+
+    static constexpr const char *NEW_BG_ON_CONFIG_PATH = "test/data/config/test_new_bg_on.toml";
+
+    static constexpr const char *NEW_VFS_OFF_BG_ON_CONFIG_PATH = "test/data/config/test_new_vfs_off_bg_on.toml";
 
     static constexpr const char *NEW_CONFIG_NOWAL_PATH = "test/data/config/test_new_nowal.toml";
 
