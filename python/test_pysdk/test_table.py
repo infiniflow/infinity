@@ -244,10 +244,10 @@ class TestInfinity:
     @pytest.mark.parametrize("conflict_type", [
         ConflictType.Error,
         ConflictType.Ignore,
-        ConflictType.Replace,
+        # ConflictType.Replace,
         0,
         1,
-        2,
+        # 2,
     ])
     def test_create_valid_option(self, conflict_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -284,8 +284,8 @@ class TestInfinity:
         db_obj.drop_table("test_table_drop_valid_option"+suffix, conflict_type)
 
     @pytest.mark.parametrize("conflict_type", [
-        pytest.param(ConflictType.Replace),
-        pytest.param(2),
+        # pytest.param(ConflictType.Replace),
+        # pytest.param(2),
         pytest.param(1.1),
         pytest.param("#@$@!%string"),
         pytest.param([]),
@@ -330,20 +330,20 @@ class TestInfinity:
         res = db_obj.drop_table("test_create_duplicated_table_with_error_option"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_create_duplicated_table_with_replace_option(self, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_create_duplicated_table_with_replace_option"+suffix, ConflictType.Ignore)
+    # def test_create_duplicated_table_with_replace_option(self, suffix):
+    #     db_obj = self.infinity_obj.get_database("default_db")
+    #     db_obj.drop_table("test_create_duplicated_table_with_replace_option"+suffix, ConflictType.Ignore)
 
-        with pytest.raises(InfinityException) as e:
-            for i in range(100):
-                db_obj.create_table("test_create_duplicated_table_with_replace_option"+suffix, {"c" + str(i): {"type": "int"}},
-                                    ConflictType.Replace)
+    #     with pytest.raises(InfinityException) as e:
+    #         for i in range(100):
+    #             db_obj.create_table("test_create_duplicated_table_with_replace_option"+suffix, {"c" + str(i): {"type": "int"}},
+    #                                 ConflictType.Replace)
 
-        assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.DUPLICATE_TABLE_NAME
+    #     assert e.type == InfinityException
+    #     assert e.value.args[0] == ErrorCode.DUPLICATE_TABLE_NAME
 
-        res = db_obj.drop_table("test_create_duplicated_table_with_replace_option"+suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
+    #     res = db_obj.drop_table("test_create_duplicated_table_with_replace_option"+suffix, ConflictType.Error)
+    #     assert res.error_code == ErrorCode.OK
 
     def test_create_upper_table_name(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")

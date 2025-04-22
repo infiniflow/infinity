@@ -108,6 +108,8 @@ private:
 
     Optional<TxnTimeStamp> first_delete_ts_;
     SharedPtr<FastRoughFilter> fast_rough_filter_;
+
+    std::mutex mtx_;
 };
 
 } // namespace infinity
