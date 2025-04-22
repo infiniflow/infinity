@@ -143,11 +143,20 @@ public:
     static Status Init(KVStore *kv_store);
 
 private:
-    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance);
-    Status TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json &table_meta_json, String const &db_name);
-    Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json);
-    Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json);
-    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json);
+    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json,
+                                    KVInstance *kv_instance,
+                                    Map<String, String> &id_str_map,
+                                    Set<String> &dir_set,
+                                    const String &db_path);
+    Status TransformCatalogTable(DBMeeta &db_meta,
+                                 const nlohmann::json &table_meta_json,
+                                 String const &db_name,
+                                 Map<String, String> &id_str_map,
+                                 Set<String> &dir_set,
+                                 const String &db_path);
+    Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json, Set<String> &dir_set, const String &db_path);
+    Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json, Set<String> &dir_set, const String &db_path);
+    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json, Set<String> &dir_set);
     Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
     Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
     Status TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance);
@@ -285,6 +294,7 @@ private:
     atomic_bool enable_profile_{false};
 
 public:
+    enum class EntityTag { kDatabase, kTable, kSegment, kBlock, kBlockColumn, kReturn };
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
     static Status MemIndexRecover(NewTxn *txn);
@@ -346,10 +356,8 @@ public:
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
-    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
-                                      NewTxn *new_txn,
-                                      SegmentID segment_id,
-                                      Optional<SegmentIndexMeta> &segment_index_meta);
+    static Status
+    AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
 
@@ -411,6 +419,7 @@ public:
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
 
     static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
-};
 
+    static void PreTransform(const EntityTag &info, const String &path, const Set<String> &dir_path, const String &data_path);
+};
 } // namespace infinity
