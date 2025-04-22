@@ -482,6 +482,76 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
+
+    auto append_line = [&](const Value &v) {
+        Span<char> embedding = v.GetEmbedding();
+
+        if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+            ++file_no_;
+            String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+            auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
+            if (!new_status.ok()) {
+                RecoverableError(new_status);
+            }
+            file_handle = std::move(new_file_handle);
+        }
+
+        file_handle->Append(&dimension, sizeof(dimension));
+        file_handle->Append(embedding.data(), embedding.size_bytes());
+
+        ++row_count;
+    };
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        TxnTimeStamp begin_ts = new_txn->BeginTS();
+        Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
+        LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
+        for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
+            SizeT block_count = segment_snapshot.block_map_.size();
+            LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
+            for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
+                LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
+                BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+
+                auto [block_row_count, status] = block_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+                ColumnMeta column_meta(exported_column_idx, *block_meta);
+                ColumnVector exported_column_vector;
+                status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, exported_column_vector);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+
+                Bitmask bitmask(block_row_count);
+                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+                for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+                    if (!bitmask.IsTrue(row_idx)) {
+                        continue;
+                    }
+                    if (offset > 0) {
+                        --offset;
+                        continue;
+                    }
+                    Value v = exported_column_vector.GetValue(row_idx);
+                    append_line(v);
+                    if (limit_ != 0 && row_count == limit_) {
+                        goto new_label_return;
+                    }
+                }
+            }
+        }
+    new_label_return:
+        LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
+        return row_count;
+    }
+
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Txn *txn = query_context->GetTxn();
@@ -513,22 +583,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
                 }
 
                 Value v = exported_column_vector.GetValue(row_idx);
-                Span<char> embedding = v.GetEmbedding();
-
-                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++file_no_;
-                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
-                    if (!new_status.ok()) {
-                        RecoverableError(new_status);
-                    }
-                    file_handle = std::move(new_file_handle);
-                }
-
-                file_handle->Append(&dimension, sizeof(dimension));
-                file_handle->Append(embedding.data(), embedding.size_bytes());
-
-                ++row_count;
+                append_line(v);
                 if (limit_ != 0 && row_count == limit_) {
                     goto label_return;
                 }

@@ -1676,24 +1676,6 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
-    const String &db_id_str = drop_index_cmd->db_id_;
-    const String &table_id_str = drop_index_cmd->table_id_;
-    const String &index_id_str = drop_index_cmd->index_id_;
-    const String &index_key = drop_index_cmd->index_key_;
-
-    // delete index key
-    Status status = kv_instance_->Delete(index_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str));
-
-    return Status::OK();
-}
-
 Status NewTxn::CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd) {
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);

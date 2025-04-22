@@ -1806,6 +1806,36 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     return Status::OK();
 }
 
+Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    const String &db_id_str = drop_index_cmd->db_id_;
+    const String &table_id_str = drop_index_cmd->table_id_;
+    const String &index_id_str = drop_index_cmd->index_id_;
+    const String &index_key = drop_index_cmd->index_key_;
+
+    // delete index key
+    Status status = kv_instance_->Delete(index_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str));
+
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
+    TableIndexMeeta table_index_meta(index_id_str, table_meta);
+    SharedPtr<IndexBase> index_base;
+    std::tie(index_base, status) = table_index_meta.GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     const String &db_id_str = dump_index_cmd->db_id_str_;
