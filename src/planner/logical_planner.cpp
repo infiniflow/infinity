@@ -1372,7 +1372,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     ColumnID column_id = 0;
                     std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
                     if (!status.ok()) {
-                        RecoverableError(status);
+                        RecoverableError(Status::ColumnNotExist(column_name));
                     }
                     bool has_index = false;
                     status = NewCatalog::CheckColumnIfIndexed(*table_meta, column_id, has_index);

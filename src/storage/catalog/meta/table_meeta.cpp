@@ -33,6 +33,7 @@ import storage;
 import new_catalog;
 import table_index_meeta;
 import create_index_info;
+import segment_meta;
 
 namespace infinity {
 
@@ -400,6 +401,43 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
 
     return Status::OK();
 }
+
+Status TableMeeta::GetTableDetail(TableDetail &table_detail, const String &db_name, const String &table_name) {
+    TableInfo table_info;
+    Status status = GetTableInfo(table_info);
+    if (!status.ok()) {
+        return status;
+    }
+    table_detail.db_name_ = MakeShared<String>(db_name);
+    table_detail.table_name_ = MakeShared<String>(table_name);
+    table_detail.table_comment_ = table_info.table_comment_;
+    table_detail.table_entry_type_ = table_info.table_entry_type_;
+    table_detail.column_count_ = table_info.column_count_;
+    table_detail.row_count_ = table_info.row_count_;
+
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    SizeT block_count = 0;
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, *this);
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        block_count += block_ids_ptr->size();
+    }
+    table_detail.block_count_ = block_count;
+    table_detail.block_capacity_ = DEFAULT_BLOCK_CAPACITY;
+    table_detail.segment_count_ = segment_ids_ptr->size();
+    table_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+
+    return Status::OK();
+}
+
 
 Status TableMeeta::AddColumn(const ColumnDef &column_def) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name());

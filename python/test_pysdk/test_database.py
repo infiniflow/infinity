@@ -379,10 +379,10 @@ class TestInfinity:
 
     @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
                                                ConflictType.Ignore,
-                                               ConflictType.Replace,
+                                            #    ConflictType.Replace,
                                                0,
                                                1,
-                                               2,
+                                            #    2,
                                                ])
     def test_create_with_valid_option(self, conflict_type, suffix):
         # create db

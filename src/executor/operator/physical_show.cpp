@@ -844,7 +844,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
         ++column_id;
         {
             // Append database storage directory to the 1 column
-            Value value = Value::MakeVarchar(*database_info->absolute_db_path_);
+            Value value = Value::MakeVarchar(database_info->absolute_db_path_ ? *database_info->absolute_db_path_ : "N/A");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

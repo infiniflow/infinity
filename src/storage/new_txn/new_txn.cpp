@@ -267,7 +267,25 @@ Status NewTxn::ListDatabase(Vector<String> &db_names) {
 Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
     this->CheckTxn(db_name);
 
-    return catalog_->GetTables(db_name, output_table_array, nullptr);
+    Vector<String> table_names;
+    Status status = this->ListTable(db_name, table_names);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &table_name : table_names) {
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        output_table_array.push_back(TableDetail{});
+        status = table_meta->GetTableDetail(output_table_array.back(), db_name, table_name);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
@@ -1680,24 +1698,6 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
             return status;
         }
     }
-    return Status::OK();
-}
-
-Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
-    const String &db_id_str = drop_index_cmd->db_id_;
-    const String &table_id_str = drop_index_cmd->table_id_;
-    const String &index_id_str = drop_index_cmd->index_id_;
-    const String &index_key = drop_index_cmd->index_key_;
-
-    // delete index key
-    Status status = kv_instance_->Delete(index_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str));
-
     return Status::OK();
 }
 
