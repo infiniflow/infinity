@@ -40,19 +40,26 @@ void MemIndex::ClearMemIndex() {
     memory_bmp_index_.reset();
 }
 
-BaseMemIndex *MemIndex::GetBaseMemIndex() {
+BaseMemIndex *MemIndex::GetBaseMemIndex(const MemIndexID &mem_index_id) {
+    BaseMemIndex *res = nullptr;
     if (memory_hnsw_index_.get() != nullptr) {
-        return static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
+        res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
     } else if (memory_ivf_index_.get() != nullptr) {
-        return static_cast<BaseMemIndex *>(memory_ivf_index_.get());
+        res = static_cast<BaseMemIndex *>(memory_ivf_index_.get());
     } else if (memory_indexer_.get() != nullptr) {
-        return static_cast<BaseMemIndex *>(memory_indexer_.get());
+        res = static_cast<BaseMemIndex *>(memory_indexer_.get());
     } else if (memory_secondary_index_.get() != nullptr) {
-        return static_cast<BaseMemIndex *>(memory_secondary_index_.get());
+        res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
-        return static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+        res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else {
+        return nullptr;
     }
-    return nullptr;
+    res->db_name_ = mem_index_id.db_name_;
+    res->table_name_ = mem_index_id.table_name_;
+    res->index_name_ = mem_index_id.index_name_;
+    res->segment_id_ = mem_index_id.segment_id_;
+    return res;
 }
 
 } // namespace infinity

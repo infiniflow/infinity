@@ -28,6 +28,7 @@ class Txn;
 struct Catalog;
 class TxnManager;
 class DumpIndexTask;
+class NewTxn;
 
 export struct MemIndexTracerInfo {
 public:
@@ -63,6 +64,8 @@ public:
 
     Vector<BaseMemIndex *> GetUndumpedMemIndexes(Txn *txn);
 
+    Vector<BaseMemIndex *> GetUndumpedMemIndexes(NewTxn *new_txn);
+
     virtual void TriggerDump(UniquePtr<DumpIndexTask> task) = 0;
 
     SizeT cur_index_memory() const { return cur_index_memory_.load(); }
@@ -71,6 +74,8 @@ protected:
     virtual Txn *GetTxn() = 0;
 
     virtual Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) = 0;
+
+    virtual Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) = 0;
 
     using MemIndexMapIter = HashSet<BaseMemIndex *>::iterator;
 
@@ -114,6 +119,8 @@ protected:
     Txn *GetTxn() override;
 
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override;
+
+    Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override;
 
 private:
     Catalog *catalog_;

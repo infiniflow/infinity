@@ -224,6 +224,7 @@ public:
 export class DumpIndexTask final : public BGTask {
 public:
     DumpIndexTask(BaseMemIndex *mem_index, Txn *txn);
+    DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn);
 
     ~DumpIndexTask() override = default;
 
@@ -232,6 +233,7 @@ public:
 public:
     BaseMemIndex *mem_index_{};
     Txn *txn_{};
+    NewTxn *new_txn_{};
 };
 
 export class DumpIndexBylineTask final : public BGTask {

@@ -145,13 +145,17 @@ private:
 };
 
 MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
+    const auto row_cnt = GetRowCount();
+    const auto mem = MemoryCostOfThis() + row_cnt * MemoryCostOfEachRow();
+    if (segment_index_entry_ == nullptr) {
+        return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem, row_cnt);
+    }
+
     auto *table_index_entry = segment_index_entry_->table_index_entry();
     SharedPtr<String> index_name = table_index_entry->GetIndexName();
     auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
     SharedPtr<String> table_name = table_entry->GetTableName();
     SharedPtr<String> db_name = table_entry->GetDBName();
-    const auto row_cnt = GetRowCount();
-    const auto mem = MemoryCostOfThis() + row_cnt * MemoryCostOfEachRow();
     return MemIndexTracerInfo(std::move(index_name), std::move(table_name), std::move(db_name), mem, row_cnt);
 }
 

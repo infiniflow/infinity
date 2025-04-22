@@ -28,12 +28,19 @@ class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
 
+export struct MemIndexID {
+    String db_name_;
+    String table_name_;
+    String index_name_;
+    SegmentID segment_id_ = 0;
+};
+
 export struct MemIndex {
     ~MemIndex();
 
     void ClearMemIndex();
 
-    BaseMemIndex *GetBaseMemIndex();
+    BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
 
     std::mutex mtx_; // Used by append / mem index dump / clear
 

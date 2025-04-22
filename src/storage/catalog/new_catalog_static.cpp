@@ -360,8 +360,11 @@ Status NewCatalog::MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts
     return Status::OK();
 }
 
-Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<SharedPtr<MemIndex>> &mem_indexes) {
-    auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta) {
+Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance,
+                                    TxnTimeStamp begin_ts,
+                                    Vector<SharedPtr<MemIndex>> &mem_indexes,
+                                    Vector<MemIndexID> &mem_index_ids) {
+    auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta, const String &db_name, const String &table_name, const String &index_name) {
         auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
             return status;
@@ -376,48 +379,58 @@ Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_
             }
 
             mem_indexes.push_back(mem_index);
+            mem_index_ids.push_back(MemIndexID{db_name, table_name, index_name, segment_id});
         }
         return Status::OK();
     };
-    auto TraverseTable = [&](TableMeeta &table_meta) {
+    auto TraverseTable = [&](TableMeeta &table_meta, const String &db_name, const String &table_name) {
         Vector<String> *index_id_strs_ptr = nullptr;
-        Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        Vector<String> *index_names_ptr = nullptr;
+        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const String &index_id_str : *index_id_strs_ptr) {
+        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const String &index_id_str = (*index_id_strs_ptr)[i];
+            const String &index_name = (*index_names_ptr)[i];
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
-            status = TraverseTableIndex(table_index_meta);
+            status = TraverseTableIndex(table_index_meta, db_name, table_name, index_name);
             if (!status.ok()) {
                 return status;
             }
         }
         return Status::OK();
     };
-    auto TraverseDB = [&](DBMeeta &db_meta) {
+    auto TraverseDB = [&](DBMeeta &db_meta, const String &db_name) {
         Vector<String> *table_id_strs_ptr = nullptr;
-        Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+        Vector<String> *table_names_ptr = nullptr;
+        Status status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
         if (!status.ok()) {
             return status;
         }
-        for (const String &table_id_str : *table_id_strs_ptr) {
+        for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
+            const String &table_id_str = (*table_id_strs_ptr)[i];
+            const String &table_name = (*table_names_ptr)[i];
             TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
-            status = TraverseTable(table_meta);
+            status = TraverseTable(table_meta, db_name, table_name);
             if (!status.ok()) {
                 return status;
             }
         }
         return Status::OK();
     };
-    Vector<String> *db_id_strs_ptr;
+    Vector<String> *db_id_strs_ptr = nullptr;
+    Vector<String> *db_names_ptr = nullptr;
     CatalogMeta catalog_meta(*kv_instance);
-    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const String &db_id_str : *db_id_strs_ptr) {
+    for (SizeT i = 0; i < db_id_strs_ptr->size(); ++i) {
+        const String &db_id_str = (*db_id_strs_ptr)[i];
+        const String &db_name = (*db_names_ptr)[i];
         DBMeeta db_meta(db_id_str, *kv_instance);
-        Status status = TraverseDB(db_meta);
+        Status status = TraverseDB(db_meta, db_name);
         if (!status.ok()) {
             return status;
         }

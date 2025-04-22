@@ -494,12 +494,6 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
 TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
 MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
-    auto *table_index_entry = segment_index_entry_->table_index_entry();
-    SharedPtr<String> index_name = table_index_entry->GetIndexName();
-    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-    SharedPtr<String> table_name = table_entry->GetTableName();
-    SharedPtr<String> db_name = table_entry->GetDBName();
-
     auto [mem_used, row_cnt] = std::visit(
         [](auto &&index) -> Pair<SizeT, SizeT> {
             using T = std::decay_t<decltype(index)>;
@@ -510,6 +504,16 @@ MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
             }
         },
         hnsw_);
+
+    if (segment_index_entry_ == nullptr) {
+        return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem_used, row_cnt);
+    }
+
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
     return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
 }
 

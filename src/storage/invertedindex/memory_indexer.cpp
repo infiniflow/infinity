@@ -469,6 +469,14 @@ void MemoryIndexer::Reset() {
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
+    if (segment_index_entry_ == nullptr) {
+        return MemIndexTracerInfo(MakeShared<String>(index_name_),
+                                  MakeShared<String>(table_name_),
+                                  MakeShared<String>(db_name_),
+                                  MemUsed(),
+                                  doc_count_);
+    }
+
     auto *table_index_entry = segment_index_entry_->table_index_entry();
     SharedPtr<String> index_name = table_index_entry->GetIndexName();
     auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();

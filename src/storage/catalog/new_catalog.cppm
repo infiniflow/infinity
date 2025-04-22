@@ -52,6 +52,7 @@ struct WalSegmentInfo;
 struct WalBlockInfo;
 struct WalChunkIndexInfo;
 class Config;
+struct MemIndexID;
 
 enum class ColumnVectorTipe;
 
@@ -291,6 +292,9 @@ public:
 
     static Status MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
+    static Status
+    GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
+
     static Status IncrLatestID(KVInstance *kv_instance, String &id_str, std::string_view id_name);
 
     static Status AddNewDB(KVInstance *kv_instance,
@@ -346,10 +350,8 @@ public:
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
-    static Status AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
-                                      NewTxn *new_txn,
-                                      SegmentID segment_id,
-                                      Optional<SegmentIndexMeta> &segment_index_meta);
+    static Status
+    AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
 

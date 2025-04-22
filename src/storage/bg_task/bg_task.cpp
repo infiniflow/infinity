@@ -86,6 +86,9 @@ NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_nam
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}
 
+DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn)
+    : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_(new_txn) {}
+
 DumpIndexBylineTask::DumpIndexBylineTask(SharedPtr<String> db_name,
                                          SharedPtr<String> table_name,
                                          SharedPtr<String> index_name,

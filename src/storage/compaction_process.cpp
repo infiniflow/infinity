@@ -317,9 +317,33 @@ void CompactionProcessor::NewScanAndOptimize() {
 }
 
 void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
-    Txn *dump_txn = dump_task->txn_;
-    BaseMemIndex *mem_index = dump_task->mem_index_;
     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+
+    Txn *dump_txn = dump_task->txn_;
+    if (!dump_txn) {
+        auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+
+        NewTxn *new_txn = dump_task->new_txn_;
+        const String &db_name = dump_task->mem_index_->db_name_;
+        const String &table_name = dump_task->mem_index_->table_name_;
+        const String &index_name = dump_task->mem_index_->index_name_;
+        SegmentID segment_id = dump_task->mem_index_->segment_id_;
+        
+        Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
+        if (status.ok()) {
+            status = new_txn_mgr->CommitTxn(new_txn);
+        }
+        if (!status.ok()) {
+            Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+            if (!rollback_status.ok()) {
+                UnrecoverableError(rollback_status.message());
+            }
+        }
+
+        return;
+    }
+
+    BaseMemIndex *mem_index = dump_task->mem_index_;
     try {
         TableIndexEntry *table_index_entry = mem_index->table_index_entry();
         auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
