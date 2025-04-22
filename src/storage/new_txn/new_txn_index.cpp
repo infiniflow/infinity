@@ -1467,6 +1467,10 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
         if (!status.ok()) {
             return status;
         }
+
+        chunk_infos_.push_back(
+            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), chunk_id});
+
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
             return status;
