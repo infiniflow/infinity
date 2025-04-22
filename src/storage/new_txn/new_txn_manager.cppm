@@ -43,6 +43,8 @@ public:
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
 
+    bool SetTxnCheckpoint(NewTxn *txn);
+
     NewTxn *GetTxn(TransactionID txn_id) const;
 
     TxnState GetTxnState(TransactionID txn_id) const;

@@ -31,6 +31,8 @@ import third_party;
 import status;
 import infinity_context;
 import background_process;
+import new_txn;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -80,9 +82,16 @@ void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *opera
     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-    checkpoint_task->new_txn_ = query_context->GetNewTxn();
+    NewTxn *new_txn = query_context->GetNewTxn();
+    checkpoint_task->new_txn_ = new_txn;
+
+    bool set_success = new_txn->txn_mgr()->SetTxnCheckpoint(new_txn);
+    if (!set_success) {
+        return;
+    }
+
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-    bg_processor->Submit(std::move(checkpoint_task));
+    bg_processor->Submit(checkpoint_task);
     checkpoint_task->Wait();
     return;
 }

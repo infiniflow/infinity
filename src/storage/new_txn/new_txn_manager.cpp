@@ -153,6 +153,23 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     return recovery_txn;
 }
 
+bool NewTxnManager::SetTxnCheckpoint(NewTxn *txn) {
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    std::lock_guard guard(locker_);
+
+    if (ckp_begin_ts_ == UNCOMMIT_TS) {
+        LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
+        ckp_begin_ts_ = begin_ts;
+    } else {
+        LOG_WARN(
+            fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn", ckp_begin_ts_, begin_ts));
+        return false;
+    }
+    txn->txn_context()->txn_type_ = TransactionType::kNewCheckpoint;
+
+    return true;
+}
+
 NewTxn *NewTxnManager::GetTxn(TransactionID txn_id) const {
     std::lock_guard guard(locker_);
     NewTxn *res = txn_map_.at(txn_id).get();
