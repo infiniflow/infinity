@@ -93,6 +93,8 @@ export struct SegmentUpdateTS {
     TxnTimeStamp ts_{0};
 };
 
+struct ChunkInfoForCreateIndex;
+
 export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
@@ -316,6 +318,7 @@ public:
                             Optional<TableIndexMeeta> &table_index_meta);
 
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta);
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, const Vector<ChunkInfoForCreateIndex> &meta_infos);
 
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 

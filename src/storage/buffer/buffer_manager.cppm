@@ -85,6 +85,8 @@ public:
 
     void RemoveClean();
 
+    void RemoveBufferObjects(const Vector<String> &object_paths);
+
     Vector<BufferObjectInfo> GetBufferObjectsInfo();
 
     inline PersistenceManager *persistence_manager() const { return persistence_manager_; }

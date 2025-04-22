@@ -145,7 +145,7 @@ Status TableIndexMeeta::AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn
 
 Status TableIndexMeeta::RemoveSegmentIndexIDs(const Vector<SegmentID> &segment_ids) {
 
-    for(SegmentID segment_id: segment_ids) {
+    for (SegmentID segment_id : segment_ids) {
         String segment_id_key = KeyEncode::CatalogIdxSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, segment_id);
         Status status = kv_instance_.Delete(segment_id_key);
         if (!status.ok()) {
