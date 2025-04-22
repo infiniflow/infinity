@@ -140,6 +140,8 @@ private:
 
     static void CSVRowHandler(void *);
 
+    static void NewCSVHeaderHandler(void *);
+
     static void NewCSVRowHandler(void *);
 
     void JSONLRowHandler(const nlohmann::json &line_json, Vector<SharedPtr<ColumnVector>> &column_vectors);

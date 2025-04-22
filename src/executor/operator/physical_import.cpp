@@ -150,6 +150,7 @@ public:
 
 public:
     ZsvParser parser_;
+    SharedPtr<String> err_msg_;
 };
 
 void PhysicalImport::Init(QueryContext *query_context) {}
@@ -941,13 +942,17 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
     if (!fp) {
         UnrecoverableError(strerror(errno));
     }
-    DeferFn defer_op([&]() { fclose(fp); });
+    DeferFn defer_op([&]() {
+        if (fp) {
+            fclose(fp);
+        }
+    });
 
     auto parser_context = MakeUnique<NewZxvParserCtx>(table_info_->column_defs_);
 
     auto opts = MakeUnique<ZsvOpts>();
     if (header_) {
-        UnrecoverableError("Unimplemented");
+        opts->row_handler = NewCSVHeaderHandler;
     } else {
         opts->row_handler = NewCSVRowHandler;
     }
@@ -965,6 +970,15 @@ void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorSta
     parser_context->parser_.Finish();
 
     data_blocks = std::move(*parser_context).Finalize();
+
+    if (csv_parser_status != zsv_status_no_more_input) {
+        if (parser_context->err_msg_.get() != nullptr) {
+            UnrecoverableError(*parser_context->err_msg_);
+        } else {
+            String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
+            UnrecoverableError(err_msg);
+        }
+    }
 
     import_op_state->result_msg_ = MakeUnique<String>(fmt::format("IMPORT {} Rows", parser_context->row_count()));
 }
@@ -1353,6 +1367,35 @@ void PhysicalImport::CSVRowHandler(void *context) {
 
     // set parser context
     parser_context->block_entry_ = std::move(block_entry);
+}
+
+void PhysicalImport::NewCSVHeaderHandler(void *context_raw_ptr) {
+    auto *parser_context = static_cast<NewZxvParserCtx *>(context_raw_ptr);
+    ZsvParser &parser = parser_context->parser_;
+    SizeT csv_column_count = parser.CellCount();
+
+    SizeT table_column_count = parser_context->column_count();
+    if (csv_column_count != table_column_count) {
+        parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
+
+        parser.Abort(); // return zsv_status_cancelled
+        return;
+    }
+
+    // Not check the header column name
+    for (SizeT idx = 0; idx < csv_column_count; ++idx) {
+        auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
+        const char *table_col_name = parser_context->GetColumnDef(idx)->name().c_str();
+        if (!strcmp(csv_col_name, table_col_name)) {
+            parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
+
+            parser.Abort(); // return zsv_status_cancelled
+            return;
+        }
+    }
+
+    // This is header, doesn't count in row number
+    parser.SetRowHandler(NewCSVRowHandler);
 }
 
 void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
