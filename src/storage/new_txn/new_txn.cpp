@@ -183,7 +183,8 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
             return Status::OK();
         }
         return Status(ErrorCode::kDuplicateDatabaseName, MakeUnique<String>(fmt::format("Database: {} already exists", db_name)));
-    } else if (status.code() != ErrorCode::kDBNotExist) {
+    }
+    if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
 

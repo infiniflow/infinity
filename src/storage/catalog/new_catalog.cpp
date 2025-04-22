@@ -53,6 +53,9 @@ import kv_code;
 import config;
 import create_index_info;
 import statement_common;
+import virtual_store;
+import logger;
+import utility;
 
 namespace infinity {
 
@@ -84,64 +87,32 @@ Status NewCatalog::Init(KVStore *kv_store) {
     return Status::OK();
 }
 
-void NewCatalog::PreTransform(const EntityTag &info, const String &path, const Set<String> &dir_path, const String &data_path) {
-    // std::cout << "path: " << path << '\n';
-    auto relative_path = std::filesystem::relative(path, data_path);
-    // std::cout << "relative_path: " << relative_path.string() << '\n';
-    if (!dir_path.contains(relative_path)) {
-        fmt::print("[WRONG]: Deleting \"{}\" because the file/folder is not a valid entity. You can find it in the old data dir.\n", path);
-        std::filesystem::remove_all(path);
-        return;
-    }
-    switch (info) {
-        case EntityTag::kDatabase:
-            for (const auto &entry : std::filesystem::directory_iterator{path}) {
-                PreTransform(EntityTag::kTable, entry.path().string(), dir_path, data_path);
-            }
-            break;
-        case EntityTag::kTable:
-            for (const auto &entry : std::filesystem::directory_iterator{path}) {
-                PreTransform(EntityTag::kSegment, entry.path().string(), dir_path, data_path);
-            }
-            break;
-        case EntityTag::kSegment:
-            for (const auto &entry : std::filesystem::directory_iterator{path}) {
-                PreTransform(EntityTag::kBlock, entry.path().string(), dir_path, data_path);
-            }
-            break;
-        case EntityTag::kBlock:
-            for (const auto &entry : std::filesystem::directory_iterator{path}) {
-                PreTransform(EntityTag::kBlockColumn, entry.path().string(), dir_path, data_path);
-            }
-            break;
-        case EntityTag::kBlockColumn:
-            for (const auto &entry : std::filesystem::directory_iterator{path}) {
-                PreTransform(EntityTag::kReturn, entry.path().string(), dir_path, data_path);
-            }
-            break;
-        case EntityTag::kReturn:
-            return;
-        default:
-            throw std::invalid_argument("Invalid info");
-    }
-}
-
 Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
     // Read full checkpoint file
+    String value;
+    Status status = kv_store_->Get(LATEST_DATABASE_ID.data(), value);
+    if (status.ok()) {
+        return status;
+    }
+    if (status.code() != ErrorCode::kNotFound) {
+        UnrecoverableError("Get element from kv failed.");
+    }
+
     UniquePtr<nlohmann::json> full_ckp_json = Catalog::LoadFullCheckpointToJson(config_ptr, full_ckp_path);
-    Status status = NewCatalog::Init(kv_store_);
+    status = NewCatalog::Init(kv_store_);
     if (!status.ok()) {
         return status;
     }
 
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
-    Map<String, String> id_str_map;
+
+    Map<String, String> dbname_to_idstr;
     Set<String> dir_set;
     dir_set.insert(".");
     auto data_path = config_ptr->DataDir();
     if (full_ckp_json->contains("databases")) {
         for (const auto &db_json : (*full_ckp_json)["databases"]) {
-            status = TransformCatalogDatabase(db_json, kv_instance.get(), id_str_map, dir_set, data_path);
+            status = TransformCatalogDatabase(db_json, kv_instance.get(), dbname_to_idstr, dir_set, data_path);
             if (!status.ok()) {
                 return status;
             }
@@ -153,146 +124,91 @@ Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_p
         UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_path);
     }
 
-    auto partition = [](const String &text, char delimiter) {
-        Vector<String> parts;
-        String tmp_str;
-        for (auto c : text) {
-            if (c == '/') {
-                parts.emplace_back(tmp_str);
-                tmp_str.clear();
-                continue;
-            }
-            tmp_str += c;
-        }
-        parts.emplace_back(tmp_str);
-        return parts;
+    constexpr SizeT db_prefix_len = 14;    // XXXXXXXXXX_db_
+    constexpr SizeT table_prefix_len = 17; // XXXXXXXXXX_table_
+
+    auto path_tuple_getter = [](const std::filesystem::directory_entry &entry) {
+        auto path = entry.path().string();
+        auto path_prefix = path.substr(0, path.find_last_of('/') + 1);
+        auto path_suffix = path.substr(path.find_last_of('/') + 1);
+        return std::make_tuple(path, path_prefix, path_suffix);
     };
 
-    const int db_prefix_len = 14;    // XXXXXXXXXX_db_
-    const int table_prefix_len = 17; // XXXXXXXXXX_table_
+    if (!(!full_ckp_json->contains("obj_addr_map") || !(*full_ckp_json)["obj_addr_map"].contains("obj_addr_size"))) {
+        for (auto &obj_addr_json : (*full_ckp_json)["obj_addr_map"]["obj_addr_array"]) {
+            String path_key = obj_addr_json["local_path"];
 
-    for (auto &some : (*full_ckp_json)["obj_addr_map"]["obj_addr_array"]) {
-        String path_key = some["local_path"];
+            auto path_names = infinity::Partition(std::move(path_key), '/');
 
-        auto somes = partition(std::move(path_key), '/');
+            auto &database_str = path_names[0];
+            auto &table_str = path_names[1];
 
-        auto &database_str = somes[0];
-        auto &table_str = somes[1];
+            auto database_name = database_str.substr(db_prefix_len);
 
-        auto database_name = database_str.substr(db_prefix_len);
-
-        auto database_id_str = id_str_map[database_name];
-        if (!status.ok()) {
-            return status;
-        }
-
-        auto table_name = table_str.substr(table_prefix_len);
-        auto table_id_str = id_str_map[fmt::format("{}.{}", database_name, table_name)];
-
-        database_str = fmt::format("db_{}", database_id_str);
-        table_str = fmt::format("tbl_{}", table_id_str);
-
-        auto concat = [](const Vector<String> &v) {
-            String ret;
-            for (const auto &s : v) {
-                ret += (s + "/");
+            auto database_id_str = dbname_to_idstr[database_name];
+            if (!status.ok()) {
+                return status;
             }
-            ret.pop_back();
-            return ret;
-        };
 
-        auto some_str = concat(somes);
-        auto some_key = KeyEncode::PMObjectPathKey(some_str);
-        nlohmann::json &some_json = some["obj_addr"];
-        kv_instance->Put(some_key, some_json.dump());
-        if (!status.ok()) {
-            return status;
-        }
-    }
+            auto table_name = table_str.substr(table_prefix_len);
+            auto db_name_and_table_name = fmt::format("{}.{}", database_name, table_name);
+            auto table_id_str = dbname_to_idstr[db_name_and_table_name];
 
-    status = kv_instance->Commit();
-    if (!status.ok()) {
-        return status;
-    }
+            database_str = fmt::format("db_{}", database_id_str);
+            table_str = fmt::format("tbl_{}", table_id_str);
 
-    // Rename the old meta filename
-    auto TransformData = [&] {
-        auto IsTransformed = [&] {
-            String value;
-            Status status = kv_instance->Get(LATEST_DATABASE_ID.data(), value);
-            if (status.code() == ErrorCode::kNotFound) {
-                return false;
+            auto obj_addr_str = infinity::Concat(path_names, '/');
+            auto ob_addr_key = KeyEncode::PMObjectPathKey(obj_addr_str);
+            kv_instance->Put(ob_addr_key, obj_addr_json["obj_addr"].dump());
+            if (!status.ok()) {
+                return status;
             }
-            if (status.ok()) {
-                return true;
-            }
-            throw std::runtime_error{"Get element from kv failed."};
-        };
-
-        kv_instance = kv_store_->GetInstance();
-        if (IsTransformed()) {
-            return;
         }
-        kv_instance->Commit();
-        if (!status.ok()) {
-            throw std::runtime_error{"KV instance commit failed."};
-        }
-
-        PreTransform(EntityTag::kDatabase, data_path, dir_set, data_path);
-
-        String old_prefix = fmt::format("{}/../old_data", data_path);
-        if (std::filesystem::exists(old_prefix)) {
-            std::filesystem::remove_all(old_prefix);
-        }
-        std::filesystem::create_directory(old_prefix);
-        const auto options = std::filesystem::copy_options::recursive;
-        std::filesystem::copy(data_path, old_prefix, options);
-        for (auto const &db_entry : std::filesystem::directory_iterator{data_path}) {
-            String db_path = db_entry.path().string();
-            String db_path_prefix = db_path.substr(0, db_path.find_last_of('/') + 1);
-            String db_path_suffix = db_path.substr(db_path.find_last_of('/') + 1);
-            if (db_path_suffix == "catalog") {
+    } else if (!full_ckp_json->contains("obj_addr_map") || !(*full_ckp_json)["obj_addr_map"].contains("obj_addr_size")) {
+        for (const auto &db_entry : std::filesystem::directory_iterator{data_path}) {
+            auto [db_path, db_path_prefix, db_path_suffix] = path_tuple_getter(db_entry);
+            if (db_path_suffix == "catalog" || !dir_set.contains(db_path_suffix)) {
+                LOG_WARN(fmt::format("\"{}\" may be a trash dir. Considering to delete it.", db_path));
                 continue;
             }
             String db_name = db_path_suffix.substr(db_prefix_len);
-            for (auto const &table_entry : std::filesystem::directory_iterator{db_path}) {
-                String table_path = table_entry.path();
-                String table_path_prefix = table_path.substr(0, table_path.find_last_of('/') + 1);
-                String table_path_suffix = table_path.substr(table_path.find_last_of('/') + 1);
-                String table_name = table_path_suffix.substr(table_prefix_len);
+            for (const auto &table_entry : std::filesystem::directory_iterator{db_path}) {
+                auto [table_path, table_path_prefix, table_path_suffix] = path_tuple_getter(table_entry);
+                auto db_path_suffix_and_table_path_suffix = fmt::format("{}/{}", db_path_suffix, table_path_suffix);
+                if (!dir_set.contains(db_path_suffix_and_table_path_suffix)) {
+                    LOG_WARN(fmt::format("\"{}\" may be a trash dir. Considering to delete it.", table_path));
+                    continue;
+                }
+                auto table_name = table_path_suffix.substr(table_prefix_len);
 
-                auto table_id_str = id_str_map[fmt::format("{}.{}", db_name, table_name)];
+                auto db_name_and_table_name = fmt::format("{}.{}", db_name, table_name);
+                auto table_id_str = dbname_to_idstr[db_name_and_table_name];
                 auto new_table_path_suffix = fmt::format("tbl_{}", table_id_str);
-                std::filesystem::rename(table_path, table_path_prefix + new_table_path_suffix);
+                auto new_table_path = VirtualStore::ConcatenatePath(table_path_prefix, new_table_path_suffix);
+                std::filesystem::rename(table_path, new_table_path);
             }
-            auto db_id_str = id_str_map[db_name];
+            auto db_id_str = dbname_to_idstr[db_name];
             auto new_db_path_suffix = fmt::format("db_{}", db_id_str);
-            std::filesystem::rename(db_path, db_path_prefix + new_db_path_suffix);
+            auto new_db_path = VirtualStore::ConcatenatePath(db_path_prefix, new_db_path_suffix);
+            std::filesystem::rename(db_path, new_db_path);
         }
-    };
-
-    if (!full_ckp_json->contains("obj_addr_map") || !(*full_ckp_json)["obj_addr_map"].contains("obj_addr_size")) {
-        TransformData();
     }
     // else {
     //     throw std::runtime_error{"Broken meta data json."};
     // }
 
-    auto RenameCatalog = [&] {
-        String full_ckp_path_prefix = full_ckp_path.substr(0, full_ckp_path.find_last_of('/') + 1);
-        String full_ckp_path_suffix = full_ckp_path.substr(full_ckp_path.find_last_of('/') + 1);
-        String old_full_ckp_path = fmt::format("{}old_{}", full_ckp_path_prefix, full_ckp_path_suffix);
-        std::filesystem::rename(full_ckp_path, old_full_ckp_path);
-    };
-    if (false) {
-        RenameCatalog();
+    // Rename the filename
+
+    status = kv_instance->Commit();
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }
 
 Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json,
                                             KVInstance *kv_instance,
-                                            Map<String, String> &id_str_map,
+                                            Map<String, String> &dbname_to_idstr,
                                             Set<String> &dir_set,
                                             const String &db_path) {
     String db_name = db_meta_json["db_name"];
@@ -323,7 +239,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json,
                 if (!status.ok()) {
                     return status;
                 }
-                id_str_map[db_name] = db_id_str;
+                dbname_to_idstr[db_name] = db_id_str;
                 Optional<DBMeeta> db_meta;
                 String dir_path = db_entry_json["db_entry_dir"];
                 dir_set.emplace(dir_path);
@@ -338,7 +254,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json,
 
                 if (db_entry_json.contains("tables")) {
                     for (const auto &table_meta_json : db_entry_json["tables"]) {
-                        Status status = TransformCatalogTable(db_meta.value(), table_meta_json, db_name, id_str_map, dir_set, db_path);
+                        Status status = TransformCatalogTable(db_meta.value(), table_meta_json, db_name, dbname_to_idstr, dir_set, db_path);
                         if (!status.ok()) {
                             return status;
                         }
@@ -354,7 +270,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json,
 Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
                                          const nlohmann::json &table_meta_json,
                                          String const &db_name,
-                                         Map<String, String> &id_str_map,
+                                         Map<String, String> &dbname_to_idstr,
                                          Set<String> &dir_set,
                                          const String &db_path) {
     String table_name = table_meta_json["table_name"];
@@ -371,15 +287,14 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
             if (!status.ok()) {
                 return status;
             }
-            id_str_map[db_name + '.' + table_name] = table_id_str;
+            dbname_to_idstr[db_name + '.' + table_name] = table_id_str;
 
             TxnTimeStamp table_begin_ts = table_entry_json["begin_ts"];
             TxnTimeStamp table_commit_ts = table_entry_json["commit_ts"];
 
             Vector<SharedPtr<ColumnDef>> columns;
 
-            SharedPtr<String> table_entry_dir;
-            table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
+            SharedPtr<String> table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
 
             for (const auto &column_def_json : table_entry_json["column_definition"]) {
                 SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
@@ -415,7 +330,7 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
             dir_set.emplace(dir_path);
             dir_path = fmt::format("{}/{}", db_path, dir_path);
             if (!std::filesystem::exists(dir_path)) {
-                throw std::runtime_error("Data does not exist");
+                UnrecoverableError("Data does not exist.");
             }
             status = AddNewTable(db_meta, table_id_str, table_begin_ts, table_commit_ts, table_def, table_meta);
             if (!status.ok()) {
@@ -459,7 +374,7 @@ NewCatalog::TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json
     dir_set.emplace(dir_path);
     dir_path = fmt::format("{}/{}", db_path, dir_path);
     if (!std::filesystem::exists(dir_path)) {
-        throw std::runtime_error("Data does not exist");
+        UnrecoverableError("Data does not exist.");
     }
     Status status = NewCatalog::AddNewSegment1(table_meta, segment_commit_ts, segment_meta);
     if (!status.ok()) {
@@ -486,14 +401,14 @@ NewCatalog::TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::jso
     dir_set.emplace(dir_path);
     dir_path = fmt::format("{}/{}", db_path, dir_path);
     if (!std::filesystem::exists(dir_path)) {
-        throw std::runtime_error("Data does not exist");
+        UnrecoverableError("Data does not exist.");
     }
 
     dir_path = block_entry_json["version_file"];
     dir_set.emplace(dir_path);
     dir_path = fmt::format("{}/{}", db_path, dir_path);
     if (!std::filesystem::exists(dir_path)) {
-        throw std::runtime_error("Data does not exist");
+        UnrecoverableError("Data does not exist.");
     }
 
     Status status = NewCatalog::AddNewBlockForTransform(segment_meta, block_commit_ts, block_meta);

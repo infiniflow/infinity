@@ -141,7 +141,7 @@ String CalcMD5(const char *input_str, SizeT length) {
     return hex_stream.str();
 }
 
-String CalcMD5(const String& input_file) {
+String CalcMD5(const String &input_file) {
     std::ifstream input(input_file, std::ios::binary);
     input.seekg(0, input.end);
     size_t raw_file_size = input.tellg();
@@ -153,18 +153,42 @@ String CalcMD5(const String& input_file) {
     return md5;
 }
 
-Tuple<u64, bool> ExtractU64FromStringSuffix(const String& src, SizeT offset) {
+Tuple<u64, bool> ExtractU64FromStringSuffix(const String &src, SizeT offset) {
     SizeT len = src.size();
     SizeT res = 0;
-    for(SizeT i = offset; i < len; ++ i) {
+    for (SizeT i = offset; i < len; ++i) {
         char ch = src[i];
-        if(std::isalnum(ch)) {
+        if (std::isalnum(ch)) {
             res += res * 10 + (ch - '0');
-        } else{
+        } else {
             return {std::numeric_limits<u64>::max(), false};
         }
     }
     return {res, true};
 }
+
+Vector<String> Partition(const String &text, char delimiter) {
+    Vector<String> parts;
+    String tmp_str;
+    for (auto c : text) {
+        if (c == delimiter) {
+            parts.emplace_back(tmp_str);
+            tmp_str.clear();
+            continue;
+        }
+        tmp_str += c;
+    }
+    parts.emplace_back(tmp_str);
+    return parts;
+}
+
+String Concat(const Vector<String> &v, char delimiter) {
+    String ret;
+    for (const auto &s : v) {
+        ret += (s + delimiter);
+    }
+    ret.pop_back();
+    return ret;
+};
 
 } // namespace infinity
