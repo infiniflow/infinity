@@ -159,7 +159,7 @@ Tuple<u64, bool> ExtractU64FromStringSuffix(const String &src, SizeT offset) {
     for (SizeT i = offset; i < len; ++i) {
         char ch = src[i];
         if (std::isalnum(ch)) {
-            res += res * 10 + (ch - '0');
+            res = res * 10 + (ch - '0');
         } else {
             return {std::numeric_limits<u64>::max(), false};
         }
