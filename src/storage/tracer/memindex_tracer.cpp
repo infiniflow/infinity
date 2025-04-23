@@ -40,6 +40,7 @@ import new_txn_manager;
 import mem_index;
 import new_txn;
 import status;
+import defer_op;
 
 namespace infinity {
 
@@ -139,6 +140,16 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
         new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
         mem_indexes = GetUndumpedMemIndexes(new_txn);
     }
+    bool make_task = false;
+    DeferFn defer_op([&] {
+        if (new_txn && !make_task) {
+            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+            Status status = new_txn_mgr->RollBackTxn(new_txn);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+        }
+    });
 
     if (mem_indexes.empty()) {
         LOG_WARN("Cannot find memindex to dump");
@@ -157,6 +168,7 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
 
     acc_proposed_dump_.fetch_add(info.mem_used_);
     proposed_dump_[mem_index] = info.mem_used_;
+    make_task = true;
     return dump_task;
 }
 

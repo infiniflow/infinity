@@ -79,6 +79,8 @@ public:
 
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 
+    Status GetMemIndexRaw(SharedPtr<MemIndex> &mem_index);
+
     // write mem index should use this function
     Status GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index);
 

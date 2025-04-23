@@ -449,6 +449,19 @@ Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::GetMemIndexRaw(SharedPtr<MemIndex> &mem_index) {
+    mem_index.reset();
+
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    String mem_index_key = GetSegmentIndexTag("mem_index");
+    Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
     // Check has mem index key, if no, set the key.
     // Clear mem index if no such key
@@ -462,7 +475,7 @@ Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
         // block here when mem index is dumpping.
         // Use GetForUpdate here. because if we use Get, when `has_mem_index_key` is true, we skip mem_index->Clear() here.
         // when we dump mem index simultaneously, we do append and dump on the same mem index.
-        Status status = kv_instance_.GetForUpdate(has_mem_index_key, has_mem_index_str);
+        Status status = kv_instance_.Get(has_mem_index_key, has_mem_index_str);
         if (!status.ok()) {
             return status;
         }

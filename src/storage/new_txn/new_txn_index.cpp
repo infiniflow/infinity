@@ -1866,7 +1866,7 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
     if (dump_index_cmd->clear_mem_index_) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         SharedPtr<MemIndex> mem_index;
-        Status status = segment_index_meta.GetMemIndex(mem_index);
+        Status status = segment_index_meta.GetMemIndexRaw(mem_index);
         if (!status.ok()) {
             return status;
         }
