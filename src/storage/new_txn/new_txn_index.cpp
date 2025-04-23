@@ -1616,7 +1616,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
             if (!status.ok()) {
                 return status;
             }
-            append_ranges.emplace_back(segment_id, block_id, block_offset, block_row_cnt);
+            append_ranges.emplace_back(segment_id, block_id, block_offset, block_row_cnt - block_offset);
             block_offset = 0;
         }
     }

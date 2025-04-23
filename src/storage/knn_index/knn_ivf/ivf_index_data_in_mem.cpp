@@ -119,13 +119,18 @@ public:
     }
 
     MemIndexTracerInfo GetInfo() const override {
+        const auto mem = MemoryUsed();
+        if (segment_index_entry_ == nullptr) {
+            return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem, input_row_count_);
+        }
+
         auto *table_index_entry = segment_index_entry_->table_index_entry();
         SharedPtr<String> index_name = table_index_entry->GetIndexName();
         auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
         SharedPtr<String> table_name = table_entry->GetTableName();
         SharedPtr<String> db_name = table_entry->GetDBName();
 
-        return MemIndexTracerInfo(index_name, table_name, db_name, MemoryUsed(), input_row_count_);
+        return MemIndexTracerInfo(index_name, table_name, db_name, mem, input_row_count_);
     }
 
     TableIndexEntry *table_index_entry() const override { return segment_index_entry_->table_index_entry(); }

@@ -305,6 +305,19 @@ Status SegmentIndexMeta::LoadSet() {
             return status;
         }
     }
+    {
+        auto [index_base, status] = table_index_meta_.GetIndexBase();
+        if (!status.ok()) {
+            return status;
+        }
+        if (index_base->index_type_ == IndexType::kFullText) {
+            auto ft_info = MakeShared<SegmentIndexFtInfo>();
+            Status status = this->SetFtInfo(ft_info);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
     return Status::OK();
 }
 

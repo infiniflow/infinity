@@ -2295,7 +2295,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                         UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
                     }
                 }
-
+                // Restore memory index here
+                // TODO: Not implemented.
+                UnrecoverableError("Not implemented");
                 break;
             }
             case WalCommandType::COMPACT: {
