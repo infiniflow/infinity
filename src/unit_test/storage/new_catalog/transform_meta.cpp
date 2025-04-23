@@ -85,8 +85,7 @@ TEST_P(TransformMeta, db_meta_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    // String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
-    String full_ckp_path = "/home/inf/Downloads/infinity_vfs_off1/data/catalog/FULL.44.json";
+    String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -100,7 +99,7 @@ TEST_P(TransformMeta, db_meta_transform_00) {
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     new_txn_mgr->SetNewSystemTS(
         std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
-    // new_txn_mgr->PrintAllKeyValue();
+    new_txn_mgr->PrintAllKeyValue();
 
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     {
@@ -590,7 +589,8 @@ TEST_P(TransformMeta, block_column_transform_02) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = "/home/infiniflow/Downloads/FULL.52.json";
+    // String full_ckp_path = "/home/infiniflow/Downloads/FULL.52.json";
+    String full_ckp_path = "/home/inf/Downloads/infinity_vfs_off1/data/catalog/FULL.44.json";
 
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
@@ -606,7 +606,7 @@ TEST_P(TransformMeta, block_column_transform_02) {
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     new_txn_mgr->SetNewSystemTS(
         std::numeric_limits<int>::max()); // due to WAL isn't replayed, and system timestamp is get from WAL. Set a huge timestamp here
-    // new_txn_mgr->PrintAllKeyValue();
+    new_txn_mgr->PrintAllKeyValue();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
     auto [table_info, get_status] = txn->GetTableInfo("default_db", "my_table_1");
     EXPECT_TRUE(get_status.ok());

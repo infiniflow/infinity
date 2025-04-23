@@ -252,6 +252,10 @@ Status Status::ColumnNotExist(const String &column_name) {
     return Status(ErrorCode::kColumnNotExist, MakeUnique<String>(fmt::format("Column: {} doesn't exist", column_name)));
 }
 
+Status Status::ColumnNotExist(const ColumnID &column_idx) {
+    return Status(ErrorCode::kColumnNotExist, MakeUnique<String>(fmt::format("Column: {} column doesn't exist", column_idx)));
+}
+
 Status Status::AggNotAllowInWhere(const String &func_name) {
     return Status(ErrorCode::kAggNotAllowInWhereClause,
                   MakeUnique<String>(fmt::format("Aggregate function: {} isn't allowed in where clause", func_name)));

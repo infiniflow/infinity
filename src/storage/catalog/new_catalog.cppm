@@ -26,6 +26,8 @@ import buffer_handle;
 import column_def;
 import profiler;
 import third_party;
+import storage;
+import catalog_delta_entry;
 
 namespace infinity {
 
@@ -148,17 +150,25 @@ private:
                                     KVInstance *kv_instance,
                                     Map<String, String> &dbname_to_idstr,
                                     Set<String> &dir_set,
-                                    const String &db_path);
+                                    const String &db_path,
+                                    bool is_vfs);
     Status TransformCatalogTable(DBMeeta &db_meta,
                                  const nlohmann::json &table_meta_json,
                                  String const &db_name,
                                  Map<String, String> &dbname_to_idstr,
                                  Set<String> &dir_set,
-                                 const String &db_path);
-    Status
-    TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json, Set<String> &dbname_to_idstr, const String &db_path);
-    Status
-    TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json, Set<String> &dbname_to_idstr, const String &db_path);
+                                 const String &db_path,
+                                 bool is_vfs);
+    Status TransformCatalogSegment(TableMeeta &table_meta,
+                                   const nlohmann::json &segment_entry_json,
+                                   Set<String> &dbname_to_idstr,
+                                   const String &db_path,
+                                   bool is_vfs);
+    Status TransformCatalogBlock(SegmentMeta &segment_meta,
+                                 const nlohmann::json &block_entry_json,
+                                 Set<String> &dbname_to_idstr,
+                                 const String &db_path,
+                                 bool is_vfs);
     Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json, Set<String> &dir_set);
     Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
     Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
@@ -206,6 +216,8 @@ public:
     Status IncreaseTableWriteCount(const String &table_key);
     Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;
+
+    void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry);
 
 private:
     KVStore *kv_store_{};

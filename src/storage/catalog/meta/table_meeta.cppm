@@ -106,6 +106,7 @@ public:
 
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name, SizeT *column_idx = nullptr);
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnID(const SizeT& column_idx);
 
     Status GetTableInfo(TableInfo &table_info);
 

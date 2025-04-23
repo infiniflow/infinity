@@ -107,6 +107,20 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const S
     return {nullptr, Status::ColumnNotExist(column_name)};
 }
 
+Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnID(const SizeT& column_idx) {
+    if (!column_defs_) {
+        Status status = LoadColumnDefs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    if (column_idx >= column_defs_->size()) {
+        return {nullptr, Status::ColumnNotExist(column_idx)};
+    }
+    return {(*column_defs_)[column_idx], Status::OK()};
+
+}
+
 // Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
 //     segment_ids_ = segment_ids;
 //     String segment_ids_key = GetTableTag("segment_ids");

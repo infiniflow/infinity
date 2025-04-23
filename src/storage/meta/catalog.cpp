@@ -1063,7 +1063,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     }
 }
 
-UniquePtr<nlohmann::json> Catalog::LoadFullCheckpointToJson(Config* config_ptr, const String &file_name) {
+UniquePtr<nlohmann::json> Catalog::LoadFullCheckpointToJson(Config *config_ptr, const String &file_name) {
     const auto &catalog_path = Path(config_ptr->DataDir()) / file_name;
     String dst_dir = catalog_path.parent_path().string();
     String dst_file_name = catalog_path.filename().string();

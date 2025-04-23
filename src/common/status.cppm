@@ -268,6 +268,7 @@ public:
     static Status TableNotExist(const String &table_name);
     static Status IndexNotExist(const String &index_name);
     static Status ColumnNotExist(const String &column_name);
+    static Status ColumnNotExist(const ColumnID &column_id);
     static Status AggNotAllowInWhere(const String &func_name);
     static Status ColumnInSelectNotInGroupBy(const String &column_name);
     static Status NoSysVar(const String &variable_name);
