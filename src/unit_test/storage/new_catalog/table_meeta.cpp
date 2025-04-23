@@ -81,10 +81,10 @@ TEST_P(TestTxnTableMeeta, table_meeta) {
     TableMeeta table_meta(table_info->db_id_, table_info->table_id_, *kv_instance, txn2->BeginTS());
 
     {
-        SegmentID segment_id = 0;
-        auto segment_status = table_meta.GetNextSegmentID(segment_id);
-        EXPECT_TRUE(segment_status.ok());
-        EXPECT_EQ(segment_id, 0);
+        // SegmentID segment_id = 0;
+        // auto segment_status = table_meta.GetNextSegmentID(segment_id);
+        // EXPECT_TRUE(segment_status.ok());
+        // EXPECT_EQ(segment_id, 0);
         {
             SegmentMeta segment_meta(0, table_meta);
             segment_meta.Init();

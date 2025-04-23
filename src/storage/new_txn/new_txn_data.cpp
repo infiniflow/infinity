@@ -356,19 +356,6 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
 
     const WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
-    SegmentID segment_id = 0;
-    status = table_meta.GetNextSegmentID(segment_id);
-    if (!status.ok()) {
-        return status;
-    }
-    if (segment_id != segment_info.segment_id_) {
-        UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_info.segment_id_));
-    }
-    status = table_meta.SetNextSegmentID(segment_id + 1);
-    if (!status.ok()) {
-        return status;
-    }
-
     status = NewCatalog::LoadFlushedSegment1(table_meta, segment_info, fake_commit_ts);
     if (!status.ok()) {
         return status;
@@ -696,19 +683,6 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     TableMeeta &table_meta = *table_meta_opt;
 
     for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
-        SegmentID segment_id = 0;
-        status = table_meta.GetNextSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-        if (segment_id != segment_info.segment_id_) {
-            UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_info.segment_id_));
-        }
-        status = table_meta.SetNextSegmentID(segment_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
-
         status = NewCatalog::LoadFlushedSegment1(table_meta, segment_info, fake_commit_ts);
         if (!status.ok()) {
             return status;

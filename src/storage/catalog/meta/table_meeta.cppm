@@ -61,18 +61,18 @@ public:
 
     Status UninitSet();
 
-    Status GetNextSegmentID(SegmentID &next_segment_id) {
-        if (!next_segment_id_) {
-            Status status = LoadNextSegmentID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        next_segment_id = *next_segment_id_;
-        return Status::OK();
-    }
+    // Status GetNextSegmentID(SegmentID &next_segment_id) {
+    //     if (!next_segment_id_) {
+    //         Status status = LoadNextSegmentID();
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
+    //     }
+    //     next_segment_id = *next_segment_id_;
+    //     return Status::OK();
+    // }
 
-    Status SetNextSegmentID(SegmentID next_segment_id);
+    // Status SetNextSegmentID(SegmentID next_segment_id);
 
     Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
         if (!unsealed_segment_id_) {
@@ -138,7 +138,7 @@ private:
 
     Status LoadIndexIDs();
 
-    Status LoadNextSegmentID();
+    // Status LoadNextSegmentID();
 
     Status LoadUnsealedSegmentID();
 

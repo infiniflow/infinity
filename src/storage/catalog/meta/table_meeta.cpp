@@ -618,17 +618,17 @@ Status TableMeeta::LoadIndexIDs() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadNextSegmentID() {
-    String next_seg_id_key = GetTableTag("next_segment_id");
-    String next_seg_id_str;
-    Status status = kv_instance_.Get(next_seg_id_key, next_seg_id_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to get next segment id from kv store, key: {}, cause: {}", next_seg_id_key, status.message()));
-        return status;
-    }
-    next_segment_id_ = std::stoull(next_seg_id_str);
-    return Status::OK();
-}
+// Status TableMeeta::LoadNextSegmentID() {
+//     String next_seg_id_key = GetTableTag("next_segment_id");
+//     String next_seg_id_str;
+//     Status status = kv_instance_.Get(next_seg_id_key, next_seg_id_str);
+//     if (!status.ok()) {
+//         LOG_ERROR(fmt::format("Fail to get next segment id from kv store, key: {}, cause: {}", next_seg_id_key, status.message()));
+//         return status;
+//     }
+//     next_segment_id_ = std::stoull(next_seg_id_str);
+//     return Status::OK();
+// }
 
 Status TableMeeta::LoadUnsealedSegmentID() {
     String unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
@@ -656,17 +656,17 @@ Status TableMeeta::LoadNextColumnID() {
 
 String TableMeeta::GetTableTag(const String &tag) const { return KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag); }
 
-Status TableMeeta::SetNextSegmentID(SegmentID next_segment_id) {
-    next_segment_id_ = next_segment_id;
-    String next_id_key = GetTableTag("next_segment_id");
-    String next_id_str = fmt::format("{}", next_segment_id);
-    Status status = kv_instance_.Put(next_id_key, next_id_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to set next segment id from kv store, key: {}:{}, cause: {}", next_id_key, next_id_str, status.message()));
-        return status;
-    }
-    return Status::OK();
-}
+// Status TableMeeta::SetNextSegmentID(SegmentID next_segment_id) {
+//     next_segment_id_ = next_segment_id;
+//     String next_id_key = GetTableTag("next_segment_id");
+//     String next_id_str = fmt::format("{}", next_segment_id);
+//     Status status = kv_instance_.Put(next_id_key, next_id_str);
+//     if (!status.ok()) {
+//         LOG_ERROR(fmt::format("Fail to set next segment id from kv store, key: {}:{}, cause: {}", next_id_key, next_id_str, status.message()));
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
     unsealed_segment_id_ = unsealed_segment_id;
