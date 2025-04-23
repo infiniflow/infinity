@@ -492,6 +492,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     }
 
     auto wal_command = MakeShared<WalCmdDropTableV2>(db_name, db_meta->db_id_str(), table_name, table_id_str);
+    wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -1596,7 +1597,7 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
 
     const String &db_id_str = drop_table_cmd->db_id_;
     const String &table_id_str = drop_table_cmd->table_id_;
-    String table_key = KeyEncode::CatalogTableKey(db_id_str, table_id_str, txn_context_ptr_->commit_ts_);
+    const String &table_key = drop_table_cmd->table_key_;
 
     // delete table key
     Status status = kv_instance_->Delete(table_key);

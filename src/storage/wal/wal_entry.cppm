@@ -386,6 +386,9 @@ export struct WalCmdDropTableV2 final : public WalCmd {
     String db_id_{};
     String table_name_{};
     String table_id_{};
+
+    // Only used in commit phase. Don't need to write to WAL.
+    String table_key_{};
 };
 
 export struct WalCmdCreateIndex final : public WalCmd {

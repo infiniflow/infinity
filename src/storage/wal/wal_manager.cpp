@@ -1126,6 +1126,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     return system_start_ts;
 }
 
+// assumes UseNewCatalog
 Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries) {
     Vector<String> wal_list{};
     {
@@ -1155,7 +1156,6 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
 
     TxnTimeStamp max_checkpoint_ts = 0; // the max commit ts that has been checkpointed
     replay_entries.clear();
-    String catalog_dir = "";
     TxnTimeStamp last_commit_ts = 0; // last wal commit ts
 
     { // if no checkpoint, max_checkpoint_ts is 0
@@ -1170,11 +1170,9 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
             }
             // LOG_TRACE(wal_entry->ToString());
 
-            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
-                std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
-                catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
                 last_commit_ts = wal_entry->commit_ts_;
                 break;
             }
