@@ -288,7 +288,12 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
         }
         case IndexType::kFullText: {
             String analyzer = index_def_json["analyzer"];
-            res = MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer);
+            auto ft_res = MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer);
+            if (index_def_json.contains("flag")) {
+                u8 flag = index_def_json["flag"];
+                ft_res->flag_ = flag;
+            }
+            res = ft_res;
             break;
         }
         case IndexType::kSecondary: {

@@ -34,6 +34,7 @@ import new_txn;
 import txn_state;
 import infinity_exception;
 import utility;
+import memory_indexer;
 
 namespace infinity {
 
@@ -576,6 +577,16 @@ Status SegmentIndexMeta::LoadFtInfo() {
     String ft_info_key = GetSegmentIndexTag("ft_info");
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     Status status = new_catalog->GetSegmentIndexFtInfo(ft_info_key, ft_info_);
+
+    if (ft_info_->ft_column_len_sum_ == 0) {
+        SharedPtr<MemIndex> mem_index;
+        Status status = GetMemIndex(mem_index);
+        if (status.ok() && mem_index && mem_index->memory_indexer_) {
+            ft_info_->ft_column_len_sum_ = mem_index->memory_indexer_->GetColumnLengthSum();
+            ft_info_->ft_column_len_cnt_ = mem_index->memory_indexer_->GetDocCount();
+        }
+    }
+
     if (!status.ok()) {
         return status;
     }
