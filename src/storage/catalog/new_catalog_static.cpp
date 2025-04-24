@@ -441,19 +441,6 @@ Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance,
     return Status::OK();
 }
 
-Status NewCatalog::IncrLatestID(KVInstance *kv_instance, String &id_str, std::string_view id_name) {
-    String string_id;
-    Status status = kv_instance->Get(id_name.data(), string_id);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SizeT id_num = std::stoull(string_id);
-    ++id_num;
-    id_str = fmt::format("{}", id_num);
-    return kv_instance->Put(id_name.data(), id_str);
-}
-
 Status NewCatalog::AddNewDB(KVInstance *kv_instance,
                             const String &db_id_str,
                             TxnTimeStamp commit_ts,

@@ -301,6 +301,8 @@ public:
 
     SizeT ProfileHistorySize() const { return history_.HistoryCapacity(); }
 
+    Status IncrLatestID(String &id_str, std::string_view id_name);
+
 private:
     std::mutex cleaned_meta_mtx_{};
     MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
@@ -317,8 +319,6 @@ public:
 
     static Status
     GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
-
-    static Status IncrLatestID(KVInstance *kv_instance, String &id_str, std::string_view id_name);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,

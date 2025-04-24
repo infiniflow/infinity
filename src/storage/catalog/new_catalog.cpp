@@ -507,7 +507,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json,
                 }
 
                 String db_id_str;
-                Status status = IncrLatestID(kv_instance, db_id_str, LATEST_DATABASE_ID);
+                Status status = IncrLatestID(db_id_str, LATEST_DATABASE_ID);
                 if (!status.ok()) {
                     return status;
                 }
@@ -550,7 +550,6 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
                                          bool is_vfs) {
     String table_name = table_meta_json["table_name"];
     if (table_meta_json.contains("table_entries")) {
-        auto &kv_instance = db_meta.kv_instance();
         for (auto &table_entry_json : table_meta_json["table_entries"]) {
             bool deleted = table_entry_json["deleted"];
             if (deleted) {
@@ -558,7 +557,7 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
             }
 
             String table_id_str;
-            Status status = IncrLatestID(&kv_instance, table_id_str, LATEST_TABLE_ID);
+            Status status = IncrLatestID(table_id_str, LATEST_TABLE_ID);
             if (!status.ok()) {
                 return status;
             }
@@ -727,8 +726,7 @@ Status NewCatalog::TransformCatalogBlockColumn(BlockMeta &block_meta, const nloh
 
 Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json) {
     String index_id_str;
-    auto &kv_instance = table_meta.kv_instance();
-    Status status = IncrLatestID(&kv_instance, index_id_str, LATEST_INDEX_ID);
+    Status status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1466,6 +1464,24 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         metas.push_back(std::move(it->second));
     }
     cleaned_meta_.erase(cleaned_meta_.begin(), iter);
+}
+
+Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
+    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
+    Status s = kv_instance->Get(id_name.data(), id_str);
+    if (!s.ok()) {
+        kv_instance->Rollback();
+        return s;
+    }
+    SizeT id_num = std::stoull(id_str);
+    ++id_num;
+    s = kv_instance->Put(id_name.data(), fmt::format("{}", id_num));
+    if (!s.ok()) {
+        kv_instance->Rollback();
+        return s;
+    }
+    s = kv_instance->Commit();
+    return s;
 }
 
 } // namespace infinity
