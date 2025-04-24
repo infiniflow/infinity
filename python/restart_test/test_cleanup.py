@@ -56,8 +56,8 @@ class TestCleanup:
         infinity_runner.clear()
         table_name = "test_cleanup"
         table_name2 = "test2_cleanup"
-        table_id = 1
-        table2_id = 2
+        table_id = 0
+        table2_id = 1
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
@@ -139,9 +139,9 @@ class TestCleanup:
         table_name = "test_cleanup_index"
         index_name = "idx1"
         index_name2 = "idx2"
-        table_id = 1
-        index_id = 1
-        index2_id = 2
+        table_id = 0
+        index_id = 0
+        index2_id = 1
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
         insert_n = 100
@@ -232,7 +232,7 @@ class TestCleanup:
             table_obj.insert([{"c1": "text1", "c2": "text2"}])
 
             drop_index_name = "idx1_todrop"
-            drop_index_id = 1
+            drop_index_id = 0
 
             table_obj.create_index(
                 drop_index_name, index.IndexInfo("c1", index.IndexType.FullText)
@@ -303,7 +303,7 @@ class TestCleanup:
             infinity_obj.cleanup()
             time.sleep(1)
 
-            index_id = 1
+            index_id = 0
             dropped_index_dirs = pathlib.Path(data_dir).rglob(f"*idx_{index_id}*")
             assert self.files_num(list(dropped_index_dirs)) == 3
 

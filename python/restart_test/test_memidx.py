@@ -512,8 +512,8 @@ class TestMemIdx:
         data_dir = "/var/infinity/data"
         idx1_name = "index1"
         idx2_name = "index2"
-        idx1_id = 1
-        idx2_id = 2
+        idx1_id = 0
+        idx2_id = 1
 
         @decorator1
         def part1(infinity_obj):
