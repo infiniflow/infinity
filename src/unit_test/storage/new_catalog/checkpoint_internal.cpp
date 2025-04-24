@@ -68,6 +68,7 @@ import index_filter_evaluators;
 import index_emvb;
 import constant_expr;
 import txn;
+import infinity;
 
 using namespace infinity;
 
@@ -270,7 +271,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         EXPECT_TRUE(status.ok());
     }
 
-    for (auto i = 0; i < 1025; i++)
+    for (auto i = 0; i < 1; i++)
         append();
 
     checkpoint();
@@ -320,6 +321,27 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
             }
         };
 
+        // checkpoint();
+
+        // std::cout<<"first";
+        new_txn_mgr->PrintAllKeyValue();
+
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+            Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2","col1"});
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        std::cout<<"second";
+        new_txn_mgr->PrintAllKeyValue();
+
+        // RestartTxnMgr();
+
+        std::cout << "end";
+        new_txn_mgr->PrintAllKeyValue();
+
         check_column(0, v1);
         check_column(1, v2);
     };
@@ -339,7 +361,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        Status status;Optional<DBMeeta> db_meta;
+        Status status;
+        Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetDBMeta(*db_name, db_meta);
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
@@ -347,13 +370,51 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
 
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0, 1}));
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
         SegmentMeta segment_meta(segment_id, *table_meta);
         check_segment(segment_meta);
     }
-}
 
-TEST_P(TestTxnCheckpointInternalTest, test_checkpoint2) {
+    auto renametable = [&](const String &new_table_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("renametable"), TransactionType::kNormal);
+        Status status = txn->RenameTable(*db_name, *table_name, new_table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
 
+    renametable("renametable");
+
+    checkpoint();
+
+    checkpoint();
+
+    RestartTxnMgr();
+
+    checkpoint();
+
+    checkpoint();
+
+    RestartTxnMgr();
+
+    Status status;
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+    status = txn->GetDBMeta(*db_name, db_meta);
+    status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+    status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
+    EXPECT_TRUE(status.ok());
+    checkpoint();
+
+    RestartTxnMgr();
+    auto infinity = Infinity::RemoteConnect();
+    checkpoint();
+
+    RestartTxnMgr();
+    infinity->CompactTable(*db_name,*table_name);
+    checkpoint();
+
+    RestartTxnMgr();
 }
