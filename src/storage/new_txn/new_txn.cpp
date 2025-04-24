@@ -1747,7 +1747,102 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
     return new_catalog_->IncrLatestID(id_str, id_name);
 }
 
-bool NewTxn::CheckConflictWithAppend(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause) {
+    switch (cmd.GetType()) {
+        case WalCommandType::CREATE_DATABASE_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::CREATE_TABLE_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdCreateTableV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::APPEND_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdAppendV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::IMPORT_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdImportV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::ADD_COLUMNS_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdAddColumnsV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::DROP_COLUMNS_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdDropColumnsV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::COMPACT_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdCompactV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::CREATE_INDEX_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdCreateIndexV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::DUMP_INDEX_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdDumpIndexV2 &>(cmd), previous_txn, cause);
+        }
+        case WalCommandType::DELETE_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause);
+        }
+        default: {
+            return false;
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_DATABASE_V2: {
+                auto *prev_cmd = static_cast<WalCmdCreateDatabaseV2 *>(wal_cmd.get());
+                if (prev_cmd->db_name_ == db_name) {
+                    cause = fmt::format("Create database {}.", db_name);
+                    return true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const SharedPtr<String> &table_name = cmd.table_def_->table_name();
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_DATABASE_V2: {
+                auto *prev_cmd = static_cast<WalCmdCreateDatabaseV2 *>(wal_cmd.get());
+                if (prev_cmd->db_name_ == db_name) {
+                    cause = fmt::format("Create database {}.", db_name);
+                    return true;
+                }
+                break;
+            }
+            case WalCommandType::CREATE_TABLE_V2: {
+                auto *prev_cmd = static_cast<WalCmdCreateTableV2 *>(wal_cmd.get());
+                const SharedPtr<String> &prev_table_name = prev_cmd->table_def_->table_name();
+                if (prev_cmd->db_name_ == db_name && *prev_table_name == *table_name) {
+                    cause = fmt::format("Create table {} in database {}.", *table_name, db_name);
+                    return true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1769,7 +1864,9 @@ bool NewTxn::CheckConflictWithAppend(const String &db_name, const String &table_
     return false;
 }
 
-bool NewTxn::CheckConflictWithImport(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1791,7 +1888,9 @@ bool NewTxn::CheckConflictWithImport(const String &db_name, const String &table_
     return false;
 }
 
-bool NewTxn::CheckConflictWithAddColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1812,7 +1911,9 @@ bool NewTxn::CheckConflictWithAddColumns(const String &db_name, const String &ta
     return false;
 }
 
-bool NewTxn::CheckConflictWithDropColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1833,7 +1934,9 @@ bool NewTxn::CheckConflictWithDropColumns(const String &db_name, const String &t
     return false;
 }
 
-bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1896,10 +1999,21 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
     return false;
 }
 
-bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
+    const String &index_name = *cmd.index_base_->index_name_;
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *prev_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
+                if (prev_cmd->db_name_ == db_name && prev_cmd->table_name_ == table_name && *prev_cmd->index_base_->index_name_ == index_name) {
+                    cause = fmt::format("Create index {} on table {} database {}.", index_name, table_name, db_name);
+                    return true;
+                }
+                break;
+            }
             case WalCommandType::APPEND_V2: {
                 auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
                 if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
@@ -1932,7 +2046,11 @@ bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &t
     return false;
 }
 
-bool NewTxn::CheckConflictWithOptimizeIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
+    if (cmd.dump_cause_ != DumpIndexCause::kOptimizeIndex)
+        return false;
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -1952,7 +2070,9 @@ bool NewTxn::CheckConflictWithOptimizeIndex(const String &db_name, const String 
     return false;
 }
 
-bool NewTxn::CheckConflictWithDelete(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -1974,69 +2094,8 @@ bool NewTxn::CheckConflictWithDelete(const String &db_name, const String &table_
 
 bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
-    bool conflict{false};
     for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
-        WalCommandType command_type = wal_cmd->GetType();
-
-        switch (command_type) {
-            case WalCommandType::APPEND_V2: {
-                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
-                conflict = CheckConflictWithAppend(append_cmd->db_name_, append_cmd->table_name_, check_txn.get(), conflict_reason);
-                break;
-            }
-            case WalCommandType::IMPORT_V2: {
-                auto *import_cmd = static_cast<WalCmdImportV2 *>(wal_cmd.get());
-                conflict = CheckConflictWithImport(import_cmd->db_name_, import_cmd->table_name_, check_txn.get(), conflict_reason);
-                break;
-            }
-            case WalCommandType::COMPACT_V2: {
-                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
-                conflict = CheckConflictWithCompact(compact_cmd->db_name_, compact_cmd->table_name_, check_txn.get(), conflict_reason);
-                break;
-            }
-            case WalCommandType::CREATE_INDEX_V2: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
-                conflict = CheckConflictWithCreateIndex(create_index_cmd->db_name_, create_index_cmd->table_name_, check_txn.get(), conflict_reason);
-                break;
-            }
-            case WalCommandType::ADD_COLUMNS_V2: {
-                auto *add_columns_cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
-                conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn.get(), conflict_reason);
-                break;
-            }
-            case WalCommandType::DROP_COLUMNS_V2: {
-                auto *drop_columns_cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
-                bool conflict =
-                    CheckConflictWithDropColumns(drop_columns_cmd->db_name_, drop_columns_cmd->table_name_, check_txn.get(), conflict_reason);
-                if (conflict) {
-                    return true;
-                }
-                break;
-            }
-            case WalCommandType::DUMP_INDEX_V2: {
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                switch (dump_index_cmd->dump_cause_) {
-                    case DumpIndexCause::kOptimizeIndex: {
-                        conflict =
-                            CheckConflictWithOptimizeIndex(dump_index_cmd->db_name_, dump_index_cmd->table_name_, check_txn.get(), conflict_reason);
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-                break;
-            }
-            case WalCommandType::DELETE_V2: {
-                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(wal_cmd.get());
-                conflict = CheckConflictWithDelete(delete_cmd->db_name_, delete_cmd->table_name_, check_txn.get(), conflict_reason);
-
-                break;
-            }
-            default: {
-                //
-            }
-        }
+        bool conflict = this->CheckConflictCmd(*wal_cmd, check_txn.get(), conflict_reason);
         if (conflict) {
             conflicted_txn_ = check_txn;
             return true;

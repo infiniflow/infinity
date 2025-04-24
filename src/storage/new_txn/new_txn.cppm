@@ -562,14 +562,17 @@ private:
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 
     // Check transaction conflicts
-    bool CheckConflictWithAppend(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithImport(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithAddColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithDropColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithOptimizeIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
-    bool CheckConflictWithDelete(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
