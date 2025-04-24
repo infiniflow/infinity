@@ -1881,7 +1881,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str));
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_));
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);

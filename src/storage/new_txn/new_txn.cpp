@@ -1565,7 +1565,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str()));
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str(), drop_db_cmd->db_name_));
 
     return Status::OK();
 }
@@ -1606,7 +1606,7 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableMetaKey>(db_id_str, table_id_str));
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableMetaKey>(db_id_str, table_id_str, drop_table_cmd->table_name_));
 
     return Status::OK();
 }
@@ -2236,7 +2236,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                     return status;
                 }
 
-                status = NewCatalog::CleanTableIndex(*table_index_meta, chunk_infos_);
+                status = NewCatalog::CleanTableIndex(*table_index_meta, *cmd->index_base_->index_name_, chunk_infos_);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2414,7 +2414,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             case MetaKey::Type::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
                 DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta, ts);
+                Status status = NewCatalog::CleanDB(db_meta, db_meta_key->db_name_, ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2423,7 +2423,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             case MetaKey::Type::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts);
-                Status status = NewCatalog::CleanTable(table_meta, ts);
+                Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2466,7 +2466,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                Status status = NewCatalog::CleanTableIndex(table_index_meta);
+                Status status = NewCatalog::CleanTableIndex(table_index_meta, table_index_meta_key->index_name_);
                 if (!status.ok()) {
                     return status;
                 }

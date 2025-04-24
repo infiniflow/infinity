@@ -38,17 +38,19 @@ export struct MetaKey {
 class ColumnDef;
 
 export struct DBMetaKey : public MetaKey {
-    DBMetaKey(String db_id_str) : MetaKey(Type::kDB), db_id_str_(std::move(db_id_str)) {}
+    DBMetaKey(String db_id_str, String db_name) : MetaKey(Type::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)) {}
 
     String db_id_str_;
+    String db_name_;
 };
 
 export struct TableMetaKey : public MetaKey {
-    TableMetaKey(String db_id_str, String table_id_str)
-        : MetaKey(Type::kTable), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)) {}
+    TableMetaKey(String db_id_str, String table_id_str, const String &table_name)
+        : MetaKey(Type::kTable), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}
 
     String db_id_str_;
     String table_id_str_;
+    String table_name_;
 };
 
 export struct SegmentMetaKey : public MetaKey {
@@ -84,13 +86,14 @@ export struct ColumnMetaKey : public MetaKey {
 };
 
 export struct TableIndexMetaKey : public MetaKey {
-    TableIndexMetaKey(String db_id_str, String table_id_str, String index_id_str)
+    TableIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, const String &index_name)
         : MetaKey(Type::kTableIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
-          index_id_str_(std::move(index_id_str)) {}
+          index_id_str_(std::move(index_id_str)), index_name_(std::move(index_name)) {}
 
     String db_id_str_;
     String table_id_str_;
     String index_id_str_;
+    String index_name_;
 };
 
 export struct SegmentIndexMetaKey : public MetaKey {

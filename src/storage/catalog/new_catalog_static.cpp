@@ -311,8 +311,11 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     return Status::OK();
 }
 
-Status NewCatalog::MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
+Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     Status status;
+
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    KVInstance *kv_instance = new_txn->kv_instance();
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance);
@@ -472,18 +475,34 @@ Status NewCatalog::AddNewDB(KVInstance *kv_instance,
     return Status::OK();
 }
 
-Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts) {
+Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts) {
+    KVInstance &kv_instance = db_meta.kv_instance();
+    String db_prefix = KeyEncode::CatalogDbPrefix(db_name);
+    auto iter = kv_instance.GetIterator();
+    iter->Seek(db_prefix);
+    while (iter->Valid() && iter->Key().starts_with(db_prefix)) {
+        String db_key = iter->Key().ToString();
+        Status status = kv_instance.Delete(db_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter->Next();
+    }
+
     Status status;
 
     Vector<String> *table_id_strs_ptr = nullptr;
-    status = db_meta.GetTableIDs(table_id_strs_ptr);
+    Vector<String> *table_names_ptr = nullptr;
+    status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
     if (!status.ok()) {
         return status;
     }
 
-    for (const String &table_id_str : *table_id_strs_ptr) {
+    for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
+        const String &table_id_str = (*table_id_strs_ptr)[i];
+        const String &table_name = (*table_names_ptr)[i];
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
-        status = NewCatalog::CleanTable(table_meta, begin_ts);
+        status = NewCatalog::CleanTable(table_meta, table_name, begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -520,7 +539,20 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     return status;
 }
 
-Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts) {
+Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts) {
+    KVInstance &kv_instance = table_meta.kv_instance();
+    String table_prefix = KeyEncode::CatalogTablePrefix(table_meta.db_id_str(), table_name);
+    auto iter = kv_instance.GetIterator();
+    iter->Seek(table_prefix);
+    while (iter->Valid() && iter->Key().starts_with(table_prefix)) {
+        String table_key = iter->Key().ToString();
+        Status status = kv_instance.Delete(table_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter->Next();
+    }
+
     Status status;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -537,13 +569,16 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts) {
     }
 
     Vector<String> *index_id_strs_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
     if (!status.ok()) {
         return status;
     }
-    for (const String &index_id_str : *index_id_strs_ptr) {
+    for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const String &index_id_str = (*index_id_strs_ptr)[i];
+        const String &index_name = (*index_names_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
-        status = NewCatalog::CleanTableIndex(table_index_meta);
+        status = NewCatalog::CleanTableIndex(table_index_meta, index_name);
         if (!status.ok()) {
             return status;
         }
@@ -579,7 +614,20 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     return Status::OK();
 }
 
-Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
+Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name) {
+    KVInstance &kv_instance = table_index_meta.kv_instance();
+    String index_prefix =
+        KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
+    auto iter = kv_instance.GetIterator();
+    iter->Seek(index_prefix);
+    while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
+        String index_key = iter->Key().ToString();
+        Status status = kv_instance.Delete(index_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter->Next();
+    }
 
     auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
@@ -601,7 +649,21 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
     return Status::OK();
 }
 
-Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Vector<ChunkInfoForCreateIndex> &meta_infos) {
+Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, const Vector<ChunkInfoForCreateIndex> &meta_infos) {
+    KVInstance &kv_instance = table_index_meta.kv_instance();
+    String index_prefix =
+        KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
+    auto iter = kv_instance.GetIterator();
+    iter->Seek(index_prefix);
+    while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
+        String index_key = iter->Key().ToString();
+        Status status = kv_instance.Delete(index_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter->Next();
+    }
+
     for (auto iter = meta_infos.begin(); iter != meta_infos.end(); iter++) {
         if (table_index_meta.table_meta().db_id_str() == iter->db_id_ && table_index_meta.table_meta().table_id_str() == iter->table_id_) {
             SegmentIndexMeta segment_index_meta(iter->segment_id_, table_index_meta);

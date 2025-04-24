@@ -272,7 +272,7 @@ Status TableIndexMeeta::UninitSet1() {
     }
     if (index_base->index_type_ == IndexType::kFullText) {
         status = table_meta_.RemoveFtIndexCache();
-        if (!status.ok()) {
+        if (!status.ok() && status.code() != ErrorCode::kCatalogError) {
             return status;
         }
 

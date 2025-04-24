@@ -67,6 +67,8 @@ import snapshot_info;
 
 import new_txn_manager;
 import new_catalog;
+import new_txn;
+import txn_state;
 import kv_store;
 import config;
 
@@ -1280,19 +1282,17 @@ void Catalog::MemIndexCommit() {
             }
         }
     } else {
-        TxnTimeStamp begin_ts = new_txn_mgr->CurrentTS();
+        NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("mem index commit"), TransactionType::kNewCheckpoint);
 
-        KVStore *kv_store = new_txn_mgr->kv_store();
-        UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
-
-        Status status = NewCatalog::MemIndexCommit(kv_instance.get(), begin_ts);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("MemIndexCommit catalog failed: {}", status.message()));
+        Status status = NewCatalog::MemIndexCommit(new_txn);
+        if (status.ok()) {
+            status = new_txn_mgr->CommitTxn(new_txn);
         }
-
-        status = kv_instance->Commit();
         if (!status.ok()) {
-            UnrecoverableError(fmt::format("Commit catalog failed: {}", status.message()));
+            Status status1 = new_txn_mgr->RollBackTxn(new_txn);
+            if (!status1.ok()) {
+                UnrecoverableError(fmt::format("Rollback mem index commit failed: {}", status1.message()));
+            }
         }
     }
 }
