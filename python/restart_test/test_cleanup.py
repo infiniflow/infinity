@@ -232,6 +232,8 @@ class TestCleanup:
             table_obj.insert([{"c1": "text1", "c2": "text2"}])
 
             drop_index_name = "idx1_todrop"
+            drop_index_id = 1
+
             table_obj.create_index(
                 drop_index_name, index.IndexInfo("c1", index.IndexType.FullText)
             )
@@ -249,9 +251,9 @@ class TestCleanup:
 
             infinity_obj.cleanup()
             dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob(
-                f"*{drop_index_name}*"
+                f"*idx_{drop_index_id}*"
             )
-            assert len(list(dropped_index_dirs)) == 0
+            assert self.files_num(list(dropped_index_dirs)) == 0
 
             db_obj.drop_table(table_name)
 
@@ -266,6 +268,8 @@ class TestCleanup:
         uri = common_values.TEST_LOCAL_HOST
         import_file = "test/data/csv/enwiki_9.csv"
         abs_import_file = os.path.abspath(import_file)
+
+        infinity_runner.clear()
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
@@ -299,13 +303,9 @@ class TestCleanup:
             infinity_obj.cleanup()
             time.sleep(1)
 
-            cnt = 0
-            for path in pathlib.Path(data_dir).rglob("*"):
-                depth = len(path.relative_to(data_dir).parts)
-                # print("    " * depth + path.name)
-                if path.is_dir() and index_name in str(path):
-                    cnt += 1
-            assert cnt == 1
+            index_id = 1
+            dropped_index_dirs = pathlib.Path(data_dir).rglob(f"*idx_{index_id}*")
+            assert self.files_num(list(dropped_index_dirs)) == 3
 
             db_obj.drop_table(table_name)
 

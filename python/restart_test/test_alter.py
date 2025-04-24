@@ -163,6 +163,9 @@ class TestAlter:
                     }
                 ),
             )
+
+            infinity_obj.cleanup()
+
             dropped_column_dirs = pathlib.Path("/var/infinity/data").rglob("1.col")
             assert len(list(dropped_column_dirs)) == 0
 
@@ -278,6 +281,8 @@ class TestAlter:
 
         @decorator
         def part2(infinity_obj):
+            infinity_obj.cleanup()
+
             dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col")
             assert len(list(dropped_column_dirs)) == 0
 

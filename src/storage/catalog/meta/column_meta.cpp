@@ -256,7 +256,6 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
         }
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-    [[maybe_unused]] SizeT chunk_offset = 0;
     if (buffer_type == VectorBufferType::kVarBuffer) {
         String outline_filename = fmt::format("col_{}_out_0", column_id);
         String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
@@ -264,12 +263,6 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
         outline_buffer_ = buffer_mgr->GetBufferObject(outline_filepath);
         if (outline_buffer_ == nullptr) {
             return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
-        }
-        {
-            Status status = this->GetChunkOffset(chunk_offset);
-            if (!status.ok()) {
-                return status;
-            }
         }
     }
     return Status::OK();
