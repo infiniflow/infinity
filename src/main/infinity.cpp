@@ -1281,6 +1281,18 @@ QueryResult Infinity::Cleanup() {
     return result;
 }
 
+QueryResult Infinity::DumpIndex(const String &db_name, const String &table_name, const String &index_name) {
+    UniquePtr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+
+    auto command_statement = MakeUnique<CommandStatement>();
+
+    command_statement->command_info_ = MakeUnique<DumpIndexCmd>(db_name.c_str(), table_name.c_str(), index_name.c_str());
+
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
 QueryResult Infinity::ForceCheckpoint() {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);

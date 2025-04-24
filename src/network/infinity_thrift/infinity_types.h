@@ -395,6 +395,8 @@ class AddColumnsRequest;
 
 class DropColumnsRequest;
 
+class DumpIndexRequest;
+
 class ShowTablesRequest;
 
 class ShowSegmentsRequest;
@@ -5183,6 +5185,70 @@ class DropColumnsRequest : public virtual ::apache::thrift::TBase {
 void swap(DropColumnsRequest &a, DropColumnsRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const DropColumnsRequest& obj);
+
+typedef struct _DumpIndexRequest__isset {
+  _DumpIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool index_name :1;
+  bool session_id :1;
+} _DumpIndexRequest__isset;
+
+class DumpIndexRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  DumpIndexRequest(const DumpIndexRequest&);
+  DumpIndexRequest& operator=(const DumpIndexRequest&);
+  DumpIndexRequest() noexcept
+                   : db_name(),
+                     table_name(),
+                     index_name(),
+                     session_id(0) {
+  }
+
+  virtual ~DumpIndexRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::string index_name;
+  int64_t session_id;
+
+  _DumpIndexRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_index_name(const std::string& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const DumpIndexRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(index_name == rhs.index_name))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const DumpIndexRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DumpIndexRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DumpIndexRequest &a, DumpIndexRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const DumpIndexRequest& obj);
 
 typedef struct _ShowTablesRequest__isset {
   _ShowTablesRequest__isset() : session_id(false), db_name(false) {}

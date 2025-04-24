@@ -51,6 +51,7 @@ import wal_manager;
 import result_cache_manager;
 import snapshot;
 import periodic_trigger_thread;
+import new_txn;
 
 namespace infinity {
 
@@ -483,6 +484,30 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         LOG_DEBUG("Skip cleanup");
                     }
                 }
+            }
+            break;
+        }
+        case CommandType::kDumpIndex: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+                operator_state->SetComplete();
+                return true;
+            }
+
+            if (use_new_catalog) {
+                auto *dump_index_cmd = static_cast<DumpIndexCmd *>(command_info_.get());
+                NewTxn *new_txn = query_context->GetNewTxn();
+                Status status = new_txn->DumpMemIndex(dump_index_cmd->db_name(), dump_index_cmd->table_name(), dump_index_cmd->index_name());
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+            } else {
+                UnrecoverableError("Not implemented");
             }
             break;
         }

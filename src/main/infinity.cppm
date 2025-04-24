@@ -206,6 +206,8 @@ public:
 
     QueryResult Cleanup();
 
+    QueryResult DumpIndex(const String &db_name, const String &table_name, const String &index_name);
+
     QueryResult ForceCheckpoint();
     QueryResult CompactTable(const String &db_name, const String &table_name);
 

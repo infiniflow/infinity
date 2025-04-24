@@ -1190,6 +1190,16 @@ void InfinityThriftService::Cleanup(infinity_thrift_rpc::CommonResponse &respons
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::DumpIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DumpIndexRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    auto result = infinity->DumpIndex(request.db_name, request.table_name, request.index_name);
+    ProcessQueryResult(response, result);
+}
+
 void InfinityThriftService::ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response,
                                          const infinity_thrift_rpc::ListDatabaseRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
@@ -1563,10 +1573,10 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
             response.store_dir = value.GetVarchar();
         }
 
-//        {
-//            Value value = data_block->GetValue(1, 9);
-//            response.store_size = value.GetVarchar();
-//        }
+        //        {
+        //            Value value = data_block->GetValue(1, 9);
+        //            response.store_size = value.GetVarchar();
+        //        }
 
         {
             Value value = data_block->GetValue(1, 9);
@@ -1816,7 +1826,8 @@ void InfinityThriftService::ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNode
 
         {
             Value value = data_block->GetValue(1, 1);
-            if (row_count == 5) value = data_block->GetValue(1, 2);
+            if (row_count == 5)
+                value = data_block->GetValue(1, 2);
             response.server_status = value.GetVarchar();
         }
 

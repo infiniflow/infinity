@@ -240,6 +240,8 @@ public:
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
+    Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name);
+
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
     Status OptimizeAllIndexes();
@@ -608,6 +610,7 @@ public:
 
     Status Dummy();
     void SetWalSize(i64 wal_size);
+
 private:
     // To record the access table reference count for release in txn committing or rollbacking phase
     HashMap<String, SizeT> table_write_reference_count_{};
@@ -655,6 +658,7 @@ private:
     // Used for new checkpoint
     TxnTimeStamp current_ckp_ts_{};
     SizeT wal_size_{};
+
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
 

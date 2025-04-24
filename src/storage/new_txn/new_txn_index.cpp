@@ -61,8 +61,63 @@ import meta_key;
 import data_access_state;
 import hnsw_util;
 import bmp_util;
+import defer_op;
 
 namespace infinity {
+
+Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name) {
+    Status status;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->SetMemIndexDump(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = this->IncreaseTableReferenceCount(table_key);
+    bool ok = false;
+    DeferFn defer_fn([&] {
+        if (ok) {
+            return;
+        }
+        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+        if (!mem_index_status.ok()) {
+            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
+        }
+    });
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+        ChunkID new_chunk_id = 0;
+        status = this->DumpMemIndexInner(segment_index_meta, new_chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
+        status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ok = true;
+    return Status::OK();
+}
 
 Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
     Status status;
