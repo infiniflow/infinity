@@ -4626,7 +4626,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             };
 
             output_block_ptr->Init(output_column_types);
-#ifdef ENABLE_JEMALLOC
+#ifdef ENABLE_JEMALLOC_PROF
             // option value
             Value value = Value::MakeVarchar("off");
 #else
@@ -5325,7 +5325,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
                 }
                 {
-#ifdef ENABLE_JEMALLOC
+#ifdef ENABLE_JEMALLOC_PROF
                     // option value
                     Value value = Value::MakeVarchar("off");
 #else

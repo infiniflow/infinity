@@ -19,7 +19,7 @@ module;
 
 import compilation_config;
 
-#ifdef ENABLE_JEMALLOC
+#ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
@@ -114,8 +114,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
                         }
                         case GlobalVariable::kJeProf: {
-#ifdef ENABLE_JEMALLOC
-                            // dump jeprof
+#ifdef ENABLE_JEMALLOC_PROF
+                            // http://jemalloc.net/jemalloc.3.html
+                            malloc_stats_print(nullptr, nullptr, "admp");
                             int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
                             if (ret != 0) {
                                 Status status = Status::UnexpectedError(fmt::format("mallctl prof1.dump failed {}", ret));

@@ -170,6 +170,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
 #ifdef ENABLE_JEMALLOC_PROF
         case SIGUSR2: {
             // http://jemalloc.net/jemalloc.3.html
+            malloc_stats_print(nullptr, nullptr, "admp");
             int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
             printf("Dump memory profile %d\n", rc);
             break;
