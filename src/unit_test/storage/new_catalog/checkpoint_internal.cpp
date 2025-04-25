@@ -433,6 +433,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         checkpoint();
         Status status = txn->CreateIndex(*db_name, "renametable", index_base, conflict_type_);
         EXPECT_TRUE(status.ok());
+        // status = new_txn_mgr->CommitTxn(txn);
+        // EXPECT_TRUE(status.ok());
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetDBMeta(*db_name, db_meta);
@@ -442,8 +444,11 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         String index_key;
         txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
         EXPECT_TRUE(status.ok());
-        // RestartTxnMgr();
-        // txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
-        // EXPECT_TRUE(!status.ok());
+        RestartTxnMgr();
+        // sometimes cannot find checkpoint
+        // if successfully getting the checkpoint
+        // crashing in getting dbmeta
+        txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(!status.ok());
     }
 }
