@@ -61,6 +61,8 @@ import table_entry;
 import segment_entry;
 import block_entry;
 import block_column_entry;
+import segment_index_meta;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -826,8 +828,45 @@ Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nloh
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
-Status NewCatalog::TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogSegmentIndex(TableIndexMeeta &table_index_meta, const nlohmann::json &segment_index_entry_json) {
+
+    for (const auto &index_entry_json : segment_index_entry_json) {
+        SegmentID segment_id = index_entry_json["segment_id"];
+        Optional<SegmentIndexMeta> segment_index_meta;
+        Status status = AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    // AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
+    return Status::OK();
+}
+
+Status NewCatalog::TransformCatalogChunkIndex(SegmentIndexMeta &segment_index_meta, const nlohmann::json &chunk_index_entry_json) {
+
+    for (const auto &index_entry_json : chunk_index_entry_json) {
+        ChunkID chunk_id= index_entry_json["chunk_id"];
+        RowID base_row_id = RowID(index_entry_json["base_rowid"].get<uint64_t>());
+        SizeT row_count= index_entry_json["row_count"];
+        String base_name = index_entry_json["base_name"];
+        Optional<ChunkIndexMeta> chunk_index_meta;
+        AddNewChunkIndex(segment_index_meta,
+                                   chunk_id,
+                                   base_row_id,
+                                   row_count,
+                                   base_name,
+                                   row_count,
+                                   chunk_index_meta);
+    }
+    // static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
+    //                                ChunkID chunk_id,
+    //                                RowID base_row_id,
+    //                                SizeT row_count,
+    //                                const String &base_name,
+    //                                SizeT index_size,
+    //                                Optional<ChunkIndexMeta> &chunk_index_meta);
+    return Status::OK();
+}
 
 String NewCatalog::GetPathNameTail(const String &path) {
     SizeT delimiter_i = path.rfind('/');

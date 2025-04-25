@@ -171,8 +171,8 @@ private:
                                  bool is_vfs);
     Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json, Set<String> &dir_set);
     Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
-    Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
-    Status TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogSegmentIndex(TableIndexMeeta &table_meta,const nlohmann::json &table_index_entry_json);
+    Status TransformCatalogChunkIndex(SegmentIndexMeta &segment_index_meta, const nlohmann::json &chunk_index_entry_json);
     // // Database related functions
     // Status CreateDatabase(const SharedPtr<String> &db_name,
     //                       const SharedPtr<String> &comment,
