@@ -25,6 +25,10 @@ import third_party;
 
 namespace infinity {
 
+// ref: https://github.com/pisa-engine/pisa
+// ref: Compressing Graphs and Indexes with Recursive Graph Bisection
+// ref: Compressing Inverted Indexes with Recursive Graph Bisection: A Reproducibility Study
+
 struct BPReorderContext {
 public:
     BPReorderContext(SizeT term_num, SizeT doc_num)

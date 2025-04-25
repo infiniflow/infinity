@@ -119,7 +119,7 @@ public:
         return res;
     }
 
-    SizeT block_size() const { return block_ids_.size(); }
+    SizeT block_num() const { return block_ids_.size(); }
     const BMPBlockID *block_ids() const { return block_ids_.data(); }
     const DataType *max_scores() const { return max_scores_.data(); }
 
@@ -147,7 +147,7 @@ public:
         return {block_data_prefix_sum, block_ids, max_scores};
     }
 
-    SizeT block_size() const { return block_size_; }
+    SizeT block_num() const { return block_size_; }
     const BMPBlockID *block_ids() const { return block_ids_; }
     const DataType *max_scores() const { return max_scores_; }
 
@@ -228,7 +228,7 @@ public:
         return res;
     }
 
-    SizeT block_size() const { return max_scores_.size(); }
+    SizeT block_num() const { return max_scores_.size(); }
     const DataType *max_scores() const { return max_scores_.data(); }
 
 public:
@@ -249,7 +249,7 @@ public:
         return {block_data_prefix_sum, max_scores};
     }
 
-    SizeT block_size() const { return block_size_; }
+    SizeT block_num() const { return block_size_; }
     const DataType *max_scores() const { return max_scores_; }
 
 private:
@@ -383,8 +383,8 @@ public:
     void AddBlock(BMPBlockID block_id, const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms, SizeT &mem_usage) {
         HashMap<IdxType, DataType> max_scores;
         for (const auto &[indices, data] : tail_terms) {
-            SizeT block_size = indices.size();
-            for (SizeT i = 0; i < block_size; ++i) {
+            SizeT nnz = indices.size();
+            for (SizeT i = 0; i < nnz; ++i) {
                 IdxType term_id = indices[i];
                 DataType score = data[i];
                 max_scores[term_id] = std::max(max_scores[term_id], score);
