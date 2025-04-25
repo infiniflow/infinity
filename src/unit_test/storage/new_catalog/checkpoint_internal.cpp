@@ -417,4 +417,15 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
     checkpoint();
 
     RestartTxnMgr();
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        ConflictType conflict_type_{};
+        SharedPtr<String> index_name_ptr = MakeShared<String>("index_name");
+        SharedPtr<String> index_comment_ptr = MakeShared<String>("index_comment");
+        const String file_name ="";
+        Vector<String> column_names {"col1","col2"};
+        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
+        status = txn->CreateIndex(*db_name,*table_name,index_base,conflict_type_);
+    }
 }
