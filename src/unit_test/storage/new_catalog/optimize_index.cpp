@@ -1651,25 +1651,6 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         EXPECT_TRUE(status.ok());
     };
 
-    auto CheckTable1 = [&](Vector<ColumnID> column_idxes) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> expected_segments{0, 1, 2};
-        EXPECT_EQ(*segment_ids_ptr, expected_segments);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
-
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
@@ -1705,7 +1686,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //  t1        optimize index    commit (success)
         //  |--------------|---------------|
         //                         |------------------|----------|
-        //                        t2               compact       commit (fail)
+        //                        t2               compact       commit (success)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
@@ -1720,9 +1701,9 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        CheckTable1({0, 1});
+        CheckTable({0, 1});
 
         DropDB();
     }
@@ -1732,7 +1713,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         //  t1       optimize index     commit (success)
         //  |--------------|---------------|
         //         |------------------|-------------|
-        //        t2            compact         commit(fail)
+        //        t2            compact         commit(success)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
 
@@ -1749,19 +1730,19 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        CheckTable1({0, 1});
+        CheckTable({0, 1});
 
         DropDB();
     }
     {
         PrepareForCompactAndOptimize();
 
-        //  t1        optimize index         commit
+        //  t1        optimize index         commit (success)
         //  |--------------|-------------------|
         //         |-----|----------|
-        //        t2   compact   commit
+        //        t2   compact   commit (success)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
 
@@ -1778,7 +1759,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         CheckTable({0, 1});
 
@@ -1787,10 +1768,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     {
         PrepareForCompactAndOptimize();
 
-        //           t1      optimize index        commit (fail)
+        //           t1      optimize index        commit (success)
         //           |----------|-------------------|
         //         |-----|----------|
-        //        t2   compact   commit
+        //        t2   compact   commit (success)
 
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
@@ -1807,7 +1788,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         CheckTable({0, 1});
 
@@ -1816,10 +1797,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     {
         PrepareForCompactAndOptimize();
 
-        //                  t1                optimize index         commit
+        //                  t1                optimize index         commit (success)
         //                  |--------------------------|---------------|
         //         |-----|----------|
-        //        t2    compact  commit
+        //        t2    compact  commit (success)
 
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
@@ -1836,7 +1817,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         CheckTable({0, 1});
 
@@ -1846,10 +1827,10 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     {
         PrepareForCompactAndOptimize();
 
-        //                             t1                  optimize index      rollback
-        //                             |--------------------------|---------------|
+        //        t1  compact    commit (success)
         //         |-----|----------|
-        //        t2  compact    commit
+        //                             |--------------------------|---------------|
+        //                             t2                  optimize index      commit (success)
 
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);

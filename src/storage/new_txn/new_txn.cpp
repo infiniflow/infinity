@@ -1937,6 +1937,13 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_t
 bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
+    Set<SegmentID> segment_ids;
+    for (const auto segment_id : cmd.deprecated_segment_ids_) {
+        segment_ids.insert(segment_id);
+    }
+    for (const auto &new_segment_info : cmd.new_segment_infos_) {
+        segment_ids.insert(new_segment_info.segment_id_);
+    }
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1979,8 +1986,11 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
                 switch (dump_index_cmd->dump_cause_) {
                     case DumpIndexCause::kOptimizeIndex: {
                         // Compact table conflicts with optimize index
-                        if (dump_index_cmd->db_name_ == db_name && dump_index_cmd->table_name_ == table_name) {
-                            cause = fmt::format("Optimize index on table {} in database {}.", table_name, db_name);
+                        if (segment_ids.contains(dump_index_cmd->segment_id_)) {
+                            cause = fmt::format("Optimize index on table {} segment {} in database {}.",
+                                                table_name,
+                                                dump_index_cmd->segment_id_,
+                                                db_name);
                             return true;
                         }
                         break;
@@ -2057,8 +2067,17 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
             case WalCommandType::COMPACT_V2: {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
-                    cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
-                    return true;
+                    Set<SegmentID> segment_ids;
+                    for (const auto segment_id : compact_cmd->deprecated_segment_ids_) {
+                        segment_ids.insert(segment_id);
+                    }
+                    for (const auto &new_segment_info : compact_cmd->new_segment_infos_) {
+                        segment_ids.insert(new_segment_info.segment_id_);
+                    }
+                    if (segment_ids.contains(cmd.segment_id_)) {
+                        cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
+                        return true;
+                    }
                 }
                 break;
             }
