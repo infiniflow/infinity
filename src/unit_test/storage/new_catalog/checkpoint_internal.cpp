@@ -69,6 +69,7 @@ import index_emvb;
 import constant_expr;
 import txn;
 import infinity;
+import table_entry;
 
 using namespace infinity;
 
@@ -324,23 +325,23 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         // checkpoint();
 
         // std::cout<<"first";
-        new_txn_mgr->PrintAllKeyValue();
-
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-            Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2","col1"});
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-
-        std::cout<<"second";
-        new_txn_mgr->PrintAllKeyValue();
+        // new_txn_mgr->PrintAllKeyValue();
+        //
+        // {
+        //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        //     Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2", "col1"});
+        //     EXPECT_TRUE(status.ok());
+        //     status = new_txn_mgr->CommitTxn(txn);
+        //     EXPECT_TRUE(status.ok());
+        // }
+        //
+        // std::cout << "second";
+        // new_txn_mgr->PrintAllKeyValue();
 
         // RestartTxnMgr();
 
-        std::cout << "end";
-        new_txn_mgr->PrintAllKeyValue();
+        // std::cout << "end";
+        // new_txn_mgr->PrintAllKeyValue();
 
         check_column(0, v1);
         check_column(1, v2);
@@ -398,34 +399,51 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
     RestartTxnMgr();
 
-    Status status;
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-    status = txn->GetDBMeta(*db_name, db_meta);
-    status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-    status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
-    EXPECT_TRUE(status.ok());
-    checkpoint();
+    {
+        Status status;
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        status = txn->GetDBMeta(*db_name, db_meta);
+        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(!status.ok());
+        status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+        checkpoint();
 
-    RestartTxnMgr();
-    auto infinity = Infinity::RemoteConnect();
-    checkpoint();
+        RestartTxnMgr();
+        auto infinity = Infinity::RemoteConnect();
+        checkpoint();
 
-    RestartTxnMgr();
-    infinity->CompactTable(*db_name,*table_name);
-    checkpoint();
+        RestartTxnMgr();
+        infinity->CompactTable(*db_name, *table_name);
+        checkpoint();
 
-    RestartTxnMgr();
+        RestartTxnMgr();
+    }
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        ConflictType conflict_type_{};
+        ConflictType conflict_type_{ConflictType::kIgnore};
         SharedPtr<String> index_name_ptr = MakeShared<String>("index_name");
         SharedPtr<String> index_comment_ptr = MakeShared<String>("index_comment");
-        const String file_name ="";
-        Vector<String> column_names {"col1","col2"};
+        const String file_name = "";
+        Vector<String> column_names{"col1", "col2"};
         SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
-        status = txn->CreateIndex(*db_name,*table_name,index_base,conflict_type_);
+        checkpoint();
+        Status status = txn->CreateIndex(*db_name, "renametable", index_base, conflict_type_);
+        EXPECT_TRUE(status.ok());
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn->GetDBMeta(*db_name, db_meta);
+        status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+        // RestartTxnMgr();
+        // txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        // EXPECT_TRUE(!status.ok());
     }
 }
