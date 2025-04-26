@@ -160,7 +160,7 @@ public:
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override { task_queue_.Enqueue(std::move(task)); }
 
-    Txn *GetTxn() override { return nullptr; }
+    NewTxn *GetTxn() override { return nullptr; }
 
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override { return catalog_.GetMemIndexes(); }
 

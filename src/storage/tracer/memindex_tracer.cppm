@@ -24,9 +24,12 @@ import global_resource_usage;
 namespace infinity {
 
 class BaseMemIndex;
+class NewTxn;
 class Txn;
+struct NewCatalog;
 struct Catalog;
 class TxnManager;
+class NewTxnManager;
 class DumpIndexTask;
 class NewTxn;
 
@@ -62,6 +65,8 @@ public:
 
     Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(Txn *txn);
 
+    Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
+
     Vector<BaseMemIndex *> GetUndumpedMemIndexes(Txn *txn);
 
     Vector<BaseMemIndex *> GetUndumpedMemIndexes(NewTxn *new_txn);
@@ -71,7 +76,7 @@ public:
     SizeT cur_index_memory() const { return cur_index_memory_.load(); }
 
 protected:
-    virtual Txn *GetTxn() = 0;
+    virtual NewTxn *GetTxn() = 0;
 
     virtual Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) = 0;
 
@@ -109,22 +114,21 @@ inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
 
 export class BGMemIndexTracer : public MemIndexTracer {
 public:
-    BGMemIndexTracer(SizeT index_memory_limit, Catalog *catalog, TxnManager *txn_mgr);
+    BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr);
 
     ~BGMemIndexTracer();
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override;
 
 protected:
-    Txn *GetTxn() override;
+    NewTxn *GetTxn() override;
 
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override;
 
     Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override;
 
 private:
-    Catalog *catalog_;
-    TxnManager *txn_mgr_;
+    NewTxnManager *txn_mgr_;
 };
 
 } // namespace infinity
