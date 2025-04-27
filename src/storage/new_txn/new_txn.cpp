@@ -1864,7 +1864,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
             case WalCommandType::DUMP_INDEX_V2: {
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 if (dump_index_cmd->db_name_ == db_name && dump_index_cmd->table_name_ == table_name &&
-                    segment_ids.contains(dump_index_cmd->segment_id_)) {
+                    segment_ids.contains(dump_index_cmd->segment_id_) && dump_index_cmd->dump_cause_ != DumpIndexCause::kOptimizeIndex) {
                     cause = fmt::format("Dump index {} on segment {} table {} in database {}.",
                                         dump_index_cmd->index_name_,
                                         dump_index_cmd->segment_id_,
