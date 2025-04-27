@@ -220,8 +220,8 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
-        BGTaskProcessor *bg_processor = storage->bg_processor();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        WalManager *wal_manager = storage->wal_manager();
 
         {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
@@ -251,11 +251,11 @@ TEST_P(WalReplayTest, wal_replay_tables) {
             txn_mgr->CommitTxn(txn3);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
-            bg_processor->Submit(force_ckp_task);
-            force_ckp_task->Wait();
-            txn_mgr->CommitTxn(txn);
+            auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -274,7 +274,7 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
             auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), MakeShared<String>(), columns);
