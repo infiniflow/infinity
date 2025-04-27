@@ -2270,9 +2270,11 @@ void NewTxn::PostCommit() {
 
     TransactionType txn_type = GetTxnType();
     if (txn_type == TransactionType::kNewCheckpoint) {
-        // TODO: Shouldn't set the ckp ts if checkpoint is skipped.
-        wal_manager->SetLastCheckpointTS(current_ckp_ts_);
-        wal_manager->SetLastCkpWalSize(wal_size_); // Update last checkpoint wal size
+        if (!wal_entry_->cmds_.empty()) {
+            // Shouldn't set the ckp ts if checkpoint is skipped.
+            wal_manager->SetLastCheckpointTS(current_ckp_ts_);
+            wal_manager->SetLastCkpWalSize(wal_size_); // Update last checkpoint wal size
+        }
     }
 
     SetCompletion();
@@ -2387,6 +2389,10 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case WalCommandType::COMPACT_V2: {
                 //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                break;
+            }
+            case WalCommandType::CHECKPOINT_V2: {
+                UnrecoverableError("Unexpected case: rollback checkpoint");
                 break;
             }
             default: {
