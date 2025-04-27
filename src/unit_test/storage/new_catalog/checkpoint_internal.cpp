@@ -323,7 +323,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         };
 
         // checkpoint();
-
+        //
         // std::cout<<"first";
         // new_txn_mgr->PrintAllKeyValue();
         //
@@ -337,11 +337,13 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         //
         // std::cout << "second";
         // new_txn_mgr->PrintAllKeyValue();
-
+        //
         // RestartTxnMgr();
-
+        //
         // std::cout << "end";
         // new_txn_mgr->PrintAllKeyValue();
+        //
+        // check_db();
 
         check_column(0, v1);
         check_column(1, v2);
@@ -431,10 +433,14 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         Vector<String> column_names{"col1", "col2"};
         SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
         checkpoint();
+        checkpoint();
         Status status = txn->CreateIndex(*db_name, "renametable", index_base, conflict_type_);
         EXPECT_TRUE(status.ok());
-        // status = new_txn_mgr->CommitTxn(txn);
-        // EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetDBMeta(*db_name, db_meta);
@@ -444,11 +450,31 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         String index_key;
         txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
         EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
         RestartTxnMgr();
+
         // sometimes cannot find checkpoint
         // if successfully getting the checkpoint
         // crashing in getting dbmeta
-        txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta1;
+        Optional<TableMeeta> table_meta1;
+        status = txn->GetDBMeta(*db_name, db_meta1);
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+        // status = txn->GetTableMeta(*db_name, "renametable", db_meta1, table_meta);
+        Optional<TableIndexMeeta> table_index_meta1;
+        String table_key1;
+        String index_key1;
+        txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta1, table_meta1, table_index_meta1, &table_key1, &index_key1);
         EXPECT_TRUE(!status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
+
+
 }
