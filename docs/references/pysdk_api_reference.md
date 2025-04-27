@@ -1031,8 +1031,7 @@ table_object.create_index(
               "metric": "l2",
               "encode": "lvq"
             }
-        ),
-    None
+        )
 )
 ```
 
@@ -1063,8 +1062,7 @@ table_object.create_index(
         IndexInfo(
             "body", 
             IndexType.FullText, 
-        ),
-    None
+        )
 )
 ```
 
@@ -1082,14 +1080,13 @@ table_object.create_index(
             {
                 "ANALYZER": "standard"
             }
-        ),
-    None
+        )
 )
 ```
 
 ##### Create a secondary index
 
-```python {11}
+```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_secondary" with a varchar column "body"
 table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "varchar"}})
@@ -1099,14 +1096,13 @@ table_object.create_index(
         IndexInfo(
             "c1", 
             IndexType.Secondary 
-        ),
-    None
+        )
 )
 ```
 
 ##### Create a BMP index
 
-```python {13}
+```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}})
@@ -1118,12 +1114,11 @@ table_object.create_index(
         IndexInfo(
             "c1",
             IndexType.BMP
-        ),
-    None
+        )
 )
 ```
 
-```python {13,14}
+```python
 from infinity.index import IndexInfo, IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}})
@@ -1138,8 +1133,7 @@ table_object.create_index(
               "block_size": "16",
               "compress_type": "compress"
             }
-        ),
-    None
+        )
 )
 ```
 
