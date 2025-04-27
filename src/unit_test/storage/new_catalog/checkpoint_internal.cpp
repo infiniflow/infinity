@@ -473,9 +473,6 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
         RestartTxnMgr();
 
-        // sometimes cannot find checkpoint
-        // if successfully getting the checkpoint
-        // crashing in getting dbmeta
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta1;
         Optional<TableMeeta> table_meta1;
