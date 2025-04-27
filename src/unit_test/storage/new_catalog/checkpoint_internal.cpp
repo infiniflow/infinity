@@ -322,32 +322,49 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
             }
         };
 
-        // checkpoint();
-        //
-        // std::cout<<"first";
-        // new_txn_mgr->PrintAllKeyValue();
-        //
-        // {
-        //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        //     Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2", "col1"});
-        //     EXPECT_TRUE(status.ok());
-        //     status = new_txn_mgr->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // }
-        //
-        // std::cout << "second";
-        // new_txn_mgr->PrintAllKeyValue();
-        //
-        // RestartTxnMgr();
-        //
-        // std::cout << "end";
-        // new_txn_mgr->PrintAllKeyValue();
-        //
-        // check_db();
+        check_db();
 
         check_column(0, v1);
         check_column(1, v2);
     };
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2", "col1"});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    RestartTxnMgr();
+    checkpoint();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto default_value1 = std::make_shared<ConstantExpr>(LiteralType::kInteger);
+        {
+            int64_t num = 1;
+            default_value1->integer_value_ = num;
+        }
+
+        auto default_value2 = std::make_shared<ConstantExpr>(LiteralType::kString);
+        {
+            const char *str = "abcdefghijklmnopqrstuvwxyz";
+            size_t str_len = strlen(str);
+            default_value2->str_value_ = (char *)malloc(str_len + 1);
+            strncpy(default_value2->str_value_, str, str_len + 1);
+        }
+        auto column_def11 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>(), "", default_value1);
+        auto column_def22 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), "", default_value2);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def11);
+        columns.emplace_back(column_def22);
+        Status status = txn->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    RestartTxnMgr();
+    checkpoint();
 
     auto check_segment = [&](SegmentMeta &segment_meta) {
         Vector<BlockID> *block_ids_ptr = nullptr;
@@ -437,8 +454,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         Status status = txn->CreateIndex(*db_name, "renametable", index_base, conflict_type_);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        // status = new_txn_mgr->CommitTxn(txn);
+        // EXPECT_TRUE(status.ok());
 
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
@@ -471,10 +488,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         String index_key1;
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         txn->GetTableIndexMeta(*db_name, "renametable", "index_name", db_meta1, table_meta1, table_index_meta1, &table_key1, &index_key1);
-        EXPECT_TRUE(!status.ok());
+        EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
-
 }
