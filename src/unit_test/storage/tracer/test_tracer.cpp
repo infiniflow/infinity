@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
 import stl;
 import memindex_tracer;
@@ -24,6 +25,8 @@ import logger;
 import txn;
 import table_index_entry;
 import new_txn;
+import compilation_config;
+import infinity_context;
 
 using namespace infinity;
 
@@ -228,6 +231,13 @@ void TestMemIndexTracer::DumpRoutine() {
 class MemIndexTracerTest : public BaseTest {};
 
 TEST_F(MemIndexTracerTest, test1) {
+
+    RemoveDbDirs();
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    //    RemoveDbDirs();
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+
     SizeT memory_limit = 50;
     TestCatalog catalog;
 
