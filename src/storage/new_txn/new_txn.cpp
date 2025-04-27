@@ -390,6 +390,19 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
 
 Status NewTxn::DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names) {
 
+    if (column_names.empty()) {
+        return Status::NotSupport("DropColumns: column_names is empty");
+    }
+
+    {
+        Set<String> name_set;
+        for (const auto &name : column_names) {
+            if (!name_set.insert(name).second) {
+                return Status::DuplicateColumnName(name);
+            }
+        }
+    }
+
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
@@ -414,6 +427,10 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         } else {
             return Status::ColumnNotExist(column_name);
         }
+    }
+
+    if (column_names.size() == old_column_defs->size()) {
+        return Status::NotSupport("Cannot delete all the columns of a table");
     }
 
     status = new_catalog_->ImmutateTable(table_key, txn_context_ptr_->txn_id_);

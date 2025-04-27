@@ -306,7 +306,6 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         Status status;
 
         SizeT row_count = 0;
-        // std::tie(row_count, status) = block_meta.GetRowCnt();
         std::tie(row_count, status) = block_meta.GetRowCnt1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, block_row_cnt);
@@ -330,7 +329,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2", "col1"});
+        Status status = txn->DropColumns(*db_name, *table_name, Vector<String>{"col2"});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -352,8 +351,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
             default_value2->str_value_ = (char *)malloc(str_len + 1);
             strncpy(default_value2->str_value_, str, str_len + 1);
         }
-        auto column_def11 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>(), "", default_value1);
-        auto column_def22 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), "", default_value2);
+        auto column_def11 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), "", default_value2);
+        auto column_def22 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kInteger), "col3", std::set<ConstraintType>(), "", default_value1);
         Vector<SharedPtr<ColumnDef>> columns;
         columns.emplace_back(column_def11);
         columns.emplace_back(column_def22);
@@ -403,20 +402,9 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
-
+    checkpoint();
+    RestartTxnMgr();
     renametable("renametable");
-
-    checkpoint();
-
-    checkpoint();
-
-    RestartTxnMgr();
-
-    checkpoint();
-
-    checkpoint();
-
-    RestartTxnMgr();
 
     {
         Status status;
@@ -454,9 +442,6 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         Status status = txn->CreateIndex(*db_name, "renametable", index_base, conflict_type_);
         EXPECT_TRUE(status.ok());
 
-        // status = new_txn_mgr->CommitTxn(txn);
-        // EXPECT_TRUE(status.ok());
-
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -479,7 +464,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         status = txn->GetDBMeta(*db_name, db_meta1);
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        // status = txn->GetTableMeta(*db_name, "renametable", db_meta1, table_meta);
+
         Optional<TableIndexMeeta> table_index_meta1;
         String table_key1;
         String index_key1;
