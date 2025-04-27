@@ -1843,6 +1843,11 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
 bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
+    Set<SegmentID> segment_ids;
+    for (const auto &row_range : cmd.row_ranges_) {
+        RowID row_id = row_range.first;
+        segment_ids.insert(row_id.segment_id_);
+    }
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
         WalCommandType command_type = wal_cmd->GetType();
@@ -1852,6 +1857,19 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
                     cause =
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
+                    return true;
+                }
+                break;
+            }
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
+                if (dump_index_cmd->db_name_ == db_name && dump_index_cmd->table_name_ == table_name &&
+                    segment_ids.contains(dump_index_cmd->segment_id_)) {
+                    cause = fmt::format("Dump index {} on segment {} table {} in database {}.",
+                                        dump_index_cmd->index_name_,
+                                        dump_index_cmd->segment_id_,
+                                        table_name,
+                                        db_name);
                     return true;
                 }
                 break;
