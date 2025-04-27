@@ -63,6 +63,12 @@ import txn_state;
 import new_txn;
 import new_txn_manager;
 import wal_manager;
+import segment_meta;
+import block_meta;
+import column_meta;
+import table_meeta;
+import db_meeta;
+import new_catalog;
 
 using namespace infinity;
 
@@ -310,8 +316,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
-        BGTaskProcessor *bg_processor = storage->bg_processor();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        WalManager *wal_manager = storage->wal_manager();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -373,29 +379,27 @@ TEST_P(WalReplayTest, wal_replay_append) {
 
             input_block->Init(column_types, row_count);
             for (SizeT i = 0; i < row_count; ++i) {
-                input_block->AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+                input_block->AppendValue(0, Value::MakeTinyInt(5));
             }
 
             for (SizeT i = 0; i < row_count; ++i) {
-                input_block->AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
+                input_block->AppendValue(1, Value::MakeBigInt(1000));
             }
 
             for (SizeT i = 0; i < row_count; ++i) {
-                input_block->AppendValue(2, Value::MakeDouble(static_cast<f64>(i)));
+                input_block->AppendValue(2, Value::MakeDouble(0.1));
             }
             input_block->Finalize();
             EXPECT_EQ(input_block->Finalized(), true);
-            auto [table_entry, status] = txn5->GetTableByName("default_db", "tbl4");
-            EXPECT_TRUE(status.ok());
             txn5->Append("default_db", "tbl4", input_block);
             txn_mgr->CommitTxn(txn5);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
-            bg_processor->Submit(force_ckp_task);
-            force_ckp_task->Wait();
-            txn_mgr->CommitTxn(txn);
+            auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
         }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
@@ -414,7 +418,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -437,38 +441,100 @@ TEST_P(WalReplayTest, wal_replay_append) {
 
             txn_mgr->CommitTxn(txn);
         }
-        {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl4");
-            EXPECT_NE(table_entry, nullptr);
 
-            auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
-            EXPECT_NE(segment_entry, nullptr);
-            EXPECT_EQ(segment_entry->segment_id(), 0u);
-            EXPECT_EQ(segment_entry->row_count(), row_count);
+        auto check_table = [&] {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            Status status;
 
-            auto *block_entry = segment_entry->GetBlockEntryByID(0).get();
-            EXPECT_EQ(block_entry->block_id(), 0u);
-            EXPECT_EQ(block_entry->row_count(), row_count);
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            status = txn->GetTableMeta("default_db", "tbl4", db_meta, table_meta);
+            EXPECT_TRUE(status.ok());
 
-            ColumnVector col0 = block_entry->GetConstColumnVector(storage->buffer_manager(), 0);
-            ColumnVector col1 = block_entry->GetConstColumnVector(storage->buffer_manager(), 1);
-            ColumnVector col2 = block_entry->GetConstColumnVector(storage->buffer_manager(), 2);
+            auto check_block = [&](BlockMeta &block_meta) {
+                Value v1 = Value::MakeTinyInt(5);
+                Value v2 = Value::MakeBigInt(1000);
+                Value v3 = Value::MakeDouble(0.1);
 
-            for (SizeT i = 0; i < row_count; ++i) {
-                Value v0 = col0.GetValue(i);
-                EXPECT_EQ(v0.GetValue<TinyIntT>(), static_cast<i8>(i));
+                SizeT block_row_count = 0;
+                // std::tie(row_count, status) = block_meta.GetRowCnt();
+                std::tie(block_row_count, status) = block_meta.GetRowCnt1();
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(block_row_count, row_count);
 
-                Value v1 = col1.GetValue(i);
-                EXPECT_EQ(v1.GetValue<BigIntT>(), static_cast<i64>(i));
+                auto check_column = [&](ColumnID column_id, const Value &v) {
+                    ColumnMeta column_meta(column_id, block_meta);
+                    ColumnVector col1;
+                    status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, col1);
+                    EXPECT_TRUE(status.ok());
 
-                Value v2 = col2.GetValue(i);
-                EXPECT_EQ(v2.GetValue<DoubleT>(), static_cast<f64>(i));
+                    for (u32 i = 0; i < block_row_count; ++i) {
+                        EXPECT_EQ(col1.GetValue(i), v);
+                    }
+                };
+
+                check_column(0, v1);
+                check_column(1, v2);
+                check_column(2, v3);
+            };
+
+            auto check_segment = [&](SegmentMeta &segment_meta) {
+                Vector<BlockID> *block_ids_ptr = nullptr;
+                std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+
+                for (BlockID block_id : *block_ids_ptr) {
+                    BlockMeta block_meta(block_id, segment_meta);
+                    check_block(block_meta);
+                }
+            };
+
+            {
+                Vector<SegmentID> *segment_ids_ptr = nullptr;
+                std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+                SegmentID segment_id = (*segment_ids_ptr)[0];
+                SegmentMeta segment_meta(segment_id, *table_meta);
+                check_segment(segment_meta);
             }
+        };
 
-            txn_mgr->CommitTxn(txn);
-        }
+        check_table();
+//        {
+//            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+//            TxnTimeStamp begin_ts = txn->BeginTS();
+//            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl4");
+//            EXPECT_NE(table_entry, nullptr);
+//
+//            auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
+//            EXPECT_NE(segment_entry, nullptr);
+//            EXPECT_EQ(segment_entry->segment_id(), 0u);
+//            EXPECT_EQ(segment_entry->row_count(), row_count);
+//
+//            auto *block_entry = segment_entry->GetBlockEntryByID(0).get();
+//            EXPECT_EQ(block_entry->block_id(), 0u);
+//            EXPECT_EQ(block_entry->row_count(), row_count);
+//
+//            ColumnVector col0 = block_entry->GetConstColumnVector(storage->buffer_manager(), 0);
+//            ColumnVector col1 = block_entry->GetConstColumnVector(storage->buffer_manager(), 1);
+//            ColumnVector col2 = block_entry->GetConstColumnVector(storage->buffer_manager(), 2);
+//
+//            for (SizeT i = 0; i < row_count; ++i) {
+//                Value v0 = col0.GetValue(i);
+//                EXPECT_EQ(v0.GetValue<TinyIntT>(), static_cast<i8>(i));
+//
+//                Value v1 = col1.GetValue(i);
+//                EXPECT_EQ(v1.GetValue<BigIntT>(), static_cast<i64>(i));
+//
+//                Value v2 = col2.GetValue(i);
+//                EXPECT_EQ(v2.GetValue<DoubleT>(), static_cast<f64>(i));
+//            }
+//
+//            txn_mgr->CommitTxn(txn);
+//        }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
