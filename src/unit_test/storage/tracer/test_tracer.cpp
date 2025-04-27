@@ -247,9 +247,18 @@ TEST_F(MemIndexTracerTest, test1) {
     catalog.AppendMemIndex("idx1", 10, 10);
     catalog.AppendMemIndex("idx2", 30, 30);
     catalog.AppendMemIndex("idx3", 20, 20);
+
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(MemIndexTracerTest, test2) {
+
+    RemoveDbDirs();
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    //    RemoveDbDirs();
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+
     auto Test = [](bool may_fail) {
         int thread_n = 2;
         SizeT memory_limit = 50;
@@ -280,4 +289,6 @@ TEST_F(MemIndexTracerTest, test2) {
     };
     Test(false);
     Test(true);
+
+    infinity::InfinityContext::instance().UnInit();
 }
