@@ -2972,7 +2972,6 @@ WalListIterator::WalListIterator(const Vector<String> &wal_list) {
 }
 
 void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
-    bool use_new_catalog = InfinityContext::instance().config()->UseNewCatalog();
     bool found_checkpoint = false;
     SizeT file_num = 0;
     auto it = wal_list_.begin();
@@ -2982,12 +2981,13 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
         while (iter_->HasNext()) {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
-                if (use_new_catalog) {
+                {
                     WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
                     if (entry->IsCheckPoint(checkpoint_cmd)) {
                         found_checkpoint = true;
                     }
-                } else {
+                }
+                {
                     WalCmdCheckpoint *checkpoint_cmd = nullptr;
                     if (entry->IsCheckPoint(checkpoint_cmd)) {
                         found_checkpoint = true;
