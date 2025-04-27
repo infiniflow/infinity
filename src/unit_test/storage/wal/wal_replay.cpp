@@ -62,6 +62,7 @@ import compaction_process;
 import txn_state;
 import new_txn;
 import new_txn_manager;
+import wal_manager;
 
 using namespace infinity;
 
@@ -101,39 +102,39 @@ TEST_P(WalReplayTest, wal_replay_database) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
-        BGTaskProcessor *bg_processor = storage->bg_processor();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        WalManager *wal_manager = storage->wal_manager();
 
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kIgnore, MakeShared<String>());
+            txn->CreateDatabase("db1", ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            txn->CreateDatabase(MakeShared<String>("db2"), ConflictType::kIgnore, MakeShared<String>());
+            txn->CreateDatabase("db2", ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            txn->CreateDatabase(MakeShared<String>("db3"), ConflictType::kIgnore, MakeShared<String>());
+            txn->CreateDatabase("db3", ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            txn->CreateDatabase(MakeShared<String>("db4"), ConflictType::kIgnore, MakeShared<String>());
+            txn->CreateDatabase("db4", ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
-            bg_processor->Submit(force_ckp_task);
-            force_ckp_task->Wait();
-            txn_mgr->CommitTxn(txn);
+            auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            txn->CreateDatabase(MakeShared<String>("db5"), ConflictType::kIgnore, MakeShared<String>());
+            txn->CreateDatabase("db5", ConflictType::kIgnore, MakeShared<String>());
             txn_mgr->CommitTxn(txn);
         }
         {
@@ -159,7 +160,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -169,7 +170,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+            Status status = txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
             EXPECT_EQ(status.ok(), true);
             txn_mgr->CommitTxn(txn);
         }
