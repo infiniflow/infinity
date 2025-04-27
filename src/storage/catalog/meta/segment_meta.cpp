@@ -463,7 +463,7 @@ Tuple<SharedPtr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo() {
     column_count = column_defs->size();
     status = table_meta_.GetUnsealedSegmentID(unsealed_segment_id);
     if (!status.ok()) {
-        return {nullptr, status};
+        unsealed_segment_id = INVALID_SEGMENT_ID;
     }
 
     segment_info->segment_id_ = segment_id_;
@@ -472,10 +472,6 @@ Tuple<SharedPtr<SegmentInfo>, Status> SegmentMeta::GetSegmentInfo() {
     segment_info->column_count_ = column_count;
     segment_info->row_capacity_ = segment_capacity();
     segment_info->storage_size_ = 0; // TODO: How to determine storage size?
-    std::tie(segment_info->segment_dir_, status) = GetSegmentDir();
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
     Vector<BlockID> *block_ids_ptr = nullptr;
     std::tie(block_ids_ptr, status) = GetBlockIDs1();
     if (!status.ok()) {

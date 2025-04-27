@@ -60,6 +60,8 @@ import base_entry;
 import compilation_config;
 import compaction_process;
 import txn_state;
+import new_txn;
+import new_txn_manager;
 
 using namespace infinity;
 
@@ -687,21 +689,12 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        BufferManager *buffer_manager = storage->buffer_manager();
-        TxnManager *txn_mgr = storage->txn_manager();
-        CompactionProcessor *compaction_processor = storage->compaction_processor();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         Vector<SharedPtr<ColumnDef>> columns;
-        {
-            i64 column_id = 0;
-            {
-                std::set<ConstraintType> constraints;
-                auto column_def_ptr =
-                    MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
-                columns.emplace_back(column_def_ptr);
-            }
-        }
-        int column_count = 1;
+        std::set<ConstraintType> constraints;
+        auto column_def_ptr = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+        columns.emplace_back(column_def_ptr);
         { // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
@@ -712,45 +705,46 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             txn_mgr->CommitTxn(txn);
         }
 
+        u32 block_row_cnt = 8192;
+        auto make_input_block = [&] {
+            auto input_block = MakeShared<DataBlock>();
+            auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+                for (u32 i = 0; i < block_row_cnt; i += 2) {
+                    col.AppendValue(v1);
+                    col.AppendValue(v2);
+                }
+            };
+            // Initialize input block
+            {
+                auto col1 = ColumnVector::Make(column_def_ptr->type());
+                col1->Initialize();
+                append_to_col(*col1, Value::MakeTinyInt(1), Value::MakeTinyInt(2));
+                input_block->InsertVector(col1, 0);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
+
         for (u64 i = 0; i < test_segment_n; ++i) { // add 2 segments
-            auto txn2 = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-
-            auto [table_info, status] = txn2->GetTableInfo("default_db", "tbl1");
-            EXPECT_NE(table_info, nullptr);
-
-            auto [segment_entry, segment_status] = txn2->MakeNewSegment("default_db", "tbl1");
-            EXPECT_EQ(segment_entry->segment_id(), i);
-
-            auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
-
-            Vector<SharedPtr<ColumnVector>> column_vectors;
-            {
-                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(LogicalType::kTinyInt));
-                column_vector->Initialize();
-                Value v = Value::MakeTinyInt(static_cast<TinyIntT>(1));
-                column_vector->AppendValue(v);
-                column_vectors.push_back(column_vector);
-            }
-
-            {
-                auto column_type0 = block_entry->GetColumnBlockEntry(0)->column_type().get();
-                EXPECT_EQ(column_type0->type(), LogicalType::kTinyInt);
-                SizeT data_type_size = column_vectors[0]->data_type_size_;
-                EXPECT_EQ(data_type_size, 1u);
-                ColumnVector col = block_entry->GetColumnVector(buffer_manager, 0);
-                col.AppendWith(*column_vectors[0], 0, 1);
-                block_entry->IncreaseRowCount(1);
-            }
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-
-            PhysicalImport::SaveSegmentData(table_info.get(), txn2, segment_entry);
-            txn_mgr->CommitTxn(txn2);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+            Status status = txn->Import("default_db", "tbl1", input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
         }
 
-        { // add compact
-            auto commit_ts = compaction_processor->ManualDoCompact("default_db", "tbl1", false);
-            EXPECT_NE(commit_ts, 0u);
+        {
+            // add compact
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+            Status status = txn->Compact("default_db", "tbl1", {0, 1});
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
         }
+
+        txn_mgr->PrintAllKeyValue();
+
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
@@ -766,27 +760,34 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
             auto txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-
-            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl1");
-            EXPECT_NE(table_entry, nullptr);
-
-            for (u64 i = 0; i < test_segment_n; ++i) {
-                auto segment = table_entry->GetSegmentByID(i, begin_ts);
-                EXPECT_EQ(segment, nullptr);
+            txn_mgr->PrintAllKeyValue();
+            {
+                auto [table_info, status] = txn->GetTableInfo("default_db", "tbl1");
+                EXPECT_NE(table_info, nullptr);
+                EXPECT_EQ(table_info->segment_count_, 1);
             }
-            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
-            EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
-            EXPECT_EQ(compact_segment->row_count(), test_segment_n);
 
-            auto block_entry = compact_segment->GetBlockEntryByID(0).get();
-            EXPECT_NE(block_entry, nullptr);
-            EXPECT_EQ(block_entry->row_count(), test_segment_n);
+            {
+                auto [segment_info, status] = txn->GetSegmentInfo("default_db", "tbl1", 2);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(segment_info->row_count_, 16384);
+            }
+
+            {
+                auto [block_info, status] = txn->GetBlockInfo("default_db", "tbl1", 2, 0);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(block_info->row_count_, 8192);
+            }
+
+            {
+                auto [block_info, status] = txn->GetBlockInfo("default_db", "tbl1", 2, 1);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(block_info->row_count_, 8192);
+            }
             txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();

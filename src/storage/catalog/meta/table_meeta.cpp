@@ -413,6 +413,12 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     table_info.db_id_ = db_id_str_;
     table_info.table_id_ = table_id_str_;
 
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    table_info.segment_count_ = segment_ids_ptr->size();
     return Status::OK();
 }
 
