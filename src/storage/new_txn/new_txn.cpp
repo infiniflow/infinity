@@ -821,6 +821,10 @@ Tuple<SharedPtr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const String &db_na
     if (!status.ok()) {
         return {nullptr, status};
     }
+    status = table_meta->CheckSegments({segment_id});
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
     SegmentMeta segment_meta(segment_id, table_meta.value());
     std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
     if (!status.ok()) {
