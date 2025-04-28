@@ -40,7 +40,7 @@ Status DBMeeta::InitSet(const String *comment) {
     return Status::OK();
 }
 
-Status DBMeeta::UninitSet() {
+Status DBMeeta::UninitSet(UseAgeFlag use_age_flag) {
     Status status;
 
     String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);

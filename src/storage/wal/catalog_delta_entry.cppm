@@ -41,6 +41,7 @@ import base_entry;
 import default_values;
 import constant_expr;
 import persistence_manager;
+import config;
 
 namespace infinity {
 
@@ -89,14 +90,22 @@ enum class PruneFlag : u8 {
 /// class CatalogDeltaOperation
 export class CatalogDeltaOperation {
 public:
-    explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
+    explicit CatalogDeltaOperation(CatalogDeltaOpType type, PersistenceManager *pm_ptr) : type_(type) {
+        pm_ = pm_ptr;
+        // String persistence_dir = config_ptr->PersistenceDir();
+        // pm_.reset();
+        // if (!persistence_dir.empty()) {
+        //     i64 persistence_object_size_limit = config_ptr->PersistenceObjectSizeLimit();
+        //     pm_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr->DataDir(), static_cast<SizeT>(persistence_object_size_limit));
+        // }
+    }
     CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts);
     virtual ~CatalogDeltaOperation() {};
     CatalogDeltaOpType GetType() const { return type_; }
     virtual String GetTypeStr() const = 0;
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
     virtual void WriteAdv(char *&ptr) const = 0;
-    static UniquePtr<CatalogDeltaOperation> ReadAdv(const char *&ptr, i32 max_bytes);
+    static UniquePtr<CatalogDeltaOperation> ReadAdv(const char *&ptr, i32 max_bytes, PersistenceManager *pm_ptr);
     SizeT GetBaseSizeInBytes() const;
     void InitializeAddrSerializer();
     void WriteAdvBase(char *&buf) const;
@@ -122,6 +131,7 @@ public:
     SharedPtr<String> encode_;
     AddrSerializer addr_serializer_{};
     mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
+    PersistenceManager *pm_;
 
 public:
     CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
@@ -130,9 +140,9 @@ public:
 /// class AddDBEntryOp
 export class AddDBEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddDBEntryOp> ReadAdv(const char *&ptr);
+    static UniquePtr<AddDBEntryOp> ReadAdv(const char *&ptr, PersistenceManager *pm_ptr);
 
-    AddDBEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY) {}
+    AddDBEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, pm_ptr) {}
 
     AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts);
 
@@ -151,9 +161,9 @@ public:
 /// class AddTableEntryOp
 export class AddTableEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddTableEntryOp> ReadAdv(const char *&ptr, const char *ptr_end);
+    static UniquePtr<AddTableEntryOp> ReadAdv(const char *&ptr, const char *ptr_end, PersistenceManager *pm_ptr);
 
-    AddTableEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY) {}
+    AddTableEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, pm_ptr) {}
 
     AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts);
 
@@ -178,9 +188,9 @@ public:
 /// class AddSegmentEntryOp
 export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddSegmentEntryOp> ReadAdv(const char *&ptr);
+    static UniquePtr<AddSegmentEntryOp> ReadAdv(const char *&ptr, PersistenceManager *pm_ptr);
 
-    AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {};
+    AddSegmentEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, pm_ptr) {};
 
     AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data = "");
 
@@ -207,9 +217,9 @@ public:
 /// class AddBlockEntryOp
 export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddBlockEntryOp> ReadAdv(const char *&ptr);
+    static UniquePtr<AddBlockEntryOp> ReadAdv(const char *&ptr, PersistenceManager *pm_ptr);
 
-    AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY) {};
+    AddBlockEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, pm_ptr) {};
 
     AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data = "");
 
@@ -241,9 +251,9 @@ public:
 /// class AddColumnEntryOp
 export class AddColumnEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddColumnEntryOp> ReadAdv(const char *&ptr);
+    static UniquePtr<AddColumnEntryOp> ReadAdv(const char *&ptr, PersistenceManager *pm_ptr);
 
-    AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY) {};
+    AddColumnEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, pm_ptr) {};
 
     AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts);
 
@@ -267,9 +277,9 @@ public:
 /// class AddTableIndexEntryOp
 export class AddTableIndexEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddTableIndexEntryOp> ReadAdv(const char *&ptr, const char *ptr_end);
+    static UniquePtr<AddTableIndexEntryOp> ReadAdv(const char *&ptr, const char *ptr_end, PersistenceManager *pm_ptr);
 
-    AddTableIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {}
+    AddTableIndexEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, pm_ptr) {}
 
     AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts);
 
@@ -288,9 +298,9 @@ public:
 /// class AddSegmentColumnEntryOperation
 export class AddSegmentIndexEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddSegmentIndexEntryOp> ReadAdv(const char *&ptr);
+    static UniquePtr<AddSegmentIndexEntryOp> ReadAdv(const char *&ptr, PersistenceManager *pm_ptr);
 
-    AddSegmentIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {}
+    AddSegmentIndexEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY, pm_ptr) {}
 
     AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_entry, TxnTimeStamp commit_ts);
 
@@ -314,9 +324,9 @@ public:
 /// class AddSegmentColumnEntryOperation
 export class AddChunkIndexEntryOp : public CatalogDeltaOperation {
 public:
-    static UniquePtr<AddChunkIndexEntryOp> ReadAdv(const char *&ptr);
+    static UniquePtr<AddChunkIndexEntryOp> ReadAdv(const char *&ptr, PersistenceManager *pm_ptr);
 
-    AddChunkIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {}
+    AddChunkIndexEntryOp(PersistenceManager *pm_ptr) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, pm_ptr) {}
 
     AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts);
 
@@ -360,7 +370,7 @@ public:
 
     void WriteAdv(char *&ptr);
 
-    static UniquePtr<CatalogDeltaEntry> ReadAdv(const char *&ptr, i32 max_bytes);
+    static UniquePtr<CatalogDeltaEntry> ReadAdv(const char *&ptr, i32 max_bytes, PersistenceManager *pm_ptr);
 
     [[nodiscard]] String ToString() const;
 

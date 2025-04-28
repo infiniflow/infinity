@@ -20,12 +20,13 @@ import stl;
 import status;
 import default_values;
 import meta_info;
+import new_catalog;
 
 namespace infinity {
 
 class KVInstance;
 class SegmentMeta;
-struct BlockLock;
+// struct BlockLock;
 class BufferObj;
 class FastRoughFilter;
 
@@ -51,7 +52,7 @@ public:
 
     Status LoadSet(TxnTimeStamp checkpoint_ts);
 
-    Status UninitSet();
+    Status UninitSet(UseAgeFlag use_age_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();
 

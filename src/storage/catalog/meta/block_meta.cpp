@@ -121,7 +121,7 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     return Status::OK();
 }
 
-Status BlockMeta::UninitSet() {
+Status BlockMeta::UninitSet(UseAgeFlag use_age_flag) {
     // {
     //     String block_row_cnt_key = GetBlockTag("row_cnt");
     //     Status status = kv_instance_.Delete(block_row_cnt_key);
@@ -129,12 +129,14 @@ Status BlockMeta::UninitSet() {
     //         return status;
     //     }
     // }
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    {
-        String block_lock_key = GetBlockTag("lock");
-        Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
-        if (!status.ok()) {
-            return status;
+    if (use_age_flag == UseAgeFlag::kNormal) {
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        {
+            String block_lock_key = GetBlockTag("lock");
+            Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     {

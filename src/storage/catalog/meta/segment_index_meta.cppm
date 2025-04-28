@@ -20,13 +20,14 @@ import stl;
 import status;
 import third_party;
 import meta_info;
+import new_catalog;
 
 namespace infinity {
 
 class KVInstance;
 class TableIndexMeeta;
 class MemIndex;
-struct SegmentIndexFtInfo;
+// struct SegmentIndexFtInfo;
 class NewTxn;
 
 export class SegmentIndexMeta {
@@ -73,9 +74,9 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet();
+    Status UninitSet(UseAgeFlag use_age_flag);
 
-    Status UninitSet1();
+    Status UninitSet1(UseAgeFlag use_age_flag);
 
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 

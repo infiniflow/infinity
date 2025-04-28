@@ -84,8 +84,8 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
     size += sizeof(i32) + encode_->size();
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
+    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm_ != nullptr;
     if (use_object_cache) {
         pm_size_ = addr_serializer_.GetSizeInBytes();
         size += pm_size_;
@@ -94,10 +94,11 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
 }
 
 void CatalogDeltaOperation::InitializeAddrSerializer() {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
+    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+
+    bool use_object_cache = pm_ != nullptr;
     if (use_object_cache) {
-        addr_serializer_.Initialize(pm, GetFilePaths());
+        addr_serializer_.Initialize(pm_, GetFilePaths());
     }
 }
 
@@ -108,8 +109,8 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     WriteBufAdv(buf, this->commit_ts_);
     WriteBufAdv(buf, *(this->encode_));
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
+    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm_ != nullptr;
     if (use_object_cache) {
         char *start = buf;
         addr_serializer_.WriteBufAdv(buf);
@@ -128,12 +129,28 @@ void CatalogDeltaOperation::ReadAdvBase(const char *&ptr) {
     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
+    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+
+    bool use_object_cache = pm_ != nullptr;
+
+    use_object_cache = true;
+
     if (use_object_cache) {
         addr_serializer_.ReadBufAdv(ptr); // discard return value
     }
 }
+
+// void CatalogDeltaOperation::ReadAdvBaseForTransform(const char *&ptr, bool use_object_cache) {
+//     begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+//     merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
+//     txn_id_ = ReadBufAdv<TransactionID>(ptr);
+//     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+//     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
+//
+//     if (use_object_cache) {
+//         addr_serializer_.ReadBufAdv(ptr); // discard return value
+//     }
+// }
 
 const String CatalogDeltaOperation::ToString() const {
     return fmt::format("begin_ts: {}, txn_id: {}, commit_ts: {}, merge_flag: {}, encode: {}",
@@ -166,41 +183,41 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
     // LOG_TRACE(fmt::format("Create delta op: {} ", this->ToString()));
 }
 
-UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(const char *&ptr, i32 max_bytes) {
+UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(const char *&ptr, i32 max_bytes, PersistenceManager *pm_ptr) {
     const char *const ptr_end = ptr + max_bytes;
     UniquePtr<CatalogDeltaOperation> operation{nullptr};
     auto operation_type = ReadBufAdv<CatalogDeltaOpType>(ptr);
     switch (operation_type) {
         case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
-            operation = AddDBEntryOp::ReadAdv(ptr);
+            operation = AddDBEntryOp::ReadAdv(ptr, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
-            operation = AddTableEntryOp::ReadAdv(ptr, ptr_end);
+            operation = AddTableEntryOp::ReadAdv(ptr, ptr_end, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
-            operation = AddSegmentEntryOp::ReadAdv(ptr);
+            operation = AddSegmentEntryOp::ReadAdv(ptr, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
-            operation = AddBlockEntryOp::ReadAdv(ptr);
+            operation = AddBlockEntryOp::ReadAdv(ptr, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
-            operation = AddColumnEntryOp::ReadAdv(ptr);
+            operation = AddColumnEntryOp::ReadAdv(ptr, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
-            operation = AddTableIndexEntryOp::ReadAdv(ptr, ptr_end);
+            operation = AddTableIndexEntryOp::ReadAdv(ptr, ptr_end, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
-            operation = AddSegmentIndexEntryOp::ReadAdv(ptr);
+            operation = AddSegmentIndexEntryOp::ReadAdv(ptr, pm_ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
-            operation = AddChunkIndexEntryOp::ReadAdv(ptr);
+            operation = AddChunkIndexEntryOp::ReadAdv(ptr, pm_ptr);
             break;
         }
         default: {
@@ -451,8 +468,8 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
     }
 }
 
-UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr) {
-    auto add_db_op = MakeUnique<AddDBEntryOp>();
+UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr, PersistenceManager *pm_ptr) {
+    auto add_db_op = MakeUnique<AddDBEntryOp>(pm_ptr);
     add_db_op->ReadAdvBase(ptr);
 
     add_db_op->db_entry_dir_ = MakeShared<String>(ReadBufAdv<String>(ptr));
@@ -460,8 +477,8 @@ UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(const char *&ptr) {
     return add_db_op;
 }
 
-UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char *ptr_end) {
-    auto add_table_op = MakeUnique<AddTableEntryOp>();
+UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char *ptr_end, PersistenceManager *pm_ptr) {
+    auto add_table_op = MakeUnique<AddTableEntryOp>(pm_ptr);
     add_table_op->ReadAdvBase(ptr);
 
     add_table_op->table_entry_dir_ = MakeShared<String>(ReadBufAdv<String>(ptr));
@@ -497,8 +514,8 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(const char *&ptr, const char
     return add_table_op;
 }
 
-UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(const char *&ptr) {
-    auto add_segment_op = MakeUnique<AddSegmentEntryOp>();
+UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(const char *&ptr, PersistenceManager *pm_ptr) {
+    auto add_segment_op = MakeUnique<AddSegmentEntryOp>(pm_ptr);
     add_segment_op->ReadAdvBase(ptr);
 
     add_segment_op->status_ = ReadBufAdv<SegmentStatus>(ptr);
@@ -514,8 +531,8 @@ UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(const char *&ptr) {
     return add_segment_op;
 }
 
-UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(const char *&ptr) {
-    auto add_block_op = MakeUnique<AddBlockEntryOp>();
+UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(const char *&ptr, PersistenceManager *pm_ptr) {
+    auto add_block_op = MakeUnique<AddBlockEntryOp>(pm_ptr);
     add_block_op->ReadAdvBase(ptr);
 
     add_block_op->row_count_ = ReadBufAdv<u16>(ptr);
@@ -528,8 +545,8 @@ UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(const char *&ptr) {
     return add_block_op;
 }
 
-UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(const char *&ptr) {
-    auto add_column_op = MakeUnique<AddColumnEntryOp>();
+UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(const char *&ptr, PersistenceManager *pm_ptr) {
+    auto add_column_op = MakeUnique<AddColumnEntryOp>(pm_ptr);
     add_column_op->ReadAdvBase(ptr);
     auto &[outline_buffer_count, last_chunk_offset] = add_column_op->outline_info_;
     outline_buffer_count = ReadBufAdv<u32>(ptr);
@@ -537,8 +554,8 @@ UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(const char *&ptr) {
     return add_column_op;
 }
 
-UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(const char *&ptr, const char *ptr_end) {
-    auto add_table_index_op = MakeUnique<AddTableIndexEntryOp>();
+UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(const char *&ptr, const char *ptr_end, PersistenceManager *pm_ptr) {
+    auto add_table_index_op = MakeUnique<AddTableIndexEntryOp>(pm_ptr);
     add_table_index_op->ReadAdvBase(ptr);
 
     if (add_table_index_op->merge_flag_ != MergeFlag::kDelete) {
@@ -548,8 +565,8 @@ UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(const char *&ptr, 
     return add_table_index_op;
 }
 
-UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(const char *&ptr) {
-    auto add_segment_index_op = MakeUnique<AddSegmentIndexEntryOp>();
+UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(const char *&ptr, PersistenceManager *pm_ptr) {
+    auto add_segment_index_op = MakeUnique<AddSegmentIndexEntryOp>(pm_ptr);
     add_segment_index_op->ReadAdvBase(ptr);
 
     add_segment_index_op->min_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
@@ -559,8 +576,8 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(const char *&p
     return add_segment_index_op;
 }
 
-UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(const char *&ptr) {
-    auto add_chunk_index_op = MakeUnique<AddChunkIndexEntryOp>();
+UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(const char *&ptr, PersistenceManager *pm_ptr) {
+    auto add_chunk_index_op = MakeUnique<AddChunkIndexEntryOp>(pm_ptr);
     add_chunk_index_op->ReadAdvBase(ptr);
 
     add_chunk_index_op->base_name_ = ReadBufAdv<String>(ptr);
@@ -1030,7 +1047,7 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
     return size;
 }
 
-UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
+UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 max_bytes, PersistenceManager *pm_ptr) {
     const char *const ptr_start = ptr;
     const char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
@@ -1061,7 +1078,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(const char *&ptr, i32 ma
             String error_message = "ptr goes out of range when reading WalEntry";
             UnrecoverableError(error_message);
         }
-        UniquePtr<CatalogDeltaOperation> operation = CatalogDeltaOperation::ReadAdv(ptr, max_bytes);
+        UniquePtr<CatalogDeltaOperation> operation = CatalogDeltaOperation::ReadAdv(ptr, max_bytes, pm_ptr);
         entry->operations_.push_back(std::move(operation));
     }
     ptr += sizeof(i32);

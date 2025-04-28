@@ -203,7 +203,7 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
     return Status::OK();
 }
 
-Status ColumnMeta::UninitSet(const ColumnDef *column_def) {
+Status ColumnMeta::UninitSet(const ColumnDef *column_def, UseAgeFlag use_age_flag) {
     Status status;
 
     status = this->GetColumnBuffer(column_buffer_, outline_buffer_, column_def);

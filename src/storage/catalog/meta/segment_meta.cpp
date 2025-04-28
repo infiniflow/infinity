@@ -31,6 +31,7 @@ import meta_info;
 import segment_entry;
 import new_catalog;
 import fast_rough_filter;
+import column_def;
 
 namespace infinity {
 
@@ -124,7 +125,7 @@ Status SegmentMeta::InitSet() {
     return Status::OK();
 }
 
-Status SegmentMeta::UninitSet() {
+Status SegmentMeta::UninitSet(UseAgeFlag use_age_flag) {
     // {
     //     String block_ids_key = GetSegmentTag("block_ids");
     //     Status status = kv_instance_.Delete(block_ids_key);

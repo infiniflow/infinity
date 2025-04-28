@@ -225,7 +225,7 @@ Status TableIndexMeeta::InitSet1(const SharedPtr<IndexBase> &index_base, NewCata
     return Status::OK();
 }
 
-Status TableIndexMeeta::UninitSet() {
+Status TableIndexMeeta::UninitSet(UseAgeFlag use_age_flag) {
     Status status;
 
     SharedPtr<IndexBase> index_base;
@@ -233,17 +233,19 @@ Status TableIndexMeeta::UninitSet() {
     if (!status.ok()) {
         return status;
     }
-    if (index_base->index_type_ == IndexType::kFullText) {
-        status = table_meta_.RemoveFtIndexCache();
-        if (!status.ok()) {
-            return status;
-        }
+    if (use_age_flag == UseAgeFlag::kNormal) {
+        if (index_base->index_type_ == IndexType::kFullText) {
+            status = table_meta_.RemoveFtIndexCache();
+            if (!status.ok()) {
+                return status;
+            }
 
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-        status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
-        if (!status.ok()) {
-            return status;
+            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+            String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+            status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
 
@@ -262,7 +264,7 @@ Status TableIndexMeeta::UninitSet() {
     return Status::OK();
 }
 
-Status TableIndexMeeta::UninitSet1() {
+Status TableIndexMeeta::UninitSet1(UseAgeFlag use_age_flag) {
     Status status;
 
     SharedPtr<IndexBase> index_base;
@@ -270,17 +272,19 @@ Status TableIndexMeeta::UninitSet1() {
     if (!status.ok()) {
         return status;
     }
-    if (index_base->index_type_ == IndexType::kFullText) {
-        status = table_meta_.RemoveFtIndexCache();
-        if (!status.ok() && status.code() != ErrorCode::kCatalogError) {
-            return status;
-        }
+    if (use_age_flag == UseAgeFlag::kNormal) {
+        if (index_base->index_type_ == IndexType::kFullText) {
+            status = table_meta_.RemoveFtIndexCache();
+            if (!status.ok() && status.code() != ErrorCode::kCatalogError) {
+                return status;
+            }
 
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-        status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
-        if (!status.ok()) {
-            return status;
+            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+            String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
+            status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
 

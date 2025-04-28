@@ -322,7 +322,7 @@ Status SegmentIndexMeta::LoadSet() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::UninitSet() {
+Status SegmentIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
     {
         String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
         Status status = kv_instance_.Delete(chunk_ids_key);
@@ -339,12 +339,14 @@ Status SegmentIndexMeta::UninitSet() {
         }
         next_chunk_id_.reset();
     }
-    {
-        String mem_index_key = GetSegmentIndexTag("mem_index");
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
-        if (!status.ok()) {
-            return status;
+    if (use_age_flag == UseAgeFlag::kNormal) {
+        {
+            String mem_index_key = GetSegmentIndexTag("mem_index");
+            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+            Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     {
@@ -366,7 +368,7 @@ Status SegmentIndexMeta::UninitSet() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::UninitSet1() {
+Status SegmentIndexMeta::UninitSet1(UseAgeFlag use_age_flag) {
     {
         // Remove all chunk ids
         TableMeeta &table_meta = table_index_meta_.table_meta();
@@ -389,13 +391,15 @@ Status SegmentIndexMeta::UninitSet1() {
         }
         next_chunk_id_.reset();
     }
-    {
-        // Remove mem index
-        String mem_index_key = GetSegmentIndexTag("mem_index");
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
-        if (!status.ok()) {
-            return status;
+    if (use_age_flag == UseAgeFlag::kNormal) {
+        {
+            // Remove mem index
+            String mem_index_key = GetSegmentIndexTag("mem_index");
+            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+            Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     {

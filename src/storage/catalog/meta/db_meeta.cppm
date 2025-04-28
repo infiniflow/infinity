@@ -18,6 +18,7 @@ export module db_meeta;
 
 import stl;
 import status;
+import new_catalog;
 
 namespace infinity {
 
@@ -34,7 +35,7 @@ public:
 
     Status InitSet(const String *comment = nullptr);
 
-    Status UninitSet();
+    Status UninitSet(UseAgeFlag use_age_flag);
 
     Status GetComment(String *&comment) {
         if (!comment_) {

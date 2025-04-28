@@ -642,13 +642,14 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
 }
 void Catalog::AttachDeltaCheckpoint(const String &file_name) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
-    UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(catalog_path);
+    auto *pm_ptr = InfinityContext::instance().persistence_manager();
+    UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(catalog_path, pm_ptr);
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     this->LoadFromEntryDelta(std::move(catalog_delta_entry), buffer_mgr);
 }
 
 // called by Replay
-UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path) {
+UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path, PersistenceManager *pm_ptr) {
     VirtualStore::AddRequestCount();
     if (!VirtualStore::Exists(catalog_path)) {
         std::filesystem::path filePath = catalog_path;
@@ -667,7 +668,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_pa
     catalog_file_handle->Read(buf.data(), file_size);
 
     const char *ptr = buf.data();
-    auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
+    auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size, pm_ptr);
     if (catalog_delta_entry.get() == nullptr) {
         String error_message = fmt::format("Load catalog delta entry failed: {}", catalog_path);
         UnrecoverableError(error_message);

@@ -462,7 +462,7 @@ Status NewCatalog::AddNewDB(KVInstance *kv_instance,
     return Status::OK();
 }
 
-Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts) {
+Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UseAgeFlag use_age_flag) {
     KVInstance &kv_instance = db_meta.kv_instance();
     String db_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter = kv_instance.GetIterator();
@@ -489,13 +489,13 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp
         const String &table_id_str = (*table_id_strs_ptr)[i];
         const String &table_name = (*table_names_ptr)[i];
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
-        status = NewCatalog::CleanTable(table_meta, table_name, begin_ts);
+        status = NewCatalog::CleanTable(table_meta, table_name, begin_ts, use_age_flag);
         if (!status.ok()) {
             return status;
         }
     }
 
-    status = db_meta.UninitSet();
+    status = db_meta.UninitSet(use_age_flag);
     if (!status.ok()) {
         return status;
     }
@@ -526,7 +526,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     return status;
 }
 
-Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts) {
+Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UseAgeFlag use_age_flag) {
     KVInstance &kv_instance = table_meta.kv_instance();
     String table_prefix = KeyEncode::CatalogTablePrefix(table_meta.db_id_str(), table_name);
     auto iter = kv_instance.GetIterator();
@@ -549,7 +549,7 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, 
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        status = NewCatalog::CleanSegment(segment_meta, begin_ts);
+        status = NewCatalog::CleanSegment(segment_meta, begin_ts, use_age_flag);
         if (!status.ok()) {
             return status;
         }
@@ -565,13 +565,13 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, 
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_names_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
-        status = NewCatalog::CleanTableIndex(table_index_meta, index_name);
+        status = NewCatalog::CleanTableIndex(table_index_meta, index_name, use_age_flag);
         if (!status.ok()) {
             return status;
         }
     }
 
-    status = table_meta.UninitSet();
+    status = table_meta.UninitSet(use_age_flag);
     if (!status.ok()) {
         return status;
     }
@@ -601,7 +601,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
     return Status::OK();
 }
 
-Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name) {
+Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UseAgeFlag use_age_flag) {
     KVInstance &kv_instance = table_index_meta.kv_instance();
     String index_prefix =
         KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
@@ -622,13 +622,13 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Stri
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        status = NewCatalog::CleanSegmentIndex(segment_index_meta);
+        status = NewCatalog::CleanSegmentIndex(segment_index_meta, use_age_flag);
         if (!status.ok()) {
             return status;
         }
     }
 
-    status = table_index_meta.UninitSet1();
+    status = table_index_meta.UninitSet1(use_age_flag);
     if (!status.ok()) {
         return status;
     }
@@ -636,7 +636,10 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Stri
     return Status::OK();
 }
 
-Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, const Vector<ChunkInfoForCreateIndex> &meta_infos) {
+Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta,
+                                   const String &index_name,
+                                   const Vector<ChunkInfoForCreateIndex> &meta_infos,
+                                   UseAgeFlag use_age_flag) {
     KVInstance &kv_instance = table_index_meta.kv_instance();
     String index_prefix =
         KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
@@ -654,14 +657,14 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Stri
     for (auto iter = meta_infos.begin(); iter != meta_infos.end(); iter++) {
         if (table_index_meta.table_meta().db_id_str() == iter->db_id_ && table_index_meta.table_meta().table_id_str() == iter->table_id_) {
             SegmentIndexMeta segment_index_meta(iter->segment_id_, table_index_meta);
-            Status status = NewCatalog::CleanSegmentIndex(segment_index_meta);
+            Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, use_age_flag);
             if (!status.ok()) {
                 return status;
             }
         }
     }
 
-    Status status = table_index_meta.UninitSet1();
+    Status status = table_index_meta.UninitSet1(use_age_flag);
     if (!status.ok()) {
         return status;
     }
@@ -728,19 +731,19 @@ Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentI
     return Status::OK();
 }
 
-Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) {
+Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UseAgeFlag use_age_flag) {
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
     }
     for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta);
-        status = NewCatalog::CleanBlock(block_meta);
+        status = NewCatalog::CleanBlock(block_meta, use_age_flag);
         if (!status.ok()) {
             return status;
         }
     }
-    segment_meta.UninitSet();
+    segment_meta.UninitSet(use_age_flag);
 
     return Status::OK();
 }
@@ -884,7 +887,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlock(BlockMeta &block_meta) {
+Status NewCatalog::CleanBlock(BlockMeta &block_meta, UseAgeFlag use_age_flag) {
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
 
@@ -896,12 +899,12 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta) {
 
     for (const auto &column_def : *column_defs_ptr) {
         ColumnMeta column_meta(column_def->id(), block_meta);
-        Status status = NewCatalog::CleanBlockColumn(column_meta, column_def.get());
+        Status status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), use_age_flag);
         if (!status.ok()) {
             return status;
         }
     }
-    block_meta.UninitSet();
+    block_meta.UninitSet(use_age_flag);
 
     return Status::OK();
 }
@@ -939,10 +942,10 @@ Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT co
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def) {
+Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UseAgeFlag use_age_flag) {
     Status status;
 
-    status = column_meta.UninitSet(column_def);
+    status = column_meta.UninitSet(column_def, use_age_flag);
     if (!status.ok()) {
         return status;
     }
@@ -984,7 +987,7 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
     return Status::OK();
 }
 
-Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
+Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UseAgeFlag use_age_flag) {
 
     auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
@@ -992,12 +995,13 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        status = NewCatalog::CleanChunkIndex(chunk_index_meta);
+        status = NewCatalog::CleanChunkIndex(chunk_index_meta, use_age_flag);
         if (!status.ok()) {
             return status;
         }
     }
-    status = segment_index_meta.UninitSet1();
+
+    status = segment_index_meta.UninitSet1(use_age_flag);
     if (!status.ok()) {
         return status;
     }
@@ -1156,10 +1160,10 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
     return Status::OK();
 }
 
-Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta) {
+Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UseAgeFlag use_age_flag) {
     Status status;
 
-    status = chunk_index_meta.UninitSet();
+    status = chunk_index_meta.UninitSet(use_age_flag);
     if (!status.ok()) {
         return status;
     }

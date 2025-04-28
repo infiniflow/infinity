@@ -19,6 +19,7 @@ export module table_meeta;
 import stl;
 import status;
 import column_def;
+import new_catalog;
 
 namespace infinity {
 
@@ -26,11 +27,12 @@ class KVInstance;
 class TableDef;
 class TableInfo;
 class TableIndexReaderCache;
-struct SegmentUpdateTS;
+// struct SegmentUpdateTS;
 struct TableDetail;
 
 export class TableMeeta {
 public:
+    // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
     TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
@@ -59,7 +61,7 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet();
+    Status UninitSet(UseAgeFlag use_age_flag);
 
     // Status GetNextSegmentID(SegmentID &next_segment_id) {
     //     if (!next_segment_id_) {

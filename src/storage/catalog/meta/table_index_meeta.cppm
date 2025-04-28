@@ -20,15 +20,17 @@ import stl;
 import status;
 import column_def;
 import meta_info;
+import new_catalog;
 
 namespace infinity {
 
 class KVInstance;
 class TableMeeta;
 class IndexBase;
-struct SegmentUpdateTS;
-class NewCatalog;
+// struct SegmentUpdateTS;
+// class NewCatalog;
 class NewTxn;
+// enum class UseAgeFlag;
 
 export class TableIndexMeeta {
 public:
@@ -74,9 +76,9 @@ public:
 
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
-    Status UninitSet();
+    Status UninitSet(UseAgeFlag use_age_flag);
 
-    Status UninitSet1();
+    Status UninitSet1(UseAgeFlag use_age_flag);
 
 private:
     Status LoadIndexDef();

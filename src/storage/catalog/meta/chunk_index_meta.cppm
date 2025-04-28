@@ -20,6 +20,7 @@ import stl;
 import status;
 import internal_types;
 import third_party;
+import new_catalog;
 
 namespace infinity {
 
@@ -63,7 +64,7 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet();
+    Status UninitSet(UseAgeFlag use_age_flag);
 
     Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
 

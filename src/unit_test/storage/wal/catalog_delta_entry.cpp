@@ -80,14 +80,16 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     {
         catalog_delta_entry1 = std::make_unique<CatalogDeltaEntry>();
         {
-            auto op = MakeUnique<AddDBEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddDBEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}", db_name));
             op->db_entry_dir_ = db_dir;
             op->comment_ = MakeShared<String>();
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddTableEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddTableEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}", db_name, table_name));
             op->table_entry_dir_ = table_entry_dir;
             op->column_defs_ = column_defs;
@@ -97,7 +99,8 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddSegmentEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddSegmentEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", db_name, table_name, segment_id));
             op->status_ = SegmentStatus::kUnsealed;
             op->column_count_ = op->row_count_ = op->actual_row_count_ = op->row_capacity_ = 0;
@@ -105,31 +108,36 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddBlockEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddBlockEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", db_name, table_name, segment_id, block_id));
             op->row_capacity_ = op->row_count_ = op->min_row_ts_ = op->max_row_ts_ = op->checkpoint_ts_ = op->checkpoint_row_count_ = 0;
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddColumnEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddColumnEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}#{}", db_name, table_name, segment_id, block_id, column_id));
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddTableIndexEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddTableIndexEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", db_name, table_name, *index_name));
             op->index_dir_ = index_dir;
             op->index_base_ = index_base;
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddSegmentIndexEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddSegmentIndexEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", db_name, table_name, *index_name, segment_id));
             op->min_ts_ = op->max_ts_ = 0;
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddChunkIndexEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddChunkIndexEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}#{}", db_name, table_name, *index_name, segment_id, base_name));
             op->base_name_ = base_name;
             op->base_rowid_ = base_rowid;
@@ -137,13 +145,15 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddSegmentEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddSegmentEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", db_name, table_name, segment_id));
             op->segment_filter_binary_data_ = segment_filter_binary_data;
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddBlockEntryOp>();
+            auto pm_ptr = nullptr;
+            auto op = MakeUnique<AddBlockEntryOp>(pm_ptr);
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", db_name, table_name, segment_id, block_id));
             op->block_filter_binary_data_ = block_filter_binary_data;
             catalog_delta_entry1->operations().push_back(std::move(op));
@@ -158,7 +168,8 @@ TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
 
     {
         const char *ptr = buffer.get();
-        auto catalog_delta_entry2 = CatalogDeltaEntry::ReadAdv(ptr, buffer_size);
+        auto pm_ptr = nullptr;
+        auto catalog_delta_entry2 = CatalogDeltaEntry::ReadAdv(ptr, buffer_size, pm_ptr);
 
         size_t op_size = catalog_delta_entry1->operations().size();
         EXPECT_EQ(op_size, catalog_delta_entry2->operations().size());
@@ -191,9 +202,10 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
     SharedPtr<IndexBase> index_base{nullptr};
 
     {
-        auto op1 = MakeUnique<AddDBEntryOp>();
-        auto op2 = MakeUnique<AddDBEntryOp>();
-        auto op1_same_name = MakeUnique<AddDBEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddDBEntryOp>(pm_ptr);
+        auto op2 = MakeUnique<AddDBEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddDBEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}", *db_name));
         op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
@@ -213,9 +225,10 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
     }
     {
-        auto op1 = MakeUnique<AddTableEntryOp>();
-        auto op2 = MakeUnique<AddTableEntryOp>();
-        auto op1_same_name = MakeUnique<AddTableEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddTableEntryOp>(pm_ptr);
+        auto op2 = MakeUnique<AddTableEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddTableEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}#{}", *db_name, *table_name));
         op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
@@ -237,9 +250,10 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
     }
     {
-        auto op1 = MakeUnique<AddSegmentEntryOp>();
-        auto op2 = MakeUnique<AddSegmentEntryOp>();
-        auto op1_same_name = MakeUnique<AddSegmentEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddSegmentEntryOp>(pm_ptr);
+        auto op2 = MakeUnique<AddSegmentEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddSegmentEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id));
         op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
@@ -268,8 +282,9 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
     }
     {
-        auto op1 = MakeUnique<AddBlockEntryOp>();
-        auto op1_same_name = MakeUnique<AddBlockEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddBlockEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddBlockEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id));
         op1_same_name->encode_ = op1->encode_ = encode;
@@ -286,8 +301,9 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
     }
     {
-        auto op1 = MakeUnique<AddColumnEntryOp>();
-        auto op1_same_name = MakeUnique<AddColumnEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddColumnEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddColumnEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id, column_id));
         op1_same_name->encode_ = op1->encode_ = encode;
@@ -299,9 +315,10 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
     }
     {
-        auto op1 = MakeUnique<AddTableIndexEntryOp>();
-        auto op2 = MakeUnique<AddTableIndexEntryOp>();
-        auto op1_same_name = MakeUnique<AddTableIndexEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddTableIndexEntryOp>(pm_ptr);
+        auto op2 = MakeUnique<AddTableIndexEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddTableIndexEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, *index_name));
         op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
@@ -324,8 +341,9 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
     }
     {
-        auto op1 = MakeUnique<AddSegmentIndexEntryOp>();
-        auto op1_same_name = MakeUnique<AddSegmentIndexEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddSegmentIndexEntryOp>(pm_ptr);
+        auto op1_same_name = MakeUnique<AddSegmentIndexEntryOp>(pm_ptr);
 
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}", *db_name, *table_name, *index_name, segment_id));
         op1_same_name->encode_ = op1->encode_ = encode;
@@ -340,7 +358,8 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
     }
     {
-        auto op1 = MakeUnique<AddSegmentEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddSegmentEntryOp>(pm_ptr);
 
         op1->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id));
 
@@ -351,7 +370,8 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1));
     }
     {
-        auto op1 = MakeUnique<AddBlockEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddBlockEntryOp>(pm_ptr);
 
         op1->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id));
 
@@ -362,7 +382,8 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1));
     }
     {
-        auto op = MakeUnique<AddSegmentEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op = MakeUnique<AddSegmentEntryOp>(pm_ptr);
 
         op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id));
 
@@ -393,7 +414,8 @@ TEST_P(CatalogDeltaEntryTest, ComplicateMergeEntries) {
 
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto AddDBEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag, TxnTimeStamp commit_ts) {
-        auto op1 = MakeUnique<AddDBEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddDBEntryOp>(pm_ptr);
         op1->encode_ = MakeUnique<String>(fmt::format("#{}", *db_name));
 
         op1->db_entry_dir_ = db_dir;
@@ -403,7 +425,8 @@ TEST_P(CatalogDeltaEntryTest, ComplicateMergeEntries) {
         delta_entry->operations().push_back(std::move(op1));
     };
     auto AddTableEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag, TxnTimeStamp commit_ts) {
-        auto op1 = MakeUnique<AddTableEntryOp>();
+        auto pm_ptr = nullptr;
+        auto op1 = MakeUnique<AddTableEntryOp>(pm_ptr);
         op1->encode_ = MakeUnique<String>(fmt::format("#{}#{}", *db_name, *table_name));
 
         op1->table_entry_dir_ = table_entry_dir;

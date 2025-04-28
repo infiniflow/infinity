@@ -320,7 +320,7 @@ Status Storage::AdminToWriter() {
         CreateDefaultDB();
     }
 
-    i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+    i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
     if (compact_interval > 0) {
         LOG_INFO(fmt::format("Init compaction alg"));
         catalog_->InitCompactionAlg(system_start_ts);

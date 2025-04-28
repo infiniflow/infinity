@@ -318,7 +318,7 @@ Status ChunkIndexMeta::LoadSet() {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::UninitSet() {
+Status ChunkIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
     Status status = this->GetIndexBuffer(index_buffer_);
     if (!status.ok()) {
         return status;
@@ -330,34 +330,36 @@ Status ChunkIndexMeta::UninitSet() {
     if (!index_status.ok()) {
         return index_status;
     }
-    if (index_def->index_type_ == IndexType::kFullText) {
-        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-        status = this->GetChunkInfo(chunk_info_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-        SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    if (use_age_flag == UseAgeFlag::kNormal) {
+        if (index_def->index_type_ == IndexType::kFullText) {
+            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            status = this->GetChunkInfo(chunk_info_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+            SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
 
-        String posting_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX);
-        String dict_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + DICT_SUFFIX);
+            String posting_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX);
+            String dict_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + DICT_SUFFIX);
 
-        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-        if (pm != nullptr) {
-            LOG_INFO(fmt::format("Cleaned chunk index entry, posting: {}, dictionary file: {}", posting_file, dict_file));
+            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+            if (pm != nullptr) {
+                LOG_INFO(fmt::format("Cleaned chunk index entry, posting: {}, dictionary file: {}", posting_file, dict_file));
 
-            PersistResultHandler handler(pm);
-            PersistWriteResult result1 = pm->Cleanup(posting_file);
-            PersistWriteResult result2 = pm->Cleanup(dict_file);
-            handler.HandleWriteResult(result1);
-            handler.HandleWriteResult(result2);
+                PersistResultHandler handler(pm);
+                PersistWriteResult result1 = pm->Cleanup(posting_file);
+                PersistWriteResult result2 = pm->Cleanup(dict_file);
+                handler.HandleWriteResult(result1);
+                handler.HandleWriteResult(result2);
 
-        } else {
-            String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
-            String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
-            LOG_INFO(fmt::format("Clean chunk index entry , posting: {}, dictionary file: {}", absolute_posting_file, absolute_dict_file));
+            } else {
+                String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
+                String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
+                LOG_INFO(fmt::format("Clean chunk index entry , posting: {}, dictionary file: {}", absolute_posting_file, absolute_dict_file));
 
-            VirtualStore::DeleteFile(absolute_posting_file);
-            VirtualStore::DeleteFile(absolute_dict_file);
+                VirtualStore::DeleteFile(absolute_posting_file);
+                VirtualStore::DeleteFile(absolute_dict_file);
+            }
         }
     }
     {

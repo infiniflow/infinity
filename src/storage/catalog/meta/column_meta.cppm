@@ -18,13 +18,15 @@ export module column_meta;
 
 import stl;
 import status;
+import new_catalog;
+import column_def;
 
 namespace infinity {
 
 class BlockMeta;
 class KVInstance;
 class BufferObj;
-class ColumnDef;
+// class ColumnDef;
 
 export class ColumnMeta {
 public:
@@ -53,7 +55,7 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet(const ColumnDef *column_def);
+    Status UninitSet(const ColumnDef *column_def, UseAgeFlag use_age_flag);
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 

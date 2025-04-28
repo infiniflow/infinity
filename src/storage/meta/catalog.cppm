@@ -42,6 +42,7 @@ import column_def;
 import cleanup_scanner;
 import log_file;
 import snapshot_info;
+import persistence_manager;
 
 namespace infinity {
 
@@ -228,7 +229,7 @@ public:
     static UniquePtr<Catalog> LoadFullCheckpoint(const String &file_name);
     void AttachDeltaCheckpoint(const String &file_name);
 
-    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
+    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path, PersistenceManager *pm_ptr);
 
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);

@@ -34,6 +34,12 @@ import table_index_meeta;
 import segment_meta;
 import block_meta;
 import segment_index_meta;
+import config;
+import options;
+import default_values;
+import infinity_exception;
+import storage;
+import wal_manager;
 
 using namespace infinity;
 
@@ -42,25 +48,34 @@ public:
     void SetUp() override {
         CleanupDbDirs();
         String config_path_str = GetParam();
-        config_path = nullptr;
+        config_path_ = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = std::make_shared<String>(std::filesystem::absolute(config_path_str));
+            config_path_ = std::make_shared<String>(std::filesystem::absolute(config_path_str));
         }
     }
 
     void TearDown() override {}
 
-    void test_print() { std::cerr << "some OK\n"; }
-
     void Init() {
         std::string config_path_str = GetParam();
-        config_path = nullptr;
+        config_path_ = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
+            config_path_ = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
         }
-        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path_);
         infinity::InfinityContext::instance().InitPhase2();
         std::cerr << "init done!\n";
+    }
+
+    void Init(const String &config_path) {
+        std::string config_path_str = config_path;
+        config_path_ = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path_ = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
+        }
+        infinity::InfinityContext::instance().InitPhase1(config_path_);
+        infinity::InfinityContext::instance().InitPhase2();
+        std::cerr << "init with path done!\n";
     }
 
     void UnInit() {
@@ -69,7 +84,7 @@ public:
     }
 
 protected:
-    std::shared_ptr<String> config_path;
+    std::shared_ptr<String> config_path_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -78,7 +93,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(TransformMeta, db_meta_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -86,7 +101,7 @@ TEST_P(TransformMeta, db_meta_transform_00) {
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
     String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
-    Vector<String> delta_ckp_path_array;
+    Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
     status = kv_store_ptr->Flush();
@@ -122,7 +137,7 @@ TEST_P(TransformMeta, db_meta_transform_00) {
 
 TEST_P(TransformMeta, db_meta_transform_01) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -165,7 +180,7 @@ TEST_P(TransformMeta, db_meta_transform_01) {
 
 TEST_P(TransformMeta, db_meta_transform_02) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -208,7 +223,7 @@ TEST_P(TransformMeta, db_meta_transform_02) {
 
 TEST_P(TransformMeta, table_meta_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -246,7 +261,7 @@ TEST_P(TransformMeta, table_meta_transform_00) {
 
 TEST_P(TransformMeta, table_index_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -295,7 +310,7 @@ TEST_P(TransformMeta, table_index_transform_00) {
 
 TEST_P(TransformMeta, table_index_transform_01) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -348,7 +363,7 @@ TEST_P(TransformMeta, table_index_transform_01) {
 
 TEST_P(TransformMeta, segment_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -397,7 +412,7 @@ TEST_P(TransformMeta, segment_transform_00) {
 
 TEST_P(TransformMeta, block_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -462,7 +477,7 @@ TEST_P(TransformMeta, block_transform_00) {
 
 TEST_P(TransformMeta, block_column_transform_00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -512,7 +527,7 @@ TEST_P(TransformMeta, block_column_transform_00) {
 
 TEST_P(TransformMeta, block_column_transform_01) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path_, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
@@ -582,21 +597,18 @@ TEST_P(TransformMeta, block_column_transform_01) {
 
 TEST_P(TransformMeta, block_column_transform_02) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    Status status = config_ptr->Init(config_path, nullptr);
-    EXPECT_TRUE(status.ok());
+    Status status = config_ptr->Init(config_path_, nullptr);
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
     status = kv_store_ptr->Init(config_ptr->CatalogDir());
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
     // String full_ckp_path = "/home/infiniflow/Downloads/FULL.52.json";
-    String full_ckp_path = "/home/inf/Downloads/infinity_vfs_off1/data/catalog/FULL.44.json";
+    String full_ckp_path = "/home/inf/Downloads/infinity/0000002/data/catalog/FULL.90745.json";
+    Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
 
-    Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
-    status = kv_store_ptr->Flush();
-    EXPECT_TRUE(status.ok());
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
@@ -647,7 +659,7 @@ TEST_P(TransformMeta, block_column_transform_02) {
             }
         }
     }
-    new_txn_mgr->CommitTxn(txn);
+    status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
 
     kv_instance->Commit();
