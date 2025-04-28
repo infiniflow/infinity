@@ -336,6 +336,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
     }
     RestartTxnMgr();
     checkpoint();
+    RestartTxnMgr();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
         auto default_value1 = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -364,6 +365,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
     RestartTxnMgr();
     checkpoint();
+    RestartTxnMgr();
 
     auto check_segment = [&](SegmentMeta &segment_meta) {
         Vector<BlockID> *block_ids_ptr = nullptr;
@@ -394,6 +396,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         SegmentMeta segment_meta(segment_id, *table_meta);
         check_segment(segment_meta);
     }
+
+    RestartTxnMgr();
 
     auto renametable = [&](const String &new_table_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("renametable"), TransactionType::kNormal);
