@@ -2157,17 +2157,23 @@ void NewTxn::CommitBottom() {
     // update txn manager ts to commit_ts
     // erase txn_id from not_committed_txns_
 
-    // Try to commit the transaction
-    Status status = kv_instance_->Commit();
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
+    LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
+    TxnState txn_state = this->GetTxnState();
+
+    // both rollback and commit will run CommitBottom, but rollback doesn't commit rocksdb, but commit state does.
+    if (txn_state == TxnState::kCommitting) {
+        // Try to commit rocksdb transaction
+        Status status = kv_instance_->Commit();
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
+        }
+    } else if (txn_state != TxnState::kRollbacking) {
+        UnrecoverableError(fmt::format("Unexptected transaction state: {}", TxnState2Str(txn_state)));
     }
 
     TransactionID txn_id = this->TxnID();
     TxnTimeStamp commit_ts = this->CommitTS();
     txn_mgr_->CommitBottom(commit_ts, txn_id);
-
-    LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(commit_lock_);
