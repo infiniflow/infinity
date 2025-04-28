@@ -273,7 +273,7 @@ error::Error BaseUrl::BuildUrl(http::Url& url, http::Method method,
   }
 
   std::string host = url.host;
-  std::string path;
+  std::string path = "/";
 
   if (enforce_path_style || !this->virtual_style) {
     path = "/" + bucket_name;
@@ -282,7 +282,7 @@ error::Error BaseUrl::BuildUrl(http::Url& url, http::Method method,
   }
 
   if (!object_name.empty()) {
-    if (object_name.front() != '/') path += '/';
+    if (!utils::EndsWith(path, "/")) path += '/';
     path += utils::EncodePath(object_name);
   }
 
