@@ -32,6 +32,8 @@ import txn;
 import status;
 import extra_ddl_info;
 import txn_state;
+import new_txn_manager;
+import new_txn;
 
 using namespace infinity;
 
@@ -43,17 +45,17 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(DBTxnTest, test1) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
 
     // Txn1: Get db1, OK
-    Status status1 = new_txn->GetDatabase("db1");
-    EXPECT_TRUE(status1.ok());
+    auto [db_info1, status1] = new_txn->GetDatabaseInfo("db1");
+    EXPECT_FALSE(status1.ok());
 
     // Txn1: Commit OK
     txn_mgr->CommitTxn(new_txn);
@@ -62,7 +64,7 @@ TEST_P(DBTxnTest, test1) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
-    Status status2 = new_txn->GetDatabase("db1");
+    auto [db_info2, status2] = new_txn->GetDatabaseInfo("db1");
     EXPECT_TRUE(status2.ok());
 
     // Txn2: Drop db1, OK
@@ -76,8 +78,8 @@ TEST_P(DBTxnTest, test1) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn3: Get db1, NOT OK
-    Status status3 = new_txn->GetDatabase("db1");
-    EXPECT_TRUE(!status3.ok());
+    auto [db_info3, status3] = new_txn->GetDatabaseInfo("db1");
+    EXPECT_FALSE(status3.ok());
 
     // Txn3: Drop db1, NOT OK
     status3 = new_txn->DropDatabase("db1", ConflictType::kError);
@@ -89,13 +91,13 @@ TEST_P(DBTxnTest, test1) {
 
 TEST_P(DBTxnTest, test20) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Commit, OK
@@ -105,20 +107,12 @@ TEST_P(DBTxnTest, test20) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
-    Status status1 = new_txn->GetDatabase("db1");
+    auto [db_info1, status1] = new_txn->GetDatabaseInfo("db1");
     EXPECT_TRUE(status1.ok());
 
     // Txn2: Drop db1, OK
     status = new_txn->DropDatabase("db1", ConflictType::kError);
     EXPECT_TRUE(status.ok());
-
-    // Txn2: Create db1, OK
-    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(status.ok());
-
-    // Txn2: Get db1, OK
-    Status status2 = new_txn->GetDatabase("db1");
-    EXPECT_TRUE(status2.ok());
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -127,12 +121,12 @@ TEST_P(DBTxnTest, test20) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    Status status3 = new_txn->GetDatabase("db1");
-    EXPECT_TRUE(status3.ok());
+    auto [db_info3, status3] = new_txn->GetDatabaseInfo("db1");
+    EXPECT_FALSE(status3.ok());
 
     // Txn3: Create db1, NOT OK
-    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(!status.ok());
+    status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+    EXPECT_TRUE(status.ok());
 
     // Txn3: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -140,27 +134,15 @@ TEST_P(DBTxnTest, test20) {
 
 TEST_P(DBTxnTest, test2) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
 
-    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
-
-    // Txn1: Create db1, duplicated，NOT OK
-    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(!status.ok());
-
-    // Txn1: Drop db1, OK
-    status = new_txn->DropDatabase("db1", ConflictType::kError);
-    EXPECT_TRUE(status.ok());
-
-    // Txn1: Get db1, NOT OK
-    Status status1 = new_txn->GetDatabase("db1");
-    EXPECT_FALSE(status1.ok());
 
     // Txn1: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -169,16 +151,12 @@ TEST_P(DBTxnTest, test2) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
-    Status status2 = new_txn->GetDatabase("db1");
-    EXPECT_FALSE(status2.ok());
+    auto [db_info2, status2] = new_txn->GetDatabaseInfo("db1");
+    EXPECT_TRUE(status2.ok());
 
     // Txn2: Create db1, OK
-    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(status.ok());
-
-    // Txn2: Get db1, OK
-    Status status3 = new_txn->GetDatabase("db1");
-    EXPECT_TRUE(status3.ok());
+    status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+    EXPECT_FALSE(status.ok());
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -187,11 +165,11 @@ TEST_P(DBTxnTest, test2) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    Status status4 = new_txn->GetDatabase("db1");
+    auto [db_info4, status4] = new_txn->GetDatabaseInfo("db1");
     EXPECT_TRUE(status4.ok());
 
     // Txn3: Create db1, NOT OK
-    status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(!status.ok());
 
     // Txn3: Commit, OK
@@ -204,21 +182,17 @@ TEST_P(DBTxnTest, test2) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)            TXN2 Commit
 TEST_P(DBTxnTest, test3) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
-    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
-
-    // Txn2: Create db1, NOT OK, WW-conflict
-    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(!status.ok());
 
     // Txn1: Commit, OK
     txn_mgr->CommitTxn(new_txn1);
@@ -233,37 +207,38 @@ TEST_P(DBTxnTest, test3) {
 //                    TXN1 Begin                    TXN1 Create db1(WW-Conflict)  TXN1 Commit
 TEST_P(DBTxnTest, test4) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
-    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Commit, OK
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create db1, NOT OK
-    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(!status.ok());
+    status = new_txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+    EXPECT_TRUE(status.ok());
 
     // Txn2: Commit, OK
-    txn_mgr->CommitTxn(new_txn2);
+    status = txn_mgr->CommitTxn(new_txn2);
+    EXPECT_TRUE(!status.ok());
 }
 
 TEST_P(DBTxnTest, test5) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Rollback, OK
@@ -273,8 +248,8 @@ TEST_P(DBTxnTest, test5) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn2: Get db1, NOT OK
-    Status status1 = new_txn->GetDatabase("db1");
-    EXPECT_TRUE(!status1.ok());
+    auto [db_info1, status1] = new_txn->GetDatabaseInfo("db1");
+    EXPECT_FALSE(status1.ok());
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -286,38 +261,34 @@ TEST_P(DBTxnTest, test5) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_P(DBTxnTest, test6) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
 
-    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
-
-    // Txn2: Create db1, NOT OK, WW-conflict
-    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(!status.ok());
 
     // Txn1: Commit, OK
     txn_mgr->RollBackTxn(new_txn1);
 
     // Txn2: Since txn1 is rollback, txn2 db1, OK, no conflict
-    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    status = new_txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn2);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
+    NewTxn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    Status status1 = new_txn3->GetDatabase("db1");
+    auto [db_info1, status1] = new_txn3->GetDatabaseInfo("db1");
     EXPECT_TRUE(status1.ok());
 
     // Txn3: Commit, OK
@@ -330,29 +301,20 @@ TEST_P(DBTxnTest, test6) {
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
 TEST_P(DBTxnTest, test7) {
     using namespace infinity;
-    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    NewTxn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
-
-    Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(status.ok());
-
-    // Txn2: Create db1, NOT OK, WW-conflict
-    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(!status.ok());
-
-    // Txn1: Drop db1, OK
-    status = new_txn1->DropDatabase("db1", ConflictType::kError);
+    Status status = new_txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn2: Create db1, OK
-    status = new_txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+    status = new_txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
     EXPECT_TRUE(status.ok());
 
     // Txn1: Commit, OK
@@ -362,10 +324,10 @@ TEST_P(DBTxnTest, test7) {
     txn_mgr->CommitTxn(new_txn2);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
+    NewTxn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    Status status1 = new_txn3->GetDatabase("db1");
+    auto [db_info1, status1] = new_txn3->GetDatabaseInfo("db1");
     EXPECT_TRUE(status1.ok());
 
     // Txn3: Commit, OK
