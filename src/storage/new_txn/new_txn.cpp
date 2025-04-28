@@ -1178,11 +1178,6 @@ Status NewTxn::Commit() {
         return status;
     }
 
-    // Try to commit the transaction
-    status = kv_instance_->Commit();
-    if (!status.ok()) {
-        return status;
-    }
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
     txn_mgr_->SendToWAL(this);
@@ -2161,6 +2156,12 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
 void NewTxn::CommitBottom() {
     // update txn manager ts to commit_ts
     // erase txn_id from not_committed_txns_
+
+    // Try to commit the transaction
+    Status status = kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
+    }
 
     TransactionID txn_id = this->TxnID();
     TxnTimeStamp commit_ts = this->CommitTS();

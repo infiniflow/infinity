@@ -939,7 +939,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
         // BufferManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_hnsw (col1 embedding(float,128));
@@ -962,8 +962,6 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
         }
         // CreateIndex
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-
             Vector<String> columns1{"col1"};
             Vector<InitParameter *> parameters1;
             parameters1.emplace_back(new InitParameter("metric", "l2"));
@@ -980,19 +978,11 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             const String &db_name = "default_db";
             const String &table_name = "test_hnsw";
             ConflictType conflict_type = ConflictType::kError;
-            bool prepare = false;
-            auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
-            EXPECT_EQ(table_status.ok(), true);
-            {
-                auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
-                auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
-                auto *table_index_entry = std::get<0>(result);
-                auto status = std::get<1>(result);
-                EXPECT_EQ(status.ok(), true);
-                txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
-                txn->CreateIndexFinish(table_entry, table_index_entry);
-            }
-            txn_mgr->CommitTxn(txn);
+            auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            Status status = txn3->CreateIndex(db_name, table_name, index_base_hnsw, conflict_type);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn3);
+            EXPECT_TRUE(status.ok());
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -1015,21 +1005,12 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        TxnManager *txn_mgr = storage->txn_manager();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
 
         {
-            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
-            Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableByName("default_db", "test_hnsw");
-            EXPECT_NE(table_entry, nullptr);
-
-            auto table_index_meta = table_entry->GetIndexMetaPtrByName("hnsw_index");
-
-            EXPECT_NE(table_index_meta, nullptr);
-            EXPECT_EQ(*table_index_meta->index_name(), "hnsw_index");
-            //            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
-            //            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
-            //            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "hnsw_index");
+            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("get index info"), TransactionType::kRead);
+            auto [table_index_info, status1] = txn->GetTableIndexInfo("default_db", "test_hnsw", "hnsw_index");
+            EXPECT_TRUE(status1.ok());
             txn_mgr->CommitTxn(txn);
         }
 
