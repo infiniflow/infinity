@@ -1844,8 +1844,8 @@ Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_m
         if (!status.ok()) {
             return status;
         }
-        for (const auto &column_def : *column_defs) {
-            ColumnMeta column_meta(column_def->id(), block_meta);
+        for (SizeT column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+            ColumnMeta column_meta(column_idx, block_meta);
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
