@@ -318,7 +318,7 @@ Status ChunkIndexMeta::LoadSet() {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
+Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     Status status = this->GetIndexBuffer(index_buffer_);
     if (!status.ok()) {
         return status;
@@ -330,7 +330,7 @@ Status ChunkIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
     if (!index_status.ok()) {
         return index_status;
     }
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         if (index_def->index_type_ == IndexType::kFullText) {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             status = this->GetChunkInfo(chunk_info_ptr);

@@ -121,7 +121,7 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     return Status::OK();
 }
 
-Status BlockMeta::UninitSet(UseAgeFlag use_age_flag) {
+Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     // {
     //     String block_row_cnt_key = GetBlockTag("row_cnt");
     //     Status status = kv_instance_.Delete(block_row_cnt_key);
@@ -129,7 +129,7 @@ Status BlockMeta::UninitSet(UseAgeFlag use_age_flag) {
     //         return status;
     //     }
     // }
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {
             String block_lock_key = GetBlockTag("lock");
@@ -149,11 +149,13 @@ Status BlockMeta::UninitSet(UseAgeFlag use_age_flag) {
         }
     }
 
-    auto [version_buffer, status] = this->GetVersionBuffer();
-    if (!status.ok()) {
-        return status;
+    if (usage_flag == UsageFlag::kOther) {
+        auto [version_buffer, status] = this->GetVersionBuffer();
+        if (!status.ok()) {
+            return status;
+        }
+        version_buffer->PickForCleanup();
     }
-    version_buffer->PickForCleanup();
     return Status::OK();
 }
 

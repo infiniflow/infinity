@@ -125,7 +125,11 @@ Status SegmentMeta::InitSet() {
     return Status::OK();
 }
 
-Status SegmentMeta::UninitSet(UseAgeFlag use_age_flag) {
+Status SegmentMeta::UninitSet(UsageFlag usage_flag) {
+    return UninitSet(usage_flag, begin_ts_);
+}
+
+Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
     // {
     //     String block_ids_key = GetSegmentTag("block_ids");
     //     Status status = kv_instance_.Delete(block_ids_key);
@@ -140,13 +144,13 @@ Status SegmentMeta::UninitSet(UseAgeFlag use_age_flag) {
         Vector<String> delete_keys;
         while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
             TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-            if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
                 UnrecoverableError(fmt::format("Block id: {}.{} is not allowed to be removed. commit_ts: {}, begin_ts: {}",
                                                segment_id_,
                                                block_id,
                                                commit_ts,
-                                               begin_ts_));
+                                               begin_ts));
             }
             // the key is committed before the txn or the key isn't committed
             delete_keys.push_back(iter->Key().ToString());

@@ -225,7 +225,7 @@ Status TableIndexMeeta::InitSet1(const SharedPtr<IndexBase> &index_base, NewCata
     return Status::OK();
 }
 
-Status TableIndexMeeta::UninitSet(UseAgeFlag use_age_flag) {
+Status TableIndexMeeta::UninitSet(UsageFlag usage_flag) {
     Status status;
 
     SharedPtr<IndexBase> index_base;
@@ -233,7 +233,7 @@ Status TableIndexMeeta::UninitSet(UseAgeFlag use_age_flag) {
     if (!status.ok()) {
         return status;
     }
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         if (index_base->index_type_ == IndexType::kFullText) {
             status = table_meta_.RemoveFtIndexCache();
             if (!status.ok()) {
@@ -264,7 +264,7 @@ Status TableIndexMeeta::UninitSet(UseAgeFlag use_age_flag) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::UninitSet1(UseAgeFlag use_age_flag) {
+Status TableIndexMeeta::UninitSet1(UsageFlag usage_flag) {
     Status status;
 
     SharedPtr<IndexBase> index_base;
@@ -272,7 +272,7 @@ Status TableIndexMeeta::UninitSet1(UseAgeFlag use_age_flag) {
     if (!status.ok()) {
         return status;
     }
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         if (index_base->index_type_ == IndexType::kFullText) {
             status = table_meta_.RemoveFtIndexCache();
             if (!status.ok() && status.code() != ErrorCode::kCatalogError) {

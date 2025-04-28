@@ -322,7 +322,7 @@ Status SegmentIndexMeta::LoadSet() {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
+Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
     {
         String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
         Status status = kv_instance_.Delete(chunk_ids_key);
@@ -339,7 +339,7 @@ Status SegmentIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
         }
         next_chunk_id_.reset();
     }
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         {
             String mem_index_key = GetSegmentIndexTag("mem_index");
             NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -368,7 +368,7 @@ Status SegmentIndexMeta::UninitSet(UseAgeFlag use_age_flag) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::UninitSet1(UseAgeFlag use_age_flag) {
+Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     {
         // Remove all chunk ids
         TableMeeta &table_meta = table_index_meta_.table_meta();
@@ -391,7 +391,7 @@ Status SegmentIndexMeta::UninitSet1(UseAgeFlag use_age_flag) {
         }
         next_chunk_id_.reset();
     }
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         {
             // Remove mem index
             String mem_index_key = GetSegmentIndexTag("mem_index");

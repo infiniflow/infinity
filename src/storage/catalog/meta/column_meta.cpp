@@ -203,16 +203,18 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
     return Status::OK();
 }
 
-Status ColumnMeta::UninitSet(const ColumnDef *column_def, UseAgeFlag use_age_flag) {
+Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) {
     Status status;
 
-    status = this->GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
-    if (!status.ok()) {
-        return status;
-    }
-    column_buffer_->PickForCleanup();
-    if (outline_buffer_) {
-        outline_buffer_->PickForCleanup();
+    if (usage_flag == UsageFlag::kOther) {
+        status = this->GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
+        if (!status.ok()) {
+            return status;
+        }
+        column_buffer_->PickForCleanup();
+        if (outline_buffer_) {
+            outline_buffer_->PickForCleanup();
+        }
     }
 
     String chunk_offset_key = GetColumnTag("last_chunk_offset");

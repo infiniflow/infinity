@@ -92,12 +92,6 @@ export class CatalogDeltaOperation {
 public:
     explicit CatalogDeltaOperation(CatalogDeltaOpType type, PersistenceManager *pm_ptr) : type_(type) {
         pm_ = pm_ptr;
-        // String persistence_dir = config_ptr->PersistenceDir();
-        // pm_.reset();
-        // if (!persistence_dir.empty()) {
-        //     i64 persistence_object_size_limit = config_ptr->PersistenceObjectSizeLimit();
-        //     pm_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr->DataDir(), static_cast<SizeT>(persistence_object_size_limit));
-        // }
     }
     CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts);
     virtual ~CatalogDeltaOperation() {};

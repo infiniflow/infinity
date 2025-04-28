@@ -74,9 +74,9 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet(UseAgeFlag use_age_flag);
+    Status UninitSet(UsageFlag usage_flag);
 
-    Status UninitSet1(UseAgeFlag use_age_flag);
+    Status UninitSet1(UsageFlag usage_flag);
 
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 

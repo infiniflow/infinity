@@ -64,7 +64,7 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet(UseAgeFlag use_age_flag);
+    Status UninitSet(UsageFlag usage_flag);
 
     Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
 

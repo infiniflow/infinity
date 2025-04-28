@@ -100,7 +100,9 @@ TEST_P(TransformMeta, db_meta_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
+    // String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
+    // Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
+    String full_ckp_path = "/home/inf/Downloads/infinity/0000002/data/catalog/FULL.90745.json";
     Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 

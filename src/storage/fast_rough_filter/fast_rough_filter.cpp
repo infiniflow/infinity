@@ -28,6 +28,8 @@ import filter_expression_push_down_helper;
 
 namespace infinity {
 
+bool FastRoughFilter::IsValid() const { return min_max_data_filter_ != nullptr; }
+
 String FastRoughFilter::SerializeToString() const {
     if (HaveMinMaxFilter()) {
         u32 probabilistic_data_filter_binary_bytes = probabilistic_data_filter_->GetSerializeSizeInBytes();
@@ -46,17 +48,21 @@ String FastRoughFilter::SerializeToString() const {
             UnrecoverableError(error_message);
         }
         return std::move(os).str();
-    } else {
-        String error_message = "FastRoughFilter::SerializeToString(): No FastRoughFilter data.";
-        UnrecoverableError(error_message);
-        return {};
     }
+    String error_message = "FastRoughFilter::SerializeToString(): No FastRoughFilter data.";
+    UnrecoverableError(error_message);
+    return {};
 }
 
 void FastRoughFilter::DeserializeFromString(const String &str) {
     // load necessary parts
     IStringStream is(str);
-    u32 total_binary_bytes;
+    u32 total_binary_bytes{};
+    if (str.empty()) {
+        LOG_ERROR(fmt::format("FastRoughFilter: empty fast rough filter"));
+        return;
+    }
+
     is.read(reinterpret_cast<char *>(&total_binary_bytes), sizeof(total_binary_bytes));
     if (total_binary_bytes != is.view().size()) {
         String error_message = "FastRoughFilter::DeserializeToString(): load size error";

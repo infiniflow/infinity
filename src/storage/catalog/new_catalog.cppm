@@ -135,9 +135,10 @@ private:
     bool end_ = false;
 };
 
-export enum class UseAgeFlag {
-    kNormal = 0,
-    kTransform,
+// This enumerates type is to indicate which case the meta objects are used to.
+export enum class UsageFlag {
+    kTransform,  // Used by catalog transformation from old json style to rocksdb.
+    kOther, // Other cases
 };
 
 export struct NewCatalog {
@@ -151,33 +152,21 @@ public:
     static Status Init(KVStore *kv_store);
 
 private:
-    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json,
-                                    KVInstance *kv_instance,
-                                    Map<String, String> &dbname_to_idstr,
-                                    Set<String> &dir_set,
-                                    const String &db_path,
-                                    bool is_vfs);
-    Status TransformCatalogTable(DBMeeta &db_meta,
-                                 const nlohmann::json &table_meta_json,
-                                 String const &db_name,
-                                 Map<String, String> &dbname_to_idstr,
-                                 Set<String> &dir_set,
-                                 const String &db_path,
-                                 bool is_vfs);
-    Status TransformCatalogSegment(TableMeeta &table_meta,
-                                   const nlohmann::json &segment_entry_json,
-                                   Set<String> &dbname_to_idstr,
-                                   const String &db_path,
-                                   bool is_vfs);
-    Status TransformCatalogBlock(SegmentMeta &segment_meta,
-                                 const nlohmann::json &block_entry_json,
-                                 Set<String> &dbname_to_idstr,
-                                 const String &db_path,
-                                 bool is_vfs);
-    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json, Set<String> &dir_set);
+    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance, const String &db_path, bool is_vfs);
+    Status TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json &table_meta_json, String const &db_name, const String &db_path, bool is_vfs);
+    Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json, const String &db_path, bool is_vfs);
+    Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json, const String &db_path, bool is_vfs);
+    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json);
     Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
     Status TransformCatalogSegmentIndex(TableIndexMeeta &table_meta, const nlohmann::json &table_index_entry_json);
     Status TransformCatalogChunkIndex(SegmentIndexMeta &segment_index_meta, const nlohmann::json &chunk_index_entry_json);
+    Status TransformDeltaMeta(Config *config, const Vector<String> &delta_ckp_paths, KVInstance *kv_instance, bool is_vfs);
+    Status RefactorPath(const String &path_key, String &fine_path, char delimiter);
+    Status TransformData(const String &data_path, KVInstance *kv_instance, nlohmann::json *full_ckp_json, bool is_vfs);
+    Map<String, String> dbname_to_idstr_;
+    Set<String> dir_set_;
+    static constexpr SizeT db_prefix_len_ = 14;    // XXXXXXXXXX_db_
+    static constexpr SizeT table_prefix_len_ = 17; // XXXXXXXXXX_table_
     // // Database related functions
     // Status CreateDatabase(const SharedPtr<String> &db_name,
     //                       const SharedPtr<String> &comment,
@@ -333,7 +322,7 @@ public:
                            const String *db_comment,
                            Optional<DBMeeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UseAgeFlag use_age_flag);
+    static Status CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -342,7 +331,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UseAgeFlag use_age_flag);
+    static Status CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
                             String &index_id_str,
@@ -350,18 +339,18 @@ public:
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UseAgeFlag use_age_flag);
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UsageFlag usage_flag);
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta,
                                   const String &index_name,
                                   const Vector<ChunkInfoForCreateIndex> &meta_infos,
-                                  UseAgeFlag use_age_flag);
+                                  UsageFlag usage_flag);
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
 
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
-    static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UseAgeFlag use_age_flag);
+    static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
@@ -371,20 +360,20 @@ public:
 
     static Status LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts);
 
-    static Status CleanBlock(BlockMeta &block_meta, UseAgeFlag use_age_flag);
+    static Status CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag);
 
     static Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
     static Status AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta, TxnTimeStamp commit_ts);
 
-    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UseAgeFlag use_age_flag);
+    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag);
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
     static Status
     AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
-    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UseAgeFlag use_age_flag);
+    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
 
     static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                    ChunkID chunk_id,
@@ -407,7 +396,7 @@ public:
 
     static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 
-    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UseAgeFlag use_age_flag);
+    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
 
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
 

@@ -301,7 +301,7 @@ Status TableMeeta::LoadSet() {
     return Status::OK();
 }
 
-Status TableMeeta::UninitSet(UseAgeFlag use_age_flag) {
+Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     Status status;
 
     // delete table segment id;
@@ -376,7 +376,7 @@ Status TableMeeta::UninitSet(UseAgeFlag use_age_flag) {
         iter->Next();
     }
 
-    if (use_age_flag == UseAgeFlag::kNormal) {
+    if (usage_flag == UsageFlag::kOther) {
         status = RemoveFtIndexCache();
         if (!status.ok()) {
             if (status.code() != ErrorCode::kCatalogError) {

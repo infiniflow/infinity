@@ -35,7 +35,7 @@ public:
 
     Status InitSet(const String *comment = nullptr);
 
-    Status UninitSet(UseAgeFlag use_age_flag);
+    Status UninitSet(UsageFlag usage_flag);
 
     Status GetComment(String *&comment) {
         if (!comment_) {

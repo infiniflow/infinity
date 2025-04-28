@@ -30,7 +30,7 @@ class IndexBase;
 // struct SegmentUpdateTS;
 // class NewCatalog;
 class NewTxn;
-// enum class UseAgeFlag;
+// enum class UsageFlag;
 
 export class TableIndexMeeta {
 public:
@@ -76,9 +76,9 @@ public:
 
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
 
-    Status UninitSet(UseAgeFlag use_age_flag);
+    Status UninitSet(UsageFlag usage_flag);
 
-    Status UninitSet1(UseAgeFlag use_age_flag);
+    Status UninitSet1(UsageFlag usage_flag);
 
 private:
     Status LoadIndexDef();

@@ -53,7 +53,9 @@ public:
 
     Status InitSet();
 
-    Status UninitSet(UseAgeFlag use_age_flag);
+    Status UninitSet(UsageFlag usage_flag);
+
+    Status UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts);
 
     // New
     Status Init();

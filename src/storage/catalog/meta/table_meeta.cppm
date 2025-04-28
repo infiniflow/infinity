@@ -61,7 +61,7 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet(UseAgeFlag use_age_flag);
+    Status UninitSet(UsageFlag usage_flag);
 
     // Status GetNextSegmentID(SegmentID &next_segment_id) {
     //     if (!next_segment_id_) {
