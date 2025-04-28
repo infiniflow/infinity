@@ -26,10 +26,6 @@ namespace infinity {
 
 Status::Status(ErrorCode code, const char *msg) : code_(code) { msg_ = MakeUnique<String>(msg); }
 
-Status::Status(ErrorCode code, rocksdb::Status detail) : code_(code) { rocksdb_status_ = MakeUnique<rocksdb::Status>(std::move(detail)); }
-
-Status::Status(ErrorCode code, rocksdb::IOStatus detail) : code_(code) { rocksdb_status_ = MakeUnique<rocksdb::IOStatus>(std::move(detail)); }
-
 Status::Status(Status &s) { MoveStatus(s); }
 
 Status::Status(Status &&s) noexcept { MoveStatus(s); }
@@ -47,13 +43,11 @@ Status &Status::operator=(Status &&s) noexcept {
 void Status::MoveStatus(Status &s) {
     code_ = s.code_;
     msg_ = std::move(s.msg_);
-    rocksdb_status_ = std::move(s.rocksdb_status_);
 }
 
 void Status::MoveStatus(Status &&s) {
     code_ = s.code_;
     msg_ = std::move(s.msg_);
-    rocksdb_status_ = std::move(s.rocksdb_status_);
 }
 
 void Status::Init(ErrorCode code, const char *msg) {
@@ -76,14 +70,6 @@ const char *Status::message() const {
     if (msg_.get() != nullptr) {
         return msg_->c_str();
     } else {
-        if (code_ == ErrorCode::kRocksDBError) {
-            if (rocksdb_status_->IsBusy()) {
-                msg_ = MakeUnique<String>(fmt::format("Rocksdb error: Busy"));
-            } else {
-                msg_ = MakeUnique<String>(fmt::format("Rocksdb error: other cause"));
-            }
-            return msg_->c_str();
-        }
         return nullptr;
     }
 }
@@ -695,8 +681,12 @@ Status Status::BufferManagerError(const String &detailed_info) {
     return Status(ErrorCode::kBufferManagerError, MakeUnique<String>(fmt::format("Buffer manager error: {}", detailed_info)));
 }
 
-Status Status::RocksDBError(rocksdb::Status rocksdb_s) { return Status(ErrorCode::kRocksDBError, std::move(rocksdb_s)); }
+Status Status::RocksDBError(rocksdb::Status rocksdb_s, const String &msg) {
+    return Status(ErrorCode::kRocksDBError, MakeUnique<String>(fmt::format("{}, {}", msg, rocksdb_s.ToString())));
+}
 
-Status Status::RocksDBError(rocksdb::IOStatus rocksdb_s) { return Status(ErrorCode::kRocksDBError, MakeUnique<String>(rocksdb_s.ToString())); }
+Status Status::RocksDBError(rocksdb::IOStatus rocksdb_s, const String &msg) {
+    return Status(ErrorCode::kRocksDBError, MakeUnique<String>(fmt::format("{}, {}", msg, rocksdb_s.ToString())));
+}
 
 } // namespace infinity

@@ -75,8 +75,9 @@ Status KVInstance::Put(const String &key, const String &value) {
     //    LOG_INFO(fmt::format("Put key: {}, value: {}", key, value));
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
-        LOG_DEBUG(fmt::format("Put key: {}, value: {}", key, value));
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::Transaction::Put key: {}, value: {}", key, value);
+        LOG_DEBUG(msg);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -84,7 +85,9 @@ Status KVInstance::Put(const String &key, const String &value) {
 Status KVInstance::Delete(const String &key) {
     rocksdb::Status s = transaction_->Delete(key);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::Transaction::Delete key: {}", key);
+        LOG_DEBUG(msg);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -97,7 +100,9 @@ Status KVInstance::Get(const String &key, String &value) {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                return Status::RocksDBError(std::move(s));
+                String msg = fmt::format("rocksdb::Transaction::Get key: {}", key);
+                LOG_DEBUG(msg);
+                return Status::RocksDBError(std::move(s), msg);
             }
         }
     }
@@ -112,7 +117,9 @@ Status KVInstance::GetForUpdate(const String &key, String &value) {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                return Status::RocksDBError(std::move(s));
+                String msg = fmt::format("rocksdb::Transaction::GetForUpdate key: {}", key);
+                LOG_DEBUG(msg);
+                return Status::RocksDBError(std::move(s), key);
             }
         }
     }
@@ -134,7 +141,8 @@ UniquePtr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const
 Status KVInstance::Commit() {
     rocksdb::Status s = transaction_->Commit();
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg("rocksdb::Transaction::Commit");
+        return Status::RocksDBError(std::move(s), msg);
     }
     if (transaction_) {
         delete transaction_;
@@ -145,7 +153,8 @@ Status KVInstance::Commit() {
 Status KVInstance::Rollback() {
     rocksdb::Status s = transaction_->Rollback();
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg("rocksdb::Transaction::Rollback");
+        return Status::RocksDBError(std::move(s), msg);
     }
     if (transaction_) {
         delete transaction_;
@@ -167,7 +176,8 @@ Status KVStore::Init(const String &db_path) {
 
     rocksdb::Status s = rocksdb::TransactionDB::Open(options_, txn_db_options_, db_path_, &transaction_db_);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::TransactionDB::Open db path: {}", db_path);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -183,7 +193,8 @@ Status KVStore::Flush() {
     rocksdb::FlushOptions flush_opts;
     rocksdb::Status s = transaction_db_->Flush(flush_opts);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg("rocksdb::TransactionDB::Flush");
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -192,12 +203,14 @@ Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupIn
     rocksdb::BackupEngine *backup_engine;
     rocksdb::Status s = rocksdb::BackupEngine::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::BackupEngine::Open: {}", backup_path);
+        return Status::RocksDBError(std::move(s), msg);
     }
 
     rocksdb::IOStatus io_status = backup_engine->CreateNewBackup(transaction_db_);
     if (!io_status.ok()) {
-        return Status::RocksDBError(std::move(io_status));
+        String msg = fmt::format("rocksdb::BackupEngine::CreateNewBackup: {}", backup_path);
+        return Status::RocksDBError(std::move(io_status), msg);
     }
 
     backup_engine->GetBackupInfo(&backup_info_list, true);
@@ -209,11 +222,13 @@ Status KVStore::RestoreFromBackup(const String &backup_path, const String &db_pa
     rocksdb::BackupEngineReadOnly *backup_engine_ro{};
     rocksdb::IOStatus s = rocksdb::BackupEngineReadOnly::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine_ro);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::BackupEngineReadOnly::Open: {}", backup_path);
+        return Status::RocksDBError(std::move(s), msg);
     }
     s = backup_engine_ro->RestoreDBFromLatestBackup(db_path, db_path);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::BackupEngineReadOnly::RestoreDBFromLatestBackup: {}", backup_path);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -228,7 +243,8 @@ UniquePtr<KVInstance> KVStore::GetInstance() {
 Status KVStore::Put(const String &key, const String &value) {
     rocksdb::Status s = transaction_db_->Put(write_options_, key, value);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::TransactionDB::Put key: {}, value: {}", key, value);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -236,7 +252,8 @@ Status KVStore::Put(const String &key, const String &value) {
 Status KVStore::Delete(const String &key) {
     rocksdb::Status s = transaction_db_->Delete(write_options_, key);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::TransactionDB::Delete key: {}", key);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -249,7 +266,8 @@ Status KVStore::Get(const String &key, String &value) {
                 return Status::NotFound(fmt::format("Key not found: {}", key));
             }
             default: {
-                return Status::RocksDBError(std::move(s));
+                String msg = fmt::format("rocksdb::TransactionDB::Get key: {}", key);
+                return Status::RocksDBError(std::move(s), msg);
             }
         }
     }
@@ -259,7 +277,8 @@ Status KVStore::Get(const String &key, String &value) {
 Status KVStore::Merge(const String &key, const String &value) {
     rocksdb::Status s = transaction_db_->Merge(write_options_, nullptr, key, value);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::TransactionDB::Merge key: {}, value: {}", key, value);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }
@@ -296,7 +315,8 @@ Status KVStore::Destroy(const String &db_path) {
 
     rocksdb::Status s = ::rocksdb::DestroyDB(db_path, options);
     if (!s.ok()) {
-        return Status::RocksDBError(std::move(s));
+        String msg = fmt::format("rocksdb::DestroyDB: {}", db_path);
+        return Status::RocksDBError(std::move(s), msg);
     }
     return Status::OK();
 }

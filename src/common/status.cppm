@@ -407,8 +407,8 @@ public:
     // catalog
     static Status CatalogError(const String &detailed_info);
     static Status BufferManagerError(const String &detailed_info);
-    static Status RocksDBError(rocksdb::Status rocksdb_s);
-    static Status RocksDBError(rocksdb::IOStatus rocksdb_s);
+    static Status RocksDBError(rocksdb::Status rocksdb_s, const String &msg);
+    static Status RocksDBError(rocksdb::IOStatus rocksdb_s, const String &msg);
 
 public:
     Status() = default;
@@ -452,7 +452,6 @@ public:
 
     ErrorCode code_{ErrorCode::kOk};
     mutable UniquePtr<String> msg_{};
-    UniquePtr<rocksdb::Status> rocksdb_status_{};
 };
 
 } // namespace infinity
