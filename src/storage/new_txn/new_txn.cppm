@@ -105,6 +105,12 @@ export struct ChunkInfoForCreateIndex {
     ChunkID chunk_id_{};
 };
 
+enum class TxnType {
+    kReadOnly,
+    kWrite,
+    kInvalid,
+};
+
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
     // For new txn
@@ -627,6 +633,7 @@ private:
     NewCatalog *new_catalog_{};
 
     NewTxnStore txn_store_; // this has this ptr, so txn cannot be moved.
+    TxnType txn_type_{TxnType::kInvalid};
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};

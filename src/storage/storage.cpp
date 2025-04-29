@@ -264,46 +264,25 @@ Status Storage::AdminToWriter() {
     kv_store_->Init(config_ptr_->CatalogDir());
     new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
 
-    // TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
-    TxnTimeStamp system_start_ts = 0;
-    if (!config_ptr_->UseNewCatalog()) {
-        system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
-        if (system_start_ts == 0) {
-            // Init database, need to create default_db
-            LOG_INFO(fmt::format("Init a new catalog"));
-            catalog_ = Catalog::NewCatalog();
-        }
+    Vector<SharedPtr<WalEntry>> replay_entries;
+    LOG_INFO("Read WAL files");
+    auto [system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
+    // Init database, need to create default_db
+    LOG_INFO(fmt::format("Init a new catalog"));
+    catalog_ = Catalog::NewCatalog();
+    this->AttachCatalog(max_checkpoint_ts);
 
-        // Construct txn manager
-        if (txn_mgr_ != nullptr) {
-            UnrecoverableError("Transaction manager was initialized before.");
-        }
-        txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
-        txn_mgr_->Start();
+    if (new_txn_mgr_) {
+        UnrecoverableError("New transaction manager was initialized before.");
+    }
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+    new_txn_mgr_->Start();
 
-        wal_mgr_->Start();
-    } else {
-        TxnTimeStamp max_checkpoint_ts = 0;
+    // start WalManager after TxnManager since it depends on TxnManager.
+    wal_mgr_->Start();
 
-        Vector<SharedPtr<WalEntry>> replay_entries;
-        std::tie(system_start_ts, max_checkpoint_ts) = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
-        // Init database, need to create default_db
-        LOG_INFO(fmt::format("Init a new catalog"));
-        catalog_ = Catalog::NewCatalog();
-        this->AttachCatalog(max_checkpoint_ts);
-
-        if (new_txn_mgr_) {
-            UnrecoverableError("New transaction manager was initialized before.");
-        }
-        new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
-        new_txn_mgr_->Start();
-
-        // start WalManager after TxnManager since it depends on TxnManager.
-        wal_mgr_->Start();
-
-        if (config_ptr_->ReplayWal()) {
-            wal_mgr_->ReplayWalEntries(replay_entries);
-        }
+    if (config_ptr_->ReplayWal()) {
+        wal_mgr_->ReplayWalEntries(replay_entries);
     }
 
     if (memory_index_tracer_ != nullptr) {

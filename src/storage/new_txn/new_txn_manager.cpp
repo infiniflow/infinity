@@ -143,7 +143,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
         UnrecoverableError(error_message);
     }
 
-    current_ts_ += 2;
+    //    current_ts_ += 2;
     prepare_commit_ts_ = current_ts_;
     TxnTimeStamp commit_ts = current_ts_;
     TxnTimeStamp begin_ts = current_ts_ - 1; // current_ts_ > 0

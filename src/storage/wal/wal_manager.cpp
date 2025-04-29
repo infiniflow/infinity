@@ -187,7 +187,7 @@ TxnTimeStamp WalManager::LastCheckpointTS() const {
 
 void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
     std::lock_guard guard(last_ckp_ts_mutex_);
-    if (new_last_ckp_ts > last_ckp_ts_) {
+    if (new_last_ckp_ts > last_ckp_ts_ or last_ckp_ts_ == UNCOMMIT_TS) {
         last_ckp_ts_ = new_last_ckp_ts;
     }
     return;
@@ -1178,7 +1178,8 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
             }
             replay_entries.push_back(wal_entry);
         }
-        LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_checkpoint_ts));
+        LOG_INFO(fmt::format("Find and set checkpoint max commit ts: {}", max_checkpoint_ts));
+        SetLastCheckpointTS(max_checkpoint_ts);
 
         // phase 2: by the max commit ts, find the entries to replay
         LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");

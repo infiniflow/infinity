@@ -975,13 +975,20 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
     }
 
+    if (last_ckp_ts % 2 == 0) {
+        UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
+    }
+
     Status status;
     TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
     CheckpointOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
 
-    if (last_ckp_ts >= checkpoint_ts) {
+    if (last_ckp_ts + 2 >= checkpoint_ts) {
+        // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
+        txn_type_ = TxnType::kReadOnly;
+        LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
         return Status::OK();
     }
 
@@ -1128,7 +1135,7 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 
 Status NewTxn::Commit() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
-    if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly() && !this->IsReplay()) {
+    if ((wal_entry_->cmds_.empty() && txn_store_.ReadOnly() && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
