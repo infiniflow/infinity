@@ -125,7 +125,6 @@ void WalManager::Start() {
     LOG_INFO(fmt::format("Open wal file: {}", wal_path_));
 
     wal_size_ = 0;
-    flush_thread_ = Thread([this] { Flush(); });
     new_flush_thread_ = Thread([this] { NewFlush(); });
     // checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
     LOG_INFO("WAL manager is started.");
@@ -154,10 +153,6 @@ void WalManager::Stop() {
     // pop all the entries in the queue. and notify the condition variable.
     wait_flush_.Enqueue(nullptr);
     new_wait_flush_.Enqueue(nullptr);
-
-    // Wait for flush thread to stop
-    LOG_TRACE("WalManager::Stop flush thread join");
-    flush_thread_.join();
 
     LOG_TRACE("WalManager::Stop new flush thread join");
     new_flush_thread_.join();
