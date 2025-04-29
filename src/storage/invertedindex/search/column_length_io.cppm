@@ -58,11 +58,11 @@ private:
     u32 SeekFile(RowID row_id);
     const String &index_dir_;
     // const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; 
-    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_; // must in ascending order
+    Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
 
-    SharedPtr<MemoryIndexer> memory_indexer_;
-    u64 total_df_;
-    float avg_column_len_;
+    SharedPtr<MemoryIndexer> memory_indexer_{};
+    u64 total_df_{};
+    float avg_column_len_{};
     const u32 *column_lengths_{nullptr};
     RowID current_chunk_base_rowid_{(u64)0};
     u32 current_chunk_row_count_{0};
