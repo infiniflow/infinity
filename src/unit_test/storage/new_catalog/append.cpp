@@ -49,7 +49,55 @@ using namespace infinity;
 
 class TestTxnAppend : public BaseTestParamStr {
 public:
+    Tuple<SizeT, Status> GetTableRowCount(const String &db_name, const String &table_name);
 };
+
+Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, const String &table_name) {
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get row count"), TransactionType::kNormal);
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return {0, status};
+    }
+
+    SizeT row_count = 0;
+    auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+    if (!status.ok()) {
+        return {0, status};
+    }
+    for (auto &segment_id : *segment_ids) {
+        SegmentMeta segment_meta(segment_id, *table_meta);
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        if (!status.ok()) {
+            return {0, status};
+        }
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+        if (!status.ok()) {
+            return {0, status};
+        }
+
+        for (auto &block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta);
+            NewTxnGetVisibleRangeState state;
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            if (!status.ok()) {
+                return {0, status};
+            }
+            Pair<BlockOffset, BlockOffset> range;
+            BlockOffset block_offset_begin = 0;
+            while (state.Next(block_offset_begin, range)) {
+                block_offset_begin = range.second;
+                row_count += range.second - range.first;
+            }
+        }
+    }
+    return {row_count, status};
+}
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnAppend,
@@ -2131,6 +2179,11 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
+        SizeT row_count = 0;
+        std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(row_count, insert_row);
+
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn6->DropDatabase("db1", ConflictType::kError);
@@ -2207,7 +2260,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (conflict)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  drop column  commit (success)
@@ -2238,6 +2291,10 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
 
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_FALSE(status.ok());
+        SizeT row_count = 0;
+        std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(row_count, 0);
 
         status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -3017,46 +3074,10 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_FALSE(status.ok());
 
-        // Check the appended data.
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
-            EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-            SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
-
-            Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-            BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
-
-            NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
-            EXPECT_TRUE(status.ok());
-            {
-                Pair<BlockOffset, BlockOffset> range;
-                BlockOffset offset = 0;
-                bool has_next = state.Next(offset, range);
-                EXPECT_TRUE(has_next);
-                EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
-                offset = range.second;
-                has_next = state.Next(offset, range);
-                EXPECT_FALSE(has_next);
-            }
-
-            SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 4096);
-        }
+        SizeT row_count = 0;
+        std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(row_count, 4096);
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -3204,46 +3225,10 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        // Check the appended data.
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-            TxnTimeStamp begin_ts = txn->BeginTS();
-
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-            EXPECT_TRUE(status.ok());
-
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
-            EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
-            SegmentMeta segment_meta(0, *table_meta);
-
-            Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
-            BlockMeta block_meta(0, segment_meta);
-
-            NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
-            EXPECT_TRUE(status.ok());
-            {
-                Pair<BlockOffset, BlockOffset> range;
-                BlockOffset offset = 0;
-                bool has_next = state.Next(offset, range);
-                EXPECT_TRUE(has_next);
-                EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
-                offset = range.second;
-                has_next = state.Next(offset, range);
-                EXPECT_FALSE(has_next);
-            }
-
-            SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 4096);
-        }
+        SizeT row_count = 0;
+        std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(row_count, 4096);
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
