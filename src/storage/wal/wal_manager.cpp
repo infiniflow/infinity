@@ -476,7 +476,7 @@ void WalManager::NewFlush() {
                 continue;
             }
 
-            if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+            if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
                 LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file",
                                      txn->BeginTS(),
                                      txn->CommitTS()));

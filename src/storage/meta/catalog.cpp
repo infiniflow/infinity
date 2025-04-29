@@ -1283,7 +1283,7 @@ void Catalog::MemIndexCommit() {
             }
         }
     } else {
-        NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("mem index commit"), TransactionType::kNewCheckpoint);
+        NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("mem index commit"), TransactionType::kNormal);
 
         Status status = NewCatalog::MemIndexCommit(new_txn);
         if (status.ok()) {

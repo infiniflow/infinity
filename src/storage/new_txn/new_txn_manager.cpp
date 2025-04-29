@@ -92,7 +92,7 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
 
-    if (txn_type == TransactionType::kCheckpoint) {
+    if (txn_type == TransactionType::kNewCheckpoint) {
         if (ckp_begin_ts_ == UNCOMMIT_TS) {
             LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
             ckp_begin_ts_ = begin_ts;
@@ -311,7 +311,7 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
@@ -335,7 +335,7 @@ void NewTxnManager::CommitReplayTxn(NewTxn *txn) {
 Status NewTxnManager::RollBackTxn(NewTxn *txn) {
     Status status = txn->Rollback();
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
