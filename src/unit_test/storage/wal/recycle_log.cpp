@@ -79,8 +79,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 }
                 // create and drop db to fill wal log
                 {
-                    NewTxnManager *new_txn_mgr{};
-                    new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+                    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
                     auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
                     EXPECT_TRUE(status.ok());
@@ -88,8 +87,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                     EXPECT_TRUE(status.ok());
                 }
                 { // put create after drop to prevent the merge delta result is empty
-                    NewTxnManager *new_txn_mgr{};
-                    new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+                    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
                     auto status = txn->CreateDatabase("db1", ConflictType::kIgnore, MakeShared<String>());
                     EXPECT_TRUE(status.ok());
@@ -105,19 +103,9 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             }
         }
 
-        // auto checkpoint = [&] {
-        //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-        //     EXPECT_TRUE(status.ok());
-        //     status = new_txn_mgr->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // };
-
-
         std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
         {
-            NewTxnManager *new_txn_mgr{};
-            new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+            NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
             wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check point"), TransactionType::kNewCheckpoint);
@@ -125,11 +113,6 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn,ckp_commit_ts.get());
             EXPECT_TRUE(status.ok());
-            // auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
-            // SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false /*full_check_point*/);
-            // bg_processor->Submit(force_ckp_task);
-            // force_ckp_task->Wait();
-            // ckp_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
             // assert there is one log file
