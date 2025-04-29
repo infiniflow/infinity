@@ -975,7 +975,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
     }
 
-    if (last_ckp_ts % 2 == 0) {
+    if (last_ckp_ts % 2 == 0 and last_ckp_ts > 0) {
         UnrecoverableError(fmt::format("last checkpoint ts isn't correct: {}", last_ckp_ts));
     }
 
@@ -985,7 +985,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
 
     current_ckp_ts_ = checkpoint_ts;
 
-    if (last_ckp_ts + 2 >= checkpoint_ts) {
+    if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
         txn_type_ = TxnType::kReadOnly;
         LOG_INFO(fmt::format("Last checkpoint ts {}, this checkpoint begin ts: {}, SKIP CHECKPOINT", last_ckp_ts, checkpoint_ts));
