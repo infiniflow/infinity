@@ -458,34 +458,25 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
-    if (global_config_->UseNewCatalog()) {
-        // use new txn
-        NewTxn *new_txn = nullptr;
-        new_txn =
-            storage_->new_txn_manager()->BeginTxn(MakeUnique<String>(base_statement ? base_statement->ToString() : ""), TransactionType::kNormal);
-        if (new_txn == nullptr) {
-            UnrecoverableError("Cannot get new txn. TODO");
-        }
-        session_ptr_->SetNewTxn(new_txn);
-        return;
-    }
-
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn *new_txn = nullptr;
-        if (base_statement == nullptr) {
-            new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(""), TransactionType::kNormal);
-        } else {
-            // TODO: more type check and setting
-            if (base_statement->type_ == StatementType::kFlush) {
-                new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kCheckpoint);
-                if (new_txn == nullptr) {
-                    RecoverableError(Status::FailToStartTxn("System is checkpointing"));
-                }
-            } else {
-                new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
+        NewTxnManager *txn_manager = storage_->new_txn_manager();
+        UniquePtr<String> txn_text = MakeUnique<String>(base_statement ? base_statement->ToString() : "");
+
+        NewTxn *new_txn{};
+        if (base_statement->type_ == StatementType::kFlush) {
+            new_txn = txn_manager->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kCheckpoint);
+            if (new_txn == nullptr) {
+                RecoverableError(Status::FailToStartTxn("System is checkpointing"));
             }
+        } else {
+            new_txn = txn_manager->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
         }
-        session_ptr_->SetTxn(new_txn);
+
+        if (new_txn == nullptr) {
+            UnrecoverableError("Cannot get new transaction.");
+        }
+
+        session_ptr_->SetNewTxn(new_txn);
     }
 }
 
