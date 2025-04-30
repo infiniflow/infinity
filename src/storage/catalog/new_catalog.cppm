@@ -235,6 +235,7 @@ public:
     Status AddMemIndex(String mem_index_key, SharedPtr<MemIndex> mem_index);
     Status GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
+    Vector<Pair<String, String>> GetAllMemIndexInfo();
 
     Status IncreaseTableReferenceCountForMemIndex(const String &table_key);
     Status DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count);

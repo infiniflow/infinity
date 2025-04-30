@@ -1311,6 +1311,42 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
     return Status::OK();
 }
 
+Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
+    Vector<Pair<String, String>> result;
+    {
+        std::unique_lock lock(mem_index_mtx_);
+        for (const auto &mem_index_pair : mem_index_map_) {
+            if (mem_index_pair.second->memory_hnsw_index_ != nullptr) {
+                result.push_back({mem_index_pair.first, "hnsw"});
+                continue;
+            }
+            if (mem_index_pair.second->memory_ivf_index_ != nullptr) {
+                result.push_back({mem_index_pair.first, "ivf"});
+                continue;
+            }
+            if (mem_index_pair.second->memory_indexer_ != nullptr) {
+                result.push_back({mem_index_pair.first, "full-text"});
+                continue;
+            }
+            if (mem_index_pair.second->memory_secondary_index_ != nullptr) {
+                result.push_back({mem_index_pair.first, "secondary"});
+                continue;
+            }
+            if (mem_index_pair.second->memory_emvb_index_ != nullptr) {
+                result.push_back({mem_index_pair.first, "emvb"});
+                continue;
+            }
+            if (mem_index_pair.second->memory_bmp_index_ != nullptr) {
+                result.push_back({mem_index_pair.first, "bmp"});
+                continue;
+            }
+            result.push_back({mem_index_pair.first, "empty"});
+        }
+    }
+
+    return result;
+}
+
 Status NewCatalog::IncreaseTableReferenceCountForMemIndex(const String &table_key) {
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);

@@ -144,9 +144,9 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     }
 
     //    current_ts_ += 2;
-    prepare_commit_ts_ = current_ts_;
-    TxnTimeStamp commit_ts = current_ts_;
-    TxnTimeStamp begin_ts = current_ts_ - 1; // current_ts_ > 0
+    prepare_commit_ts_ = current_ts_ + 2;
+    TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used, actually.
+    TxnTimeStamp begin_ts = current_ts_ + 1; // current_ts_ > 0
 
     // Create txn instance
     UniquePtr<NewTxn> recovery_txn = NewTxn::NewRecoveryTxn(this, begin_ts, commit_ts);

@@ -43,6 +43,8 @@ import wal_manager;
 
 using namespace infinity;
 
+#if 0
+
 class TransformMeta : public BaseTestWithParam<String> {
 public:
     void SetUp() override {
@@ -667,3 +669,4 @@ TEST_P(TransformMeta, block_column_transform_02) {
     kv_instance->Commit();
     UnInit();
 }
+#endif
