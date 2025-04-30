@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module table_meeta;
 
 import stl;
@@ -129,6 +131,8 @@ public:
     Status SetNextColumnID(ColumnID next_column_id);
 
     Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
+
+    Status GetNextRowID(RowID &next_row_id);
 
 private:
     Status LoadComment();

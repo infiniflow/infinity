@@ -1161,18 +1161,14 @@ Status NewTxn::Commit() {
 
     this->SetTxnCommitting(commit_ts);
 
-    txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
-    // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
-
-    Status status = this->PrepareCommit(commit_ts);
-
-    // For non-replay transaction
-    if (status.ok()) {
-        String conflict_reason;
-        bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason);
-        if (conflict) {
-            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        }
+    Status status;
+    String conflict_reason;
+    bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason);
+    if (conflict) {
+        status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+    } else {
+        txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
+        status = this->PrepareCommit(commit_ts);
     }
 
     if (!status.ok()) {
@@ -1373,47 +1369,6 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
             }
             case WalCommandType::APPEND_V2: {
                 auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
-
-                /* Not retry now */
-
-                // auto commit_append_func = [&]() -> Status {
-                //     KVStore *kv_store = txn_mgr_->kv_store();
-                //     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
-                //     Status status = CommitAppend(append_cmd, kv_instance.get());
-                //     if (!status.ok()) {
-                //         return status;
-                //     }
-                //     status = PostCommitAppend(append_cmd, kv_instance.get());
-                //     if (!status.ok()) {
-                //         return status;
-                //     }
-                //     status = kv_instance->Commit();
-                //     if (!status.ok()) {
-                //         return status;
-                //     }
-                //     return Status::OK();
-                // };
-
-                // SizeT attempt_count = 0;
-                // Status status = Status::OK();
-                // while (true) {
-                //     attempt_count++;
-                //     status = commit_append_func();
-                //     if (status.ok()) {
-                //         if (attempt_count > 0) {
-                //             LOG_DEBUG(fmt::format("Append transaction retry count: {}", attempt_count));
-                //         }
-                //         break;
-                //     } else {
-                //         if (status.code() == ErrorCode::kRocksDBError && status.rocksdb_status_->IsBusy()) {
-                //             LOG_DEBUG(fmt::format("Retry the append transaction, retry count: {}", attempt_count));
-                //         } else {
-                //             LOG_ERROR(fmt::format("Other append transaction error: {}", status.message()));
-                //             return status;
-                //         }
-                //     }
-                // }
-
                 Status status = CommitAppend(append_cmd, kv_instance_.get());
                 if (!status.ok()) {
                     return status;
@@ -1897,6 +1852,14 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
+                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Append on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2206,7 +2169,6 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND_V2: {
-                // auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::IMPORT_V2: {
@@ -2351,42 +2313,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case WalCommandType::CREATE_INDEX_V2: {
-                auto *cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
-                Optional<DBMeeta> db_meta;
-                Optional<TableMeeta> table_meta;
-                Optional<TableIndexMeeta> table_index_meta;
-                String table_key;
-                String index_key;
-                Status status = GetTableIndexMeta(cmd->db_name_,
-                                                  cmd->table_name_,
-                                                  *cmd->index_base_->index_name_,
-                                                  db_meta,
-                                                  table_meta,
-                                                  table_index_meta,
-                                                  &table_key,
-                                                  &index_key);
-                if (!status.ok()) {
-                    return status;
-                }
-
-                status = NewCatalog::CleanTableIndex(*table_index_meta, *cmd->index_base_->index_name_, chunk_infos_, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-
-                Vector<String> object_paths;
-                object_paths.reserve(chunk_infos_.size());
-                String data_dir = InfinityContext::instance().config()->DataDir();
-                SharedPtr<String> file_dir = table_index_meta->GetTableIndexDir();
-                for (auto &chunk_info : chunk_infos_) {
-                    if (chunk_info.db_id_ == cmd->db_id_ && chunk_info.table_id_ == cmd->table_id_) {
-                        String object_path =
-                            fmt::format("{}/{}/seg{}_chunk{}.idx", data_dir, *file_dir, chunk_info.segment_id_, chunk_info.chunk_id_);
-                        object_paths.push_back(object_path);
-                    }
-                }
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-
                 break;
             }
             case WalCommandType::DROP_INDEX_V2: {
