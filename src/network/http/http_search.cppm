@@ -51,7 +51,7 @@ public:
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<OrderByExpr *> *ParseSort(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<ParsedExpr> ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<SearchExpr> ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static SearchExpr *ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<FusionExpr> ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<KnnExpr> ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static UniquePtr<MatchExpr> ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);

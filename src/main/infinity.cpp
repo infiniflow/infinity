@@ -984,8 +984,10 @@ Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedE
     export_statement->limit_ = export_options.limit_;
     export_statement->row_limit_ = export_options.row_limit_;
 
-    QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
     columns = nullptr;
+
+    QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
+
     return result;
 }
 
@@ -1031,15 +1033,17 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
     for (UpdateExpr *update_expr_ptr : *update_statement->update_expr_array_) {
         ToLower(update_expr_ptr->column_name);
     }
-    QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
+
     update_list = nullptr;
+    QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
+
     return result;
 }
 
 QueryResult Infinity::Explain(const String &db_name,
                               const String &table_name,
                               ExplainType explain_type,
-                              SearchExpr *search_expr,
+                              SearchExpr *&search_expr,
                               ParsedExpr *filter,
                               ParsedExpr *limit,
                               ParsedExpr *offset,
@@ -1119,21 +1123,24 @@ QueryResult Infinity::Explain(const String &db_name,
 
     explain_statement->statement_ = select_statement;
 
-    QueryResult result = query_context_ptr->QueryStatement(explain_statement.get());
     output_columns = nullptr;
     highlight_columns = nullptr;
     order_by_list = nullptr;
     group_by_list = nullptr;
+    search_expr = nullptr;
+
+    QueryResult result = query_context_ptr->QueryStatement(explain_statement.get());
+
     return result;
 }
 
 QueryResult Infinity::Search(const String &db_name,
                              const String &table_name,
-                             SearchExpr *search_expr,
+                             SearchExpr *&search_expr,
                              ParsedExpr *filter,
                              ParsedExpr *limit,
                              ParsedExpr *offset,
-                             Vector<ParsedExpr *> *output_columns,
+                             Vector<ParsedExpr *> *&output_columns,
                              Vector<ParsedExpr *> *highlight_columns,
                              Vector<OrderByExpr *> *order_by_list,
                              Vector<ParsedExpr *> *group_by_list,
@@ -1214,11 +1221,14 @@ QueryResult Infinity::Search(const String &db_name,
     select_statement->having_expr_ = having;
     select_statement->total_hits_count_flag_ = total_hits_count_flag;
 
-    QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     output_columns = nullptr;
     highlight_columns = nullptr;
     order_by_list = nullptr;
     group_by_list = nullptr;
+    search_expr = nullptr;
+
+    QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
+
     return result;
 }
 
