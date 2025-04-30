@@ -838,21 +838,11 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = nullptr;
-    SegmentID unsealed_segment_id = 0;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return {segment_info_list, status};
     }
     std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-    if (!status.ok()) {
-        return {segment_info_list, status};
-    }
-    std::tie(column_defs, status) = table_meta->GetColumnDefs();
-    if (!status.ok()) {
-        return {segment_info_list, status};
-    }
-    status = table_meta->GetUnsealedSegmentID(unsealed_segment_id);
     if (!status.ok()) {
         return {segment_info_list, status};
     }

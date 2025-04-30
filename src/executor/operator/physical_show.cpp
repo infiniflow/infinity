@@ -1200,37 +1200,37 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
-//    {
-//        SizeT column_id = 0;
-//        {
-//            Value value = Value::MakeVarchar("storage_size");
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-//        }
-//
-//        ++column_id;
-//        {
-//            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-//            String index_size_str;
-//            if (query_context->persistence_manager() == nullptr) {
-//                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
-//            } else {
-//                const Vector<String> &paths = table_index_info->files_;
-//                SizeT index_size = 0;
-//                for (const String &path : paths) {
-//                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
-//                    if (!status.ok()) {
-//                        RecoverableError(status);
-//                    }
-//                    index_size += file_size;
-//                }
-//                index_size_str = Utility::FormatByteSize(index_size);
-//            }
-//            Value value = Value::MakeVarchar(index_size_str);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-//        }
-//    }
+    //    {
+    //        SizeT column_id = 0;
+    //        {
+    //            Value value = Value::MakeVarchar("storage_size");
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    //        }
+    //
+    //        ++column_id;
+    //        {
+    //            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+    //            String index_size_str;
+    //            if (query_context->persistence_manager() == nullptr) {
+    //                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
+    //            } else {
+    //                const Vector<String> &paths = table_index_info->files_;
+    //                SizeT index_size = 0;
+    //                for (const String &path : paths) {
+    //                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+    //                    if (!status.ok()) {
+    //                        RecoverableError(status);
+    //                    }
+    //                    index_size += file_size;
+    //                }
+    //                index_size_str = Utility::FormatByteSize(index_size);
+    //            }
+    //            Value value = Value::MakeVarchar(index_size_str);
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    //        }
+    //    }
 
     {
         SizeT column_id = 0;
@@ -2037,14 +2037,8 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     Vector<SharedPtr<SegmentInfo>> segment_info_list;
     Status status;
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxn *txn = query_context->GetNewTxn();
-        std::tie(segment_info_list, status) = txn->GetSegmentsInfo(db_name_, *object_name_);
-    } else {
-        Txn *txn = query_context->GetTxn();
-        std::tie(segment_info_list, status) = txn->GetSegmentsInfo(db_name_, *object_name_);
-    }
+    NewTxn *txn = query_context->GetNewTxn();
+    std::tie(segment_info_list, status) = txn->GetSegmentsInfo(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2084,22 +2078,23 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            String segment_size_str;
-            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
-            if (query_context->persistence_manager() == nullptr) {
-                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
-            } else {
-                const Vector<String> &paths = segment_info->files_;
-                SizeT segment_size = 0;
-                for (const String &path : paths) {
-                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
-                    if (!status.ok()) {
-                        RecoverableError(status);
-                    }
-                    segment_size += file_size;
-                }
-                segment_size_str = Utility::FormatByteSize(segment_size);
-            }
+            String segment_size_str = "TODO";
+            //            String full_segment_dir = fmt::format("{}/seg_{}")
+            //            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
+            //            if (query_context->persistence_manager() == nullptr) {
+            //                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
+            //            } else {
+            //                const Vector<String> &paths = segment_info->files_;
+            //                SizeT segment_size = 0;
+            //                for (const String &path : paths) {
+            //                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+            //                    if (!status.ok()) {
+            //                        RecoverableError(status);
+            //                    }
+            //                    segment_size += file_size;
+            //                }
+            //                segment_size_str = Utility::FormatByteSize(segment_size);
+            //            }
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2182,7 +2177,8 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
+            //            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
+            Value value = Value::MakeVarchar("TODO");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2619,7 +2615,8 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(*block_column_info->filename_);
+            Value value = Value::MakeVarchar("TODO");
+            //            Value value = Value::MakeVarchar(*block_column_info->filename_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
