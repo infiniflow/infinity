@@ -40,7 +40,7 @@ import internal_types;
 
 namespace infinity {
 
-class TableCache {
+export class TableCache {
 public:
     // Used when the table is created
     explicit TableCache(u64 table_id) : table_id_(table_id) {}
@@ -56,13 +56,13 @@ public:
     // Setter
     void UpdateCapacityPosition(SegmentID segment_id, SegmentOffset segment_offset); // used by append
     void UpdateDataPosition(SegmentID segment_id, SegmentOffset segment_offset);     // used by append
-    Tuple<Vector<SegmentID>, RowID> GetDataDistance() const;                         // used by create index
+    Deque<SegmentID> GetDiffSegments() const;                                        // used by create index
 
 private:
     u64 table_id_{};
-    RowID capacity_position_{};       // latest data placeholder, used by append and create index
-    RowID data_position_{};           // latest data position, used by append / read
-    Vector<SegmentID> segment_ids_{}; // to store segment distances, used by create index
+    RowID capacity_position_{0, 0};       // latest data placeholder, used by append and create index
+    RowID data_position_{0, 0};           // latest data position, used by append / read
+    Deque<SegmentID> diff_segment_ids_{}; // to store segment distances, used by create index
 };
 
 } // namespace infinity
