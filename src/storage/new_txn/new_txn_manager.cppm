@@ -26,16 +26,16 @@ import status;
 
 namespace infinity {
 
-class BGTaskProcessor;
+class TxnAllocator;
 class WalManager;
-class CatalogDeltaEntry;
+class Storage;
 class NewTxn;
 class KVStore;
 struct WalEntry;
 
 export class NewTxnManager {
 public:
-    explicit NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, KVStore *kv_store, TxnTimeStamp start_ts);
+    explicit NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp start_ts);
 
     ~NewTxnManager();
 
@@ -109,6 +109,7 @@ public:
     u64 total_rollbacked_txn_count() const { return total_rollbacked_txn_count_; }
 
     WalManager *wal_manager() const { return wal_mgr_; }
+    Storage *storage() const { return storage_; }
 
     void CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id);
 
@@ -135,12 +136,13 @@ public:
 
 private:
     mutable std::mutex locker_{};
+    Storage *storage_{};
     BufferManager *buffer_mgr_{};
+    WalManager *wal_mgr_{};
 
     HashMap<TransactionID, SharedPtr<NewTxn>> txn_map_{};
     Deque<SharedPtr<TxnContext>> txn_context_histories_{};
 
-    WalManager *wal_mgr_;
     KVStore *kv_store_;
 
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
@@ -161,8 +163,9 @@ private:
 
     Atomic<u64> total_committed_txn_count_{0};
     Atomic<u64> total_rollbacked_txn_count_{0};
+
+private:
+    SharedPtr<TxnAllocator> txn_allocator_{};
 };
 
 } // namespace infinity
-
-

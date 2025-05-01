@@ -93,6 +93,7 @@ struct AppendState;
 struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
+struct BaseTxnStore;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -353,6 +354,8 @@ public:
     TxnState GetTxnState() const;
 
     TransactionType GetTxnType() const;
+
+    void SetTxnType(TransactionType type);
 
     bool IsWriteTransaction() const;
 
@@ -631,6 +634,9 @@ private:
     BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
     Catalog *catalog_{};
     NewCatalog *new_catalog_{};
+
+    // Used to store the local data in this transaction
+    SharedPtr<BaseTxnStore> base_txn_store_{};
 
     NewTxnStore txn_store_; // this has this ptr, so txn cannot be moved.
     TxnType txn_type_{TxnType::kInvalid};

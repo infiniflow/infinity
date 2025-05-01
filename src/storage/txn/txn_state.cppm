@@ -68,6 +68,12 @@ export enum class TransactionType {
     kReplay,
     kRecovery,
     kNewCheckpoint,
+    kAppend,
+    kUpdate,
+    kImport,
+    kDumpMemIndex,
+    kCreateIndex,
+    kDelete,
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -77,6 +83,25 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kRead: {
             return "Read";
+        }
+        case TransactionType::kAppend: {
+            return "Append";
+        }
+        case TransactionType::kDelete: {
+            return "Delete";
+        }
+        case TransactionType::kCreateIndex: {
+            return "Read";
+        }
+
+        case TransactionType::kDumpMemIndex: {
+            return "Dump mem index";
+        }
+        case TransactionType::kImport: {
+            return "import";
+        }
+        case TransactionType::kUpdate: {
+            return "update";
         }
         case TransactionType::kNormal: {
             return "Normal";

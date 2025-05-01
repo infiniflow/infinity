@@ -37,11 +37,14 @@ import global_resource_usage;
 import bg_task;
 import kv_store;
 import new_catalog;
+import txn_allocator;
+import storage;
 
 namespace infinity {
 
-NewTxnManager::NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, KVStore *kv_store, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), kv_store_(kv_store), current_ts_(start_ts), prepare_commit_ts_(start_ts), is_running_(false) {
+NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp start_ts)
+    : storage_(storage), buffer_mgr_(storage->buffer_manager()), wal_mgr_(storage->wal_manager()), kv_store_(kv_store), current_ts_(start_ts),
+      prepare_commit_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
 #endif
@@ -74,6 +77,47 @@ NewTxnManager::~NewTxnManager() {
     GlobalResourceUsage::DecrObjectCount("NewTxnManager");
 #endif
 }
+
+void NewTxnManager::Start() {
+    txn_allocator_ = MakeShared<TxnAllocator>(storage_);
+    txn_allocator_->Start();
+
+    is_running_.store(true, std::memory_order::relaxed);
+    LOG_INFO("NewTxnManager is started.");
+}
+
+void NewTxnManager::Stop() {
+    if (!is_running_) {
+        // FIXME: protect the double stop, the double stop need to be fixed.
+        return;
+    }
+
+    txn_allocator_->Stop();
+    txn_allocator_.reset();
+
+    bool expected = true;
+    bool changed = is_running_.compare_exchange_strong(expected, false);
+    if (!changed) {
+        LOG_INFO("NewTxnManager::Stop already stopped");
+        return;
+    }
+
+    LOG_INFO("NewTxn manager is stopping...");
+    std::unique_lock<std::mutex> w_locker(locker_);
+    auto it = txn_map_.begin();
+    while (it != txn_map_.end()) {
+        // remove and notify the wal manager condition variable
+        NewTxn *txn_ptr = it->second.get();
+        if (txn_ptr != nullptr) {
+            txn_ptr->CancelCommitBottom();
+        }
+        ++it;
+    }
+    txn_map_.clear();
+    LOG_INFO("NewTxn manager is stopped");
+}
+
+bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
 NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
@@ -146,7 +190,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     //    current_ts_ += 2;
     prepare_commit_ts_ = current_ts_ + 2;
     TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used, actually.
-    TxnTimeStamp begin_ts = current_ts_ + 1; // current_ts_ > 0
+    TxnTimeStamp begin_ts = current_ts_ + 1;  // current_ts_ > 0
 
     // Create txn instance
     UniquePtr<NewTxn> recovery_txn = NewTxn::NewRecoveryTxn(this, begin_ts, commit_ts);
@@ -274,36 +318,6 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
         wal_mgr_->SubmitTxn(txn_array);
     }
 }
-
-void NewTxnManager::Start() {
-    is_running_.store(true, std::memory_order::relaxed);
-    LOG_INFO("NewTxnManager is started.");
-}
-
-void NewTxnManager::Stop() {
-    bool expected = true;
-    bool changed = is_running_.compare_exchange_strong(expected, false);
-    if (!changed) {
-        LOG_INFO("NewTxnManager::Stop already stopped");
-        return;
-    }
-
-    LOG_INFO("NewTxn manager is stopping...");
-    std::unique_lock<std::mutex> w_locker(locker_);
-    auto it = txn_map_.begin();
-    while (it != txn_map_.end()) {
-        // remove and notify the wal manager condition variable
-        NewTxn *txn_ptr = it->second.get();
-        if (txn_ptr != nullptr) {
-            txn_ptr->CancelCommitBottom();
-        }
-        ++it;
-    }
-    txn_map_.clear();
-    LOG_INFO("NewTxn manager is stopped");
-}
-
-bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
     Status status = txn->Commit();

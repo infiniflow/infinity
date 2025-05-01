@@ -1068,6 +1068,31 @@ TransactionType NewTxn::GetTxnType() const {
     return txn_context_ptr_->txn_type_;
 }
 
+void NewTxn::SetTxnType(TransactionType type) {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    switch (txn_context_ptr_->txn_type_) {
+        case TransactionType::kNormal: {
+            txn_context_ptr_->txn_type_ = type;
+            break;
+        }
+        case TransactionType::kUpdate: {
+            if (type == TransactionType::kAppend or type == TransactionType::kDelete) {
+                break;
+            } else {
+                UnrecoverableError(fmt::format("Attempt to change transaction type from {} to {}",
+                                               TransactionType2Str(txn_context_ptr_->txn_type_),
+                                               TransactionType2Str(type)));
+            }
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Attempt to change transaction type from {} to {}",
+                                           TransactionType2Str(txn_context_ptr_->txn_type_),
+                                           TransactionType2Str(type)));
+        }
+    }
+}
+
 bool NewTxn::IsWriteTransaction() const { return txn_context_ptr_->is_write_transaction_; }
 
 void NewTxn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
@@ -1157,6 +1182,8 @@ Status NewTxn::Commit() {
     if (conflict) {
         status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
     } else {
+        // If the txn is 'append' / 'import' / 'dump index' / 'create index' go to id generator;
+
         txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
         status = this->PrepareCommit(commit_ts);
     }

@@ -275,7 +275,7 @@ Status Storage::AdminToWriter() {
     if (new_txn_mgr_) {
         UnrecoverableError("New transaction manager was initialized before.");
     }
-    new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
     new_txn_mgr_->Start();
 
     // start WalManager after TxnManager since it depends on TxnManager.
@@ -819,7 +819,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     txn_mgr_->Start();
 
     // TODO: new txn manager
-    new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
     new_txn_mgr_->Start();
 
     // start WalManager after TxnManager since it depends on TxnManager.

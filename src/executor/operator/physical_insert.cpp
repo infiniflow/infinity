@@ -36,6 +36,7 @@ import status;
 import infinity_exception;
 import logger;
 import meta_info;
+import txn_state;
 
 import wal_manager;
 import infinity_context;
@@ -99,6 +100,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     bool use_new_meta = query_context->global_config()->UseNewCatalog();
     if (use_new_meta) {
         NewTxn *new_txn = query_context->GetNewTxn();
+        new_txn->SetTxnType(TransactionType::kAppend);
         Status status = new_txn->Append(*table_info_, output_block);
         if (!status.ok()) {
             operator_state->status_ = status;
