@@ -38,6 +38,7 @@ import bg_task;
 import kv_store;
 import new_catalog;
 import txn_allocator;
+import txn_allocator_task;
 import storage;
 
 namespace infinity {
@@ -548,6 +549,10 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
         }
     }
     return res;
+}
+
+void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task) {
+    txn_allocator_->Submit(std::move(txn_allocator_task));
 }
 
 } // namespace infinity

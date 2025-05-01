@@ -27,6 +27,7 @@ import status;
 namespace infinity {
 
 class TxnAllocator;
+class TxnAllocatorTask;
 class WalManager;
 class Storage;
 class NewTxn;
@@ -38,6 +39,12 @@ public:
     explicit NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp start_ts);
 
     ~NewTxnManager();
+
+    void Start();
+
+    void Stop();
+
+    bool Stopped();
 
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
@@ -68,12 +75,6 @@ public:
     bool CheckConflict1(NewTxn *txn, String &conflict_reason);
 
     void SendToWAL(NewTxn *txn);
-
-    void Start();
-
-    void Stop();
-
-    bool Stopped();
 
     //[[nodiscard]]
     Status CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr = nullptr);
@@ -133,6 +134,8 @@ public:
     Status Cleanup(TxnTimeStamp last_cleanup_ts = 0, TxnTimeStamp *cur_cleanup_ts = nullptr);
 
     Vector<SharedPtr<NewTxn>> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
 
 private:
     mutable std::mutex locker_{};

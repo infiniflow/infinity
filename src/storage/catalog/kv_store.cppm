@@ -57,6 +57,7 @@ public:
     Status GetForUpdate(const String &key, String &value);
     UniquePtr<KVIterator> GetIterator();
     UniquePtr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
+    Vector<Pair<String, String>> GetAllKeyValue();
 
     Status Commit();
     Status Rollback();
@@ -86,6 +87,7 @@ public:
 
     String ToString() const;
     SizeT KeyValueNum() const;
+    Vector<Pair<String, String>> GetAllKeyValue();
 
     // For UT
     static Status Destroy(const String &db_path);

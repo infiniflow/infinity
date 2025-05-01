@@ -138,6 +138,18 @@ UniquePtr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const
     return MakeUnique<KVIterator>(transaction_->GetIterator(read_options_));
 }
 
+Vector<Pair<String, String>> KVInstance::GetAllKeyValue() {
+    Vector<Pair<String, String>> result;
+    rocksdb::ReadOptions read_option;
+    auto iter = transaction_->GetIterator(read_options_);
+    iter->SeekToFirst();
+    for (; iter->Valid(); iter->Next()) {
+        result.push_back({iter->key().ToString(), iter->value().ToString()});
+    }
+    delete iter;
+    return result;
+}
+
 Status KVInstance::Commit() {
     rocksdb::Status s = transaction_->Commit();
     if (!s.ok()) {
@@ -305,6 +317,17 @@ SizeT KVStore::KeyValueNum() const {
     }
     delete iter;
     return cnt;
+}
+
+Vector<Pair<String, String>> KVStore::GetAllKeyValue() {
+    Vector<Pair<String, String>> result;
+    rocksdb::ReadOptions read_option;
+    auto iter = transaction_db_->NewIterator(read_option);
+    iter->SeekToFirst();
+    for (; iter->Valid(); iter->Next()) {
+        result.push_back({iter->key().ToString(), iter->value().ToString()});
+    }
+    return result;
 }
 
 Status KVStore::Destroy(const String &db_path) {

@@ -80,6 +80,7 @@ import segment_index_meta;
 import chunk_index_meta;
 import meta_key;
 import segment_entry;
+import txn_allocator_task;
 
 namespace infinity {
 
@@ -1183,6 +1184,12 @@ Status NewTxn::Commit() {
         status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
     } else {
         // If the txn is 'append' / 'import' / 'dump index' / 'create index' go to id generator;
+        TransactionType txn_type = GetTxnType();
+        if (txn_type == TransactionType::kAppend) {
+            SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
+            txn_mgr_->SubmitForAllocation(txn_allocator_task);
+            txn_allocator_task->Wait();
+        }
 
         txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
         status = this->PrepareCommit(commit_ts);
@@ -1870,15 +1877,16 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
-            case WalCommandType::APPEND_V2: {
-                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
-                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
-                    conflict = true;
-                }
-                break;
-            }
+                //            case WalCommandType::APPEND_V2: {
+                //                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
+                //                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                //                    conflict = true;
+                //                }
+                //                break;
+                //            }
             default: {
-                //
+                // No conflict
+                break;
             }
         }
         if (conflict) {

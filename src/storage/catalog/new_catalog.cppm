@@ -211,9 +211,7 @@ public:
     Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;
 
-    // void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry);
-    void ReplayDelta(const Vector<String> &delta_ckp_path_array);
-
+    Status RestoreCatalogCache();
 private:
     KVStore *kv_store_{};
 

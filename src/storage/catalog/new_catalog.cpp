@@ -67,6 +67,7 @@ import segment_index_meta;
 import chunk_index_meta;
 import fast_rough_filter;
 import persistence_manager;
+import meta_key;
 
 namespace infinity {
 
@@ -1603,6 +1604,24 @@ Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
     }
     s = kv_instance->Commit();
     return s;
+}
+
+Status NewCatalog::RestoreCatalogCache() {
+    LOG_INFO("Restore catalog cache");
+    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
+
+    Vector<Pair<String, String>> all_key_values = kv_instance->GetAllKeyValue();
+    for (const auto &pair : all_key_values) {
+        SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
+        if (meta_key == nullptr) {
+            LOG_ERROR(fmt::format("Can't parse: {}: {}", pair.first, pair.second));
+        } else {
+            LOG_INFO(fmt::format("META KEY: {}", meta_key->ToString()));
+        }
+    }
+    kv_instance->Commit();
+
+    return Status::OK();
 }
 
 } // namespace infinity

@@ -14,9 +14,14 @@
 
 module;
 
+#include <string>
+
 module meta_key;
 
 import column_def;
+import utility;
+import third_party;
+import kv_code;
 
 namespace infinity {
 
@@ -25,5 +30,40 @@ ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID se
       column_def_(std::move(column_def)) {}
 
 ColumnMetaKey::~ColumnMetaKey() = default;
+
+String DBMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
+String TableMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_); }
+String SegmentMetaKey::ToString() const { return ""; }
+String BlockMetaKey::ToString() const { return ""; }
+String ColumnMetaKey::ToString() const { return ""; }
+String TableIndexMetaKey::ToString() const { return ""; }
+String SegmentIndexMetaKey::ToString() const { return ""; }
+String ChunkIndexMetaKey::ToString() const { return ""; }
+
+SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
+    Vector<String> fields = infinity::Partition(key, '|');
+
+    if (fields[0] == "catalog" && fields[1] == "db") {
+        const String &db_name_str = fields[2];
+        const String &commit_ts_str = fields[3];
+        const String &db_id_str = value;
+        SharedPtr<DBMetaKey> db_meta_key = MakeShared<DBMetaKey>(db_id_str, db_name_str);
+        db_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return db_meta_key;
+    }
+
+    if (fields[0] == "catalog" && fields[1] == "tbl") {
+        const String &db_id_str = fields[2];
+        const String &table_name_str = fields[3];
+        const String &commit_ts_str = fields[4];
+        const String &table_id_str = value;
+
+        SharedPtr<TableMetaKey> table_meta_key = MakeShared<TableMetaKey>(db_id_str, table_id_str, table_name_str);
+        table_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return table_meta_key;
+    }
+
+    return nullptr;
+}
 
 } // namespace infinity

@@ -345,6 +345,11 @@ Status Storage::AdminToWriter() {
             UnrecoverableError("Failed to commit txn for checkpoint");
         }
 
+        status = new_catalog_->RestoreCatalogCache();
+        if (!status.ok()) {
+            UnrecoverableError("Failed to restore catalog cache");
+        }
+
         if (periodic_trigger_thread_ != nullptr) {
             UnrecoverableError("periodic trigger was initialized before.");
         }
