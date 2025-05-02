@@ -103,6 +103,20 @@ export struct SegmentMetaKey final : public MetaKey {
     String ToString() const final;
 };
 
+export struct SegmentTagMetaKey final : public MetaKey {
+    SegmentTagMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, String tag_name)
+        : MetaKey(Type::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+          tag_name_(std::move(tag_name)) {}
+
+    String db_id_str_{};
+    String table_id_str_{};
+    SegmentID segment_id_{};
+    String tag_name_{};
+    String value_{};
+
+    String ToString() const final;
+};
+
 export struct BlockMetaKey final : public MetaKey {
     BlockMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id)
         : MetaKey(Type::kBlock), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),

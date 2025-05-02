@@ -42,9 +42,15 @@ String TableColumnMetaKey::ToString() const {
 String TableTagMetaKey::ToString() const {
     return fmt::format("table_tag: {}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_);
 }
+
 String SegmentMetaKey::ToString() const {
     return fmt::format("segment: {}:{}", KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id_), commit_ts_);
 }
+
+String SegmentTagMetaKey::ToString() const {
+    return fmt::format("segment_tag: {}:{}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_), value_);
+}
+
 String BlockMetaKey::ToString() const {
     return fmt::format("block: {}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
 }
@@ -90,6 +96,18 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return segment_meta_key;
     }
 
+    // construct segment tag meta key
+    if (fields[0] == "seg") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &segment_id_str = fields[3];
+        const String &tag_name_str = fields[4];
+        SegmentID segment_id = std::stoul(segment_id_str);
+        SharedPtr<SegmentTagMetaKey> segment_tag_meta_key = MakeShared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
+        segment_tag_meta_key->value_ = value;
+        return segment_tag_meta_key;
+    }
+
     if (fields[0] == "catalog" && fields[1] == "blk") {
         const String &db_id_str = fields[2];
         const String &table_id_str = fields[3];
@@ -130,7 +148,6 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return table_tag_meta_key;
     }
 
-    // construct pm object meta key
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
             const String &object_key = fields[2];
