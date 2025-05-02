@@ -24,6 +24,7 @@ import third_party;
 import kv_code;
 import infinity_exception;
 import meta_type;
+import default_values;
 
 namespace infinity {
 
@@ -55,13 +56,139 @@ String SegmentTagMetaKey::ToString() const {
 String BlockMetaKey::ToString() const {
     return fmt::format("block: {}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
 }
-String ColumnMetaKey::ToString() const { return ""; }
-String TableIndexMetaKey::ToString() const { return ""; }
-String SegmentIndexMetaKey::ToString() const { return ""; }
-String ChunkIndexMetaKey::ToString() const { return ""; }
+
+String ColumnMetaKey::ToString() const { return fmt::format("block column: not implemented"); }
+
+String TableIndexMetaKey::ToString() const {
+    return fmt::format("table_index: {}:{}", KeyEncode::CatalogIndexKey(db_id_str_, table_id_str_, index_name_, commit_ts_), index_id_str_);
+}
+
+String SegmentIndexMetaKey::ToString() const {
+    return fmt::format("table_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
+}
+
+String ChunkIndexMetaKey::ToString() const {
+    return fmt::format("table_index: {}:{}",
+                       KeyEncode::CatalogIdxChunkKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_),
+                       commit_ts_);
+}
+
 String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
+
 String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectKey(object_key_), value_); }
+
 String PmObjectStatMetaKey::ToString() const { return fmt::format("pm_object_stat: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
+
+nlohmann::json DBMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["db_id"] = db_id_str_;
+    json_res["db_name"] = db_name_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+
+    return json_res;
+}
+
+nlohmann::json TableMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["table_id"] = table_id_str_;
+    json_res["table_name"] = table_name_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json TableColumnMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["column_name"] = table_id_str_;
+    json_res["column_definition"] = value_;
+    return json_res;
+}
+
+nlohmann::json TableTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
+    return json_res;
+}
+
+nlohmann::json SegmentMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["segment_id"] = segment_id_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json SegmentTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
+    return json_res;
+}
+
+nlohmann::json BlockMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["block_id"] = block_id_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json ColumnMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    return json_res;
+}
+
+nlohmann::json TableIndexMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["index_id"] = index_id_str_;
+    json_res["index_name"] = index_name_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json SegmentIndexMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["segment_id"] = segment_id_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json ChunkIndexMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["chunk_id"] = chunk_id_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json SystemTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
+    return json_res;
+}
+
+nlohmann::json PmObjectMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["object_key"] = object_key_;
+    json_res["object_value"] = value_;
+    return json_res;
+}
+
+nlohmann::json PmObjectStatMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["object_key"] = object_key_;
+    json_res["stat_value"] = value_;
+    return json_res;
+}
 
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     Vector<String> fields = infinity::Partition(key, '|');
@@ -140,13 +267,15 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         }
     }
 
-    if (fields[0] == "tbl") {
+    if (fields[0] == "idx") {
         const String &db_id_str = fields[2];
         const String &table_id_str = fields[3];
-        const String &tag_name_str = fields[4];
-        SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
-        table_tag_meta_key->value_ = value;
-        return table_tag_meta_key;
+        const String &index_name_str = fields[4];
+        const String &commit_ts_str = fields[5];
+        const String &index_id_str = value;
+        SharedPtr<TableIndexMetaKey> table_index_meta_key = MakeShared<TableIndexMetaKey>(db_id_str, table_id_str, index_name_str, index_id_str);
+        table_index_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return table_index_meta_key;
     }
 
     if (fields[0] == "pm") {

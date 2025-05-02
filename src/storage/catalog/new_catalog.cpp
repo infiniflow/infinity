@@ -68,6 +68,7 @@ import chunk_index_meta;
 import fast_rough_filter;
 import persistence_manager;
 import meta_key;
+import meta_tree;
 
 namespace infinity {
 
@@ -1611,6 +1612,8 @@ Status NewCatalog::RestoreCatalogCache() {
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
     Vector<Pair<String, String>> all_key_values = kv_instance->GetAllKeyValue();
+    Vector<SharedPtr<MetaKey>> meta_keys;
+    meta_keys.reserve(meta_keys.size());
     for (const auto &pair : all_key_values) {
         SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
         if (meta_key == nullptr) {
@@ -1618,8 +1621,11 @@ Status NewCatalog::RestoreCatalogCache() {
         } else {
             LOG_INFO(fmt::format("META KEY: {}", meta_key->ToString()));
         }
+        meta_keys.emplace_back(meta_key);
     }
     kv_instance->Commit();
+    SharedPtr<MetaTree> meta_tree = MetaTree::MakeMetaTree(meta_keys);
+    LOG_INFO(meta_tree->ToJson().dump());
 
     return Status::OK();
 }
