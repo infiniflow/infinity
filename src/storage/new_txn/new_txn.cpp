@@ -2558,7 +2558,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kColumn: {
+            case MetaKey::Type::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
                 TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
@@ -2602,6 +2602,9 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                     return status;
                 }
                 break;
+            }
+            default: {
+                UnrecoverableError("Unexpected");
             }
         }
     }

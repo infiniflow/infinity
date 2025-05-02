@@ -26,19 +26,28 @@ import kv_code;
 namespace infinity {
 
 ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, SharedPtr<ColumnDef> column_def)
-    : MetaKey(Type::kColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id), block_id_(block_id),
-      column_def_(std::move(column_def)) {}
+    : MetaKey(Type::kBlockColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+      block_id_(block_id), column_def_(std::move(column_def)) {}
 
 ColumnMetaKey::~ColumnMetaKey() = default;
 
 String DBMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
 String TableMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_); }
-String SegmentMetaKey::ToString() const { return ""; }
-String BlockMetaKey::ToString() const { return ""; }
+String TableColumnMetaKey::ToString() const {
+    return fmt::format("{}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_), value_);
+}
+String TableTagMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_); }
+String SegmentMetaKey::ToString() const {
+    return fmt::format("{}:{}", KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id_), commit_ts_);
+}
+String BlockMetaKey::ToString() const {
+    return fmt::format("{}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
+}
 String ColumnMetaKey::ToString() const { return ""; }
 String TableIndexMetaKey::ToString() const { return ""; }
 String SegmentIndexMetaKey::ToString() const { return ""; }
 String ChunkIndexMetaKey::ToString() const { return ""; }
+String SystemTagMetaKey::ToString() const { return fmt::format("{}:{}", tag_name_, value_); }
 
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     Vector<String> fields = infinity::Partition(key, '|');
@@ -63,7 +72,62 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return table_meta_key;
     }
 
-    return nullptr;
+    if (fields[0] == "catalog" && fields[1] == "seg") {
+        const String &db_id_str = fields[2];
+        const String &table_id_str = fields[3];
+        const String &segment_id_str = fields[4];
+        const String &commit_ts_str = value;
+        SegmentID segment_id = std::stoul(segment_id_str);
+        SharedPtr<SegmentMetaKey> segment_meta_key = MakeShared<SegmentMetaKey>(db_id_str, table_id_str, segment_id);
+        segment_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return segment_meta_key;
+    }
+
+    if (fields[0] == "catalog" && fields[1] == "blk") {
+        const String &db_id_str = fields[2];
+        const String &table_id_str = fields[3];
+        const String &segment_id_str = fields[4];
+        const String &block_id_str = fields[5];
+        const String &commit_ts_str = value;
+        SegmentID segment_id = std::stoul(segment_id_str);
+        BlockID block_id = std::stoul(block_id_str);
+        SharedPtr<BlockMetaKey> block_meta_key = MakeShared<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
+        block_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return block_meta_key;
+    }
+
+    if (fields[0] == "tbl") {
+        if (fields[1] == "col") {
+            const String &db_id_str = fields[2];
+            const String &table_id_str = fields[3];
+            const String &column_name_str = fields[4];
+            SharedPtr<TableColumnMetaKey> table_column_meta_key = MakeShared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
+            table_column_meta_key->value_ = value;
+            return table_column_meta_key;
+        } else {
+            const String &db_id_str = fields[1];
+            const String &table_id_str = fields[2];
+            const String &tag_name_str = fields[3];
+            SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
+            table_tag_meta_key->value_ = value;
+            return table_tag_meta_key;
+        }
+    }
+
+    if (fields[0] == "tbl") {
+        const String &db_id_str = fields[2];
+        const String &table_id_str = fields[3];
+        const String &tag_name_str = fields[4];
+        SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
+        table_tag_meta_key->value_ = value;
+        return table_tag_meta_key;
+    }
+
+    // construct system tag meta key
+    const String &tag_name_str = fields[0];
+    SharedPtr<SystemTagMetaKey> system_tag_meta_key = MakeShared<SystemTagMetaKey>(tag_name_str);
+    system_tag_meta_key->value_ = value;
+    return system_tag_meta_key;
 }
 
 } // namespace infinity
