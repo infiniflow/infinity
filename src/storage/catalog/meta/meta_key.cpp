@@ -22,6 +22,7 @@ import column_def;
 import utility;
 import third_party;
 import kv_code;
+import infinity_exception;
 
 namespace infinity {
 
@@ -31,23 +32,29 @@ ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID se
 
 ColumnMetaKey::~ColumnMetaKey() = default;
 
-String DBMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
-String TableMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_); }
-String TableColumnMetaKey::ToString() const {
-    return fmt::format("{}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_), value_);
+String DBMetaKey::ToString() const { return fmt::format("db: {}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
+String TableMetaKey::ToString() const {
+    return fmt::format("table: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
-String TableTagMetaKey::ToString() const { return fmt::format("{}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_); }
+String TableColumnMetaKey::ToString() const {
+    return fmt::format("table_column: {}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_), value_);
+}
+String TableTagMetaKey::ToString() const {
+    return fmt::format("table_tag: {}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_);
+}
 String SegmentMetaKey::ToString() const {
-    return fmt::format("{}:{}", KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id_), commit_ts_);
+    return fmt::format("segment: {}:{}", KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id_), commit_ts_);
 }
 String BlockMetaKey::ToString() const {
-    return fmt::format("{}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
+    return fmt::format("block: {}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
 }
 String ColumnMetaKey::ToString() const { return ""; }
 String TableIndexMetaKey::ToString() const { return ""; }
 String SegmentIndexMetaKey::ToString() const { return ""; }
 String ChunkIndexMetaKey::ToString() const { return ""; }
-String SystemTagMetaKey::ToString() const { return fmt::format("{}:{}", tag_name_, value_); }
+String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
+String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectKey(object_key_), value_); }
+String PmObjectStatMetaKey::ToString() const { return fmt::format("pm_object_stat: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     Vector<String> fields = infinity::Partition(key, '|');
@@ -123,7 +130,23 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return table_tag_meta_key;
     }
 
-    // construct system tag meta key
+    // construct pm object meta key
+    if (fields[0] == "pm") {
+        if (fields[1] == "object") {
+            const String &object_key = fields[2];
+            SharedPtr<PmObjectMetaKey> pm_object_meta_key = MakeShared<PmObjectMetaKey>(object_key);
+            pm_object_meta_key->value_ = value;
+            return pm_object_meta_key;
+        } else if (fields[1] == "object_stat") {
+            const String &object_key = fields[2];
+            SharedPtr<PmObjectStatMetaKey> pm_object_stat_meta_key = MakeShared<PmObjectStatMetaKey>(object_key);
+            pm_object_stat_meta_key->value_ = value;
+            return pm_object_stat_meta_key;
+        } else {
+            UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
+        }
+    }
+
     const String &tag_name_str = fields[0];
     SharedPtr<SystemTagMetaKey> system_tag_meta_key = MakeShared<SystemTagMetaKey>(tag_name_str);
     system_tag_meta_key->value_ = value;

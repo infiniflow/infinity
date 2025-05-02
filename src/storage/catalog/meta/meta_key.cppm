@@ -33,6 +33,8 @@ export struct MetaKey {
         kSegmentIndex,
         kChunkIndex,
         kSystemTag,
+        kPmObject,
+        kPmObjectStat,
     } type_;
 
     MetaKey(Type type) : type_(type) {}
@@ -165,6 +167,24 @@ export struct ChunkIndexMetaKey final : public MetaKey {
     String index_id_str_{};
     SegmentID segment_id_{};
     ChunkID chunk_id_{};
+
+    String ToString() const final;
+};
+
+export struct PmObjectMetaKey final : public MetaKey {
+    PmObjectMetaKey(String object_key) : MetaKey(Type::kPmObject), object_key_(std::move(object_key)) {}
+
+    String object_key_{};
+    String value_{};
+
+    String ToString() const final;
+};
+
+export struct PmObjectStatMetaKey final : public MetaKey {
+    PmObjectStatMetaKey(String object_key) : MetaKey(Type::kPmObjectStat), object_key_(std::move(object_key)) {}
+
+    String object_key_{};
+    String value_{};
 
     String ToString() const final;
 };
