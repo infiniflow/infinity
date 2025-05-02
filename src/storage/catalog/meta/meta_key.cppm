@@ -1,4 +1,4 @@
-// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,27 +17,14 @@ module;
 export module meta_key;
 
 import stl;
+import meta_type;
 
 namespace infinity {
 
 export struct MetaKey {
-    enum class Type {
-        kDB,
-        kTable,
-        kTableTag,
-        kTableColumn,
-        kSegment,
-        kBlock,
-        kBlockColumn,
-        kTableIndex,
-        kSegmentIndex,
-        kChunkIndex,
-        kSystemTag,
-        kPmObject,
-        kPmObjectStat,
-    } type_;
+    MetaType type_{MetaType::kInvalid};
 
-    MetaKey(Type type) : type_(type) {}
+    explicit MetaKey(MetaType type) : type_(type) {}
     virtual ~MetaKey() = default;
 
     virtual String ToString() const = 0;
@@ -45,7 +32,7 @@ export struct MetaKey {
 class ColumnDef;
 
 export struct DBMetaKey final : public MetaKey {
-    DBMetaKey(String db_id_str, String db_name) : MetaKey(Type::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)) {}
+    DBMetaKey(String db_id_str, String db_name) : MetaKey(MetaType::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)) {}
 
     String db_id_str_{};
     String db_name_{};
@@ -56,7 +43,7 @@ export struct DBMetaKey final : public MetaKey {
 
 export struct TableMetaKey final : public MetaKey {
     TableMetaKey(String db_id_str, String table_id_str, const String &table_name)
-        : MetaKey(Type::kTable), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}
+        : MetaKey(MetaType::kTable), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}
 
     String db_id_str_{};
     String table_id_str_{};
@@ -68,7 +55,7 @@ export struct TableMetaKey final : public MetaKey {
 
 export struct TableColumnMetaKey final : public MetaKey {
     TableColumnMetaKey(String db_id_str, String table_id_str, String column_name)
-        : MetaKey(Type::kTableColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+        : MetaKey(MetaType::kTableColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           column_name_(std::move(column_name)) {}
 
     String db_id_str_{};
@@ -81,7 +68,7 @@ export struct TableColumnMetaKey final : public MetaKey {
 
 export struct TableTagMetaKey final : public MetaKey {
     TableTagMetaKey(String db_id_str, String table_id_str, String tag_name)
-        : MetaKey(Type::kTableTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), tag_name_(std::move(tag_name)) {}
+        : MetaKey(MetaType::kTableTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), tag_name_(std::move(tag_name)) {}
 
     String db_id_str_{};
     String table_id_str_{};
@@ -93,7 +80,7 @@ export struct TableTagMetaKey final : public MetaKey {
 
 export struct SegmentMetaKey final : public MetaKey {
     SegmentMetaKey(String db_id_str, String table_id_str, SegmentID segment_id)
-        : MetaKey(Type::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id) {}
+        : MetaKey(MetaType::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id) {}
 
     String db_id_str_{};
     String table_id_str_{};
@@ -105,7 +92,7 @@ export struct SegmentMetaKey final : public MetaKey {
 
 export struct SegmentTagMetaKey final : public MetaKey {
     SegmentTagMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, String tag_name)
-        : MetaKey(Type::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+        : MetaKey(MetaType::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
           tag_name_(std::move(tag_name)) {}
 
     String db_id_str_{};
@@ -119,7 +106,7 @@ export struct SegmentTagMetaKey final : public MetaKey {
 
 export struct BlockMetaKey final : public MetaKey {
     BlockMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id)
-        : MetaKey(Type::kBlock), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+        : MetaKey(MetaType::kBlock), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
           block_id_(block_id) {}
 
     String db_id_str_{};
@@ -147,7 +134,7 @@ export struct ColumnMetaKey final : public MetaKey {
 
 export struct TableIndexMetaKey final : public MetaKey {
     TableIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, const String &index_name)
-        : MetaKey(Type::kTableIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+        : MetaKey(MetaType::kTableIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), index_name_(std::move(index_name)) {}
 
     String db_id_str_{};
@@ -160,7 +147,7 @@ export struct TableIndexMetaKey final : public MetaKey {
 
 export struct SegmentIndexMetaKey final : public MetaKey {
     SegmentIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, SegmentID segment_id)
-        : MetaKey(Type::kSegmentIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+        : MetaKey(MetaType::kSegmentIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), segment_id_(segment_id) {}
 
     String db_id_str_{};
@@ -173,7 +160,7 @@ export struct SegmentIndexMetaKey final : public MetaKey {
 
 export struct ChunkIndexMetaKey final : public MetaKey {
     ChunkIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, SegmentID segment_id, ChunkID chunk_id)
-        : MetaKey(Type::kChunkIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+        : MetaKey(MetaType::kChunkIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), segment_id_(segment_id), chunk_id_(chunk_id) {}
 
     String db_id_str_{};
@@ -186,7 +173,7 @@ export struct ChunkIndexMetaKey final : public MetaKey {
 };
 
 export struct PmObjectMetaKey final : public MetaKey {
-    PmObjectMetaKey(String object_key) : MetaKey(Type::kPmObject), object_key_(std::move(object_key)) {}
+    PmObjectMetaKey(String object_key) : MetaKey(MetaType::kPmObject), object_key_(std::move(object_key)) {}
 
     String object_key_{};
     String value_{};
@@ -195,7 +182,7 @@ export struct PmObjectMetaKey final : public MetaKey {
 };
 
 export struct PmObjectStatMetaKey final : public MetaKey {
-    PmObjectStatMetaKey(String object_key) : MetaKey(Type::kPmObjectStat), object_key_(std::move(object_key)) {}
+    PmObjectStatMetaKey(String object_key) : MetaKey(MetaType::kPmObjectStat), object_key_(std::move(object_key)) {}
 
     String object_key_{};
     String value_{};
@@ -204,7 +191,7 @@ export struct PmObjectStatMetaKey final : public MetaKey {
 };
 
 export struct SystemTagMetaKey final : public MetaKey {
-    SystemTagMetaKey(String tag_name) : MetaKey(Type::kSystemTag), tag_name_(std::move(tag_name)) {}
+    SystemTagMetaKey(String tag_name) : MetaKey(MetaType::kSystemTag), tag_name_(std::move(tag_name)) {}
 
     String tag_name_{};
     String value_{};

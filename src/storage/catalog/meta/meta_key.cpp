@@ -23,11 +23,12 @@ import utility;
 import third_party;
 import kv_code;
 import infinity_exception;
+import meta_type;
 
 namespace infinity {
 
 ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, SharedPtr<ColumnDef> column_def)
-    : MetaKey(Type::kBlockColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+    : MetaKey(MetaType::kBlockColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
       block_id_(block_id), column_def_(std::move(column_def)) {}
 
 ColumnMetaKey::~ColumnMetaKey() = default;

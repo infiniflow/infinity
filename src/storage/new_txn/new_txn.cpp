@@ -81,6 +81,7 @@ import chunk_index_meta;
 import meta_key;
 import segment_entry;
 import txn_allocator_task;
+import meta_type;
 
 namespace infinity {
 
@@ -2519,7 +2520,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
 
     for (auto &meta : metas) {
         switch (meta->type_) {
-            case MetaKey::Type::kDB: {
+            case MetaType::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
                 DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
                 Status status = NewCatalog::CleanDB(db_meta, db_meta_key->db_name_, ts, UsageFlag::kOther);
@@ -2528,7 +2529,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kTable: {
+            case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts);
                 Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, ts, UsageFlag::kOther);
@@ -2537,7 +2538,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kSegment: {
+            case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts);
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
@@ -2547,7 +2548,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kBlock: {
+            case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
                 TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
@@ -2558,7 +2559,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kBlockColumn: {
+            case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
                 TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
@@ -2570,7 +2571,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kTableIndex: {
+            case MetaType::kTableIndex: {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
@@ -2580,7 +2581,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kSegmentIndex: {
+            case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
@@ -2591,7 +2592,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 }
                 break;
             }
-            case MetaKey::Type::kChunkIndex: {
+            case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
