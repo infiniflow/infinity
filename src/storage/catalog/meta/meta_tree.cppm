@@ -97,7 +97,8 @@ export struct MetaPmObject final : public MetaObject {
     MetaPmObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kPmObject, meta_key) {}
     nlohmann::json ToJson() const final;
 
-    SharedPtr<MetaKey> object_stat_{};
+    SharedPtr<MetaKey> object_{};
+    Map<String, SharedPtr<MetaKey>> path_map_{};
 };
 
 export struct MetaTree {

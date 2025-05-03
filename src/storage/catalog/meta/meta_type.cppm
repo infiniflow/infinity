@@ -34,8 +34,8 @@ export enum class MetaType {
     kSegmentIndex,
     kChunkIndex,
     kSystemTag,
+    kPmPath,
     kPmObject,
-    kPmObjectStat,
 };
 
 }

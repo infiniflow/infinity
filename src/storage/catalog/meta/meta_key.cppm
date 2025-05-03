@@ -100,7 +100,7 @@ export struct SegmentMetaKey final : public MetaKey {
 
 export struct SegmentTagMetaKey final : public MetaKey {
     SegmentTagMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, String tag_name)
-        : MetaKey(MetaType::kSegment), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+        : MetaKey(MetaType::kSegmentTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
           tag_name_(std::move(tag_name)) {}
 
     String db_id_str_{};
@@ -189,18 +189,18 @@ export struct ChunkIndexMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmObjectMetaKey final : public MetaKey {
-    PmObjectMetaKey(String object_key) : MetaKey(MetaType::kPmObject), object_key_(std::move(object_key)) {}
+export struct PmPathMetaKey final : public MetaKey {
+    PmPathMetaKey(String path_key) : MetaKey(MetaType::kPmPath), path_key_(std::move(path_key)) {}
 
-    String object_key_{};
+    String path_key_{};
     String value_{};
 
     String ToString() const final;
     nlohmann::json ToJson() const final;
 };
 
-export struct PmObjectStatMetaKey final : public MetaKey {
-    PmObjectStatMetaKey(String object_key) : MetaKey(MetaType::kPmObjectStat), object_key_(std::move(object_key)) {}
+export struct PmObjectMetaKey final : public MetaKey {
+    PmObjectMetaKey(String object_key) : MetaKey(MetaType::kPmObject), object_key_(std::move(object_key)) {}
 
     String object_key_{};
     String value_{};

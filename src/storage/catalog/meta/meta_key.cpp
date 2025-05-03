@@ -75,9 +75,9 @@ String ChunkIndexMetaKey::ToString() const {
 
 String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
 
-String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectKey(object_key_), value_); }
+String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
 
-String PmObjectStatMetaKey::ToString() const { return fmt::format("pm_object_stat: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
+String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
@@ -176,17 +176,17 @@ nlohmann::json SystemTagMetaKey::ToJson() const {
     return json_res;
 }
 
-nlohmann::json PmObjectMetaKey::ToJson() const {
+nlohmann::json PmPathMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res["object_key"] = object_key_;
-    json_res["object_value"] = value_;
+    json_res["path"] = path_key_;
+    json_res["description"] = value_;
     return json_res;
 }
 
-nlohmann::json PmObjectStatMetaKey::ToJson() const {
+nlohmann::json PmObjectMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res["object_key"] = object_key_;
-    json_res["stat_value"] = value_;
+    json_res["object"] = object_key_;
+    json_res["stat"] = value_;
     return json_res;
 }
 
@@ -280,15 +280,15 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
 
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
+            const String &path_key = fields[2];
+            SharedPtr<PmPathMetaKey> pm_path_meta_key = MakeShared<PmPathMetaKey>(path_key);
+            pm_path_meta_key->value_ = value;
+            return pm_path_meta_key;
+        } else if (fields[1] == "object_stat") {
             const String &object_key = fields[2];
             SharedPtr<PmObjectMetaKey> pm_object_meta_key = MakeShared<PmObjectMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
-        } else if (fields[1] == "object_stat") {
-            const String &object_key = fields[2];
-            SharedPtr<PmObjectStatMetaKey> pm_object_stat_meta_key = MakeShared<PmObjectStatMetaKey>(object_key);
-            pm_object_stat_meta_key->value_ = value;
-            return pm_object_stat_meta_key;
         } else {
             UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
         }

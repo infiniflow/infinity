@@ -1612,14 +1612,16 @@ Status NewCatalog::RestoreCatalogCache() {
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
     Vector<Pair<String, String>> all_key_values = kv_instance->GetAllKeyValue();
+    SizeT meta_count = all_key_values.size();
     Vector<SharedPtr<MetaKey>> meta_keys;
-    meta_keys.reserve(meta_keys.size());
-    for (const auto &pair : all_key_values) {
+    meta_keys.reserve(meta_count);
+    for (SizeT idx = 0; idx < meta_count; ++idx) {
+        const auto &pair = all_key_values[idx];
         SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
         if (meta_key == nullptr) {
-            LOG_ERROR(fmt::format("Can't parse: {}: {}", pair.first, pair.second));
+            LOG_ERROR(fmt::format("Can't parse {}: {}: {}", idx, pair.first, pair.second));
         } else {
-            LOG_INFO(fmt::format("META KEY: {}", meta_key->ToString()));
+            LOG_INFO(fmt::format("META[{}] KEY: {}", idx, meta_key->ToString()));
         }
         meta_keys.emplace_back(meta_key);
     }
