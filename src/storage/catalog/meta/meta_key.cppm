@@ -128,6 +128,22 @@ export struct BlockMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
+export struct BlockTagMetaKey final : public MetaKey {
+    BlockTagMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, String tag_name)
+        : MetaKey(MetaType::kBlockTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
+          block_id_(block_id), tag_name_(std::move(tag_name)) {}
+
+    String db_id_str_{};
+    String table_id_str_{};
+    SegmentID segment_id_{};
+    BlockID block_id_{};
+    String tag_name_{};
+    String value_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
 export struct ColumnMetaKey final : public MetaKey {
     ColumnMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, SharedPtr<ColumnDef> column_def);
 
@@ -144,7 +160,7 @@ export struct ColumnMetaKey final : public MetaKey {
 };
 
 export struct TableIndexMetaKey final : public MetaKey {
-    TableIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, const String &index_name)
+    TableIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, String index_name)
         : MetaKey(MetaType::kTableIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
           index_id_str_(std::move(index_id_str)), index_name_(std::move(index_name)) {}
 
@@ -153,6 +169,21 @@ export struct TableIndexMetaKey final : public MetaKey {
     String index_id_str_{};
     String index_name_{};
     TxnTimeStamp commit_ts_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
+export struct TableIndexTagMetaKey final : public MetaKey {
+    TableIndexTagMetaKey(String db_id_str, String table_id_str, String index_id_str, String tag_name)
+        : MetaKey(MetaType::kTableIndexTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+          index_id_str_(std::move(index_id_str)), tag_name_(std::move(tag_name)) {}
+
+    String db_id_str_{};
+    String table_id_str_{};
+    String index_id_str_{};
+    String tag_name_{};
+    String value_{};
 
     String ToString() const final;
     nlohmann::json ToJson() const final;

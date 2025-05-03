@@ -57,10 +57,20 @@ String BlockMetaKey::ToString() const {
     return fmt::format("block: {}:{}", KeyEncode::CatalogTableSegmentBlockKey(db_id_str_, table_id_str_, segment_id_, block_id_), commit_ts_);
 }
 
+String BlockTagMetaKey::ToString() const {
+    return fmt::format("block_tag: {}:{}",
+                       KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str_, table_id_str_, segment_id_, block_id_, tag_name_),
+                       value_);
+}
+
 String ColumnMetaKey::ToString() const { return fmt::format("block column: not implemented"); }
 
 String TableIndexMetaKey::ToString() const {
     return fmt::format("table_index: {}:{}", KeyEncode::CatalogIndexKey(db_id_str_, table_id_str_, index_name_, commit_ts_), index_id_str_);
+}
+
+String TableIndexTagMetaKey::ToString() const {
+    return fmt::format("table_index_tag: {}:{}", KeyEncode::CatalogIndexTagKey(db_id_str_, table_id_str_, index_id_str_, tag_name_), value_);
 }
 
 String SegmentIndexMetaKey::ToString() const {
@@ -124,7 +134,9 @@ nlohmann::json SegmentMetaKey::ToJson() const {
 
 nlohmann::json SegmentTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = value_;
+    json_res["tag_name"] = tag_name_;
+    // TODO: fast rough filter isn't deserialized here.
+    //    json_res["tag_value"] = value_;
     return json_res;
 }
 
@@ -134,6 +146,12 @@ nlohmann::json BlockMetaKey::ToJson() const {
     if (commit_ts_ != UNCOMMIT_TS) {
         json_res["commit_ts"] = commit_ts_;
     }
+    return json_res;
+}
+
+nlohmann::json BlockTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
     return json_res;
 }
 
@@ -149,6 +167,12 @@ nlohmann::json TableIndexMetaKey::ToJson() const {
     if (commit_ts_ != UNCOMMIT_TS) {
         json_res["commit_ts"] = commit_ts_;
     }
+    return json_res;
+}
+
+nlohmann::json TableIndexTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
     return json_res;
 }
 
@@ -267,15 +291,27 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         }
     }
 
-    if (fields[0] == "idx") {
+    if (fields[0] == "catalog" && fields[1] == "idx") {
         const String &db_id_str = fields[2];
         const String &table_id_str = fields[3];
         const String &index_name_str = fields[4];
         const String &commit_ts_str = fields[5];
         const String &index_id_str = value;
-        SharedPtr<TableIndexMetaKey> table_index_meta_key = MakeShared<TableIndexMetaKey>(db_id_str, table_id_str, index_name_str, index_id_str);
+
+        SharedPtr<TableIndexMetaKey> table_index_meta_key = MakeShared<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, index_name_str);
         table_index_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_index_meta_key;
+    }
+
+    if (fields[0] == "idx") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &index_id_str = fields[3];
+        const String &tag_name_str = fields[4];
+        SharedPtr<TableIndexTagMetaKey> table_index_tag_meta_key =
+            MakeShared<TableIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, tag_name_str);
+        table_index_tag_meta_key->value_ = value;
+        return table_index_tag_meta_key;
     }
 
     if (fields[0] == "pm") {

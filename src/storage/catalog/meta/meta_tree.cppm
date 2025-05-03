@@ -20,6 +20,7 @@ import stl;
 import meta_type;
 import meta_key;
 import third_party;
+import internal_types;
 
 namespace infinity {
 
@@ -42,6 +43,10 @@ export struct MetaDBObject final : public MetaObject {
 export struct MetaTableObject final : public MetaObject {
     MetaTableObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTable, meta_key) {}
     nlohmann::json ToJson() const final;
+
+    SegmentID GetNextSegmentID() const;
+    SegmentID GetUnsealedSegmentID() const;
+    RowID GetNextRowID() const;
 
     Map<String, SharedPtr<MetaKey>> column_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;
@@ -76,6 +81,7 @@ export struct MetaTableIndexObject final : public MetaObject {
     MetaTableIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTableIndex, meta_key) {}
     nlohmann::json ToJson() const final;
 
+    Map<String, SharedPtr<MetaKey>> tag_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;
 };
 
@@ -102,12 +108,15 @@ export struct MetaPmObject final : public MetaObject {
 };
 
 export struct MetaTree {
-    Map<String, SharedPtr<MetaDBObject>> db_map_{};
-    Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
-
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
+public:
+    Vector<MetaTableObject *> ListTables() const;
+
     nlohmann::json ToJson() const;
+
+    Map<String, SharedPtr<MetaDBObject>> db_map_{};
+    Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
 };
 
 } // namespace infinity

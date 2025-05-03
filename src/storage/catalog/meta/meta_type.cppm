@@ -31,6 +31,7 @@ export enum class MetaType {
     kBlockColumn,
     kBlockColumnTag,
     kTableIndex,
+    kTableIndexTag,
     kSegmentIndex,
     kChunkIndex,
     kSystemTag,

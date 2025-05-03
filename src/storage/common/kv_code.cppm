@@ -110,8 +110,8 @@ public:
     static String CatalogIndexPrefix(const String &db_id, const String &table_id, const String &index_name);
     static String CatalogTableIndexPrefix(const String &db_id, const String &table_id);
 
-    static String CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
-    static String CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
+    static String CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_id, const String &tag_name);
+    static String CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_id, const String &tag_name);
 
     static String CatalogIdxSegmentKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
     static String CatalogIdxSegmentKeyPrefix(const String &db_id, const String &table_id, const String &index_id);

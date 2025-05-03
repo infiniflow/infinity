@@ -132,12 +132,12 @@ String KeyEncode::CatalogIndexPrefix(const String &db_id, const String &table_id
 }
 String KeyEncode::CatalogTableIndexPrefix(const String &db_id, const String &table_id) { return fmt::format("catalog|idx|{}|{}|", db_id, table_id); }
 
-String KeyEncode::CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name) {
-    return fmt::format("idx|{}|{}|{}|{}", db_id, table_id, index_name, tag_name);
+String KeyEncode::CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_id, const String &tag_name) {
+    return fmt::format("idx|{}|{}|{}|{}", db_id, table_id, index_id, tag_name);
 }
 
-String KeyEncode::CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name) {
-    return fmt::format("idx|{}|{}|{}|{}|", db_id, table_id, index_name, tag_name);
+String KeyEncode::CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_id, const String &tag_name) {
+    return fmt::format("idx|{}|{}|{}|{}|", db_id, table_id, index_id, tag_name);
 }
 
 String KeyEncode::CatalogIdxSegmentKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id) {

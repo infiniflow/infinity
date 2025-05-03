@@ -21,6 +21,9 @@ module meta_tree;
 import stl;
 import third_party;
 import infinity_exception;
+import internal_types;
+import default_values;
+import logger;
 
 namespace infinity {
 
@@ -69,7 +72,9 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto iter = meta_tree->db_map_.find(table_key->db_id_str_);
                 if (iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found for table: {}, idx: {}", table_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = iter->second->table_map_;
@@ -95,14 +100,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(segment_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", segment_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(segment_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", segment_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -121,14 +130,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(table_tag_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", table_tag_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_tag_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_tag_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &tag_map = table_object->tag_map_;
@@ -140,14 +153,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(table_index_meta_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_index_meta_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 auto table_index_object = MakeShared<MetaTableIndexObject>(meta_key);
@@ -161,14 +178,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(table_column_meta_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(table_column_meta_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -190,14 +211,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(block_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(block_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -205,7 +230,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto segment_iter = segment_map.find(block_key->segment_id_);
                 if (segment_iter == segment_map.end()) {
                     String error_message = fmt::format("Segment not found: {}, idx: {}", block_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    continue;
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
@@ -219,14 +245,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(segment_tag->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(segment_tag->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -234,7 +264,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto segment_iter = segment_map.find(segment_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
                     String error_message = fmt::format("Segment not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    continue;
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
@@ -256,14 +287,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(block_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", block_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(block_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -281,31 +316,43 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 break;
             }
             case MetaType::kBlockTag: {
-                auto segment_tag = static_cast<SegmentTagMetaKey *>(meta_key.get());
-                auto db_iter = meta_tree->db_map_.find(segment_tag->db_id_str_);
+                auto block_tag = static_cast<BlockTagMetaKey *>(meta_key.get());
+                auto db_iter = meta_tree->db_map_.find(block_tag->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    String error_message = fmt::format("DB not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    String error_message = fmt::format("DB not found: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
-                auto table_iter = table_map.find(segment_tag->table_id_str_);
+                auto table_iter = table_map.find(block_tag->table_id_str_);
                 if (table_iter == table_map.end()) {
-                    String error_message = fmt::format("Table not found: {}, idx: {}", segment_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    String error_message = fmt::format("Table not found: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
                 auto &segment_map = table_object->segment_map_;
-                auto segment_iter = segment_map.find(segment_tag->segment_id_);
+                auto segment_iter = segment_map.find(block_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
-                    String error_message = fmt::format("Segment not found: {}, idx: {}", segment_tag->ToString(), idx);
+                    String error_message = fmt::format("Segment not found: {}, idx: {}", block_tag->ToString(), idx);
                     UnrecoverableError(error_message);
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
-                auto &tag_map = segment_object->tag_map_;
-                tag_map.emplace(segment_tag->tag_name_, meta_key);
+                auto &block_map = segment_object->block_map_;
+                auto block_iter = block_map.find(block_tag->block_id_);
+                if (block_iter == block_map.end()) {
+                    String error_message = fmt::format("Block not found: {}, idx: {}", block_tag->ToString(), idx);
+                    UnrecoverableError(error_message);
+                }
+
+                MetaBlockObject *block_object = static_cast<MetaBlockObject *>(block_iter->second.get());
+                auto &tag_map = block_object->tag_map_;
+                tag_map.emplace(block_tag->tag_name_, meta_key);
                 break;
             }
             default:
@@ -322,14 +369,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(segment_index_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", segment_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(segment_index_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", segment_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -337,12 +388,48 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto table_index_iter = index_map.find(segment_index_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
                     String error_message = fmt::format("Table index not found: {}, idx: {}", segment_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table index is dropped
+                    continue;
                 }
 
                 MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
                 auto segment_index_object = MakeShared<MetaSegmentIndexObject>(meta_key);
                 table_index_object->segment_map_.emplace(segment_index_key->segment_id_, segment_index_object);
+                break;
+            }
+            case MetaType::kTableIndexTag: {
+                auto table_index_tag_key = static_cast<TableIndexTagMetaKey *>(meta_key.get());
+                auto db_iter = meta_tree->db_map_.find(table_index_tag_key->db_id_str_);
+                if (db_iter == meta_tree->db_map_.end()) {
+                    String error_message = fmt::format("DB not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
+                }
+
+                auto &table_map = db_iter->second->table_map_;
+                auto table_iter = table_map.find(table_index_tag_key->table_id_str_);
+                if (table_iter == table_map.end()) {
+                    String error_message = fmt::format("Table not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
+                }
+
+                MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
+                auto &index_map = table_object->index_map_;
+                auto table_index_iter = index_map.find(table_index_tag_key->index_id_str_);
+                if (table_index_iter == index_map.end()) {
+                    String error_message = fmt::format("Table index not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // Table index is dropped.
+                    continue;
+                }
+
+                MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
+                auto &tag_map = table_index_object->tag_map_;
+                tag_map.emplace(table_index_tag_key->tag_name_, meta_key);
                 break;
             }
             default:
@@ -359,14 +446,18 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto db_iter = meta_tree->db_map_.find(chunk_index_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
                     String error_message = fmt::format("DB not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
                 auto table_iter = table_map.find(chunk_index_key->table_id_str_);
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -374,7 +465,9 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto table_index_iter = index_map.find(chunk_index_key->index_id_str_);
                 if (table_index_iter == index_map.end()) {
                     String error_message = fmt::format("Table index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    // Table is dropped
+                    continue;
                 }
 
                 MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_iter->second.get());
@@ -424,6 +517,9 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
                 nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
                 String object_key = pm_path_json["obj_key"];
+                if(object_key == "KEY_EMPTY") {
+                    continue;
+                }
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(object_key);
                 if (pm_obj_iter == meta_tree->pm_object_map_.end()) {
                     String error_message = fmt::format("PM object not found: {}, idx: {}", pm_path_key->ToString(), idx);
@@ -452,6 +548,16 @@ nlohmann::json MetaTree::ToJson() const {
     return json_res.dump();
 }
 
+Vector<MetaTableObject *> MetaTree::ListTables() const {
+    Vector<MetaTableObject *> tables;
+    for (const auto &db_pair : db_map_) {
+        for (const auto &table_pair : db_pair.second->table_map_) {
+            tables.push_back(static_cast<MetaTableObject *>(table_pair.second.get()));
+        }
+    }
+    return tables;
+};
+
 nlohmann::json MetaDBObject::ToJson() const {
     nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &table_pair : table_map_) {
@@ -479,8 +585,14 @@ nlohmann::json MetaTableObject::ToJson() const {
     return json_res;
 }
 
+SegmentID MetaTableObject::GetNextSegmentID() const { return INVALID_SEGMENT_ID; }
+
+SegmentID MetaTableObject::GetUnsealedSegmentID() const { return INVALID_SEGMENT_ID; }
+
+RowID MetaTableObject::GetNextRowID() const { return RowID(); }
+
 nlohmann::json MetaSegmentObject::ToJson() const {
-    nlohmann::json json_res;
+    nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &block_pair : block_map_) {
         json_res["blocks"].push_back(block_pair.second->ToJson());
     }
@@ -491,7 +603,7 @@ nlohmann::json MetaSegmentObject::ToJson() const {
 }
 
 nlohmann::json MetaBlockObject::ToJson() const {
-    nlohmann::json json_res;
+    nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &column_pair : column_map_) {
         json_res["columns"].push_back(column_pair.second->ToJson());
     }
@@ -502,7 +614,7 @@ nlohmann::json MetaBlockObject::ToJson() const {
 }
 
 nlohmann::json MetaBlockColumnObject::ToJson() const {
-    nlohmann::json json_res;
+    nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &tag_pair : tag_map_) {
         json_res["tags"].push_back(tag_pair.second->ToJson());
     }
@@ -511,6 +623,9 @@ nlohmann::json MetaBlockColumnObject::ToJson() const {
 
 nlohmann::json MetaTableIndexObject::ToJson() const {
     nlohmann::json json_res = meta_key_->ToJson();
+    for (const auto &tag_pair : tag_map_) {
+        json_res["tags"].push_back(tag_pair.second->ToJson());
+    }
     for (const auto &segment_pair : segment_map_) {
         json_res["segments"].push_back(segment_pair.second->ToJson());
     }
@@ -518,7 +633,7 @@ nlohmann::json MetaTableIndexObject::ToJson() const {
 }
 
 nlohmann::json MetaSegmentIndexObject::ToJson() const {
-    nlohmann::json json_res;
+    nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &chunk_pair : chunk_map_) {
         json_res["chunks"].push_back(chunk_pair.second->ToJson());
     }
@@ -526,7 +641,7 @@ nlohmann::json MetaSegmentIndexObject::ToJson() const {
 }
 
 nlohmann::json MetaChunkIndexObject::ToJson() const {
-    nlohmann::json json_res;
+    nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &tag_pair : tag_map_) {
         json_res["tags"].push_back(tag_pair.second->ToJson());
     }
