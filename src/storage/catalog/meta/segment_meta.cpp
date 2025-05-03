@@ -32,6 +32,7 @@ import segment_entry;
 import new_catalog;
 import fast_rough_filter;
 import column_def;
+import kv_utility;
 
 namespace infinity {
 
@@ -125,9 +126,7 @@ Status SegmentMeta::InitSet() {
     return Status::OK();
 }
 
-Status SegmentMeta::UninitSet(UsageFlag usage_flag) {
-    return UninitSet(usage_flag, begin_ts_);
-}
+Status SegmentMeta::UninitSet(UsageFlag usage_flag) { return UninitSet(usage_flag, begin_ts_); }
 
 Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
     // {
@@ -209,25 +208,7 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
 // }
 
 Status SegmentMeta::LoadBlockIDs1() {
-    block_ids1_ = Vector<BlockID>();
-    Vector<BlockID> &block_ids = *block_ids1_;
-
-    String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
-    auto iter = kv_instance_.GetIterator();
-    iter->Seek(block_id_prefix);
-    while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-            iter->Next();
-            continue;
-        }
-        // the key is committed before the txn or the key isn't committed
-        BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
-        block_ids.push_back(block_id);
-        iter->Next();
-    }
-
-    std::sort(block_ids.begin(), block_ids.end());
+    block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
     return Status::OK();
 }
 

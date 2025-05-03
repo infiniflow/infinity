@@ -517,7 +517,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
                 nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
                 String object_key = pm_path_json["obj_key"];
-                if(object_key == "KEY_EMPTY") {
+                if (object_key == "KEY_EMPTY") {
                     continue;
                 }
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(object_key);
@@ -585,9 +585,35 @@ nlohmann::json MetaTableObject::ToJson() const {
     return json_res;
 }
 
-SegmentID MetaTableObject::GetNextSegmentID() const { return INVALID_SEGMENT_ID; }
+SegmentID MetaTableObject::GetNextSegmentID() const {
+    Vector<SegmentID> segments;
+    segments.reserve(segment_map_.size());
+    for (const auto &segment_pair : segment_map_) {
+        segments.push_back(segment_pair.first);
+    }
+    std::sort(segments.begin(), segments.end());
+    SegmentID next_segment_id = segments.empty() ? 0 : segments.back() + 1;
+    return next_segment_id;
+}
 
-SegmentID MetaTableObject::GetUnsealedSegmentID() const { return INVALID_SEGMENT_ID; }
+SegmentID MetaTableObject::GetUnsealedSegmentID() const {
+    auto meta_iter = tag_map_.find("unsealed_segment_id");
+    if (meta_iter == tag_map_.end()) {
+        String error_message = fmt::format("Can't find 'unsealed_segment_id' in table: {}", meta_key_->ToString());
+        UnrecoverableError(error_message);
+    }
+    MetaKey *meta_key = meta_iter->second.get();
+    TableTagMetaKey *table_tag_meta_key = static_cast<TableTagMetaKey *>(meta_key);
+
+    SegmentID unsealed_segment_id{INVALID_SEGMENT_ID};
+    try {
+        unsealed_segment_id = std::stoull(table_tag_meta_key->value_);
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("Unsealed segment id is invalid: {}, cause: {}", table_tag_meta_key->value_, e.what());
+        UnrecoverableError(error_message);
+    }
+    return unsealed_segment_id;
+}
 
 RowID MetaTableObject::GetNextRowID() const { return RowID(); }
 

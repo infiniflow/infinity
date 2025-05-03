@@ -35,6 +35,7 @@ import new_catalog;
 import table_index_meeta;
 import create_index_info;
 import segment_meta;
+import kv_utility;
 
 namespace infinity {
 
@@ -599,24 +600,7 @@ Status TableMeeta::LoadColumnDefs() {
 // }
 
 Status TableMeeta::LoadSegmentIDs1() {
-    segment_ids1_ = Vector<SegmentID>();
-    Vector<SegmentID> &segment_ids = *segment_ids1_;
-
-    String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
-    auto iter = kv_instance_.GetIterator();
-    iter->Seek(segment_id_prefix);
-    while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts_ and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-            iter->Next();
-            continue;
-        }
-        // the key is committed before the txn or the key isn't committed
-        SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
-        segment_ids.push_back(segment_id);
-        iter->Next();
-    }
-    std::sort(segment_ids.begin(), segment_ids.end());
+    segment_ids1_ = infinity::GetTableSegments(&kv_instance_, db_id_str_, table_id_str_, begin_ts_);
     return Status::OK();
 }
 

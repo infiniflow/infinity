@@ -85,6 +85,7 @@ using std::to_string;
 using std::stoi;
 using std::stol;
 using std::stoll;
+using std::stoull;
 using std::strtod;
 using std::strtof;
 using std::strtol;
