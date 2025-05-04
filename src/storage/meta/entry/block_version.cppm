@@ -50,6 +50,7 @@ export struct BlockVersion {
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
 
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
+    i64 GetRowCount() const;
 
     Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 

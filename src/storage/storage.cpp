@@ -345,7 +345,7 @@ Status Storage::AdminToWriter() {
             UnrecoverableError("Failed to commit txn for checkpoint");
         }
 
-        status = new_catalog_->RestoreCatalogCache();
+        status = new_catalog_->RestoreCatalogCache(this);
         if (!status.ok()) {
             UnrecoverableError("Failed to restore catalog cache");
         }

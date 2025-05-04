@@ -211,7 +211,7 @@ public:
     Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;
 
-    Status RestoreCatalogCache();
+    Status RestoreCatalogCache(Storage* storage_ptr);
 private:
     KVStore *kv_store_{};
 

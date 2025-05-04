@@ -79,6 +79,14 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     return iter->row_count_;
 }
 
+i64 BlockVersion::GetRowCount() const {
+    i64 row_count = 0;
+    for (const auto &created : created_) {
+        row_count += created.row_count_;
+    }
+    return row_count;
+}
+
 Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
     // check read-write conflict
     if (!created_.empty() && created_.back().create_ts_ >= begin_ts) {

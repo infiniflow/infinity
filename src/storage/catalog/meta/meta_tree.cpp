@@ -24,6 +24,15 @@ import infinity_exception;
 import internal_types;
 import default_values;
 import logger;
+import buffer_obj;
+import storage;
+import config;
+import buffer_manager;
+import block_version;
+import buffer_handle;
+import new_catalog;
+import status;
+import kv_code;
 
 namespace infinity {
 
@@ -585,6 +594,11 @@ nlohmann::json MetaTableObject::ToJson() const {
     return json_res;
 }
 
+const String &MetaTableObject::GetTableName() const {
+    TableMetaKey *table_meta_key = static_cast<TableMetaKey *>(meta_key_.get());
+    return table_meta_key->table_name_;
+}
+
 SegmentID MetaTableObject::GetNextSegmentID() const {
     Vector<SegmentID> segments;
     segments.reserve(segment_map_.size());
@@ -599,8 +613,11 @@ SegmentID MetaTableObject::GetNextSegmentID() const {
 SegmentID MetaTableObject::GetUnsealedSegmentID() const {
     auto meta_iter = tag_map_.find("unsealed_segment_id");
     if (meta_iter == tag_map_.end()) {
-        String error_message = fmt::format("Can't find 'unsealed_segment_id' in table: {}", meta_key_->ToString());
-        UnrecoverableError(error_message);
+        SegmentID next_segment_id = this->GetNextSegmentID();
+        String error_message =
+            fmt::format("Can't find 'unsealed_segment_id' in table: {}, use next segment id: {}", meta_key_->ToString(), next_segment_id);
+        LOG_WARN(error_message);
+        return next_segment_id;
     }
     MetaKey *meta_key = meta_iter->second.get();
     TableTagMetaKey *table_tag_meta_key = static_cast<TableTagMetaKey *>(meta_key);
@@ -615,7 +632,58 @@ SegmentID MetaTableObject::GetUnsealedSegmentID() const {
     return unsealed_segment_id;
 }
 
-RowID MetaTableObject::GetNextRowID() const { return RowID(); }
+SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
+    if (segment_map_.empty()) {
+        return 0;
+    }
+    SegmentID unsealed_segment_id = this->GetUnsealedSegmentID();
+    auto seg_iter = segment_map_.find(unsealed_segment_id);
+    if (seg_iter == segment_map_.end()) {
+        String error_message = fmt::format("Can't find unsealed segment id: {}, table: {}", unsealed_segment_id, meta_key_->ToString());
+        LOG_WARN(error_message);
+        return 0;
+    }
+    auto segment_object = static_cast<MetaSegmentObject *>(seg_iter->second.get());
+    SizeT block_count = segment_object->block_map_.size();
+    if (block_count == 0) {
+        return 0;
+    }
+    TableMetaKey *table_meta_key = static_cast<TableMetaKey *>(meta_key_.get());
+    BlockID current_block_id = segment_object->GetCurrentBlockID();
+    BufferManager *buffer_mgr_ptr = storage_ptr->buffer_manager();
+    Config *config_ptr = storage_ptr->config();
+    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/block_{}/{}",
+                                          config_ptr->DataDir(),
+                                          table_meta_key->db_id_str_,
+                                          table_meta_key->table_id_str_,
+                                          unsealed_segment_id,
+                                          current_block_id,
+                                          BlockVersion::PATH);
+    BufferObj *version_buffer = buffer_mgr_ptr->GetBufferObject(version_filepath);
+    if (version_buffer == nullptr) {
+        UnrecoverableError(fmt::format("Can't get version from: {}", version_filepath));
+    }
+    BufferHandle buffer_handle = version_buffer->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    SizeT row_cnt = 0;
+    {
+        SharedPtr<BlockLock> block_lock{};
+        NewCatalog *new_catalog = storage_ptr->new_catalog();
+        String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(table_meta_key->db_id_str_,
+                                                                          table_meta_key->table_id_str_,
+                                                                          unsealed_segment_id,
+                                                                          current_block_id,
+                                                                          "lock");
+        Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        std::shared_lock lock(block_lock->mtx_);
+        row_cnt = block_version->GetRowCount();
+    }
+    SizeT segment_row_count = (block_count - 1) * DEFAULT_BLOCK_CAPACITY + row_cnt;
+    return segment_row_count;
+}
 
 nlohmann::json MetaSegmentObject::ToJson() const {
     nlohmann::json json_res = meta_key_->ToJson();
@@ -626,6 +694,17 @@ nlohmann::json MetaSegmentObject::ToJson() const {
         json_res["tags"].push_back(tag_pair.second->ToJson());
     }
     return json_res;
+}
+
+BlockID MetaSegmentObject::GetCurrentBlockID() const {
+    Vector<BlockID> blocks;
+    blocks.reserve(block_map_.size());
+    for (const auto &block_pair : block_map_) {
+        blocks.push_back(block_pair.first);
+    }
+    std::sort(blocks.begin(), blocks.end());
+    BlockID current_block_id = blocks.empty() ? 0 : blocks.back();
+    return current_block_id;
 }
 
 nlohmann::json MetaBlockObject::ToJson() const {

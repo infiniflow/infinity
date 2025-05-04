@@ -24,6 +24,8 @@ import internal_types;
 
 namespace infinity {
 
+class Storage;
+
 export struct MetaObject {
     MetaObject(MetaType type, const SharedPtr<MetaKey> &meta_key) : type_(type), meta_key_(meta_key) {}
     virtual ~MetaObject() = default;
@@ -44,9 +46,10 @@ export struct MetaTableObject final : public MetaObject {
     MetaTableObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTable, meta_key) {}
     nlohmann::json ToJson() const final;
 
+    const String& GetTableName() const;
     SegmentID GetNextSegmentID() const;
     SegmentID GetUnsealedSegmentID() const;
-    RowID GetNextRowID() const;
+    SizeT GetCurrentSegmentRowCount(Storage* storage_ptr) const;
 
     Map<String, SharedPtr<MetaKey>> column_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;
@@ -57,6 +60,8 @@ export struct MetaTableObject final : public MetaObject {
 export struct MetaSegmentObject final : public MetaObject {
     MetaSegmentObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kSegment, meta_key) {}
     nlohmann::json ToJson() const final;
+
+    BlockID GetCurrentBlockID() const;
 
     Map<BlockID, SharedPtr<MetaObject>> block_map_;
     Map<String, SharedPtr<MetaKey>> tag_map_;

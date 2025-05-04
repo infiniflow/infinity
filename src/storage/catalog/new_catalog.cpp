@@ -1607,7 +1607,7 @@ Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
     return s;
 }
 
-Status NewCatalog::RestoreCatalogCache() {
+Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
@@ -1628,6 +1628,18 @@ Status NewCatalog::RestoreCatalogCache() {
     kv_instance->Commit();
     SharedPtr<MetaTree> meta_tree = MetaTree::MakeMetaTree(meta_keys);
     LOG_INFO(meta_tree->ToJson().dump());
+
+    Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
+    for (const auto &table_ptr : table_ptrs) {
+        SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
+        SegmentID next_segment_id = table_ptr->GetNextSegmentID();
+        SizeT current_segment_row_count = table_ptr->GetCurrentSegmentRowCount(storage_ptr);
+        LOG_INFO(fmt::format("Table: {}, unsealed_segment_id: {}, next_segment_id: {}, current_segment_row_count: {}",
+                             table_ptr->GetTableName(),
+                             unsealed_segment_id,
+                             next_segment_id,
+                             current_segment_row_count));
+    }
 
     return Status::OK();
 }

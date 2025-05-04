@@ -180,7 +180,8 @@ Vector<String> BlockMeta::FilePaths() {
 SharedPtr<String> BlockMeta::GetBlockDir() {
     if (block_dir_ == nullptr) {
         TableMeeta &table_meta = segment_meta_.table_meta();
-        block_dir_ = MakeShared<String>(fmt::format("tbl_{}/seg_{}/block_{}", table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
+        block_dir_ = MakeShared<String>(
+            fmt::format("db_{}/tbl_{}/seg_{}/block_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
     }
 
     return block_dir_;
