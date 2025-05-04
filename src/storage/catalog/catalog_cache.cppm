@@ -20,7 +20,7 @@ import stl;
 // import status;
 // import meta_info;
 // import extra_ddl_info;
-// import default_values;
+import default_values;
 import internal_types;
 // import buffer_handle;
 // import column_def;
@@ -40,29 +40,81 @@ import internal_types;
 
 namespace infinity {
 
-export class TableCache {
+export class TableIndexCache {
 public:
-    // Used when the table is created
-    explicit TableCache(u64 table_id) : table_id_(table_id) {}
-
-    // Used when system is restarted.
-    explicit TableCache(u64 table_id, RowID data_position) : table_id_(table_id), capacity_position_(data_position), data_position_(data_position) {}
-
-    // Getter
-    u64 table_id() const { return table_id_; };
-    const RowID &capacity_position() const { return capacity_position_; } // used by append, read
-    const RowID &data_position() const { return data_position_; }         // used by append, read
-
-    // Setter
-    void UpdateCapacityPosition(SegmentID segment_id, SegmentOffset segment_offset); // used by append
-    void UpdateDataPosition(SegmentID segment_id, SegmentOffset segment_offset);     // used by append
-    Deque<SegmentID> GetDiffSegments() const;                                        // used by create index
+    TableIndexCache(u64 table_id, u64 index_id) : table_id_(table_id), index_id_(index_id) {}
 
 private:
     u64 table_id_{};
-    RowID capacity_position_{0, 0};       // latest data placeholder, used by append and create index
-    RowID data_position_{0, 0};           // latest data position, used by append / read
-    Deque<SegmentID> diff_segment_ids_{}; // to store segment distances, used by create index
+    u64 index_id_{};
+
+    // Used by optimize index and dump mem index
+    ChunkID next_chunk_id_{0};
+
+    // Used by dump mem index
+    Vector<Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
+};
+
+export class TableCache {
+public:
+    // Used when the table is created
+    explicit TableCache(u64 table_id) : table_id_(table_id), has_prepare_unsealed_segment_(true), has_commit_unsealed_segment_(true) {}
+
+    // Used when system is restarted.
+    explicit TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
+        : table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id), prepare_unsealed_segment_offset_(unsealed_segment_offset),
+          commit_unsealed_segment_id_(unsealed_segment_id), commit_unsealed_segment_offset_(unsealed_segment_offset),
+          next_segment_id_(next_segment_id) {
+        if (unsealed_segment_offset == DEFAULT_SEGMENT_CAPACITY) {
+            has_prepare_unsealed_segment_ = true;
+            has_commit_unsealed_segment_ = true;
+        } else {
+            has_prepare_unsealed_segment_ = true;
+            has_commit_unsealed_segment_ = true;
+        }
+    }
+
+    // Getter
+    bool has_prepared_unsealed_segment() const { return has_prepare_unsealed_segment_; }
+    bool has_commit_unsealed_segment() const { return has_commit_unsealed_segment_; }
+    u64 table_id() const { return table_id_; };
+    SegmentID prepare_unsealed_segment_id() const { return prepare_unsealed_segment_id_; }
+    SegmentOffset prepare_unsealed_segment_offset() const { return prepare_unsealed_segment_offset_; }
+    SegmentID commit_unsealed_segment_id() const { return commit_unsealed_segment_id_; }
+    SegmentOffset commit_unsealed_segment_offset() const { return commit_unsealed_segment_offset_; }
+
+    SegmentID next_segment_id() const { return next_segment_id_; }
+
+    Vector<Pair<RowID, u64>> PrepareAppendRanges(SizeT row_count, TransactionID txn_id);
+    void CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id);
+    RowID GetCommitUnsealedPosition();
+
+    Vector<SegmentID> GetImportSegments(SizeT segment_count);
+    SegmentID GetCompactSegment();
+    Pair<RowID, u64> PrepareDumpIndexRange(u64 index_id); // used by dump mem index and create index
+
+    String ToString() const;
+
+private:
+    u64 table_id_{};
+
+    bool has_prepare_unsealed_segment_{false};
+    bool has_commit_unsealed_segment_{false};
+
+    // Used by append
+    SegmentID prepare_unsealed_segment_id_{0};
+    SegmentOffset prepare_unsealed_segment_offset_{0};
+    SegmentID commit_unsealed_segment_id_{0};
+    SegmentOffset commit_unsealed_segment_offset_{0};
+
+    // Used by append and import
+    SegmentID next_segment_id_{0};
+
+    // Used by append
+    Deque<Tuple<RowID, u64, TransactionID>> prepared_append_ranges_{};
+
+    // Used by dump index / create index
+    Map<u64, SharedPtr<TableIndexCache>> index_cache_map_{};
 };
 
 } // namespace infinity

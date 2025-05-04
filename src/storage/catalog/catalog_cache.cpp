@@ -14,81 +14,107 @@
 
 module;
 
+#include <vector>
+
 module catalog_cache;
 
 import stl;
-// import status;
-// import meta_info;
-// import extra_ddl_info;
-// import default_values;
 import internal_types;
-import logger;
+import default_values;
 import infinity_exception;
-// import buffer_handle;
-// import column_def;
-// import profiler;
 import third_party;
-// import storage;
-// import catalog_delta_entry;
 
-// uint32_t segment_offset_;
-// uint32_t segment_id_;
 
 namespace infinity {
 
-void TableCache::UpdateCapacityPosition(SegmentID segment_id, SegmentOffset segment_offset) {
-    if (capacity_position_.segment_id_ > segment_id) {
-        UnrecoverableError("Update capacity position to smaller segment id");
+Vector<Pair<RowID, u64>> TableCache::PrepareAppendRanges(SizeT row_count, TransactionID transaction_id) {
+    if (row_count > MAX_BLOCK_CAPACITY) {
+        UnrecoverableError(fmt::format("Attempt to prepare row_count: {} > MAX_BLOCK_CAPACITY: {}", row_count, MAX_BLOCK_CAPACITY));
     }
 
-    if (capacity_position_.segment_id_ == segment_id and capacity_position_.segment_offset_ > segment_offset) {
-        UnrecoverableError("Update capacity position to smaller segment offset");
-    }
-
-    if (capacity_position_.segment_id_ != segment_id) {
-        if (capacity_position_.segment_id_ != data_position_.segment_id_) {
-            diff_segment_ids_.push_back(capacity_position_.segment_id_);
+    Vector<Pair<RowID, u64>> ranges;
+    if (has_prepare_unsealed_segment_) {
+        prepare_unsealed_segment_id_ = next_segment_id_;
+        prepare_unsealed_segment_offset_ = row_count;
+        ++next_segment_id_;
+        ranges.emplace_back(RowID(prepare_unsealed_segment_id_, 0), row_count);
+        has_prepare_unsealed_segment_ = false;
+    } else {
+        if (prepare_unsealed_segment_offset_ + row_count < DEFAULT_SEGMENT_CAPACITY) {
+            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), row_count);
+            prepare_unsealed_segment_offset_ += row_count;
+            has_prepare_unsealed_segment_ = false;
+        } else if (prepare_unsealed_segment_offset_ + row_count == DEFAULT_SEGMENT_CAPACITY) {
+            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), row_count);
+            prepare_unsealed_segment_offset_ += row_count;
+            has_prepare_unsealed_segment_ = true;
+        } else {
+            SizeT remaining = DEFAULT_SEGMENT_CAPACITY - prepare_unsealed_segment_offset_;
+            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), remaining);
+            prepare_unsealed_segment_id_ = next_segment_id_;
+            ++next_segment_id_;
+            prepare_unsealed_segment_offset_ = row_count - remaining; // remaining rows must not exceed DEFAULT_SEGMENT_CAPACITY
+            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, 0), prepare_unsealed_segment_offset_);
+            has_prepare_unsealed_segment_ = false;
         }
-        capacity_position_.segment_id_ = segment_id;
     }
 
-    capacity_position_.segment_offset_ = segment_offset;
-    return;
+    // append all ranges item to prepared_append_ranges_
+    for (const auto &range : ranges) {
+        prepared_append_ranges_.emplace_back(range.first, range.second, transaction_id);
+    }
+    return ranges;
 }
 
-void TableCache::UpdateDataPosition(SegmentID segment_id, SegmentOffset segment_offset) {
-
-    if (data_position_.segment_id_ > segment_id) {
-        UnrecoverableError("Update data position to smaller segment id");
-    }
-
-    if (data_position_.segment_id_ == segment_id and data_position_.segment_offset_ > segment_offset) {
-        UnrecoverableError("Update data position to smaller segment offset");
-    }
-
-    if (data_position_.segment_id_ != segment_id) {
-        if (capacity_position_.segment_id_ != segment_id) {
-            // The save the segment_id must be same as the segment_id
-            if (diff_segment_ids_.front() != segment_id) {
-                LOG_CRITICAL(fmt::format("current data position: {}:{}, proposed data position: {}:{}",
-                                         data_position_.segment_id_,
-                                         data_position_.segment_offset_,
-                                         segment_id,
-                                         segment_offset));
-                LOG_CRITICAL(fmt::format("current capacity position: {}:{}", capacity_position_.segment_id_, capacity_position_.segment_offset_));
-                for (SegmentID segment_id : diff_segment_ids_) {
-                    LOG_CRITICAL(fmt::format("diff segment id: {}", segment_id));
-                }
-                UnrecoverableError("Unmatched segment id");
-            }
-            diff_segment_ids_.pop_front();
+void TableCache::CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id) {
+    for (const auto &range : ranges) {
+        auto [row_offset, row_count, transaction] = prepared_append_ranges_.front();
+        if (range.first != row_offset or range.second != row_count or transaction != txn_id) {
+            UnrecoverableError(fmt::format("Attempt to commit row range: {}: {}, {} != {}: {}, {}",
+                                           txn_id,
+                                           range.first.ToString(),
+                                           range.second,
+                                           transaction,
+                                           row_offset.ToString(),
+                                           row_count));
         }
-        data_position_.segment_id_ = segment_id;
+        prepared_append_ranges_.pop_front();
+        commit_unsealed_segment_id_ = range.first.segment_id_;
+        commit_unsealed_segment_offset_ += range.second;
+        if (commit_unsealed_segment_offset_ == DEFAULT_SEGMENT_CAPACITY) {
+            has_commit_unsealed_segment_ = true;
+        } else if (commit_unsealed_segment_offset_ > DEFAULT_SEGMENT_CAPACITY) {
+            commit_unsealed_segment_offset_ -= DEFAULT_SEGMENT_CAPACITY;
+            has_commit_unsealed_segment_ = false;
+        } else {
+            has_commit_unsealed_segment_ = false;
+        }
     }
-    data_position_.segment_offset_ = segment_offset;
-    return;
 }
 
-Deque<SegmentID> TableCache::GetDiffSegments() const { return diff_segment_ids_; }
+RowID TableCache::GetCommitUnsealedPosition() {
+    if (has_commit_unsealed_segment_) {
+        UnrecoverableError("No unsealed segment");
+    }
+    return RowID(commit_unsealed_segment_id_, commit_unsealed_segment_offset_);
+}
 
+Vector<SegmentID> TableCache::GetImportSegments(SizeT segment_count) {
+    Vector<SegmentID> segment_ids;
+    segment_ids.reserve(segment_count);
+    for (SizeT i = 0; i < segment_count; ++i) {
+        segment_ids.emplace_back(next_segment_id_);
+        ++next_segment_id_;
+    }
+    return segment_ids;
+}
+
+SegmentID TableCache::GetCompactSegment() {
+    // For debug, not to use next_segment_id_++
+    SegmentID segment_id = next_segment_id_;
+    next_segment_id_ += 1;
+    return segment_id;
+}
+
+Pair<RowID, u64> TableCache::PrepareDumpIndexRange(u64 index_id) { return {RowID(), 0}; }
 } // namespace infinity
