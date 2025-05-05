@@ -32,6 +32,7 @@ import new_txn;
 import txn_state;
 import infinity_exception;
 import utility;
+import kv_utility;
 
 namespace infinity {
 
@@ -42,10 +43,7 @@ TableIndexMeeta::~TableIndexMeeta() = default;
 
 Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     if (!index_def_) {
-        Status status = LoadIndexDef();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
+        index_def_ = GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
     return {index_def_, Status::OK()};
 }
@@ -84,10 +82,7 @@ Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIDs() {
 
 Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
     if (!segment_ids_) {
-        auto status = LoadSegmentIDs1();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
+        segment_ids_ = GetTableIndexSegments(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
     return {&*segment_ids_, Status::OK()};
 }
@@ -307,19 +302,6 @@ Status TableIndexMeeta::UninitSet1(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::LoadIndexDef() {
-    String index_def_key = GetTableIndexTag("index_base");
-    String index_def_str;
-    Status status = kv_instance_.Get(index_def_key, index_def_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to get index definition from kv store, key: {}, cause: {}", index_def_key, status.message()));
-        return status;
-    }
-    nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);
-    index_def_ = IndexBase::Deserialize(index_def_json);
-    return Status::OK();
-}
-
 Status TableIndexMeeta::LoadSegmentIDs() {
     String segment_ids_key = GetTableIndexTag("segment_ids");
     String segment_ids_str;
@@ -332,33 +314,6 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     return Status::OK();
 }
 
-Status TableIndexMeeta::LoadSegmentIDs1() {
-    segment_ids_ = Vector<SegmentID>();
-    Vector<SegmentID> &segment_ids = *segment_ids_;
-
-    TxnTimeStamp begin_ts = table_meta_.begin_ts();
-    String segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_);
-    auto iter = kv_instance_.GetIterator();
-    iter->Seek(segment_id_prefix);
-    while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        String key = iter->Key().ToString();
-        auto [segment_id, is_segment_id] = ExtractU64FromStringSuffix(key, segment_id_prefix.size());
-        if (is_segment_id) {
-            TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-                iter->Next();
-                continue;
-            }
-            // the key is committed before the txn or the key isn't committed
-            segment_ids.push_back(segment_id);
-        }
-        iter->Next();
-    }
-
-    std::sort(segment_ids.begin(), segment_ids.end());
-    return Status::OK();
-}
-
 String TableIndexMeeta::GetTableIndexTag(const String &tag) const {
     return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
@@ -368,16 +323,10 @@ String TableIndexMeeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_ca
 Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     Status status;
     if (!segment_ids_) {
-        status = LoadSegmentIDs1();
-        if (!status.ok()) {
-            return status;
-        }
+        segment_ids_ = GetTableIndexSegments(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
     if (!index_def_) {
-        status = LoadIndexDef();
-        if (!status.ok()) {
-            return status;
-        }
+        index_def_ = GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
 
     SharedPtr<ColumnDef> column_def = nullptr;

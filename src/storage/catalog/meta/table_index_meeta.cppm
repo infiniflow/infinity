@@ -81,11 +81,7 @@ public:
     Status UninitSet1(UsageFlag usage_flag);
 
 private:
-    Status LoadIndexDef();
-
     Status LoadSegmentIDs();
-
-    Status LoadSegmentIDs1();
 
     String GetTableIndexTag(const String &tag) const;
 

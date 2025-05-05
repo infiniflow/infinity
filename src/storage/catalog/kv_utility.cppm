@@ -23,8 +23,15 @@ import internal_types;
 namespace infinity {
 
 class KVInstance;
+class IndexBase;
 
 export Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts);
+
+export Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
+                                        const String &db_id_str,
+                                        const String &table_id_str,
+                                        const String &index_id_str,
+                                        TxnTimeStamp begin_ts);
 
 export Vector<BlockID>
 GetTableSegmentBlocks(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, SegmentID segment_id, TxnTimeStamp begin_ts);
@@ -35,5 +42,7 @@ export Vector<ColumnID> GetTableSegmentBlockColumns(KVInstance *kv_instance,
                                                     SegmentID segment_id,
                                                     BlockID block_id,
                                                     TxnTimeStamp begin_ts);
+export SharedPtr<IndexBase>
+GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, const String &index_id_str, TxnTimeStamp begin_ts);
 
 } // namespace infinity
