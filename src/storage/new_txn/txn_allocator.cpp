@@ -21,6 +21,7 @@ import txn_allocator_task;
 import new_txn;
 import logger;
 import storage;
+import third_party;
 
 namespace infinity {
 
@@ -51,6 +52,7 @@ void TxnAllocator::Process() {
     Deque<SharedPtr<TxnAllocatorTask>> tasks;
     while (running) {
         task_queue_.DequeueBulk(tasks);
+        // LOG_INFO(fmt::format("Receive tasks: {}", tasks.size()));
 
         for (const auto &txn_allocator_task : tasks) {
             if (txn_allocator_task->IsStopTask()) {

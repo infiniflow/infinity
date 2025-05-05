@@ -17,6 +17,7 @@ module;
 export module txn_allocator_task;
 
 import stl;
+import status;
 
 namespace infinity {
 
@@ -39,9 +40,12 @@ public:
         cv_.notify_one();
     }
 
+    Status status() { return status_; }
+
 private:
     NewTxn *new_txn_{};
     bool stop_task_{false};
+    Status status_{};
 
     bool complete_{false};
     std::mutex mutex_{};

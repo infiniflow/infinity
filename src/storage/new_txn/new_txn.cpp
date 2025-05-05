@@ -1070,6 +1070,23 @@ TransactionType NewTxn::GetTxnType() const {
     return txn_context_ptr_->txn_type_;
 }
 
+bool NewTxn::NeedToAllocate() const {
+    TransactionType txn_type = GetTxnType();
+    switch (txn_type) {
+        case TransactionType::kOptimizeIndex: // for new chunk id
+        case TransactionType::kCompact:       // for new segment id
+        case TransactionType::kDumpMemIndex:  // for new chunk id
+        case TransactionType::kCreateIndex:   // for data range to create index
+        case TransactionType::kImport:        // for new segment id
+        case TransactionType::kAppend: {      // for data range to append
+            return true;
+        }
+        default:
+            break;
+    }
+    return false;
+}
+
 void NewTxn::SetTxnType(TransactionType type) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (txn_context_ptr_->txn_type_) {
@@ -1100,6 +1117,9 @@ bool NewTxn::IsWriteTransaction() const { return txn_context_ptr_->is_write_tran
 void NewTxn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     TxnState txn_state = txn_context_ptr_->state_;
+    if (txn_state == TxnState::kRollbacking) {
+        return;
+    }
     if (txn_state != TxnState::kCommitting && txn_state != TxnState::kStarted) {
         String error_message = fmt::format("Transaction is in {} status, which can't rollback.", TxnState2Str(txn_state));
         UnrecoverableError(error_message);
@@ -1183,15 +1203,20 @@ Status NewTxn::Commit() {
     bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason);
     if (conflict) {
         status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-    } else {
-        // If the txn is 'append' / 'import' / 'dump index' / 'create index' go to id generator;
-        TransactionType txn_type = GetTxnType();
-        if (txn_type == TransactionType::kAppend) {
-            SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
-            txn_mgr_->SubmitForAllocation(txn_allocator_task);
-            txn_allocator_task->Wait();
-        }
+        this->SetTxnRollbacking(commit_ts);
+    }
 
+    if (NeedToAllocate()) {
+        // If the txn is 'append' / 'import' / 'dump index' / 'create index' go to id generator;
+        // LOG_INFO(fmt::format("To allocation task: {}", *this->GetTxnText()));
+        SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
+        txn_mgr_->SubmitForAllocation(txn_allocator_task);
+        txn_allocator_task->Wait();
+        status = txn_allocator_task->status();
+        // LOG_INFO(fmt::format("Finish allocation task: {}", *this->GetTxnText()));
+    }
+
+    if (status.ok()) {
         txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
         status = this->PrepareCommit(commit_ts);
     }

@@ -357,6 +357,8 @@ public:
 
     TransactionType GetTxnType() const;
 
+    bool NeedToAllocate() const;
+
     void SetTxnType(TransactionType type);
 
     bool IsWriteTransaction() const;

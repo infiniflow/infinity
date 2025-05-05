@@ -260,6 +260,9 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     TxnTimeStamp commit_ts = prepare_commit_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     check_txns_.emplace_back(txn);
+    if (txn->NeedToAllocate()) {
+        allocator_map_.emplace(commit_ts, nullptr);
+    }
     txn->SetTxnWrite();
     return commit_ts;
 }
@@ -552,7 +555,36 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
 }
 
 void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task) {
-    txn_allocator_->Submit(std::move(txn_allocator_task));
-}
+    // Check if the is_running_ is true
+    if (is_running_.load() == false) {
+        String error_message = "NewTxnManager is not running, cannot put wal entry";
+        UnrecoverableError(error_message);
+    }
+    if (wal_mgr_ == nullptr) {
+        String error_message = "NewTxnManager is null";
+        UnrecoverableError(error_message);
+    }
+    NewTxn *txn = txn_allocator_task->txn_ptr();
+    TxnTimeStamp commit_ts = txn->CommitTS();
+
+    std::lock_guard guard(locker_);
+    if (allocator_map_.empty()) {
+        String error_message = fmt::format("NewTxnManager::SubmitForAllocation allocator_map_ is empty, txn->CommitTS() {}", txn->CommitTS());
+        UnrecoverableError(error_message);
+    }
+    if (allocator_map_.begin()->first > commit_ts) {
+        String error_message = fmt::format("NewTxnManager::SubmitForAllocation allocator_map_.begin()->first {} > txn->CommitTS() {}",
+                                           allocator_map_.begin()->first,
+                                           txn->CommitTS());
+        UnrecoverableError(error_message);
+    }
+
+    allocator_map_.at(commit_ts) = txn_allocator_task;
+    while (!allocator_map_.empty() && allocator_map_.begin()->second != nullptr) {
+        // LOG_INFO(fmt::format("Before submit: {}", *allocator_map_.begin()->second->txn_ptr()->GetTxnText()));
+        txn_allocator_->Submit(allocator_map_.begin()->second);
+        allocator_map_.erase(allocator_map_.begin());
+    }
+} // namespace infinity
 
 } // namespace infinity

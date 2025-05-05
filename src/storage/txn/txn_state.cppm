@@ -72,8 +72,10 @@ export enum class TransactionType {
     kUpdate,
     kImport,
     kDumpMemIndex,
+    kOptimizeIndex,
     kCreateIndex,
     kDelete,
+    kCompact,
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -93,7 +95,12 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         case TransactionType::kCreateIndex: {
             return "Read";
         }
-
+        case TransactionType::kOptimizeIndex: {
+            return "optimize_index";
+        }
+        case TransactionType::kCompact: {
+            return "compact";
+        }
         case TransactionType::kDumpMemIndex: {
             return "Dump mem index";
         }

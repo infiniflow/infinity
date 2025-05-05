@@ -55,6 +55,7 @@ struct WalBlockInfo;
 struct WalChunkIndexInfo;
 class Config;
 struct MemIndexID;
+class TableCache;
 
 enum class ColumnVectorTipe;
 
@@ -212,8 +213,14 @@ public:
     SizeT GetTableWriteCount() const;
 
     Status RestoreCatalogCache(Storage* storage_ptr);
+    TableCache* GetTableCache(u64 table_id) const;
+    Status AddNewTableCache(u64 table_id); // used by create table in post commit
+    Status DropTableCache(u64 table_id); // used by drop table in post commit
 private:
     KVStore *kv_store_{};
+
+    mutable std::mutex table_cache_mtx_{};
+    HashMap<u64, SharedPtr<TableCache>> table_cache_map_{};
 
 private:
     mutable std::mutex mtx_{};

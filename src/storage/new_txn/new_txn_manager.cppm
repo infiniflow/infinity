@@ -168,6 +168,8 @@ private:
     Atomic<u64> total_rollbacked_txn_count_{0};
 
 private:
+    // Also protected by locker_, to contain append / import / create index / dump mem index txn.
+    Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
     SharedPtr<TxnAllocator> txn_allocator_{};
 };
 
