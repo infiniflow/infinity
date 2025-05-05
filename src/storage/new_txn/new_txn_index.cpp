@@ -89,9 +89,8 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     status = this->IncreaseTableReferenceCount(table_key);
-    bool ok = false;
     DeferFn defer_fn([&] {
-        if (ok) {
+        if (status.ok()) {
             return;
         }
         Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
@@ -105,7 +104,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         ChunkID new_chunk_id = 0;
-        status = this->DumpMemIndexInner(segment_index_meta, new_chunk_id);
+        status = this->DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
         if (!status.ok()) {
             return status;
         }
@@ -115,7 +114,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
             return status;
         }
     }
-    ok = true;
     return Status::OK();
 }
 
@@ -139,31 +137,28 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
+    DeferFn defer_fn([&] {
+        if (status.ok()) {
+            return;
+        }
         Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
         if (!mem_index_status.ok()) {
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
         }
+    });
+    if (!status.ok()) {
         return status;
     }
 
     ChunkID new_chunk_id = 0;
-    status = this->DumpMemIndexInner(segment_index_meta, new_chunk_id);
+    status = this->DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
     if (!status.ok()) {
-        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
-        if (!mem_index_status.ok()) {
-            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
-        }
         return status;
     }
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
     if (!status.ok()) {
-        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
-        if (!mem_index_status.ok()) {
-            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
-        }
         return status;
     }
 
@@ -859,7 +854,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
         }
         {
-            Status status = DumpMemIndexInner(*segment_index_meta, new_chunk_id);
+            Status status = DumpSegmentMemIndex(*segment_index_meta, new_chunk_id);
             if (!status.ok()) {
                 return status;
             }
@@ -1423,7 +1418,7 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
     return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
 }
 
-Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
+Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {

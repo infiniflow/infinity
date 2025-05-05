@@ -522,7 +522,7 @@ private:
 
     Status ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd);
 
-    Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
+    Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
 
     Status AddChunkWal(const String &db_name,
                        const String &table_name,
