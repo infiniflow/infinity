@@ -54,8 +54,6 @@ public:
 
     Status GetTableIndexInfo(TableIndexInfo &table_index_info);
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs();
-
     Tuple<Vector<SegmentID> *, Status> GetSegmentIndexIDs1();
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
@@ -72,11 +70,7 @@ private:
 public:
     Status UpdateFulltextSegmentTS(TxnTimeStamp ts);
 
-    Status InitSet(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
-
     Status InitSet1(const SharedPtr<IndexBase> &index_base, NewCatalog *new_catalog);
-
-    Status UninitSet(UsageFlag usage_flag);
 
     Status UninitSet1(UsageFlag usage_flag);
 
