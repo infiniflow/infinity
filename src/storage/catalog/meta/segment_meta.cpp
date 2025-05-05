@@ -368,10 +368,7 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
 
 Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     if (!block_ids1_) {
-        Status status = LoadBlockIDs1();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
+        block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
     }
     return {&*block_ids1_, Status::OK()};
 }

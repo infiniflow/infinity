@@ -36,6 +36,7 @@ import column_def;
 import column_meta;
 import fast_rough_filter;
 import kv_code;
+import kv_utility;
 
 namespace infinity {
 
@@ -213,10 +214,12 @@ Status BlockMeta::LoadVersionBuffer() {
 
 Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
     if (!column_ids1_) {
-        Status status = LoadBlockColumnIDs1();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
+        column_ids1_ = infinity::GetTableSegmentBlockColumns(&kv_instance_,
+                                                             segment_meta_.table_meta().db_id_str(),
+                                                             segment_meta_.table_meta().table_id_str(),
+                                                             segment_meta_.segment_id(),
+                                                             block_id_,
+                                                             begin_ts_);
     }
     return {&*column_ids1_, Status::OK()};
 }

@@ -715,10 +715,7 @@ SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_i
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     if (!segment_ids1_) {
-        auto status = LoadSegmentIDs1();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
+        segment_ids1_ = infinity::GetTableSegments(&kv_instance_, db_id_str_, table_id_str_, begin_ts_);
     }
     return {&*segment_ids1_, Status::OK()};
 }
