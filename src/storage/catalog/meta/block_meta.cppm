@@ -77,13 +77,6 @@ public:
     Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
 
 private:
-    // Status LoadRowCnt();
-
-    Status LoadVersionBuffer();
-
-    Status LoadBlockColumnIDs1();
-
-private:
     TxnTimeStamp begin_ts_ = 0;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;

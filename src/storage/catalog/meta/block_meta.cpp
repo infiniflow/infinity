@@ -53,16 +53,6 @@ Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     return Status::OK();
 }
 
-// Status BlockMeta::SetRowCnt(SizeT row_cnt) {
-//     row_cnt_ = row_cnt;
-//     String block_dir_key = GetBlockTag("row_cnt");
-//     Status status = kv_instance_.Put(block_dir_key, fmt::format("{}", row_cnt));
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     return Status::OK();
-// }
-
 Status BlockMeta::InitSet() {
     // {
     //     Status status = SetRowCnt(0);
@@ -162,9 +152,13 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
 
 Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
     if (!version_buffer_) {
-        Status status = LoadVersionBuffer();
-        if (!status.ok()) {
-            return {nullptr, status};
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+        SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer_ == nullptr) {
+            return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
         }
     }
     return {version_buffer_, Status::OK()};
@@ -188,30 +182,6 @@ SharedPtr<String> BlockMeta::GetBlockDir() {
     return block_dir_;
 }
 
-// Status BlockMeta::LoadRowCnt() {
-//     String row_cnt_key = GetBlockTag("row_cnt");
-//     String row_cnt_str;
-//     Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
-//     if (!status.ok()) {
-//         return status;
-//     }
-//     row_cnt_ = std::stoull(row_cnt_str);
-//     return Status::OK();
-// }
-
-Status BlockMeta::LoadVersionBuffer() {
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-
-    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
-    String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-    version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
-    if (version_buffer_ == nullptr) {
-        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-    }
-
-    return Status::OK();
-}
-
 Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
     if (!column_ids1_) {
         column_ids1_ = infinity::GetTableSegmentBlockColumns(&kv_instance_,
@@ -228,16 +198,6 @@ String BlockMeta::GetBlockTag(const String &tag) const {
     TableMeeta &table_meta = segment_meta_.table_meta();
     return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
-
-// Tuple<SizeT, Status> BlockMeta::GetRowCnt() {
-//     if (!row_cnt_) {
-//         Status status = LoadRowCnt();
-//         if (!status.ok()) {
-//             return {0, status};
-//         }
-//     }
-//     return {*row_cnt_, Status::OK()};
-// }
 
 Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     if (row_cnt_) {
@@ -353,121 +313,6 @@ Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filte
         return status;
     }
     fast_rough_filter_ = fast_rough_filter;
-    return Status::OK();
-}
-
-// Pair<ColumnID, Status> BlockMeta::AddBlockColumnID1(TxnTimeStamp commit_ts) {
-//     Status status;
-//
-//     BlockID column_id = 0;
-//     {
-//         Vector<ColumnID> *column_ids_ptr = nullptr;
-//         std::tie(column_ids_ptr, status) = GetBlockColumnIDs1();
-//         if (!status.ok()) {
-//             return {INVALID_BLOCK_ID, status};
-//         }
-//         block_id = column_ids_ptr->empty() ? 0 : column_ids_ptr->back() + 1;
-//         column_ids_ptr->push_back(block_id);
-//     }
-//
-//     auto &table_meta = segment_meta_.table_meta();
-//     String block_column_id_key =
-//         KeyEncode::CatalogTableSegmentBlockColumnKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, );
-//     String commit_ts_str = fmt::format("{}", commit_ts);
-//     status = kv_instance_.Put(block_column_id_key, commit_ts_str);
-//     if (!status.ok()) {
-//         return {0, status};
-//     }
-//     return {block_id, Status::OK()};
-// }
-//
-// // Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
-// //     Status status;
-// //
-// //     BlockID block_id = 0;
-// //     {
-// //         Vector<BlockID> *block_ids_ptr = nullptr;
-// //         std::tie(block_ids_ptr, status) = GetBlockIDs1();
-// //         if (!status.ok()) {
-// //             return {INVALID_BLOCK_ID, status};
-// //         }
-// //         block_id = block_ids_ptr->empty() ? 0 : block_ids_ptr->back() + 1;
-// //         block_ids1_->push_back(block_id);
-// //     }
-// //
-// //     String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
-// //     String commit_ts_str = fmt::format("{}", commit_ts);
-// //     status = kv_instance_.Put(block_id_key, commit_ts_str);
-// //     if (!status.ok()) {
-// //         return {0, status};
-// //     }
-// //     return {block_id, Status::OK()};
-// // }
-//
-// // Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
-// //     if (!block_ids1_) {
-// //         Status status = LoadBlockIDs1();
-// //         if (!status.ok()) {
-// //             return {nullptr, status};
-// //         }
-// //     }
-// //     return {&*block_ids1_, Status::OK()};
-// // }
-//
-// // Status SegmentMeta::LoadBlockIDs1() {
-// //     block_ids1_ = Vector<BlockID>();
-// //     Vector<BlockID> &block_ids = *block_ids1_;
-// //
-// //     String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
-// //     auto iter = kv_instance_.GetIterator();
-// //     iter->Seek(block_id_prefix);
-// //     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
-// //         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-// //         if (commit_ts > begin_ts_) {
-// //             iter->Next();
-// //             continue;
-// //         }
-// //         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
-// //         block_ids.push_back(block_id);
-// //         iter->Next();
-// //     }
-// //
-// //     std::sort(block_ids.begin(), block_ids.end());
-// //     return Status::OK();
-// // }
-//
-// Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
-//     if (!column_ids1_) {
-//         Status status = LoadBlockColumnIDs1();
-//         if (!status.ok()) {
-//             return {nullptr, status};
-//         }
-//     }
-//     return {&*column_ids1_, Status::OK()};
-// }
-//
-Status BlockMeta::LoadBlockColumnIDs1() {
-    column_ids1_ = Vector<ColumnID>();
-    Vector<ColumnID> &column_ids = *column_ids1_;
-
-    auto &table_meta = segment_meta_.table_meta();
-
-    String block_column_id_prefix =
-        KeyEncode::CatalogTableSegmentBlockColumnKeyPrefix(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_);
-    auto iter = kv_instance_.GetIterator();
-    iter->Seek(block_column_id_prefix);
-    while (iter->Valid() && iter->Key().starts_with(block_column_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts_) {
-            iter->Next();
-            continue;
-        }
-        BlockID block_id = std::stoull(iter->Key().ToString().substr(block_column_id_prefix.size()));
-        column_ids.push_back(block_id);
-        iter->Next();
-    }
-
-    std::sort(column_ids.begin(), column_ids.end());
     return Status::OK();
 }
 
