@@ -42,10 +42,9 @@ namespace infinity {
 
 export class TableIndexCache {
 public:
-    TableIndexCache(u64 table_id, u64 index_id) : table_id_(table_id), index_id_(index_id) {}
+    TableIndexCache(u64 index_id) : index_id_(index_id) {}
 
 private:
-    u64 table_id_{};
     u64 index_id_{};
 
     // Used by optimize index and dump mem index
@@ -58,13 +57,14 @@ private:
 export class TableCache {
 public:
     // Used when the table is created
-    explicit TableCache(u64 table_id) : table_id_(table_id), has_prepare_unsealed_segment_(true), has_commit_unsealed_segment_(true) {}
+    explicit TableCache(u64 db_id, u64 table_id)
+        : db_id_(db_id), table_id_(table_id), has_prepare_unsealed_segment_(true), has_commit_unsealed_segment_(true) {}
 
     // Used when system is restarted.
-    explicit TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
-        : table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id), prepare_unsealed_segment_offset_(unsealed_segment_offset),
-          commit_unsealed_segment_id_(unsealed_segment_id), commit_unsealed_segment_offset_(unsealed_segment_offset),
-          next_segment_id_(next_segment_id) {
+    explicit TableCache(u64 db_id, u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
+        : db_id_(db_id), table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id),
+          prepare_unsealed_segment_offset_(unsealed_segment_offset), commit_unsealed_segment_id_(unsealed_segment_id),
+          commit_unsealed_segment_offset_(unsealed_segment_offset), next_segment_id_(next_segment_id) {
         if (unsealed_segment_offset == DEFAULT_SEGMENT_CAPACITY) {
             has_prepare_unsealed_segment_ = true;
             has_commit_unsealed_segment_ = true;
@@ -96,6 +96,7 @@ public:
     String ToString() const;
 
 private:
+    u64 db_id_{};
     u64 table_id_{};
 
     bool has_prepare_unsealed_segment_{false};

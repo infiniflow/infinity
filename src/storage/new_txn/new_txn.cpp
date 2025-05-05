@@ -2427,10 +2427,6 @@ void NewTxn::PostCommit() {
                 // }
                 break;
             }
-            case WalCommandType::DROP_TABLE_V2: {
-                //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
-                break;
-            }
             case WalCommandType::RENAME_TABLE_V2: {
                 //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 break;

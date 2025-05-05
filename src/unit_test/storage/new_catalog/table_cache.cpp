@@ -31,7 +31,7 @@ TEST_P(TestTableCache, test_table_cache) {
     using namespace infinity;
 
     {
-        UniquePtr<TableCache> table_cache_ptr = MakeUnique<TableCache>(1);
+        UniquePtr<TableCache> table_cache_ptr = MakeUnique<TableCache>(0, 1);
         EXPECT_EQ(table_cache_ptr->table_id(), 1);
         EXPECT_TRUE(table_cache_ptr->has_prepared_unsealed_segment());
         EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());

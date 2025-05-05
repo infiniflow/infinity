@@ -138,8 +138,8 @@ private:
 
 // This enumerates type is to indicate which case the meta objects are used to.
 export enum class UsageFlag {
-    kTransform,  // Used by catalog transformation from old json style to rocksdb.
-    kOther, // Other cases
+    kTransform, // Used by catalog transformation from old json style to rocksdb.
+    kOther,     // Other cases
 };
 
 export struct NewCatalog {
@@ -212,15 +212,16 @@ public:
     Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;
 
-    Status RestoreCatalogCache(Storage* storage_ptr);
-    TableCache* GetTableCache(u64 table_id) const;
-    Status AddNewTableCache(u64 table_id); // used by create table in post commit
-    Status DropTableCache(u64 table_id); // used by drop table in post commit
+    Status RestoreCatalogCache(Storage *storage_ptr);
+    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const; // used by append in allocation
+    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id);                   // used by append in allocation
+    Status DropDbCache(u64 db_id);                                      // used by drop db in post commit
+    Status DropTableCache(u64 db_id, u64 table_id);                     // used by drop table in post commit
 private:
     KVStore *kv_store_{};
 
     mutable std::mutex table_cache_mtx_{};
-    HashMap<u64, SharedPtr<TableCache>> table_cache_map_{};
+    HashMap<u64, SharedPtr<HashMap<u64, SharedPtr<TableCache>>>> table_cache_map_{};
 
 private:
     mutable std::mutex mtx_{};
