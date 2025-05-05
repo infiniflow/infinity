@@ -45,9 +45,11 @@ export struct AppendTxnStore : public BaseTxnStore {
     explicit AppendTxnStore() : BaseTxnStore(TxnStoreType::kAppend) {}
 
     String db_name_{};
-    String db_id_{};
+    String db_id_str_{};
     String table_name_{};
-    String table_id_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
 
     SharedPtr<DataBlock> input_block_{};
     Vector<Pair<RowID, u64>> row_ranges_{};

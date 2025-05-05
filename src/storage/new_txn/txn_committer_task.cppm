@@ -14,7 +14,7 @@
 
 module;
 
-export module txn_allocator_task;
+export module txn_committer_task;
 
 import stl;
 import status;
@@ -22,9 +22,9 @@ import new_txn;
 
 namespace infinity {
 
-export struct TxnAllocatorTask {
+export struct TxnCommitterTask {
 public:
-    TxnAllocatorTask(NewTxn *txn, bool stop_task = false) : new_txn_(txn), stop_task_(stop_task) {}
+    TxnCommitterTask(NewTxn *txn, bool stop_task = false) : new_txn_(txn), stop_task_(stop_task) {}
 
     bool IsStopTask() const { return stop_task_; }
     NewTxn *txn_ptr() const { return new_txn_; }

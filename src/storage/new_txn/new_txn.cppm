@@ -94,6 +94,7 @@ struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
 struct BaseTxnStore;
+struct TxnCommitterTask;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -403,6 +404,8 @@ public:
 
     NewTxnStore *txn_store() { return &txn_store_; }
 
+    BaseTxnStore *GetTxnStore() const { return base_txn_store_.get(); }
+
     SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
     void AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
     Vector<SharedPtr<String>> GetOperations() const { return txn_context_ptr_->GetOperations(); }
@@ -680,6 +683,8 @@ private:
     // Used for new checkpoint
     TxnTimeStamp current_ckp_ts_{};
     SizeT wal_size_{};
+
+    SharedPtr<TxnCommitterTask> txn_committer_task_{nullptr};
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};

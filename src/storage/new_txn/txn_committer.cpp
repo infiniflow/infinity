@@ -14,10 +14,10 @@
 
 module;
 
-module txn_allocator;
+module txn_committer;
 
 import stl;
-import txn_allocator_task;
+import txn_committer_task;
 import new_txn;
 import logger;
 import storage;
@@ -31,32 +31,32 @@ import status;
 
 namespace infinity {
 
-TxnAllocator::TxnAllocator(Storage *storage) : storage_(storage) {}
-TxnAllocator::~TxnAllocator() = default;
+TxnCommitter::TxnCommitter(Storage *storage) : storage_(storage) {}
+TxnCommitter::~TxnCommitter() = default;
 
-void TxnAllocator::Start() {
+void TxnCommitter::Start() {
     processor_thread_ = Thread([this] { Process(); });
     LOG_INFO("Transaction allocator is started.");
 }
 
-void TxnAllocator::Stop() {
+void TxnCommitter::Stop() {
     LOG_INFO("Transaction allocator is stopping.");
-    SharedPtr<TxnAllocatorTask> stop_task = MakeShared<TxnAllocatorTask>(nullptr, true);
+    SharedPtr<TxnCommitterTask> stop_task = MakeShared<TxnCommitterTask>(nullptr, true);
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Transaction allocator is stopped.");
 }
 
-void TxnAllocator::Submit(SharedPtr<TxnAllocatorTask> task) {
+void TxnCommitter::Submit(SharedPtr<TxnCommitterTask> task) {
     ++task_count_;
     task_queue_.Enqueue(std::move(task));
 }
 
-void TxnAllocator::Process() {
+void TxnCommitter::Process() {
     bool running{true};
-    Deque<SharedPtr<TxnAllocatorTask>> tasks;
-    NewCatalog *catalog = storage_->new_catalog();
+    Deque<SharedPtr<TxnCommitterTask>> tasks;
+    //    NewCatalog *catalog = storage_->new_catalog();
     while (running) {
         task_queue_.DequeueBulk(tasks);
         // LOG_INFO(fmt::format("Receive tasks: {}", tasks.size()));
@@ -71,18 +71,12 @@ void TxnAllocator::Process() {
                 switch (txn_type) {
                     case TransactionType::kAppend: {
                         AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store);
-                        LOG_INFO(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
+                        LOG_INFO(fmt::format("TxnCommitter: Append txn: db: {}, {}, table: {}, {}, data size: {}",
                                              append_txn_store->db_name_,
                                              append_txn_store->db_id_,
                                              append_txn_store->table_name_,
                                              append_txn_store->table_id_,
                                              append_txn_store->input_block_->row_count()));
-                        SharedPtr<TableCache> table_cache = catalog->GetTableCache(append_txn_store->db_id_, append_txn_store->table_id_);
-                        if (table_cache.get() == nullptr) {
-                            Status status;
-                            std::tie(table_cache, status) = catalog->AddNewTableCache(append_txn_store->db_id_, append_txn_store->table_id_);
-                        }
-                        append_txn_store->row_ranges_ = table_cache->PrepareAppendRanges(append_txn_store->input_block_->row_count(), txn->TxnID());
                         break;
                     }
                     case TransactionType::kUpdate: {

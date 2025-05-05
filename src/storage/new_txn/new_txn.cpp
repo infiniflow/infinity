@@ -81,6 +81,7 @@ import chunk_index_meta;
 import meta_key;
 import segment_entry;
 import txn_allocator_task;
+import txn_committer_task;
 import meta_type;
 
 namespace infinity {
@@ -1078,7 +1079,8 @@ bool NewTxn::NeedToAllocate() const {
         case TransactionType::kDumpMemIndex:  // for new chunk id
         case TransactionType::kCreateIndex:   // for data range to create index
         case TransactionType::kImport:        // for new segment id
-        case TransactionType::kAppend: {      // for data range to append
+        case TransactionType::kAppend:        // for data range to append
+        case TransactionType::kUpdate: {      // for data range to append
             return true;
         }
         default:
@@ -1243,6 +1245,10 @@ Status NewTxn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
+    if (NeedToAllocate()) {
+        // Wait the commit task finish.
+        txn_committer_task_->Wait();
+    }
     PostCommit();
 
     return Status::OK();
@@ -2382,6 +2388,12 @@ void NewTxn::CommitBottom() {
         }
     } else if (txn_state != TxnState::kRollbacking) {
         UnrecoverableError(fmt::format("Unexptected transaction state: {}", TxnState2Str(txn_state)));
+    }
+
+    if (NeedToAllocate()) {
+        // Submit commit task to commit thread
+        txn_committer_task_ = MakeShared<TxnCommitterTask>(this);
+        txn_mgr_->SubmitForCommit(txn_committer_task_);
     }
 
     TransactionID txn_id = this->TxnID();

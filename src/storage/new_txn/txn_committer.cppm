@@ -14,13 +14,39 @@
 
 module;
 
-module txn_allocator_task;
+export module txn_committer;
 
-// import stl;
-import new_txn;
+import stl;
+import blocking_queue;
 
 namespace infinity {
 
-TxnAllocatorTask::TxnAllocatorTask(NewTxn *txn, bool stop_task) : new_txn_(txn), stop_task_(stop_task) {}
+class Storage;
+class NewTxn;
+struct TxnCommitterTask;
+
+export class TxnCommitter {
+public:
+    explicit TxnCommitter(Storage *storage);
+    virtual ~TxnCommitter();
+
+    void Start();
+    void Stop();
+    void Submit(SharedPtr<TxnCommitterTask> task);
+
+private:
+    void Process();
+
+private:
+    BlockingQueue<SharedPtr<TxnCommitterTask>> task_queue_{"TxnCommitterQueue"};
+
+    Thread processor_thread_{};
+
+    Storage *storage_{};
+
+    Atomic<u64> task_count_{};
+
+    mutable std::mutex task_mutex_;
+};
 
 } // namespace infinity

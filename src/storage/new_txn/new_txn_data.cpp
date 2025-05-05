@@ -464,9 +464,11 @@ Status NewTxn::AppendInner(const String &db_name,
     base_txn_store_ = MakeShared<AppendTxnStore>();
     AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
     append_txn_store->db_name_ = db_name;
-    append_txn_store->db_id_ = table_meta.db_id_str();
+    append_txn_store->db_id_str_ = table_meta.db_id_str();
+    append_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
     append_txn_store->table_name_ = table_name;
-    append_txn_store->table_id_ = table_meta.table_id_str();
+    append_txn_store->table_id_str_ = table_meta.table_id_str();
+    append_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
     append_txn_store->input_block_ = input_block;
 
     auto append_command = MakeShared<WalCmdAppendV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ranges, input_block);

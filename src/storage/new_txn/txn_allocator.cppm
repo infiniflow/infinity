@@ -38,7 +38,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<TxnAllocatorTask>> task_queue_{"BGTaskProcessor"};
+    BlockingQueue<SharedPtr<TxnAllocatorTask>> task_queue_{"TxnAllocatorQueue"};
 
     Thread processor_thread_{};
 
