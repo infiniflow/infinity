@@ -37,6 +37,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -92,6 +93,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -104,6 +106,7 @@ target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_p
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(knn_import_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # query benchmark
@@ -143,6 +146,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -155,6 +159,7 @@ target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_pa
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(knn_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
@@ -196,6 +201,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -208,6 +214,7 @@ target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(fulltext_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # ########################################
@@ -247,6 +254,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -259,6 +267,7 @@ target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(sparse_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 add_executable(bmp_benchmark
@@ -297,6 +306,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -309,6 +319,7 @@ target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/cu
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(bmp_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 add_executable(hnsw_benchmark
@@ -347,6 +358,7 @@ target_link_libraries(
     libcurl_static
     ssl.a
     crypto.a
+    rocksdb.a
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -359,6 +371,7 @@ target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/c
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(hnsw_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 # add_definitions(-march=native)

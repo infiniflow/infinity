@@ -175,7 +175,7 @@ public:
     QueryResult Explain(const String &db_name,
                         const String &table_name,
                         ExplainType explain_type,
-                        SearchExpr *search_expr,
+                        SearchExpr *&search_expr,
                         ParsedExpr *filter,
                         ParsedExpr *limit,
                         ParsedExpr *offset,
@@ -187,11 +187,11 @@ public:
 
     QueryResult Search(const String &db_name,
                        const String &table_name,
-                       SearchExpr *search_expr,
+                       SearchExpr *&search_expr,
                        ParsedExpr *filter,
                        ParsedExpr *limit,
                        ParsedExpr *offset,
-                       Vector<ParsedExpr *> *output_columns,
+                       Vector<ParsedExpr *> *&output_columns,
                        Vector<ParsedExpr *> *highlight_columns,
                        Vector<OrderByExpr *> *order_by_list,
                        Vector<ParsedExpr *> *group_by_list,
@@ -205,6 +205,8 @@ public:
     QueryResult DropColumns(const String &db_name, const String &table_name, Vector<String> column_names);
 
     QueryResult Cleanup();
+
+    QueryResult DumpIndex(const String &db_name, const String &table_name, const String &index_name);
 
     QueryResult ForceCheckpoint();
     QueryResult CompactTable(const String &db_name, const String &table_name);

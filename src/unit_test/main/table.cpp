@@ -34,6 +34,7 @@ import knn_expr;
 import column_def;
 import explain_statement;
 import data_type;
+import search_expr;
 
 using namespace infinity;
 class InfinityTableTest : public BaseTest {};
@@ -75,6 +76,8 @@ TEST_F(InfinityTableTest, test1) {
         CreateTableOptions create_tb_options;
         create_tb_options.conflict_type_ = ConflictType::kIgnore;
 
+        SearchExpr *search_expr = nullptr;
+
         QueryResult create_result =
             infinity->CreateTable(db_name, table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
         EXPECT_TRUE(create_result.IsOk());
@@ -85,9 +88,18 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_ast =
-                infinity
-                    ->Explain(db_name, table_name, ExplainType::kAst, nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr);
+            QueryResult explain_ast = infinity->Explain(db_name,
+                                                        table_name,
+                                                        ExplainType::kAst,
+                                                        search_expr,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr,
+                                                        output_columns,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr,
+                                                        nullptr);
             EXPECT_TRUE(explain_ast.IsOk());
             //            fmt::print("AST: {}\n", explain_ast.ToString());
         }
@@ -101,7 +113,7 @@ TEST_F(InfinityTableTest, test1) {
             QueryResult explain_unopt = infinity->Explain(db_name,
                                                           table_name,
                                                           ExplainType::kUnOpt,
-                                                          nullptr,
+                                                          search_expr,
                                                           nullptr,
                                                           nullptr,
                                                           nullptr,
@@ -120,9 +132,18 @@ TEST_F(InfinityTableTest, test1) {
             col2->names_.emplace_back(col2_name);
             output_columns->emplace_back(col2);
 
-            QueryResult explain_optimized_logical =
-                infinity
-                    ->Explain(db_name, table_name, ExplainType::kOpt, nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr);
+            QueryResult explain_optimized_logical = infinity->Explain(db_name,
+                                                                      table_name,
+                                                                      ExplainType::kOpt,
+                                                                      search_expr,
+                                                                      nullptr,
+                                                                      nullptr,
+                                                                      nullptr,
+                                                                      output_columns,
+                                                                      nullptr,
+                                                                      nullptr,
+                                                                      nullptr,
+                                                                      nullptr);
 
             EXPECT_TRUE(explain_optimized_logical.IsOk());
             //            fmt::print("Optimized logical plan: {}\n", explain_opt.ToString());
@@ -137,7 +158,7 @@ TEST_F(InfinityTableTest, test1) {
             QueryResult explain_phy = infinity->Explain(db_name,
                                                         table_name,
                                                         ExplainType::kPhysical,
-                                                        nullptr,
+                                                        search_expr,
                                                         nullptr,
                                                         nullptr,
                                                         nullptr,
@@ -159,7 +180,7 @@ TEST_F(InfinityTableTest, test1) {
             QueryResult explain_fragment = infinity->Explain(db_name,
                                                              table_name,
                                                              ExplainType::kFragment,
-                                                             nullptr,
+                                                             search_expr,
                                                              nullptr,
                                                              nullptr,
                                                              nullptr,
@@ -181,7 +202,7 @@ TEST_F(InfinityTableTest, test1) {
             QueryResult explain_pipeline = infinity->Explain(db_name,
                                                              table_name,
                                                              ExplainType::kPipeline,
-                                                             nullptr,
+                                                             search_expr,
                                                              nullptr,
                                                              nullptr,
                                                              nullptr,

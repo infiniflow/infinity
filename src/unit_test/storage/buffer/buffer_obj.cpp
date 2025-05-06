@@ -31,7 +31,7 @@ import column_def;
 import logical_type;
 import data_type;
 import data_block;
-import txn_manager;
+import new_txn_manager;
 import table_def;
 import extra_ddl_info;
 import column_vector;
@@ -56,6 +56,17 @@ import internal_types;
 import persistence_manager;
 import default_values;
 import txn_state;
+import new_txn;
+import db_meeta;
+import table_meeta;
+import table_index_meeta;
+import segment_index_meta;
+import chunk_index_meta;
+import mem_index;
+import segment_meta;
+import block_meta;
+import column_meta;
+import new_catalog;
 
 using namespace infinity;
 
@@ -70,15 +81,27 @@ public:
     void WaitCleanup(Storage *storage) {
         Catalog *catalog = storage->catalog();
         BufferManager *buffer_mgr = storage->buffer_manager();
-        TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS1();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
 
-    void WaitFlushDeltaOp(Storage *storage) {
-        WalManager *wal_mgr = storage->wal_manager();
-        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
+    void WaitFlushOp(Storage *storage) {
+        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        WalManager *wal_manager = storage->wal_manager();
+        auto *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+
+        TxnTimeStamp max_commit_ts{};
+        i64 wal_size{};
+        std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+
+        new_txn->SetWalSize(wal_size);
+        TxnTimeStamp last_checkpoint_ts = wal_manager->LastCheckpointTS();
+        Status status = new_txn->Checkpoint(last_checkpoint_ts);
+        if (status.ok()) {
+            status = txn_mgr->CommitTxn(new_txn);
+        }
     }
 };
 
@@ -518,8 +541,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     EXPECT_NE(storage, nullptr);
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)8 * 4 * 128 * 8192);
 
-    TxnManager *txn_mgr = storage->txn_manager();
-    BufferManager *buffer_mgr = storage->buffer_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("test_hnsw");
@@ -540,7 +562,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         }
         auto tbl1_def =
             MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), MakeShared<String>("test_comment"), column_defs);
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        NewTxn *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
@@ -563,27 +585,17 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         const String &db_name = "default_db";
         const String &table_name = "test_hnsw";
         ConflictType conflict_type = ConflictType::kError;
-        bool prepare = false;
-        auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
-        EXPECT_EQ(table_status.ok(), true);
-        {
-            auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
-            auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
-            auto *table_index_entry = std::get<0>(result);
-            auto status = std::get<1>(result);
-            EXPECT_EQ(status.ok(), true);
-            txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
-            txn->CreateIndexFinish(table_entry, table_index_entry);
-        }
-        txn_mgr->CommitTxn(txn);
+
+        // create index idx1
+        Status status = txn->CreateIndex(db_name, table_name, index_base_hnsw, conflict_type);
+        EXPECT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     // Insert data
     {
         for (SizeT i = 0; i < kInsertN; ++i) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-            EXPECT_TRUE(status.ok());
-
             Vector<SharedPtr<ColumnVector>> column_vectors;
             SharedPtr<ColumnVector> column_vector = ColumnVector::Make(column_defs[0]->type());
             column_vector->Initialize();
@@ -606,68 +618,48 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             txn_mgr->CommitTxn(txn);
         }
     }
-    WaitFlushDeltaOp(storage);
+    WaitFlushOp(storage);
     // Get Index
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get index"), TransactionType::kRead);
 
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_TRUE(status.ok());
-        {
-            auto [_, table_index_metas, table_index_meta_lock] = table_entry->GetAllIndexMapGuard();
-            SizeT index_size = table_index_metas.size();
-            for (SizeT i = 0; i < index_size; ++i) {
-                //            String& index_name = index_names[i];
-                auto &table_index_meta = table_index_metas[i];
-                auto [table_index_entry, table_index_status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-                EXPECT_TRUE(table_index_status.ok());
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
-                auto &index_by_segment = table_index_entry->index_by_segment();
-                auto iter = index_by_segment.find(0);
-                if (iter != index_by_segment.end()) {
-                    auto &segment_index_entry = iter->second;
-
-                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                    SharedPtr<MemoryIndexer> memory_indexer;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
-                    for (auto &chunk_index_entry : chunk_index_entries) {
-                        auto index_handle = chunk_index_entry->GetIndex();
-                    }
-                }
-            }
-        }
-        txn_mgr->CommitTxn(txn);
-    }
-    {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        Vector<String> index_names;
+        Status status = txn->ListIndex(*db_name, *table_name, index_names);
         EXPECT_TRUE(status.ok());
 
-        EXPECT_EQ(table_entry->row_count(), kInsertN * kImportSize);
-        ASSERT_EQ(table_entry->segment_map().size(), 1ul);
-        {
-            auto &segment_entry = table_entry->segment_map().begin()->second;
-            EXPECT_EQ(segment_entry->row_count(), kInsertN * kImportSize);
-            ASSERT_EQ(segment_entry->block_entries().size(), kInsertN);
-            for (u64 i = 0; i < kInsertN; ++i) {
-                auto block_entry = segment_entry->GetBlockEntryByID(i);
-                EXPECT_EQ(block_entry->row_count(), kImportSize);
-                auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, 0);
-                for (u64 j = 0; j < kImportSize; ++j) {
-                    Value v1 = column_vector.GetValue(j);
-                }
+        for (const String &index_name : index_names) {
+            status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+            EXPECT_TRUE(status.ok());
+
+            {
+                auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             }
+            SegmentID segment_id = 0;
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+            SharedPtr<MemIndex> mem_index;
+            status = segment_index_meta.GetMemIndex(mem_index);
+            EXPECT_TRUE(status.ok());
+            EXPECT_NE(mem_index, nullptr);
         }
+
         txn_mgr->CommitTxn(txn);
     }
     // Drop Table
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
-        txn_mgr->CommitTxn(txn);
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     WaitCleanup(storage);
 
@@ -687,8 +679,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     EXPECT_NE(storage, nullptr);
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)512 * 1024);
 
-    TxnManager *txn_mgr = storage->txn_manager();
-    BufferManager *buffer_mgr = storage->buffer_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    //    BufferManager *buffer_mgr = storage->buffer_manager();
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
@@ -712,9 +704,6 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     {
         for (SizeT i = 0; i < kInsertN; ++i) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-            EXPECT_TRUE(status.ok());
-
             Vector<SharedPtr<ColumnVector>> column_vectors;
             SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
@@ -732,25 +721,63 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             txn_mgr->CommitTxn(txn);
         }
     }
-    {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        EXPECT_EQ(table_entry->row_count(), kInsertN * kImportSize);
-        ASSERT_EQ(table_entry->segment_map().size(), 1ul);
-        {
-            auto &segment_entry = table_entry->segment_map().begin()->second;
-            EXPECT_EQ(segment_entry->row_count(), kInsertN * kImportSize);
-            ASSERT_EQ(segment_entry->block_entries().size(), kInsertN);
-            for (u64 i = 0; i < kInsertN; ++i) {
-                auto block_entry = segment_entry->GetBlockEntryByID(i);
-                EXPECT_EQ(block_entry->row_count(), kImportSize);
-                auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, 0);
-                for (u64 j = 0; j < kImportSize; ++j) {
-                    Value v1 = column_vector.GetValue(j);
-                    Value v2 = Value::MakeBigInt(i * 1000 + j);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(segment_ids->size(), 1);
+        SegmentID segment_id = segment_ids->at(0);
+        EXPECT_EQ(segment_id, 0);
+        SegmentMeta segment_meta(segment_id, *table_meta);
+
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(block_ids_ptr->size(), kInsertN);
+
+        for (SizeT idx = 0; idx < kInsertN; ++idx) {
+            BlockID block_id = block_ids_ptr->at(idx);
+            EXPECT_EQ(block_id, idx);
+            BlockMeta block_meta(block_id, segment_meta);
+            NewTxnGetVisibleRangeState state;
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            EXPECT_TRUE(status.ok());
+
+            Pair<BlockOffset, BlockOffset> range;
+            BlockOffset offset = 0;
+            bool has_next = state.Next(offset, range);
+            EXPECT_TRUE(has_next);
+            EXPECT_EQ(range.first, 0);
+
+            EXPECT_EQ(range.second, DEFAULT_BLOCK_CAPACITY);
+
+            offset = range.second;
+            has_next = state.Next(offset, range);
+            EXPECT_FALSE(has_next);
+
+            SizeT row_count = state.block_offset_end();
+            EXPECT_EQ(row_count, DEFAULT_BLOCK_CAPACITY);
+
+            {
+                SizeT column_idx = 0;
+                ColumnMeta column_meta(column_idx, block_meta);
+                ColumnVector col;
+
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
+                    Value v1 = col.GetValue(row_id);
+                    Value v2 = Value::MakeBigInt(idx * 1000 + row_id);
                     EXPECT_EQ(v1, v2);
                 }
             }
@@ -760,7 +787,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
@@ -782,9 +809,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     EXPECT_NE(storage, nullptr);
     EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)512 * 1024);
 
-    TxnManager *txn_mgr = storage->txn_manager();
-    BufferManager *buffer_mgr = storage->buffer_manager();
-
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     auto table_comment = MakeShared<String>("table_comment");
@@ -807,9 +832,6 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     {
         for (SizeT i = 0; i < kInsertN; ++i) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
-            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-            EXPECT_TRUE(status.ok());
-
             Vector<SharedPtr<ColumnVector>> column_vectors;
             SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
             column_vector->Initialize();
@@ -830,24 +852,61 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     Vector<std::thread> ths;
     for (SizeT i = 0; i < kThreadN; ++i) {
         std::thread th([&]() {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            TxnTimeStamp begin_ts = txn->BeginTS();
 
-            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(table_entry->row_count(), kInsertN * kImportSize);
-            ASSERT_EQ(table_entry->segment_map().size(), 1ul);
-            {
-                auto &segment_entry = table_entry->segment_map().begin()->second;
-                EXPECT_EQ(segment_entry->row_count(), kInsertN * kImportSize);
-                ASSERT_EQ(segment_entry->block_entries().size(), kInsertN);
-                for (u64 i = 0; i < kInsertN; ++i) {
-                    auto block_entry = segment_entry->GetBlockEntryByID(i);
-                    EXPECT_EQ(block_entry->row_count(), kImportSize);
-                    auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, 0);
-                    for (u64 j = 0; j < kImportSize; ++j) {
-                        Value v1 = column_vector.GetValue(j);
-                        Value v2 = Value::MakeBigInt(i * 1000 + j);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(seg_status.ok());
+            EXPECT_EQ(segment_ids->size(), 1);
+            SegmentID segment_id = segment_ids->at(0);
+            EXPECT_EQ(segment_id, 0);
+            SegmentMeta segment_meta(segment_id, *table_meta);
+
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(block_ids_ptr->size(), kInsertN);
+
+            for (SizeT idx = 0; idx < kInsertN; ++idx) {
+                BlockID block_id = block_ids_ptr->at(idx);
+                EXPECT_EQ(block_id, idx);
+                BlockMeta block_meta(block_id, segment_meta);
+                NewTxnGetVisibleRangeState state;
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                EXPECT_TRUE(status.ok());
+
+                Pair<BlockOffset, BlockOffset> range;
+                BlockOffset offset = 0;
+                bool has_next = state.Next(offset, range);
+                EXPECT_TRUE(has_next);
+                EXPECT_EQ(range.first, 0);
+
+                EXPECT_EQ(range.second, DEFAULT_BLOCK_CAPACITY);
+
+                offset = range.second;
+                has_next = state.Next(offset, range);
+                EXPECT_FALSE(has_next);
+
+                SizeT row_count = state.block_offset_end();
+                EXPECT_EQ(row_count, DEFAULT_BLOCK_CAPACITY);
+
+                {
+                    SizeT column_idx = 0;
+                    ColumnMeta column_meta(column_idx, block_meta);
+                    ColumnVector col;
+
+                    status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                    EXPECT_TRUE(status.ok());
+
+                    for (SizeT row_id = 0; row_id < kImportSize; ++row_id) {
+                        Value v1 = col.GetValue(row_id);
+                        Value v2 = Value::MakeBigInt(idx * 1000 + row_id);
                         EXPECT_EQ(v1, v2);
                     }
                 }
@@ -862,7 +921,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
 
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }

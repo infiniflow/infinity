@@ -27,6 +27,7 @@ namespace infinity {
 class Catalog;
 class TxnManager;
 class SessionManager;
+class NewTxn;
 
 class TestCommander {
 public:
@@ -64,6 +65,10 @@ public:
 
     void DoCompact();
 
+    void NewDoCompact();
+
+    void NewManualCompact(NewTxn *new_txn, const String &db_name, const String &table_name);
+
     u64 RunningTaskCount() const { return task_count_; }
 
     TxnTimeStamp ManualDoCompact(const String &schema_name,
@@ -77,6 +82,8 @@ private:
     Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
 
     void ScanAndOptimize();
+
+    void NewScanAndOptimize();
 
     void DoDump(DumpIndexTask *dump_task);
 

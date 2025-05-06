@@ -75,7 +75,7 @@ public:
     // different from table scan:
     // table scan: one tasklet scan one block
     // index scan: one tasklet scan one segment
-    SizeT TaskletCount() final { return base_table_ref_->block_index_->SegmentCount(); }
+    SizeT TaskletCount() final;
 
     Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64) const override;
 

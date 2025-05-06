@@ -18,6 +18,7 @@ export module block_version;
 
 import stl;
 import local_file_handle;
+import status;
 
 namespace infinity {
 
@@ -49,6 +50,9 @@ export struct BlockVersion {
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
 
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
+    i64 GetRowCount() const;
+
+    Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
     void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
@@ -61,9 +65,15 @@ export struct BlockVersion {
 
     void Append(TxnTimeStamp commit_ts, i32 row_count);
 
-    void Delete(i32 offset, TxnTimeStamp commit_ts);
+    void CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts);
+
+    Status Delete(i32 offset, TxnTimeStamp commit_ts);
+
+    void RollbackDelete(i32 offset);
 
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
+
+    Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
     TxnTimeStamp latest_change_ts() const { return latest_change_ts_; }
 
@@ -72,7 +82,7 @@ private:
                                     // risk to write uninitialized buffer. (ts, rows)
     Vector<TxnTimeStamp> deleted_{};
 
-    TxnTimeStamp latest_change_ts_{};
+    TxnTimeStamp latest_change_ts_{}; // used by checkpoint to decide if the version file need to be flushed or not.
 };
 
 } // namespace infinity

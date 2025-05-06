@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
 import stl;
 import memindex_tracer;
@@ -23,6 +24,9 @@ import third_party;
 import logger;
 import txn;
 import table_index_entry;
+import new_txn;
+import compilation_config;
+import infinity_context;
 
 using namespace infinity;
 
@@ -159,9 +163,11 @@ public:
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override { task_queue_.Enqueue(std::move(task)); }
 
-    Txn *GetTxn() override { return nullptr; }
+    NewTxn *GetTxn() override { return nullptr; }
 
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override { return catalog_.GetMemIndexes(); }
+
+    Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override { return {}; }
 
     void HandleDump(UniquePtr<DumpIndexTask> task);
 
@@ -225,6 +231,13 @@ void TestMemIndexTracer::DumpRoutine() {
 class MemIndexTracerTest : public BaseTest {};
 
 TEST_F(MemIndexTracerTest, test1) {
+
+    RemoveDbDirs();
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    //    RemoveDbDirs();
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+
     SizeT memory_limit = 50;
     TestCatalog catalog;
 
@@ -234,9 +247,18 @@ TEST_F(MemIndexTracerTest, test1) {
     catalog.AppendMemIndex("idx1", 10, 10);
     catalog.AppendMemIndex("idx2", 30, 30);
     catalog.AppendMemIndex("idx3", 20, 20);
+
+    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(MemIndexTracerTest, test2) {
+
+    RemoveDbDirs();
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    //    RemoveDbDirs();
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+
     auto Test = [](bool may_fail) {
         int thread_n = 2;
         SizeT memory_limit = 50;
@@ -267,4 +289,6 @@ TEST_F(MemIndexTracerTest, test2) {
     };
     Test(false);
     Test(true);
+
+    infinity::InfinityContext::instance().UnInit();
 }

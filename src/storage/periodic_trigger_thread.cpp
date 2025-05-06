@@ -39,6 +39,9 @@ void PeriodicTriggerThread::Start() {
 void PeriodicTriggerThread::Stop() {
     {
         std::lock_guard lock(mtx_);
+        if (!running_) {
+            return;
+        }
         running_ = false;
         cv_.notify_all();
     }

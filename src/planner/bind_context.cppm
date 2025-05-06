@@ -26,7 +26,6 @@ import column_expression;
 import column_identifer;
 import binding;
 import base_expression;
-import block_index;
 import meta_info;
 import internal_types;
 import select_statement;
@@ -37,6 +36,7 @@ import global_resource_usage;
 
 namespace infinity {
 
+struct BlockIndex;
 class ExpressionBinder;
 
 export struct CommonTableExpressionInfo {

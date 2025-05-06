@@ -43,6 +43,17 @@ public:
         buffers_ = buffer;
     }
 
+    VarBuffer(VarBuffer &&other) : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
+
+    VarBuffer &operator=(VarBuffer &&other) {
+        if (this != &other) {
+            buffers_ = std::move(other.buffers_);
+            buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
+            buffer_obj_ = other.buffer_obj_;
+        }
+        return *this;
+    }
+
 public:
     SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
 
@@ -71,6 +82,8 @@ public:
 
     VarBufferManager(BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr);
 
+    VarBufferManager(BufferObj *outline_buffer_obj);
+
     SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
 
     SizeT Append(const char *data, SizeT size, bool *free_success = nullptr);
@@ -83,6 +96,8 @@ public:
 
     SizeT TotalSize() { return GetInner()->TotalSize(); }
 
+    void SetToCatalog(BufferObj *outline_buffer_obj);
+
 private:
     void InitBuffer();
 
@@ -90,12 +105,17 @@ private:
 
     const VarBuffer *GetInner();
 
-private:
-    enum class BufferType { kBuffer, kBufferObj } type_;
+    enum class BufferType {
+        kBuffer,
+        kBufferObj,
+        kNewCatalog,
+    } type_;
+
     UniquePtr<VarBuffer> mem_buffer_;
     Optional<BufferHandle> buffer_handle_;
     BlockColumnEntry *block_column_entry_ = nullptr;
     BufferManager *buffer_mgr_ = nullptr;
+    BufferObj *outline_buffer_obj_ = nullptr;
 };
 
 } // namespace infinity

@@ -36,6 +36,7 @@ export struct TxnContext {
     TransactionType txn_type_{TransactionType::kRead};
 
     bool is_write_transaction_{false};
+    bool replay_{false};
 
     SharedPtr<String> text_{};
     Vector<SharedPtr<String>> operations_;

@@ -33,6 +33,7 @@ export using infinity::ExportCmd;
 export using infinity::LockCmd;
 export using infinity::UnlockCmd;
 export using infinity::CleanupCmd;
+export using infinity::DumpIndexCmd;
 export using infinity::TestCmd;
 export using infinity::SnapshotCmd;
 export using infinity::SnapshotOp;

@@ -21,11 +21,8 @@ import global_block_id;
 import physical_operator_type;
 import fragment_data;
 import data_block;
-import table_scan_function_data;
-import knn_scan_data;
 import match_tensor_scan_function_data;
 import match_sparse_scan_function_data;
-import compact_state_data;
 import table_def;
 
 import merge_knn_data;
@@ -40,6 +37,10 @@ import segment_entry;
 import hash_table;
 
 namespace infinity {
+
+class TableScanFunctionData;
+class KnnScanFunctionData;
+class CompactStateData;
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
@@ -106,7 +107,8 @@ export struct UnionAllOperatorState : public OperatorState {
 
 // TableScan
 export struct TableScanOperatorState : public OperatorState {
-    inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
+    TableScanOperatorState();
+    ~TableScanOperatorState();
 
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
 };
@@ -146,7 +148,8 @@ export struct MergeMatchSparseOperatorState : public OperatorState {
 
 // KnnScan
 export struct KnnScanOperatorState : public OperatorState {
-    inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
+    KnnScanOperatorState();
+    ~KnnScanOperatorState();
 
     //    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
     UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
@@ -410,8 +413,8 @@ export struct ReadCacheState : public OperatorState {
 
 // Compact
 export struct CompactOperatorState : public OperatorState {
-    inline explicit CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data)
-        : OperatorState(PhysicalOperatorType::kCompact), segment_groups_(std::move(segment_groups)), compact_state_data_(compact_state_data) {}
+    CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data);
+    ~CompactOperatorState();
 
     SizeT compact_idx_{};
     Vector<Vector<SegmentEntry *>> segment_groups_;
@@ -419,10 +422,9 @@ export struct CompactOperatorState : public OperatorState {
 };
 
 export struct CompactIndexPrepareOperatorState : public OperatorState {
-    inline explicit CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
-                                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
-        : OperatorState(PhysicalOperatorType::kCompactIndexPrepare), compact_state_data_(compact_state_data),
-          create_index_shared_data_(create_index_shared_data) {}
+    CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data);
+    ~CompactIndexPrepareOperatorState();
 
     SharedPtr<CompactStateData> compact_state_data_{};
     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
@@ -430,10 +432,9 @@ export struct CompactIndexPrepareOperatorState : public OperatorState {
 };
 
 export struct CompactIndexDoOperatorState : public OperatorState {
-    inline explicit CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
-                                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
-        : OperatorState(PhysicalOperatorType::kCompactIndexDo), compact_state_data_(compact_state_data),
-          create_index_shared_data_(create_index_shared_data) {}
+    CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data);
+    ~CompactIndexDoOperatorState();
 
     SharedPtr<CompactStateData> compact_state_data_{};
     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
@@ -441,8 +442,8 @@ export struct CompactIndexDoOperatorState : public OperatorState {
 };
 
 export struct CompactFinishOperatorState : public OperatorState {
-    explicit CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data)
-        : OperatorState(PhysicalOperatorType::kCompactFinish), compact_state_data_(compact_state_data) {}
+    CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data);
+    ~CompactFinishOperatorState();
 
     SharedPtr<CompactStateData> compact_state_data_{};
 };

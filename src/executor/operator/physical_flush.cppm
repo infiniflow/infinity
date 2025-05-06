@@ -51,6 +51,7 @@ public:
 
 private:
     void FlushData(QueryContext *query_context, OperatorState *operator_state);
+    void FlushData1(QueryContext *query_context, OperatorState *operator_state);
 
     void FlushLog(QueryContext *query_context, OperatorState *operator_state);
 

@@ -64,7 +64,18 @@ export inline String TxnState2Str(TxnState txn_state) {
 export enum class TransactionType {
     kCheckpoint, // Develop know it's a checkpoint txn
     kRead,       // Developer know it's a read txn
-    kNormal      // Developer doesn't know what type is this txn
+    kNormal,     // Developer doesn't know what type is this txn
+    kReplay,
+    kRecovery,
+    kNewCheckpoint,
+    kAppend,
+    kUpdate,
+    kImport,
+    kDumpMemIndex,
+    kOptimizeIndex,
+    kCreateIndex,
+    kDelete,
+    kCompact,
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -75,8 +86,41 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         case TransactionType::kRead: {
             return "Read";
         }
+        case TransactionType::kAppend: {
+            return "Append";
+        }
+        case TransactionType::kDelete: {
+            return "Delete";
+        }
+        case TransactionType::kCreateIndex: {
+            return "Read";
+        }
+        case TransactionType::kOptimizeIndex: {
+            return "optimize_index";
+        }
+        case TransactionType::kCompact: {
+            return "compact";
+        }
+        case TransactionType::kDumpMemIndex: {
+            return "Dump mem index";
+        }
+        case TransactionType::kImport: {
+            return "import";
+        }
+        case TransactionType::kUpdate: {
+            return "update";
+        }
         case TransactionType::kNormal: {
             return "Normal";
+        }
+        case TransactionType::kReplay: {
+            return "Replay";
+        }
+        case TransactionType::kRecovery: {
+            return "Recovery";
+        }
+        case TransactionType::kNewCheckpoint: {
+            return "NewCheckpoint";
         }
     }
     return "Normal";

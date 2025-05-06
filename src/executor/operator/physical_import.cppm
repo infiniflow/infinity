@@ -41,6 +41,8 @@ import meta_info;
 
 namespace infinity {
 
+class DataBlock;
+
 class ZxvParserCtx {
 public:
     ZsvParser parser_;
@@ -67,7 +69,7 @@ public:
 export class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(u64 id,
-                            const SharedPtr<TableInfo>& table_info,
+                            const SharedPtr<TableInfo> &table_info,
                             String file_path,
                             bool header,
                             char delimiter,
@@ -88,21 +90,40 @@ public:
 
     void ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     void ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     void ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
+
+    void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
+    void NewImportTypeVecs(QueryContext *query_context,
+                           ImportOperatorState *import_op_state,
+                           EmbeddingDataType embedding_data_type,
+                           Vector<SharedPtr<DataBlock>> &data_blocks);
 
     /// for push based execution
     void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     /// for push based execution
     void ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     void ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
+
+    void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
 
     void ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    inline const TableInfo* table_info() const { return table_info_.get(); }
+    void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
+    inline const TableInfo *table_info() const { return table_info_.get(); }
 
     inline CopyFileType FileType() const { return file_type_; }
 
@@ -119,7 +140,11 @@ private:
 
     static void CSVRowHandler(void *);
 
-    void JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors);
+    static void NewCSVHeaderHandler(void *);
+
+    static void NewCSVRowHandler(void *);
+
+    void JSONLRowHandler(const nlohmann::json &line_json, Vector<SharedPtr<ColumnVector>> &column_vectors);
 
     void ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
 

@@ -108,6 +108,12 @@ import wal_manager;
 import infinity_context;
 import table_entry;
 
+import new_txn;
+import meta_info;
+import db_meeta;
+import table_meeta;
+import new_catalog;
+
 namespace infinity {
 
 Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -271,15 +277,36 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         UnrecoverableError(error_message);
     }
     // Check schema and table in the catalog
-    Txn *txn = query_context_ptr_->GetTxn();
-    Status status = txn->AddWriteTxnNum(schema_name, table_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
 
-    auto [table_info, info_status] = txn->GetTableInfo(schema_name, table_name);
-    if (!info_status.ok()) {
-        RecoverableError(info_status);
+    SharedPtr<TableInfo> table_info;
+    if (!query_context_ptr_->global_config()->UseNewCatalog()) {
+        Txn *txn = query_context_ptr_->GetTxn();
+        Status status = txn->AddWriteTxnNum(schema_name, table_name);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+
+        std::tie(table_info, status) = txn->GetTableInfo(schema_name, table_name);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        String table_key;
+        Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, &table_key);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(schema_name);
+        table_info->table_name_ = MakeShared<String>(table_name);
+        table_info->table_key_ = table_key;
     }
 
     if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
@@ -742,6 +769,8 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
     Txn *txn = query_context_ptr_->GetTxn();
+    NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
@@ -758,21 +787,29 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    {
-        TableEntry::TableStatus table_status;
-        if (!table_entry->SetCreatingIndex(table_status, txn)) {
-            RecoverableError(
-                Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(table_status))));
+    if (!use_new_catalog) {
+        auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
         }
-    }
-    status = table_entry->AddWriteTxnNum(txn);
-    if (!status.ok()) {
-        RecoverableError(status);
+        {
+            TableEntry::TableStatus table_status;
+            if (!table_entry->SetCreatingIndex(table_status, txn)) {
+                RecoverableError(
+                    Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(table_status))));
+            }
+        }
+        status = table_entry->AddWriteTxnNum(txn);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     IndexInfo *index_info = create_index_info->index_info_;
@@ -1025,11 +1062,33 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         RecoverableError(status);
     }
 
-    Txn *txn = query_context_ptr_->GetTxn();
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    SharedPtr<TableInfo> table_info;
+    Status status;
+    Txn *txn = nullptr;
+    NewTxn *new_txn = nullptr;
+    if (!use_new_catalog) {
+        txn = query_context_ptr_->GetTxn();
 
-    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
-    if (!info_status.ok()) {
-        RecoverableError(info_status);
+        std::tie(table_info, status) = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        new_txn = query_context_ptr_->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(statement->schema_name_);
+        table_info->table_name_ = MakeShared<String>(statement->table_name_);
     }
 
     Vector<u64> column_idx_array;
@@ -1146,7 +1205,13 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         }
     }
 
-    SharedPtr<BlockIndex> block_index = txn->GetBlockIndexFromTable(statement->schema_name_, statement->table_name_);
+    SharedPtr<BlockIndex> block_index;
+    if (use_new_catalog) {
+        block_index = MakeShared<BlockIndex>();
+        block_index->NewInit(new_txn, statement->schema_name_, statement->table_name_);
+    } else {
+        block_index = txn->GetBlockIndexFromTable(statement->schema_name_, statement->table_name_);
+    }
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                       table_info,
@@ -1168,14 +1233,34 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
-    Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_info, status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    status = txn->AddWriteTxnNum(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    SharedPtr<TableInfo> table_info;
+    if (!use_new_catalog) {
+        Status status;
+        Txn *txn = query_context_ptr_->GetTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        status = txn->AddWriteTxnNum(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(statement->schema_name_);
+        table_info->table_name_ = MakeShared<String>(statement->table_name_);
     }
 
     // Check the file existence
@@ -1200,14 +1285,36 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         statement->schema_name_ = query_context_ptr_->schema_name();
     }
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, entry_status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!entry_status.ok()) {
-        RecoverableError(entry_status);
-    }
+    NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    Status status;
+    TableEntry *table_entry = nullptr;
+    Optional<TableMeeta> table_meta;
 
-    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
-    if (!info_status.ok()) {
-        RecoverableError(info_status);
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    SharedPtr<TableInfo> table_info;
+
+    if (use_new_catalog) {
+        Optional<DBMeeta> db_meta;
+        status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(statement->schema_name_);
+        table_info->table_name_ = MakeShared<String>(statement->table_name_);
+    } else {
+        std::tie(table_entry, status) = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        std::tie(table_info, status) = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     switch (statement->type_) {
@@ -1226,13 +1333,24 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
                 }
                 bool found = true;
-                try {
-                    [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
-                } catch (const RecoverableException &e) {
-                    if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
-                        throw;
+                if (!use_new_catalog) {
+                    try {
+                        [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
+                    } catch (const RecoverableException &e) {
+                        if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
+                            throw;
+                        }
+                        found = false;
                     }
-                    found = false;
+                } else {
+                    ColumnID column_id = 0;
+                    std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_def->name());
+                    if (!status.ok()) {
+                        if (status.code() != ErrorCode::kNotFound) {
+                            RecoverableError(status);
+                        }
+                        found = false;
+                    }
                 }
                 if (found) {
                     RecoverableError(Status::DuplicateColumnName(column_def->name()));
@@ -1245,9 +1363,25 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             auto *drop_columns_statement = static_cast<DropColumnsStatement *>(statement);
             Vector<String> column_names = std::move(drop_columns_statement->column_names_);
             for (const auto &column_name : column_names) {
-                i64 column_id = table_entry->GetColumnIdByName(column_name);
-                if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
-                    RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                if (!use_new_catalog) {
+                    i64 column_id = table_entry->GetColumnIdByName(column_name);
+                    if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
+                        RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                    }
+                } else {
+                    ColumnID column_id = 0;
+                    std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
+                    if (!status.ok()) {
+                        RecoverableError(Status::ColumnNotExist(column_name));
+                    }
+                    bool has_index = false;
+                    status = NewCatalog::CheckColumnIfIndexed(*table_meta, column_id, has_index);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    if (has_index) {
+                        RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                    }
                 }
             }
             this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_names));
@@ -1261,10 +1395,25 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
 }
 
 Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, SharedPtr<BindContext> &bind_context_ptr) {
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+
     Txn *txn = query_context_ptr_->GetTxn();
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
+
+            if (use_new_catalog) {
+                NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+                auto [db_info, status] = new_txn->GetDatabaseInfo(use_command_info->db_name());
+                if (!status.ok()) {
+                    return status;
+                }
+                SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                this->logical_plan_ = logical_command;
+                break;
+            }
+
             Status status = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
@@ -1292,6 +1441,20 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
+            if (use_new_catalog) {
+                auto *new_txn = query_context_ptr_->GetNewTxn();
+                Optional<DBMeeta> db_meta;
+                Optional<TableMeeta> table_meta;
+                Status status = new_txn->GetTableMeta(query_context_ptr_->schema_name(), check_table->table_name(), db_meta, table_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+                this->logical_plan_ = logical_command;
+                break;
+            }
             auto [table_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
@@ -1369,6 +1532,16 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
                 UnrecoverableError("Uninitialized storage mode");
             }
 
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
+            break;
+        }
+        case CommandType::kDumpIndex: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+            
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
             this->logical_plan_ = logical_command;
             break;

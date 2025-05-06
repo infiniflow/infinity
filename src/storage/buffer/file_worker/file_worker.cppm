@@ -67,6 +67,8 @@ public:
 
     void *GetData() const { return data_; }
 
+    void SetData(void *data);
+
     // Get absolute file path. As key of buffer handle.
     String GetFilePath() const;
 

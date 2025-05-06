@@ -17,12 +17,13 @@ module;
 export module binding;
 
 import stl;
-import block_index;
 import meta_info;
 import internal_types;
 import data_type;
 
 namespace infinity {
+
+class BlockIndex;
 
 export enum class BindingType { kInvalid, kTable, kSubquery, kCTE, kView };
 
@@ -30,7 +31,7 @@ export class Binding {
 public:
     Binding() = default;
 
-    virtual ~Binding() = default;
+    virtual ~Binding();
 
     static SharedPtr<Binding> MakeBinding(BindingType binding_type,
                                           const String &name,

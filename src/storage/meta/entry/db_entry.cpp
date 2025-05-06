@@ -171,7 +171,6 @@ void DBEntry::CreateTableReplay(
         begin_ts);
 }
 
-
 Status DBEntry::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, MakeShared<String>(table_snapshot_info->table_name_), this); };
     LOG_TRACE(fmt::format("Adding new table entry: {}", table_snapshot_info->table_name_));
@@ -377,7 +376,7 @@ void DBEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> DBEntry::GetFilePath(Txn* txn) const {
+Vector<String> DBEntry::GetFilePath(Txn *txn) const {
     String error_message = "Unimplemented";
     UnrecoverableError(error_message);
     return Vector<String>();

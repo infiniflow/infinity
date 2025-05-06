@@ -18,6 +18,7 @@ module physical_flush;
 
 import stl;
 import txn;
+import new_txn;
 import query_context;
 import table_def;
 import data_table;
@@ -29,10 +30,13 @@ import bg_task;
 import third_party;
 import status;
 import infinity_context;
+import background_process;
+import new_txn;
+import new_txn_manager;
 
 namespace infinity {
 
-void PhysicalFlush::Init(QueryContext* query_context) {}
+void PhysicalFlush::Init(QueryContext *query_context) {}
 
 bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -49,7 +53,7 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     switch (flush_type_) {
         case FlushType::kDelta:
         case FlushType::kData: {
-            FlushData(query_context, operator_state);
+            FlushData1(query_context, operator_state);
             break;
         }
         case FlushType::kLog: {
@@ -65,11 +69,49 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     return true;
 }
 
+void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *operator_state) {
+    auto *wal_manager = query_context->storage()->wal_manager();
+    if (wal_manager->IsCheckpointing()) {
+        LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by command");
+        Status status = Status::Checkpointing();
+        RecoverableError(status);
+    }
+
+    TxnTimeStamp max_commit_ts{};
+    i64 wal_size{};
+    std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+    LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+    auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+    NewTxn *new_txn = query_context->GetNewTxn();
+    checkpoint_task->new_txn_ = new_txn;
+
+    bool set_success = new_txn->txn_mgr()->SetTxnCheckpoint(new_txn);
+    if (!set_success) {
+        return;
+    }
+
+    auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    bg_processor->Submit(checkpoint_task);
+    checkpoint_task->Wait();
+    return;
+}
+
 void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     // full checkpoint here
 
     bool is_full_checkpoint = flush_type_ == FlushType::kData;
-    auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), is_full_checkpoint);
+    SharedPtr<ForceCheckpointTask> force_ckp_task = nullptr;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        if (!is_full_checkpoint) {
+            LOG_WARN("Delta checkpoint is not supported in new catalog");
+        }
+        auto *new_txn = query_context->GetNewTxn();
+        force_ckp_task = MakeShared<ForceCheckpointTask>(new_txn, is_full_checkpoint);
+    } else {
+        auto *txn = query_context->GetTxn();
+        force_ckp_task = MakeShared<ForceCheckpointTask>(txn, is_full_checkpoint);
+    }
     auto *wal_mgr = query_context->storage()->wal_manager();
     if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));

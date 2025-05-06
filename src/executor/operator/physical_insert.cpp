@@ -36,11 +36,13 @@ import status;
 import infinity_exception;
 import logger;
 import meta_info;
+import txn_state;
 
 import wal_manager;
 import infinity_context;
 
 import column_def;
+import new_txn;
 
 namespace infinity {
 
@@ -95,8 +97,18 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     }
     output_block->Finalize();
 
-    auto *txn = query_context->GetTxn();
-    txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_block);
+    bool use_new_meta = query_context->global_config()->UseNewCatalog();
+    if (use_new_meta) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        new_txn->SetTxnType(TransactionType::kAppend);
+        Status status = new_txn->Append(*table_info_, output_block);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+        }
+    } else {
+        auto *txn = query_context->GetTxn();
+        txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_block);
+    }
 
     UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));
     if (operator_state == nullptr) {

@@ -118,6 +118,8 @@ public:
 
     void Cleanup(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) final;
 
+    void DumpIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DumpIndexRequest &request) final;
+
     void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) final;
 
     void ListTable(infinity_thrift_rpc::ListTableResponse &response, const infinity_thrift_rpc::ListTableRequest &request) final;

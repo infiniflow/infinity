@@ -31,6 +31,16 @@ import table_entry;
 import table_index_entry;
 import txn_manager;
 import txn_state;
+import compaction_process;
+import storage;
+
+import kv_store;
+import new_catalog;
+import new_txn_manager;
+import mem_index;
+import new_txn;
+import status;
+import defer_op;
 
 namespace infinity {
 
@@ -39,6 +49,16 @@ void MemIndexTracer::DecreaseMemUsed(SizeT mem_used) {
     if (old_index_memory < mem_used) {
         UnrecoverableException(fmt::format("Memindex memory {} is larger than current index memory {}", mem_used, old_index_memory));
     }
+}
+
+bool MemIndexTracer::TryTriggerDump() {
+    auto dump_task = MakeDumpTask();
+    if (!dump_task) {
+        return false;
+    }
+    LOG_TRACE(fmt::format("Dump triggered!"));
+    TriggerDump(std::move(dump_task));
+    return true;
 }
 
 void MemIndexTracer::DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index) {
@@ -80,6 +100,15 @@ Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(Txn *txn) {
     return info_vec;
 }
 
+Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(NewTxn *txn) {
+    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
+    Vector<MemIndexTracerInfo> info_vec;
+    for (auto *mem_index : mem_indexes) {
+        info_vec.push_back(mem_index->GetInfo());
+    }
+    return info_vec;
+}
+
 Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(Txn *txn) {
     Vector<BaseMemIndex *> results;
     Vector<BaseMemIndex *> mem_indexes = GetAllMemIndexes(txn);
@@ -93,11 +122,40 @@ Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(Txn *txn) {
     return results;
 }
 
+Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(NewTxn *new_txn) {
+    Vector<BaseMemIndex *> results;
+    Vector<BaseMemIndex *> mem_indexes = GetAllMemIndexes(new_txn);
+    for (auto *mem_index : mem_indexes) {
+        if (auto iter = proposed_dump_.find(mem_index); iter == proposed_dump_.end()) {
+            auto info = mem_index->GetInfo();
+            proposed_dump_.emplace(mem_index, info.mem_used_);
+            results.push_back(mem_index);
+        }
+    }
+    return results;
+}
+
 UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     std::lock_guard lck(mtx_);
 
-    Txn *txn = GetTxn();
-    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
+    Vector<BaseMemIndex *> mem_indexes;
+
+    NewTxn *new_txn = GetTxn();
+
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+    mem_indexes = GetUndumpedMemIndexes(new_txn);
+
+    bool make_task = false;
+    DeferFn defer_op([&] {
+        if (new_txn && !make_task) {
+            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+            Status status = new_txn_mgr->RollBackTxn(new_txn);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+        }
+    });
 
     if (mem_indexes.empty()) {
         LOG_WARN("Cannot find memindex to dump");
@@ -106,10 +164,14 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     SizeT dump_idx = ChooseDump(mem_indexes);
     auto *mem_index = mem_indexes[dump_idx];
     auto info = mem_index->GetInfo();
-    auto dump_task = MakeUnique<DumpIndexTask>(mem_index, txn);
+
+    UniquePtr<DumpIndexTask> dump_task;
+
+    dump_task = MakeUnique<DumpIndexTask>(mem_index, new_txn);
 
     acc_proposed_dump_.fetch_add(info.mem_used_);
     proposed_dump_[mem_index] = info.mem_used_;
+    make_task = true;
     return dump_task;
 }
 
@@ -123,6 +185,18 @@ SizeT MemIndexTracer::ChooseDump(const Vector<BaseMemIndex *> &mem_indexes) {
     return std::distance(info_vec.begin(), max_iter);
 }
 
+BGMemIndexTracer::BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr) : MemIndexTracer(index_memory_limit), txn_mgr_(txn_mgr) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("BGMemIndexTracer");
+#endif
+}
+
+BGMemIndexTracer::~BGMemIndexTracer() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("BGMemIndexTracer");
+#endif
+}
+
 void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
     auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
 
@@ -130,27 +204,58 @@ void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
     compaction_process->Submit(std::move(dump_task));
 }
 
-Txn *BGMemIndexTracer::GetTxn() {
-    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+NewTxn *BGMemIndexTracer::GetTxn() {
+    if (!txn_mgr_) {
+        return nullptr;
+    }
+    NewTxn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
     return txn;
 }
 
 Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(Txn *scan_txn) {
     Vector<BaseMemIndex *> mem_indexes;
-    TransactionID txn_id = scan_txn->TxnID();
-    TxnTimeStamp begin_ts = scan_txn->BeginTS();
-    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
-    for (auto *db_entry : db_entries) {
-        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
-        for (auto *table_entry : table_entries) {
-            Vector<TableIndexEntry *> table_index_entries = table_entry->TableIndexes(txn_id, begin_ts);
-            for (auto *table_index_entry : table_index_entries) {
-                Vector<BaseMemIndex *> memindex_list = table_index_entry->GetMemIndex();
-                mem_indexes.insert(mem_indexes.end(), memindex_list.begin(), memindex_list.end());
-            }
+    //    TransactionID txn_id = scan_txn->TxnID();
+    //    TxnTimeStamp begin_ts = scan_txn->BeginTS();
+    //    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
+    //    for (auto *db_entry : db_entries) {
+    //        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
+    //        for (auto *table_entry : table_entries) {
+    //            Vector<TableIndexEntry *> table_index_entries = table_entry->TableIndexes(txn_id, begin_ts);
+    //            for (auto *table_index_entry : table_index_entries) {
+    //                Vector<BaseMemIndex *> memindex_list = table_index_entry->GetMemIndex();
+    //                mem_indexes.insert(mem_indexes.end(), memindex_list.begin(), memindex_list.end());
+    //            }
+    //        }
+    //    }
+    return mem_indexes;
+}
+
+Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
+    Vector<SharedPtr<MemIndex>> mem_indexes;
+    Vector<MemIndexID> mem_index_ids;
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    Status status = NewCatalog::GetAllMemIndexes(new_txn->kv_instance(), begin_ts, mem_indexes, mem_index_ids);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    Vector<BaseMemIndex *> base_mem_indexes;
+    // for (auto &mem_index : mem_indexes) {
+    for (SizeT i = 0; i < mem_indexes.size(); ++i) {
+        auto &mem_index = mem_indexes[i];
+        auto &mem_index_id = mem_index_ids[i];
+        auto *base_mem_index = mem_index->GetBaseMemIndex(mem_index_id);
+        if (base_mem_index) {
+            base_mem_indexes.emplace_back(base_mem_index);
+        } else {
+            LOG_WARN(fmt::format("Not implement base index of index {}.{}.{}.{}",
+                                 mem_index_id.db_name_,
+                                 mem_index_id.table_name_,
+                                 mem_index_id.index_name_,
+                                 mem_index_id.segment_id_));
         }
     }
-    return mem_indexes;
+    return base_mem_indexes;
 }
 
 } // namespace infinity

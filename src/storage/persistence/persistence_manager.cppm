@@ -20,11 +20,13 @@ import stl;
 import serialize;
 import third_party;
 import obj_status;
-import obj_stat_accessor;
 import status;
 
 // A view means a logical plan
 namespace infinity {
+
+class KVInstance;
+class ObjectStatAccessorBase;
 
 export struct ObjAddr {
     String obj_key_{};
@@ -36,6 +38,8 @@ export struct ObjAddr {
     nlohmann::json Serialize() const;
 
     void Deserialize(const nlohmann::json &obj);
+
+    void Deserialize(const String &str);
 
     SizeT GetSizeInBytes() const;
 
@@ -97,6 +101,8 @@ public:
 
     void Deserialize(const nlohmann::json &obj);
 
+    void Deserialize(KVInstance *kv_instance);
+
     HashMap<String, ObjStat> GetAllObjects() const;
     HashMap<String, ObjAddr> GetAllFiles() const;
 
@@ -131,6 +137,8 @@ public: // for unit test
 
 private:
     void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
+
+    void AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr);
 
     String workspace_;
     String local_data_dir_;

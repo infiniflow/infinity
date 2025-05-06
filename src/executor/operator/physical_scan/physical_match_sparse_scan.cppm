@@ -45,7 +45,7 @@ public:
                             const SharedPtr<CommonQueryFilter> &common_query_filter,
                             SharedPtr<Vector<LoadMeta>> load_metas);
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -55,9 +55,10 @@ public:
 
     SizeT TaskletCount() override;
 
-    SizeT GetTaskletCount(QueryContext *query_context);
+    void PlanWithIndex(QueryContext *query_context);
 
-    Vector<SharedPtr<Vector<SegmentID>>> PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count);
+    Vector<SharedPtr<Vector<SegmentID>>>
+    PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context);
 
     SharedPtr<MatchSparseExpression> match_sparse_expr() const { return match_sparse_expr_; }
 

@@ -30,6 +30,8 @@ struct BlockColumnEntry;
 class BufferManager;
 struct ChunkIndexEntry;
 struct SegmentIndexEntry;
+class ColumnVector;
+class BufferObj;
 
 export class SecondaryIndexInMem : public BaseMemIndex {
 protected:
@@ -50,6 +52,8 @@ public:
 
     TableIndexEntry *table_index_entry() const override;
 
+    virtual RowID GetBeginRowID() const = 0;
+
     virtual u32 GetRowCount() const = 0;
 
     virtual void InsertBlockData(SegmentOffset block_offset,
@@ -57,8 +61,11 @@ public:
                                  BufferManager *buffer_manager,
                                  u32 row_offset,
                                  u32 row_count) = 0;
+    virtual void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) = 0;
 
     virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const = 0;
+
+    virtual void Dump(BufferObj *buffer_obj) const = 0;
 
     virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 

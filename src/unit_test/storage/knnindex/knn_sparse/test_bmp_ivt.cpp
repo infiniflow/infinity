@@ -54,14 +54,14 @@ protected:
                 const auto &block_data1 = postings1.data();
                 const auto &block_data2 = postings2.data();
                 if constexpr (CompressType == BMPCompressType::kCompressed) {
-                    EXPECT_EQ(block_data1.block_size(), block_data2.block_size());
-                    for (SizeT i = 0; i < block_data1.block_size(); ++i) {
+                    EXPECT_EQ(block_data1.block_num(), block_data2.block_num());
+                    for (SizeT i = 0; i < block_data1.block_num(); ++i) {
                         EXPECT_EQ(block_data1.block_ids()[i], block_data2.block_ids()[i]);
                         EXPECT_EQ(block_data1.max_scores()[i], block_data2.max_scores()[i]);
                     }
                 } else {
-                    EXPECT_EQ(block_data1.block_size(), block_data2.block_size());
-                    for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_data1.block_size()); ++block_id) {
+                    EXPECT_EQ(block_data1.block_num(), block_data2.block_num());
+                    for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_data1.block_num()); ++block_id) {
                         EXPECT_EQ(block_data1.max_scores()[block_id], block_data2.max_scores()[block_id]);
                     }
                 }

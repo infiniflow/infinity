@@ -30,7 +30,6 @@ import default_values;
 import meta_info;
 import index_base;
 import txn_store;
-import data_access_state;
 import extra_ddl_info;
 import db_entry;
 import table_entry;
@@ -43,46 +42,16 @@ import column_def;
 import cleanup_scanner;
 import log_file;
 import snapshot_info;
+import persistence_manager;
 
 namespace infinity {
 
+class Config;
 class TxnManager;
 class Txn;
 struct CatalogDeltaOpBrief;
 class SegmentIndexEntry;
-
-class ProfileHistory {
-private:
-    mutable std::mutex lock_{};
-    Deque<SharedPtr<QueryProfiler>> deque_{};
-    SizeT max_size_{};
-
-public:
-    explicit ProfileHistory(SizeT size) {
-        std::unique_lock<std::mutex> lk(lock_);
-        max_size_ = size;
-    }
-
-    SizeT HistoryCapacity() const {
-        std::unique_lock<std::mutex> lk(lock_);
-        return max_size_;
-    }
-
-    void Resize(SizeT new_size);
-
-    void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
-        std::unique_lock<std::mutex> lk(lock_);
-        if (deque_.size() >= max_size_) {
-            deque_.pop_back();
-        }
-
-        deque_.emplace_front(profiler);
-    }
-
-    QueryProfiler *GetElement(SizeT index);
-
-    Vector<SharedPtr<QueryProfiler>> GetElements();
-};
+struct DeleteState;
 
 class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
@@ -256,10 +225,11 @@ public:
 
     Vector<CatalogDeltaOpBrief> GetDeltaLogBriefs() const;
 
+    static UniquePtr<nlohmann::json> LoadFullCheckpointToJson(Config* config_ptr, const String& file_name);
     static UniquePtr<Catalog> LoadFullCheckpoint(const String &file_name);
     void AttachDeltaCheckpoint(const String &file_name);
 
-    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
+    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path, PersistenceManager *pm_ptr);
 
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);

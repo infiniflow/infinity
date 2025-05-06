@@ -25,14 +25,17 @@ import logger;
 import third_party;
 import infinity_context;
 import cleanup_scanner;
-import txn_manager;
+import new_txn_manager;
 import txn_context;
 
 namespace infinity {
 
 void PrintTransactionHistory() {
-    TxnManager *txn_manager = InfinityContext::instance().storage()->txn_manager();
-
+    NewTxnManager *txn_manager = InfinityContext::instance().storage()->new_txn_manager();
+    if (!txn_manager) {
+        LOG_WARN("TxnManager is null");
+        return;
+    }
     Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
     SizeT history_count = txn_contexts.size();

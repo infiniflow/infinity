@@ -37,16 +37,17 @@ export class FastRoughFilter {
 private:
     friend class BuildFastRoughFilterTask;
     friend class FastRoughFilterEvaluator;
+    friend struct BuildingSegmentFastFilters;
     static constexpr std::string_view JsonTagBuildTime = "fast_rough_filter_build_time";
 
     // in minmax build task, first set build_time_ to be the begin_ts of the task txn
     // if set to valid time, we know one job has started
     mutable std::mutex mutex_check_task_start_;
     TxnTimeStamp build_time_{UNCOMMIT_TS};          // for minmax filter
-    std::atomic_flag finished_build_minmax_filter_; // for minmax filter
-    UniquePtr<MinMaxDataFilter> min_max_data_filter_;
+    std::atomic_flag finished_build_minmax_filter_{}; // for minmax filter
+    UniquePtr<MinMaxDataFilter> min_max_data_filter_{};
 
-    UniquePtr<ProbabilisticDataFilter> probabilistic_data_filter_;
+    UniquePtr<ProbabilisticDataFilter> probabilistic_data_filter_{};
 
 public:
     // bloom filter test
@@ -62,6 +63,8 @@ public:
     String SerializeToString() const;
 
     void DeserializeFromString(const String &str);
+
+    bool IsValid() const;
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 

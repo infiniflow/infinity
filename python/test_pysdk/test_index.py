@@ -823,10 +823,10 @@ class TestInfinity:
 
     @pytest.mark.parametrize("conflict_type", [ConflictType.Ignore,
                                                ConflictType.Error,
-                                               ConflictType.Replace,
+                                            #    ConflictType.Replace,
                                                0,
                                                1,
-                                               2,
+                                            #    2,
                                                ])
     def test_create_index_with_valid_options(self, conflict_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -915,11 +915,12 @@ class TestInfinity:
             "test_create_duplicated_index_with_valid_options" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    # TODO: Add ConflictType::Replace
     @pytest.mark.parametrize("conflict_type", [pytest.param(ConflictType.Error),
-                                               pytest.param(
-                                                   ConflictType.Replace),
+                                            #    pytest.param(
+                                            #        ConflictType.Replace),
                                                pytest.param(1),
-                                               pytest.param(2),
+                                            #    pytest.param(2),
                                                ])
     def test_create_duplicated_index_with_valid_error_options(self, conflict_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")

@@ -34,6 +34,12 @@ public:
 protected:
     void IncreaseMemoryUsageBase(SizeT mem);
     void DecreaseMemoryUsageBase(SizeT mem);
+
+public:
+    String db_name_;
+    String table_name_;
+    String index_name_;
+    SegmentID segment_id_ = 0;
 };
 
 } // namespace infinity

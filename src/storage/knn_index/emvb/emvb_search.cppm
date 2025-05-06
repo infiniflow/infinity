@@ -26,7 +26,6 @@ namespace infinity {
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 struct BlockIndex;
-struct SegmentEntry;
 
 // REQUIREMENTS:
 // FIXED_QUERY_TOKEN_NUM % 8 == 0, to simplify alignment
@@ -73,7 +72,6 @@ public:
                                                                   f32 thresh_query,
                                                                   Bitmask &bitmask,
                                                                   u32 start_segment_offset,
-                                                                  const SegmentEntry *segment_entry,
                                                                   const BlockIndex *block_index,
                                                                   TxnTimeStamp begin_ts) const;
 

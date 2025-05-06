@@ -41,8 +41,14 @@ bool ParseIPPort(const String &str, String &ip, i64 &port);
 
 String StringTransform(const String &source, const String &from, const String &to);
 
-String CalcMD5(const char* input_str, SizeT length);
+String CalcMD5(const char *input_str, SizeT length);
 
-String CalcMD5(const String& filename);
+String CalcMD5(const String &filename);
+
+Tuple<u64, bool> ExtractU64FromStringSuffix(const String &src, SizeT offset);
+
+Vector<String> Partition(const String &text, char delimiter);
+
+String Concat(const Vector<String> &v, char delimiter);
 
 } // namespace infinity

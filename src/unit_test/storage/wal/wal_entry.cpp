@@ -98,10 +98,10 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2", "default2_comment", "AAA_default2"));
-        entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default_db", "BBB_default", MockTableDesc2()));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateDatabaseV2>("default2", "1", "default2_comment"));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateTableV2>("default_db", "0", "1", MockTableDesc2()));
         WalSegmentInfo segment_info = MakeSegmentInfo(row_count, commit_ts, 2);
-        entry->cmds_.push_back(MakeShared<WalCmdImport>("default_db", "tbl1", std::move(segment_info)));
+        entry->cmds_.push_back(MakeShared<WalCmdImportV2>("default_db", "0", "tbl1", "1", std::move(segment_info)));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -113,7 +113,10 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
             data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
         }
         data_block->Finalize();
-        entry->cmds_.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
+
+        RowID start_row(0, 0);
+        entry->cmds_.push_back(
+            MakeShared<WalCmdAppendV2>("db1", "2", "tbl1", "1", Vector<Pair<RowID, u64>>{Pair<RowID, u64>{start_row, 8192}}, data_block));
         entry->commit_ts_ = commit_ts;
 
         i32 expect_size = entry->GetSizeInBytes();
@@ -136,7 +139,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto entry = MakeShared<WalEntry>();
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         Vector<SegmentID> deprecated_segment_ids{0, 1, 2};
-        entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
+        entry->cmds_.push_back(MakeShared<WalCmdCompactV2>("db1", "2", "tbl1", "1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
         entry->commit_ts_ = 5;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -156,7 +159,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, ckp_file_path, ckp_file_name));
+        entry->cmds_.push_back(MakeShared<WalCmdCheckpointV2>(int64_t(123)));
         entry->commit_ts_ = 3;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -176,7 +179,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+        entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "2", "tbl1", "1"));
         entry->commit_ts_ = 4;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -292,6 +295,103 @@ TEST_F(WalEntryTest, ReadWrite) {
     infinity::InfinityContext::instance().UnInit();
 }
 
+TEST_F(WalEntryTest, ReadWriteV2) {
+    RemoveDbDirs();
+    auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
+    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
+    entry->cmds_.push_back(MakeShared<WalCmdCreateDatabaseV2>("db1", "1", "default2_comment"));
+    entry->cmds_.push_back(MakeShared<WalCmdDropDatabaseV2>("db1", "1"));
+    entry->cmds_.push_back(MakeShared<WalCmdCreateTableV2>("db1", "1", "2", MockTableDesc2()));
+    entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "1", "tbl1", "2"));
+    {
+        WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
+        entry->cmds_.push_back(MakeShared<WalCmdImportV2>("db1", "1", "tbl1", "2", std::move(segment_info)));
+    }
+    {
+        Vector<InitParameter *> parameters = {new InitParameter("metric", "ip")};
+        SharedPtr<String> index_name = MakeShared<String>("idx1");
+        auto index_base = IndexIVF::Make(index_name, MakeShared<String>("test comment"), "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        for (auto parameter : parameters) {
+            delete parameter;
+        }
+        entry->cmds_.push_back(MakeShared<WalCmdCreateIndexV2>("db1", "1", "tbl1", "2", "3", index_base));
+    }
+    entry->cmds_.push_back(MakeShared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3"));
+    {
+        SharedPtr<DataBlock> data_block = DataBlock::Make();
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        data_block->Init(column_types);
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
+            data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
+        }
+        data_block->Finalize();
+        Vector<Pair<RowID, u64>> row_ranges = {{RowID(0, 0), row_count}};
+        entry->cmds_.push_back(MakeShared<WalCmdAppendV2>("db1", "1", "tbl1", "2", row_ranges, data_block));
+    }
+    {
+        Vector<RowID> row_ids = {RowID(1, 3)};
+        entry->cmds_.push_back(MakeShared<WalCmdDeleteV2>("db1", "1", "tbl1", "2", row_ids));
+    }
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpointV2>(int64_t(123)));
+    {
+        Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
+        entry->cmds_.push_back(MakeShared<WalCmdCompactV2>("db1", "1", "tbl1", "2", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+    }
+    {
+        WalChunkIndexInfo info;
+        info.chunk_id_ = 2;
+        info.base_name_ = "base_name";
+        info.base_rowid_ = RowID(0, 0);
+        info.row_count_ = 4;
+        info.deprecate_ts_ = 0;
+        Vector<WalChunkIndexInfo> chunk_infos{info};
+        Vector<ChunkID> deprecate_ids{0, 1};
+        entry->cmds_.push_back(MakeShared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids));
+    }
+    {
+        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2"));
+    }
+    {
+        Vector<SharedPtr<ColumnDef>> column_defs;
+        std::set<ConstraintType> constraints;
+
+        auto column_def3 = MakeShared<ColumnDef>(3 /*column_id*/, MakeShared<DataType>(LogicalType::kBoolean), "boolean_col", constraints);
+        auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
+        auto column_def4 =
+            MakeShared<ColumnDef>(4 /*column id*/, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "embedding_col", constraints);
+
+        column_defs.push_back(column_def3);
+        column_defs.push_back(column_def4);
+        entry->cmds_.push_back(MakeShared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_defs)));
+    }
+    {
+        Vector<String> column_names;
+        column_names.push_back("boolean_col");
+        column_names.push_back("embedding_col");
+        entry->cmds_.push_back(MakeShared<WalCmdDropColumnsV2>("db1", "1", "tbl1", "2", std::move(column_names), Vector<ColumnID>{3, 4}));
+    }
+
+    i32 exp_size = entry->GetSizeInBytes();
+    Vector<char> buf(exp_size, char(0));
+    char *buf_beg = buf.data();
+    char *ptr = buf_beg;
+    entry->WriteAdv(ptr);
+    EXPECT_EQ(ptr - buf_beg, exp_size);
+
+    const char *ptr_r = buf_beg;
+    SharedPtr<WalEntry> entry2 = WalEntry::ReadAdv(ptr_r, exp_size);
+    EXPECT_NE(entry2, nullptr);
+    EXPECT_EQ(*entry == *entry2, true);
+    EXPECT_EQ(ptr_r - buf_beg, exp_size);
+    infinity::InfinityContext::instance().UnInit();
+}
+
 TEST_F(WalEntryTest, ReadWriteVFS) {
     RemoveDbDirs();
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
@@ -350,7 +450,6 @@ TEST_F(WalEntryTest, WalEntryIterator) {
 
     Vector<SharedPtr<WalEntry>> replay_entries;
     TxnTimeStamp max_commit_ts = 0;
-    String catalog_path;
     {
         auto iterator = WalEntryIterator::Make(wal_file_path, true);
 
@@ -360,12 +459,11 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             if (wal_entry == nullptr) {
                 break;
             }
-            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
             if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
-                catalog_path = checkpoint_cmd->catalog_path_;
 
                 //                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
                 //                Println("Catalog Path: {}", catalog_path);
@@ -394,7 +492,6 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     //        }
     //    }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, String("catalog"));
     EXPECT_EQ(replay_entries.size(), 1u);
 }
 
@@ -424,7 +521,6 @@ TEST_F(WalEntryTest, WalListIterator) {
 
     Vector<SharedPtr<WalEntry>> replay_entries;
     TxnTimeStamp max_commit_ts = 0;
-    String catalog_path;
     {
         WalListIterator iterator({wal_file_path1, wal_file_path2});
 
@@ -434,13 +530,11 @@ TEST_F(WalEntryTest, WalListIterator) {
             if (wal_entry.get() == nullptr) {
                 break;
             }
-            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
             if (!wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
-                catalog_path = checkpoint_cmd->catalog_path_;
-
                 //                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
                 //                Println("Catalog Path: {}", catalog_path);
                 break;
@@ -468,6 +562,5 @@ TEST_F(WalEntryTest, WalListIterator) {
     //        }
     //    }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, ckp_file_path);
     EXPECT_EQ(replay_entries.size(), 1u);
 }

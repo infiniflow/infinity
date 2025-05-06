@@ -79,6 +79,23 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     return iter->row_count_;
 }
 
+i64 BlockVersion::GetRowCount() const {
+    i64 row_count = 0;
+    for (const auto &created : created_) {
+        row_count += created.row_count_;
+    }
+    return row_count;
+}
+
+Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
+    // check read-write conflict
+    if (!created_.empty() && created_.back().create_ts_ >= begin_ts) {
+        return {0, Status::TxnConflict(0, fmt::format("Append conflict, begin_ts: {}, last_create_ts: {}", begin_ts, created_.back().create_ts_))};
+    }
+    i32 row_count = created_.empty() ? 0 : created_.back().row_count_;
+    return {row_count, Status::OK()};
+}
+
 void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
@@ -177,19 +194,58 @@ void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     latest_change_ts_ = commit_ts;
 }
 
-void BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
+void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
+    for (auto &[create_ts, row_count] : created_) {
+        if (create_ts == save_ts) {
+            create_ts = commit_ts;
+            break;
+        }
+    }
+}
+
+Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
     if (deleted_[offset] != 0) {
-        UnrecoverableError(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
+        return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
     }
     deleted_[offset] = commit_ts;
     latest_change_ts_ = commit_ts;
+    return Status::OK();
 }
+
+void BlockVersion::RollbackDelete(i32 offset) { deleted_[offset] = 0; } // FIXME latest_change_ts_ ?
 
 bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
     if (SizeT(offset) >= deleted_.size()) {
         return false;
     }
     return deleted_[offset] != 0 && deleted_[offset] <= check_ts;
+}
+
+Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) {
+    i32 row_count = 0;
+    for (const auto &created_range : created_) {
+        if (offset < row_count + created_range.row_count_) {
+            if (ignore_invisible) {
+                if (begin_ts < created_range.create_ts_) {
+                    // Can't see the record
+                    ;
+                } else if (begin_ts >= created_range.create_ts_ && (begin_ts < deleted_[offset] or deleted_[offset] == 0)) {
+                    LOG_INFO(fmt::format("Row {} created: {}", offset, created_range.create_ts_));
+                } else if (begin_ts >= deleted_[offset]) {
+                    // Can't see the record
+                    ;
+                } else {
+                    return Status::UnexpectedError(
+                        fmt::format("BeginTS is invalid: {}, create_ts: {}, delete_ts: {}", begin_ts, created_range.create_ts_, deleted_[offset]));
+                }
+            } else {
+                LOG_INFO(fmt::format("Row {}, created: {}, deleted: {}", offset, created_range.create_ts_, deleted_[offset]));
+            }
+            return Status::OK();
+        }
+        row_count += created_range.row_count_;
+    }
+    return Status::UnexpectedError(fmt::format("Offset {} out of range", offset));
 }
 
 } // namespace infinity

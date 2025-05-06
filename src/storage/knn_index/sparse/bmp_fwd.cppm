@@ -297,8 +297,8 @@ public:
         Vector<Tuple<IdxType, BMPBlockOffset, DataType>> term_pairs;
         SizeT block_size = tail_terms_.size();
         for (SizeT block_offset = 0; block_offset < block_size; ++block_offset) {
-            SizeT block_size = tail_terms_[block_offset].first.size();
-            for (SizeT i = 0; i < block_size; ++i) {
+            SizeT nnz = tail_terms_[block_offset].first.size();
+            for (SizeT i = 0; i < nnz; ++i) {
                 IdxType term_id = tail_terms_[block_offset].first[i];
                 DataType score = tail_terms_[block_offset].second[i];
                 term_pairs.emplace_back(term_id, block_offset, score);

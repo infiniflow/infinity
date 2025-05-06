@@ -125,6 +125,13 @@ class RemoteTable():
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
+        
+    def dump_index(self, index_name: str):
+        res = self._conn.dump_index(db_name=self._db_name, table_name=self._table_name, index_name=index_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_columns(self):
         res = self._conn.show_columns(db_name=self._db_name, table_name=self._table_name)
@@ -222,12 +229,12 @@ class RemoteTable():
                         options.copy_file_type = ttypes.CopyFileType.BVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
-                                                f"Unrecognized export file type: {file_type}")
+                                                f"Unrecognized import file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
-                                                f"Unrecognized export file delimiter: {delimiter}")
+                                                f"Unrecognized import file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
@@ -236,7 +243,7 @@ class RemoteTable():
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
                                                 "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown import parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,

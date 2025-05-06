@@ -20,6 +20,7 @@ target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(remote_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 target_link_libraries(
@@ -52,6 +53,7 @@ target_link_libraries(
         libcurl_static
         ssl.a
         crypto.a
+        rocksdb.a
 )
 
 # add_definitions(-march=native)

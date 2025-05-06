@@ -60,6 +60,11 @@ import global_resource_usage;
 import infinity_context;
 import txn_state;
 
+import new_txn;
+import new_txn_manager;
+import catalog;
+import new_catalog;
+
 namespace infinity {
 
 QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) {
@@ -123,10 +128,20 @@ QueryResult QueryContext::Query(const String &query) {
     BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
 
     QueryResult query_result = QueryStatement(base_statement);
+
     return query_result;
 }
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
+    QueryResult query_result;
+    do {
+        query_result = QueryStatementInternal(base_statement);
+    } while (!query_result.status_.ok() && query_result.status_.code_ == ErrorCode::kTxnConflict);
+
+    return query_result;
+}
+
+QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_statement) {
     QueryResult query_result;
 
     if (base_statement->Type() == StatementType::kAdmin) {
@@ -273,10 +288,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
 
     } catch (RecoverableException &e) {
 
-        StopProfile();
-        StartProfile(QueryPhase::kRollback);
-        this->RollbackTxn();
-        StopProfile(QueryPhase::kRollback);
+        // If txn has been rollbacked, do not rollback again here.
+        if (GetTxn() != nullptr) {
+            StopProfile();
+            StartProfile(QueryPhase::kRollback);
+            this->RollbackTxn();
+            StopProfile(QueryPhase::kRollback);
+        }
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());
 
@@ -319,11 +337,21 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
 }
 
 void QueryContext::CreateQueryProfiler() {
-    if (InfinityContext::instance().storage()->catalog() == nullptr) {
-        return;
+    bool query_profiler_flag = false;
+    bool use_new_catalog = global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+        if (catalog == nullptr) {
+            return;
+        }
+        query_profiler_flag = catalog->GetProfile();
+    } else {
+        Catalog *catalog = InfinityContext::instance().storage()->catalog();
+        if (catalog == nullptr) {
+            return;
+        }
+        query_profiler_flag = catalog->GetProfile();
     }
-
-    bool query_profiler_flag = InfinityContext::instance().storage()->catalog()->GetProfile();
 
     if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
@@ -334,7 +362,14 @@ void QueryContext::CreateQueryProfiler() {
 
 void QueryContext::RecordQueryProfiler(const StatementType &type) {
     if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-        InfinityContext::instance().storage()->catalog()->AppendProfileRecord(query_profiler_);
+        bool use_new_catalog = global_config()->UseNewCatalog();
+        if (use_new_catalog) {
+            NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+            catalog->AppendProfileRecord(query_profiler_);
+        } else {
+            Catalog *catalog = InfinityContext::instance().storage()->catalog();
+            catalog->AppendProfileRecord(query_profiler_);
+        }
     }
 }
 
@@ -424,25 +459,40 @@ QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_state
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn *new_txn = nullptr;
-        if (base_statement == nullptr) {
-            new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(""), TransactionType::kNormal);
-        } else {
-            // TODO: more type check and setting
-            if (base_statement->type_ == StatementType::kFlush) {
-                new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kCheckpoint);
-                if (new_txn == nullptr) {
-                    RecoverableError(Status::FailToStartTxn("System is checkpointing"));
-                }
-            } else {
-                new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
+        NewTxnManager *txn_manager = storage_->new_txn_manager();
+        UniquePtr<String> txn_text = MakeUnique<String>(base_statement ? base_statement->ToString() : "");
+
+        NewTxn *new_txn{};
+        if (base_statement->type_ == StatementType::kFlush) {
+            new_txn = txn_manager->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNewCheckpoint);
+            if (new_txn == nullptr) {
+                RecoverableError(Status::FailToStartTxn("System is checkpointing"));
             }
+        } else {
+            new_txn = txn_manager->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
         }
-        session_ptr_->SetTxn(new_txn);
+
+        if (new_txn == nullptr) {
+            UnrecoverableError("Cannot get new transaction.");
+        }
+
+        session_ptr_->SetNewTxn(new_txn);
     }
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
+    if (global_config_->UseNewCatalog()) {
+        TxnTimeStamp commit_ts = 0;
+        NewTxn *new_txn = session_ptr_->GetNewTxn();
+        Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        session_ptr_->SetNewTxn(nullptr);
+        session_ptr_->IncreaseCommittedTxnCount();
+
+        return commit_ts;
+    }
     Txn *txn = session_ptr_->GetTxn();
     TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
@@ -452,11 +502,31 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
+    if (global_config_->UseNewCatalog()) {
+        NewTxn *new_txn = session_ptr_->GetNewTxn();
+        Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        session_ptr_->SetNewTxn(nullptr);
+        session_ptr_->IncreaseRollbackedTxnCount();
+        return;
+    }
     Txn *txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();
     storage_->txn_manager()->IncreaseRollbackedTxnCount();
+}
+
+NewTxn *QueryContext::GetNewTxn() const { return session_ptr_->GetNewTxn(); }
+
+bool QueryContext::SetNewTxn(NewTxn *txn) const {
+    if (session_ptr_->GetNewTxn() == nullptr) {
+        session_ptr_->SetNewTxn(txn);
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity

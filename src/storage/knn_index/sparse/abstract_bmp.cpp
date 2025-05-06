@@ -27,16 +27,11 @@ import segment_entry;
 import infinity_exception;
 import third_party;
 import logger;
+import buffer_obj;
 
 namespace infinity {
 
 MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
-    auto *table_index_entry = segment_index_entry_->table_index_entry();
-    SharedPtr<String> index_name = table_index_entry->GetIndexName();
-    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-    SharedPtr<String> table_name = table_entry->GetTableName();
-    SharedPtr<String> db_name = table_entry->GetDBName();
-
     auto [mem_used, row_cnt] = std::visit(
         [](auto &&index) -> Pair<SizeT, SizeT> {
             using T = std::decay_t<decltype(index)>;
@@ -53,6 +48,16 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
             }
         },
         bmp_);
+
+    if (segment_index_entry_ == nullptr) {
+        return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem_used, row_cnt);
+    }
+
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
     return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
 }
 
@@ -124,6 +129,25 @@ SizeT BMPIndexInMem::GetRowCount() const {
         bmp_);
 }
 
+SizeT BMPIndexInMem::GetSizeInBytes() const {
+    return std::visit(
+        [](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return SizeT(0);
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    return index->GetSizeInBytes();
+                } else {
+                    UnrecoverableError("BMPIndexInMem::GetSizeInBytes: index does not own memory");
+                    return SizeT(0);
+                }
+            }
+        },
+        bmp_);
+}
+
 // realtime insert, trace this
 void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count) {
     std::visit(
@@ -137,6 +161,30 @@ void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_e
                     using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
                     SizeT mem_before = index->MemoryUsage();
                     MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
+                    index->AddDocs(std::move(iter));
+                    SizeT mem_after = index->MemoryUsage();
+                    IncreaseMemoryUsageBase(mem_after - mem_before);
+                    LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
+                } else {
+                    UnrecoverableError("BMPIndexInMem::AddDocs: index does not own memory");
+                }
+            }
+        },
+        bmp_);
+}
+
+void BMPIndexInMem::AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+                    SizeT mem_before = index->MemoryUsage();
+                    MemIndexInserterIter1<SparseRefT> iter(block_offset, col, offset, row_count);
                     index->AddDocs(std::move(iter));
                     SizeT mem_after = index->MemoryUsage();
                     IncreaseMemoryUsageBase(mem_after - mem_before);
@@ -208,6 +256,37 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
     own_memory_ = false;
     chunk_handle_ = std::move(handle);
     return new_chunk_index_entry;
+}
+
+void BMPIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
+    if (!own_memory_) {
+        UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
+    }
+    if (dump_size_ptr) {
+        SizeT dump_size = 0;
+        std::visit(
+            [&](auto &&index) {
+                using IndexType = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<IndexType, std::nullptr_t>) {
+                    return;
+                } else {
+                    using IndexT = std::decay_t<decltype(*index)>;
+                    if constexpr (IndexT::kOwnMem) {
+                        dump_size = index->MemoryUsage();
+                    } else {
+                        UnrecoverableError("BMPIndexInMem::Dump: index does not own memory");
+                    }
+                }
+            },
+            bmp_);
+        *dump_size_ptr = dump_size;
+    }
+
+    BufferHandle handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<AbstractBMP *>(handle.GetDataMut());
+    *data_ptr = bmp_;
+    own_memory_ = false;
+    chunk_handle_ = std::move(handle);
 }
 
 } // namespace infinity

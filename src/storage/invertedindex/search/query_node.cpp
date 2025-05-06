@@ -432,6 +432,10 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
     search->term_ptr_ = &term_;
     search->column_name_ptr_ = &column_;
     auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
+    if (column_length_reader->GetAvgColumnLength() <= 1e-6f) {
+        LOG_WARN("avg_column_len is 0.0f");
+        return nullptr;
+    }
     search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_term, params.bm25_params.k1, params.bm25_params.b);
     return search;
 }

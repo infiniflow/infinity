@@ -39,6 +39,7 @@ import block_entry;
 import segment_entry;
 import table_entry;
 import infinity_context;
+import block_index;
 
 namespace infinity {
 

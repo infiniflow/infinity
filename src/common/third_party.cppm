@@ -69,6 +69,18 @@ module;
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
 #include <miniocpp/client.h>
+
+#include "rocksdb/db.h"
+#include "rocksdb/options.h"
+#include "rocksdb/slice.h"
+#include "rocksdb/io_status.h"
+#include "rocksdb/utilities/transaction.h"
+#include "rocksdb/utilities/transaction_db.h"
+#include "rocksdb/utilities/backup_engine.h"
+#include "rocksdb/utilities/merge_operators.h"
+#include "rocksdb/merge_operator.h"
+#include "rocksdb/env.h"
+
 #pragma clang diagnostic pop
 
 export module third_party;
@@ -334,5 +346,30 @@ export using HTTPStatus = oatpp::web::protocol::http::Status;
 
 // Python
 export using PyObject = PyObject;
+
+export namespace rocksdb {
+using Options = ::ROCKSDB_NAMESPACE::Options;
+using ReadOptions = ::ROCKSDB_NAMESPACE::ReadOptions;
+using Snapshot = ::ROCKSDB_NAMESPACE::Snapshot;
+using Status = ::ROCKSDB_NAMESPACE::Status;
+using Transaction = ::ROCKSDB_NAMESPACE::Transaction;
+using TransactionDB = ::ROCKSDB_NAMESPACE::TransactionDB;
+using TransactionDBOptions = ::ROCKSDB_NAMESPACE::TransactionDBOptions;
+using TransactionOptions = ::ROCKSDB_NAMESPACE::TransactionOptions;
+using WriteOptions = ::ROCKSDB_NAMESPACE::WriteOptions;
+using FlushOptions = ::ROCKSDB_NAMESPACE::FlushOptions;
+using Iterator = ::ROCKSDB_NAMESPACE::Iterator;
+using BackupEngine = ::ROCKSDB_NAMESPACE::BackupEngine;
+using BackupInfo = ::ROCKSDB_NAMESPACE::BackupInfo;
+using BackupEngineReadOnly = ::ROCKSDB_NAMESPACE::BackupEngineReadOnly;
+using BackupEngineOptions = ::ROCKSDB_NAMESPACE::BackupEngineOptions;
+using Env = ::ROCKSDB_NAMESPACE::Env;
+using IOStatus = ::ROCKSDB_NAMESPACE::IOStatus;
+using Slice = ::ROCKSDB_NAMESPACE::Slice;
+using AssociativeMergeOperator = ::ROCKSDB_NAMESPACE::AssociativeMergeOperator;
+using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
+using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
+using Logger = ::ROCKSDB_NAMESPACE::Logger;
+} // namespace rocksdb
 
 } // namespace infinity

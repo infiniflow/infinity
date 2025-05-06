@@ -57,6 +57,7 @@ class InfinityServiceIf {
   virtual void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) = 0;
   virtual void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) = 0;
   virtual void Cleanup(CommonResponse& _return, const CommonRequest& request) = 0;
+  virtual void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) = 0;
   virtual void Command(CommonResponse& _return, const CommandRequest& request) = 0;
   virtual void Flush(CommonResponse& _return, const FlushRequest& request) = 0;
   virtual void Compact(CommonResponse& _return, const CompactRequest& request) = 0;
@@ -192,6 +193,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Cleanup(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
+    return;
+  }
+  void DumpIndex(CommonResponse& /* _return */, const DumpIndexRequest& /* request */) override {
     return;
   }
   void Command(CommonResponse& /* _return */, const CommandRequest& /* request */) override {
@@ -3845,6 +3849,110 @@ class InfinityService_Cleanup_presult {
 
 };
 
+typedef struct _InfinityService_DumpIndex_args__isset {
+  _InfinityService_DumpIndex_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_DumpIndex_args__isset;
+
+class InfinityService_DumpIndex_args {
+ public:
+
+  InfinityService_DumpIndex_args(const InfinityService_DumpIndex_args&);
+  InfinityService_DumpIndex_args& operator=(const InfinityService_DumpIndex_args&);
+  InfinityService_DumpIndex_args() noexcept {
+  }
+
+  virtual ~InfinityService_DumpIndex_args() noexcept;
+  DumpIndexRequest request;
+
+  _InfinityService_DumpIndex_args__isset __isset;
+
+  void __set_request(const DumpIndexRequest& val);
+
+  bool operator == (const InfinityService_DumpIndex_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_DumpIndex_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_DumpIndex_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_DumpIndex_pargs {
+ public:
+
+
+  virtual ~InfinityService_DumpIndex_pargs() noexcept;
+  const DumpIndexRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_DumpIndex_result__isset {
+  _InfinityService_DumpIndex_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_DumpIndex_result__isset;
+
+class InfinityService_DumpIndex_result {
+ public:
+
+  InfinityService_DumpIndex_result(const InfinityService_DumpIndex_result&);
+  InfinityService_DumpIndex_result& operator=(const InfinityService_DumpIndex_result&);
+  InfinityService_DumpIndex_result() noexcept {
+  }
+
+  virtual ~InfinityService_DumpIndex_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_DumpIndex_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_DumpIndex_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_DumpIndex_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_DumpIndex_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_DumpIndex_presult__isset {
+  _InfinityService_DumpIndex_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_DumpIndex_presult__isset;
+
+class InfinityService_DumpIndex_presult {
+ public:
+
+
+  virtual ~InfinityService_DumpIndex_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_DumpIndex_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _InfinityService_Command_args__isset {
   _InfinityService_Command_args__isset() : request(false) {}
   bool request :1;
@@ -4287,6 +4395,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
   void send_Cleanup(const CommonRequest& request);
   void recv_Cleanup(CommonResponse& _return);
+  void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) override;
+  void send_DumpIndex(const DumpIndexRequest& request);
+  void recv_DumpIndex(CommonResponse& _return);
   void Command(CommonResponse& _return, const CommandRequest& request) override;
   void send_Command(const CommandRequest& request);
   void recv_Command(CommonResponse& _return);
@@ -4346,6 +4457,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_AddColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_DropColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_DumpIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Compact(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -4387,6 +4499,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["AddColumns"] = &InfinityServiceProcessor::process_AddColumns;
     processMap_["DropColumns"] = &InfinityServiceProcessor::process_DropColumns;
     processMap_["Cleanup"] = &InfinityServiceProcessor::process_Cleanup;
+    processMap_["DumpIndex"] = &InfinityServiceProcessor::process_DumpIndex;
     processMap_["Command"] = &InfinityServiceProcessor::process_Command;
     processMap_["Flush"] = &InfinityServiceProcessor::process_Flush;
     processMap_["Compact"] = &InfinityServiceProcessor::process_Compact;
@@ -4768,6 +4881,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->DumpIndex(_return, request);
+    }
+    ifaces_[i]->DumpIndex(_return, request);
+    return;
+  }
+
   void Command(CommonResponse& _return, const CommandRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -4935,6 +5058,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
   int32_t send_Cleanup(const CommonRequest& request);
   void recv_Cleanup(CommonResponse& _return, const int32_t seqid);
+  void DumpIndex(CommonResponse& _return, const DumpIndexRequest& request) override;
+  int32_t send_DumpIndex(const DumpIndexRequest& request);
+  void recv_DumpIndex(CommonResponse& _return, const int32_t seqid);
   void Command(CommonResponse& _return, const CommandRequest& request) override;
   int32_t send_Command(const CommandRequest& request);
   void recv_Command(CommonResponse& _return, const int32_t seqid);

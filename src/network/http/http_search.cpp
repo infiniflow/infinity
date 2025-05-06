@@ -63,13 +63,21 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> filter{};
         UniquePtr<ParsedExpr> limit{};
         UniquePtr<ParsedExpr> offset{};
-        UniquePtr<SearchExpr> search_expr{};
+        SearchExpr *search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
         Vector<ParsedExpr *> *group_by_columns{nullptr};
         UniquePtr<ParsedExpr> having{};
         bool total_hits_count_flag{};
+
+        DeferFn search_fn([&]() {
+            if (search_expr != nullptr) {
+                delete search_expr;
+                search_expr = nullptr;
+            }
+        });
+
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -257,7 +265,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
         const QueryResult result = infinity_ptr->Search(db_name,
                                                         table_name,
-                                                        search_expr.release(),
+                                                        search_expr,
                                                         filter.release(),
                                                         limit.release(),
                                                         offset.release(),
@@ -268,6 +276,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                                         having.release(),
                                                         total_hits_count_flag);
 
+        search_expr = nullptr;
         output_columns = nullptr;
         highlight_columns = nullptr;
         order_by_list = nullptr;
@@ -346,7 +355,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> filter{};
         UniquePtr<ParsedExpr> limit{};
         UniquePtr<ParsedExpr> offset{};
-        UniquePtr<SearchExpr> search_expr{};
+        SearchExpr* search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
@@ -526,7 +535,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         const QueryResult result = infinity_ptr->Explain(db_name,
                                                          table_name,
                                                          explain_type,
-                                                         search_expr.release(),
+                                                         search_expr,
                                                          filter.release(),
                                                          limit.release(),
                                                          offset.release(),
@@ -535,7 +544,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                                                          order_by_list,
                                                          group_by_columns,
                                                          having.release());
-
+        search_expr = nullptr;
         output_columns = nullptr;
         highlight_columns = nullptr;
         order_by_list = nullptr;
@@ -716,7 +725,7 @@ Vector<OrderByExpr *> *HTTPSearch::ParseSort(const nlohmann::json &json_object, 
     return res;
 }
 
-UniquePtr<SearchExpr> HTTPSearch::ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+SearchExpr *HTTPSearch::ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (json_object.type() != nlohmann::json::value_t::array) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = "Search field should be list";
@@ -786,11 +795,13 @@ UniquePtr<SearchExpr> HTTPSearch::ParseSearchExpr(const nlohmann::json &json_obj
             }
         }
     }
-    auto search_expr = MakeUnique<SearchExpr>();
+    auto search_expr = new SearchExpr();
     try {
         search_expr->SetExprs(child_expr);
         child_expr = nullptr;
     } catch (std::exception &e) {
+        delete search_expr;
+        search_expr = nullptr;
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = fmt::format("Invalid Search expression, error info: {}", e.what());
         return nullptr;

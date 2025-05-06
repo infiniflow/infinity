@@ -38,6 +38,13 @@ import wal_entry;
 import wal_manager;
 import infinity_context;
 
+import new_txn;
+import db_meeta;
+import table_meeta;
+import segment_meta;
+import bg_task;
+import compaction_process;
+
 namespace infinity {
 
 class GreedyCompactableSegmentsGenerator {
@@ -83,6 +90,11 @@ private:
 };
 
 void PhysicalCompact::Init(QueryContext *query_context) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        return;
+    }
+
     auto [table_entry, status] =
         query_context->GetTxn()->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
     if (!status.ok()) {
@@ -118,6 +130,23 @@ void PhysicalCompact::Init(QueryContext *query_context) {
 }
 
 bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        auto *compact_operator_state = static_cast<CompactOperatorState *>(operator_state);
+
+        const String &db_name = *base_table_ref_->table_info_->db_name_;
+        const String &table_name = *base_table_ref_->table_info_->table_name_;
+        NewTxn *new_txn = query_context->GetNewTxn();
+
+        auto compact_task = MakeShared<NewCompactTask>(new_txn, db_name, table_name);
+        auto *compaction_processor = InfinityContext::instance().storage()->compaction_processor();
+        compaction_processor->Submit(compact_task);
+        compact_task->Wait();
+
+        compact_operator_state->SetComplete();
+        return true;
+    }
+
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
     if (storage_mode == StorageMode::kUnInitialized) {
         UnrecoverableError("Uninitialized storage mode");
@@ -160,7 +189,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     compact_state_data->SetScanTS(scan_ts);
 
     auto [table_entry, status] = txn->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
 

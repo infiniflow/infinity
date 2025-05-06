@@ -116,6 +116,7 @@ String IndexFullText::BuildOtherParamsString() const {
 nlohmann::json IndexFullText::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
     res["analyzer"] = analyzer_;
+    res["flag"] = flag_;
     return res;
 }
 

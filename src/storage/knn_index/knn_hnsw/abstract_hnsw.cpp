@@ -226,7 +226,11 @@ HnswIndexInMem::~HnswIndexInMem() {
         },
         hnsw_);
     if (trace_) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        auto *storage = InfinityContext::instance().storage();
+        if (storage == nullptr) {
+            return;
+        }
+        auto *memindex_tracer = storage->memindex_tracer();
         if (memindex_tracer != nullptr) {
             memindex_tracer->DecreaseMemUsed(mem_usage);
         }
@@ -241,6 +245,24 @@ SizeT HnswIndexInMem::GetRowCount() const {
                 return SizeT(0);
             } else {
                 return index->GetVecNum();
+            }
+        },
+        hnsw_);
+}
+
+SizeT HnswIndexInMem::GetSizeInBytes() const {
+    return std::visit(
+        [](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return SizeT(0);
+            } else {
+                using IndexT = typename std::remove_pointer_t<T>;
+                if constexpr (IndexT::kOwnMem) {
+                    return index->GetSizeInBytes();
+                } else {
+                    return SizeT(0);
+                }
             }
         },
         hnsw_);
@@ -274,6 +296,52 @@ void HnswIndexInMem::InsertVecs(SizeT block_offset,
                                                                                 buffer_manager,
                                                                                 row_offset,
                                                                                 row_count);
+                            InsertVecs(index, std::move(iter), config, mem_usage);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
+                    }
+                    this->IncreaseMemoryUsageBase(mem_usage);
+                } else {
+                    UnrecoverableError("HnswIndexInMem::InsertVecs: index does not own memory");
+                }
+            }
+        },
+        hnsw_);
+}
+
+void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
+                                const ColumnVector &col,
+                                BlockOffset offset,
+                                BlockOffset row_count,
+                                const HnswInsertConfig &config) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using DataType = typename IndexT::DataType;
+                    SizeT mem_usage{};
+                    switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            // MemIndexInserterIter<DataType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                            InsertVecs(index, std::move(iter), config, mem_usage);
+                            break;
+                        }
+                        case LogicalType::kMultiVector: {
+                            MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                            // MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset,
+                            //                                                     block_column_entry,
+                            //                                                     buffer_manager,
+                            //                                                     row_offset,
+                            //                                                     row_count);
                             InsertVecs(index, std::move(iter), config, mem_usage);
                             break;
                         }
@@ -394,15 +462,38 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
     return new_chunk_indey_entry;
 }
 
+void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
+    trace_ = false;
+    if (dump_size_ptr != nullptr) {
+        SizeT dump_size = 0;
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                    return;
+                } else {
+                    using IndexT = typename std::remove_pointer_t<T>;
+                    if constexpr (IndexT::kOwnMem) {
+                        dump_size = index->mem_usage();
+                    } else {
+                        UnrecoverableError("HnswIndexInMem::Dump: index does not own memory");
+                    }
+                }
+            },
+            hnsw_);
+        *dump_size_ptr = dump_size;
+    }
+
+    BufferHandle handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<AbstractHnsw *>(handle.GetDataMut());
+    *data_ptr = hnsw_;
+    own_memory_ = false;
+    chunk_handle_ = std::move(handle);
+}
+
 TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
 MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
-    auto *table_index_entry = segment_index_entry_->table_index_entry();
-    SharedPtr<String> index_name = table_index_entry->GetIndexName();
-    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-    SharedPtr<String> table_name = table_entry->GetTableName();
-    SharedPtr<String> db_name = table_entry->GetDBName();
-
     auto [mem_used, row_cnt] = std::visit(
         [](auto &&index) -> Pair<SizeT, SizeT> {
             using T = std::decay_t<decltype(index)>;
@@ -413,6 +504,16 @@ MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
             }
         },
         hnsw_);
+
+    if (segment_index_entry_ == nullptr) {
+        return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem_used, row_cnt);
+    }
+
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
     return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
 }
 

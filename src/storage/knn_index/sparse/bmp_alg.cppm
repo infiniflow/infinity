@@ -31,6 +31,10 @@ import infinity_exception;
 
 namespace infinity {
 
+// ref: https://github.com/pisa-engine/BMP
+// ref: Faster Learned Sparse Retrieval with Block-Max Pruning
+// ref: A Candidate Filtering Mechanism for Fast Top-K Query Processing on Modern CPUs
+
 export template <typename DataType, typename IdxType, BMPCompressType CompressType, BMPOwnMem OwnMem>
 class BMPAlgBase {
 public:
@@ -102,7 +106,7 @@ public:
             if constexpr (std::is_same_v<Filter, std::nullptr_t>) {
                 result_handler.AddResult(0 /*query_id*/, score, doc_id);
             } else {
-                if (filter(doc_ids_[doc_id])) {
+                if (doc_id < BMPDocID(doc_ids_.size()) && filter(doc_ids_[doc_id])) {
                     result_handler.AddResult(0 /*query_id*/, score, doc_id);
                 }
             }
@@ -177,18 +181,18 @@ protected:
 
     static void Calculate2(Vector<DataType> &upper_bounds, DataType query_score, const BlockData<DataType, CompressType, OwnMem> &block_data) {
         if constexpr (CompressType == BMPCompressType::kCompressed) {
-            SizeT block_size = block_data.block_size();
+            SizeT block_num = block_data.block_num();
             const BMPBlockID *block_ids = block_data.block_ids();
             const DataType *max_scores = block_data.max_scores();
-            for (SizeT i = 0; i < block_size; ++i) {
+            for (SizeT i = 0; i < block_num; ++i) {
                 BMPBlockID block_id = block_ids[i];
                 DataType score = max_scores[i];
                 upper_bounds[block_id] += score * query_score;
             }
         } else {
-            SizeT block_size = block_data.block_size();
+            SizeT block_num = block_data.block_num();
             const DataType *max_scores = block_data.max_scores();
-            for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_size); ++block_id) {
+            for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_num); ++block_id) {
                 if (max_scores[block_id] > 0.0) {
                     upper_bounds[block_id] += max_scores[block_id] * query_score;
                 }

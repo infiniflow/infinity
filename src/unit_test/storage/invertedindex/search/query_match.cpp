@@ -42,6 +42,9 @@ import logger;
 import column_index_reader;
 import parse_fulltext_options;
 import txn_state;
+import new_txn_manager;
+import new_txn;
+import data_block;
 
 using namespace infinity;
 
@@ -75,13 +78,13 @@ public:
     const String table_name_ = "test_table";
     const String index_name_ = "test_fulltext_index";
     String config_path_{};
-    TxnTimeStamp last_commit_ts_ = 0;
     Vector<Vector<String>> datas_;
+    SharedPtr<TableDef> table_def_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          QueryMatchTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 void QueryMatchTest::InitData() {
     datas_ = {
@@ -177,125 +180,64 @@ void QueryMatchTest::CreateDBAndTable(const String &db_name, const String &table
     }
     auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(), std::move(column_defs));
     Storage *storage = InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        txn->DropTableCollectionByName(db_name, table_name, ConflictType::kIgnore);
-        last_commit_ts_ = txn_mgr->CommitTxn(txn);
+        txn->DropTable(db_name, table_name, ConflictType::kIgnore);
+        Status status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
-        auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
+        Status status = txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-
-        last_commit_ts_ = txn_mgr->CommitTxn(txn);
     }
+    table_def_ = std::move(table_def);
 }
 
 void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name, const String &index_name, const String &analyzer) {
     Storage *storage = InfinityContext::instance().storage();
 
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+    Status status = txn_idx->DropIndexByName(db_name, table_name, index_name, ConflictType::kIgnore);
+    // EXPECT_TRUE(status.ok());
 
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
-    {
-        auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-        auto status0 = txn_idx->DropIndexByName(db_name, table_name, index_name, ConflictType::kIgnore);
-        // EXPECT_TRUE(status0.ok());
-
-        auto [table_entry, status1] = txn_idx->GetTableByName(db_name, table_name);
-        EXPECT_TRUE(status1.ok());
-
-        IndexFullText full_idx_base(MakeShared<String>(index_name), MakeShared<String>("test comment"), index_file_name, col_name_list, analyzer);
-        SharedPtr<IndexBase> full_idx_base_ptr = MakeShared<IndexFullText>(full_idx_base);
-
-        auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, full_idx_base_ptr, ConflictType::kInvalid);
-        EXPECT_TRUE(status2.ok());
-        {
-            auto [table_entry, status3] = txn_idx->GetTableByName(db_name, table_name);
-            EXPECT_TRUE(status3.ok());
-
-            auto [table_info, status4] = txn_idx->GetTableInfo(db_name, table_name);
-            EXPECT_TRUE(status4.ok());
-            auto col_cnt = (*table_info).column_count_;
-
-            String alias = "tb1";
-            SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
-            SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
-            Vector<SizeT> columns;
-
-            for (i64 idx = 0; idx < col_cnt; idx++) {
-                const ColumnDef *column_def = table_entry->GetColumnDefByIdx(idx);
-                types_ptr->emplace_back(column_def->column_type_);
-                names_ptr->emplace_back(column_def->name_);
-                columns.emplace_back(idx);
-            }
-
-            SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
-
-            u64 table_idx = 0;
-            auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
-
-            auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
-            EXPECT_TRUE(status5.ok());
-
-            {
-                HashMap<SegmentID, atomic_u64> create_index_idxes;
-                create_index_idxes[0] = 1;
-
-                auto status6 = txn_idx->CreateIndexDo(table_ref.get(), index_name, create_index_idxes);
-                EXPECT_TRUE(status6.ok());
-            }
-
-            {
-                auto [table_entry, status7] = txn_idx->GetTableByName(db_name, table_name);
-                EXPECT_TRUE(status7.ok());
-
-                auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
-                EXPECT_TRUE(status8.ok());
-            }
-
-            last_commit_ts_ = txn_mgr->CommitTxn(txn_idx);
-        }
-    }
+    auto index_def =
+        MakeShared<IndexFullText>(MakeShared<String>(index_name), MakeShared<String>("test comment"), index_file_name, col_name_list, analyzer);
+    auto *txn7 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+    status = txn7->CreateIndex(db_name, table_name, index_def, ConflictType::kError);
+    EXPECT_TRUE(status.ok());
+    status = txn_mgr->CommitTxn(txn7);
+    EXPECT_TRUE(status.ok());
 }
 
 void QueryMatchTest::InsertData(const String &db_name, const String &table_name) {
     Storage *storage = InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
-    auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
-    EXPECT_TRUE(status.ok());
-
-    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
-    {
-        for (BlockID block_id = 0; block_id < datas_.size(); ++block_id) {
-            UniquePtr<BlockEntry> block_entry =
-                BlockEntry::NewBlockEntry(segment_entry.get(), block_id, 0 /*checkpoint_ts*/, table_entry->ColumnCount(), txn);
-            {
-                Vector<ColumnVector> column_vectors;
-                for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                    column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
-                }
-                auto &row = datas_[block_id];
-                for (SizeT i = 0; i < column_vectors.size(); ++i) {
-                    auto &column = row[i];
-                    column_vectors[i].AppendByStringView(column);
-                }
-                block_entry->IncreaseRowCount(1);
-            }
-            segment_entry->AppendBlockEntry(std::move(block_entry));
+    auto input_block = MakeShared<DataBlock>();
+    for (SizeT column_id = 0; column_id < table_def_->column_count(); ++column_id) {
+        auto col1 = ColumnVector::Make(table_def_->columns()[column_id]->type());
+        col1->Initialize();
+        for (SizeT row_id = 0; row_id < datas_.size(); ++row_id) {
+            auto &row = datas_[row_id];
+            auto &cell = row[column_id];
+            col1->AppendByStringView(cell);
         }
+        input_block->InsertVector(col1, column_id);
     }
-    segment_entry->FlushNewData();
-    txn->Import(db_name, table_name, segment_entry);
+    input_block->Finalize();
+    Vector<SharedPtr<DataBlock>> input_blocks{input_block};
+    txn->Import(db_name, table_name, input_blocks);
 
-    last_commit_ts_ = txn_mgr->CommitTxn(txn);
+    Status status = txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
 }
 
 void QueryMatchTest::QueryMatch(const String &db_name,
@@ -307,20 +249,17 @@ void QueryMatchTest::QueryMatch(const String &db_name,
                                 const float &expected_matched_freq,
                                 const DocIteratorType &query_type) {
     Storage *storage = InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("query match"), TransactionType::kRead);
+    auto [table_info, status] = txn->GetTableInfo(db_name, table_name);
+    EXPECT_TRUE(status.ok());
 
-    auto [table_entry, status_table] = txn->GetTableByName(db_name, table_name);
-    EXPECT_TRUE(status_table.ok());
+    SharedPtr<IndexReader> index_reader;
+    status = txn->GetFullTextIndexReader(db_name, table_name, index_reader);
+    EXPECT_TRUE(status.ok());
 
-    auto [table_index_entry, status_index] = txn->GetIndexByName(db_name, table_name, index_name);
-    EXPECT_TRUE(status_index.ok());
-
-    auto fake_table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
-
-    QueryBuilder query_builder(fake_table_ref->table_info_);
-    SharedPtr<IndexReader> index_reader = table_entry->GetFullTextIndexReader(txn);
+    QueryBuilder query_builder(table_info);
     query_builder.Init(index_reader);
     Vector<String> index_hints;
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer(index_hints);
@@ -375,5 +314,6 @@ void QueryMatchTest::QueryMatch(const String &db_name,
             EXPECT_FLOAT_EQ(res_term_freq, expected_matched_freq);
         }
     }
-    last_commit_ts_ = txn_mgr->CommitTxn(txn);
+    status = txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
 }

@@ -113,6 +113,7 @@ void Infinity::LocalInit(const String &path, const String &config_path) {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
         default_config->default_log_dir_ = fmt::format("{}/log", path);
         default_config->default_data_dir_ = fmt::format("{}/data", path);
+        default_config->default_catalog_dir_ = fmt::format("{}/catalog", path);
         default_config->default_wal_dir_ = fmt::format("{}/wal", path);
         default_config->default_temp_dir_ = fmt::format("{}/tmp", path);
         default_config->default_resource_dir_ = fmt::format("{}/resource", path);
@@ -983,8 +984,10 @@ Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedE
     export_statement->limit_ = export_options.limit_;
     export_statement->row_limit_ = export_options.row_limit_;
 
-    QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
     columns = nullptr;
+
+    QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
+
     return result;
 }
 
@@ -1030,15 +1033,17 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
     for (UpdateExpr *update_expr_ptr : *update_statement->update_expr_array_) {
         ToLower(update_expr_ptr->column_name);
     }
-    QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
+
     update_list = nullptr;
+    QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
+
     return result;
 }
 
 QueryResult Infinity::Explain(const String &db_name,
                               const String &table_name,
                               ExplainType explain_type,
-                              SearchExpr *search_expr,
+                              SearchExpr *&search_expr,
                               ParsedExpr *filter,
                               ParsedExpr *limit,
                               ParsedExpr *offset,
@@ -1118,21 +1123,24 @@ QueryResult Infinity::Explain(const String &db_name,
 
     explain_statement->statement_ = select_statement;
 
-    QueryResult result = query_context_ptr->QueryStatement(explain_statement.get());
     output_columns = nullptr;
     highlight_columns = nullptr;
     order_by_list = nullptr;
     group_by_list = nullptr;
+    search_expr = nullptr;
+
+    QueryResult result = query_context_ptr->QueryStatement(explain_statement.get());
+
     return result;
 }
 
 QueryResult Infinity::Search(const String &db_name,
                              const String &table_name,
-                             SearchExpr *search_expr,
+                             SearchExpr *&search_expr,
                              ParsedExpr *filter,
                              ParsedExpr *limit,
                              ParsedExpr *offset,
-                             Vector<ParsedExpr *> *output_columns,
+                             Vector<ParsedExpr *> *&output_columns,
                              Vector<ParsedExpr *> *highlight_columns,
                              Vector<OrderByExpr *> *order_by_list,
                              Vector<ParsedExpr *> *group_by_list,
@@ -1213,11 +1221,14 @@ QueryResult Infinity::Search(const String &db_name,
     select_statement->having_expr_ = having;
     select_statement->total_hits_count_flag_ = total_hits_count_flag;
 
-    QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     output_columns = nullptr;
     highlight_columns = nullptr;
     order_by_list = nullptr;
     group_by_list = nullptr;
+    search_expr = nullptr;
+
+    QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
+
     return result;
 }
 
@@ -1275,6 +1286,18 @@ QueryResult Infinity::Cleanup() {
     auto command_statement = MakeUnique<CommandStatement>();
 
     command_statement->command_info_ = MakeUnique<CleanupCmd>();
+
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::DumpIndex(const String &db_name, const String &table_name, const String &index_name) {
+    UniquePtr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+
+    auto command_statement = MakeUnique<CommandStatement>();
+
+    command_statement->command_info_ = MakeUnique<DumpIndexCmd>(db_name.c_str(), table_name.c_str(), index_name.c_str());
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;

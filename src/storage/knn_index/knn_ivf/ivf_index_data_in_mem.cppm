@@ -35,6 +35,8 @@ struct ChunkIndexEntry;
 struct SegmentIndexEntry;
 class IndexBase;
 class KnnDistanceBase1;
+class ColumnVector;
+class BufferObj;
 
 export class IVFIndexInMem : public BaseMemIndex {
 protected:
@@ -60,12 +62,19 @@ public:
                   SegmentIndexEntry *segment_index_entry);
     virtual ~IVFIndexInMem();
     u32 GetInputRowCount() const;
+
+    virtual RowID GetBeginRowID() const = 0;
+
+    virtual u32 GetRowCount() const = 0;
+
     virtual void InsertBlockData(SegmentOffset block_offset,
                                  BlockColumnEntry *block_column_entry,
                                  BufferManager *buffer_manager,
                                  u32 row_offset,
                                  u32 row_count) = 0;
+    virtual void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &col, BlockOffset row_offset, BlockOffset row_cnt) = 0;
     virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *p_dump_size = nullptr) = 0;
+    virtual void Dump(BufferObj *buffer_obj, SizeT *p_dump_size = nullptr) = 0;
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,

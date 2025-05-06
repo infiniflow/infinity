@@ -66,6 +66,8 @@ public:
     // Get an existing BufferHandle from memory or disk.
     BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker, bool restart = false);
 
+    BufferObj *GetBufferObject(const String &file_path);
+
     SharedPtr<String> GetFullDataDir() const { return data_dir_; }
 
     SharedPtr<String> GetTempDir() const { return temp_dir_; }
@@ -82,6 +84,8 @@ public:
     SizeT BufferedObjectCount();
 
     void RemoveClean();
+
+    void RemoveBufferObjects(const Vector<String> &object_paths);
 
     Vector<BufferObjectInfo> GetBufferObjectsInfo();
 

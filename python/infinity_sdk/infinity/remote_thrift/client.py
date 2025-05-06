@@ -382,6 +382,13 @@ class ThriftInfinityClient:
     @retry_wrapper
     def cleanup(self):
         return self.client.Cleanup(CommonRequest(session_id=self.session_id))
+    
+    @retry_wrapper
+    def dump_index(self, db_name: str, table_name: str, index_name: str):
+        return self.client.DumpIndex(DumpIndexRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name,
+                                                      index_name=index_name))
 
     @retry_wrapper
     def command(self, command: ttypes.CommandRequest):

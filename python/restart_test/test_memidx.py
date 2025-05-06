@@ -512,6 +512,8 @@ class TestMemIdx:
         data_dir = "/var/infinity/data"
         idx1_name = "index1"
         idx2_name = "index2"
+        idx1_id = 0
+        idx2_id = 1
 
         @decorator1
         def part1(infinity_obj):
@@ -557,8 +559,8 @@ class TestMemIdx:
 
         part1()
 
-        idx1_dirs = list(pathlib.Path(data_dir).rglob(f"*{idx1_name}*"))
-        idx2_dirs = list(pathlib.Path(data_dir).rglob(f"*{idx2_name}*"))
+        idx1_dirs = list(pathlib.Path(data_dir).rglob(f"*idx_{idx1_id}*"))
+        idx2_dirs = list(pathlib.Path(data_dir).rglob(f"*idx_{idx2_id}*"))
         assert len(idx1_dirs) == 1
         assert len(idx2_dirs) == 1
 
@@ -601,8 +603,6 @@ class TestMemIdx:
             assert len(idx2_files) == 1
 
         part2()
-
-        infinity_runner.clear()
 
     def test_recover_memindex_with_dump(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/4.toml"
@@ -775,6 +775,8 @@ class TestMemIdx:
 
         @decorator
         def part2(infinity_obj):
+            time.sleep(1)
+
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx5")
             data_dict, data_type_dict, _ = (

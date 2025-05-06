@@ -118,6 +118,12 @@ String LogicalCommand::ToString(i64 &space) const {
             ss << String(space, ' ') << arrow_str << "Cleanup";
             break;
         }
+        case CommandType::kDumpIndex: {
+            ss << String(space, ' ') << arrow_str << "Dump index: ";
+            auto *dump_index_info = static_cast<DumpIndexCmd *>(command_info_.get());
+            ss << dump_index_info->db_name() << "." << dump_index_info->table_name() << "." << dump_index_info->index_name();
+            break;
+        }
         case CommandType::kTestCommand: {
             auto *test_command_info = static_cast<TestCmd *>(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Test command: " << test_command_info->command_content();

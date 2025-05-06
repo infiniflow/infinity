@@ -31,6 +31,7 @@ enum class CommandType {
     kLockTable,
     kUnlockTable,
     kCleanup,
+    kDumpIndex,
     kTestCommand,
     kSnapshot,
 };
@@ -222,6 +223,25 @@ public:
     ~CleanupCmd() final = default;
 
     [[nodiscard]] std::string ToString() const final;
+};
+
+class DumpIndexCmd final : public CommandInfo {
+public:
+    explicit DumpIndexCmd(const char *db_name, const char *table_name, const char *index_name)
+        : CommandInfo(CommandType::kDumpIndex), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+
+    ~DumpIndexCmd() final = default;
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &db_name() const { return db_name_; }
+    const std::string &table_name() const { return table_name_; }
+    const std::string &index_name() const { return index_name_; }
+
+private:
+    std::string db_name_{};
+    std::string table_name_{};
+    std::string index_name_{};
 };
 
 class CommandStatement final : public BaseStatement {

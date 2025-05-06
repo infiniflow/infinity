@@ -30,6 +30,7 @@ import infinity_exception;
 import table_entry;
 import segment_index_entry;
 import meta_info;
+import compact_state_data;
 
 namespace infinity {
 

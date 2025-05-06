@@ -28,6 +28,8 @@ import extra_ddl_info;
 import wal_manager;
 import infinity_context;
 
+import new_txn;
+
 module physical_create_table;
 
 namespace infinity {
@@ -65,6 +67,17 @@ bool PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *op
 
     if (storage_mode != StorageMode::kWritable) {
         operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+        operator_state->SetComplete();
+        return true;
+    }
+
+    bool use_new_meta = query_context->global_config()->UseNewCatalog();
+    if (use_new_meta) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+        }
         operator_state->SetComplete();
         return true;
     }

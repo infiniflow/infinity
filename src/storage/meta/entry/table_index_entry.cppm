@@ -23,7 +23,6 @@ import segment_index_entry;
 import chunk_index_entry;
 import base_entry;
 import index_base;
-import block_index;
 import third_party;
 import status;
 import random;
@@ -38,6 +37,7 @@ import meta_info;
 
 namespace infinity {
 
+struct BlockIndex;
 class TxnManager;
 class TableIndexMeta;
 class BufferManager;

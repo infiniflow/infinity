@@ -26,7 +26,56 @@ import table_index_entry;
 import segment_index_entry;
 import default_values;
 
+import status;
+import infinity_exception;
+import new_txn;
+import db_meeta;
+import table_meeta;
+import segment_meta;
+import block_meta;
+import kv_store;
+
+import table_index_meeta;
+import segment_index_meta;
+
 namespace infinity {
+
+BlockIndex::BlockIndex() = default;
+
+BlockIndex::~BlockIndex() = default;
+
+void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &table_name) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(), table_meta->table_id_str(), table_meta->kv_instance(), table_meta->begin_ts());
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
+        segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
+        std::tie(segment_snapshot.segment_offset_, status) = segment_snapshot.segment_meta_->GetRowCnt1();
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_snapshot.segment_meta_->GetBlockIDs1();
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_snapshot.segment_meta_);
+            segment_snapshot.block_map_.emplace_back(std::move(block_meta));
+        }
+    }
+}
 
 void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
     if (segment_entry->CheckVisible(txn)) {
@@ -48,11 +97,38 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
     }
 }
 
+SizeT BlockIndex::BlockCount() const {
+    SizeT count = 0;
+    if (!table_meta_)
+        for (const auto &[_, segment_info] : segment_block_index_) {
+            count += segment_info.block_map_.size();
+        }
+    else
+        for (const auto &[_, segment_info] : new_segment_block_index_) {
+            count += segment_info.block_map_.size();
+        }
+    return count;
+}
+
+SizeT BlockIndex::SegmentCount() const {
+    if (!table_meta_)
+        return segment_block_index_.size();
+    return new_segment_block_index_.size();
+}
+
 SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
-    auto seg_it = segment_block_index_.find(segment_id);
-    if (seg_it != segment_block_index_.end()) {
-        const auto &blocks_info = seg_it->second;
-        return blocks_info.segment_offset_;
+    if (!table_meta_) {
+        auto seg_it = segment_block_index_.find(segment_id);
+        if (seg_it != segment_block_index_.end()) {
+            const auto &blocks_info = seg_it->second;
+            return blocks_info.segment_offset_;
+        }
+    } else {
+        auto seg_it = new_segment_block_index_.find(segment_id);
+        if (seg_it != new_segment_block_index_.end()) {
+            const auto &blocks_info = seg_it->second;
+            return blocks_info.segment_offset_;
+        }
     }
     return 0;
 }
@@ -63,6 +139,12 @@ BlockOffset BlockIndex::GetBlockOffset(SegmentID segment_id, BlockID block_id) c
         return DEFAULT_BLOCK_CAPACITY;
     }
     return segment_offset % DEFAULT_BLOCK_CAPACITY;
+}
+
+bool BlockIndex::IsEmpty() const {
+    if (!table_meta_)
+        return segment_block_index_.empty();
+    return new_segment_block_index_.empty();
 }
 
 BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
@@ -77,9 +159,26 @@ BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
     return blocks_info.block_map_[block_id];
 }
 
+BlockMeta *BlockIndex::GetBlockMeta(u32 segment_id, u16 block_id) const {
+    auto seg_it = new_segment_block_index_.find(segment_id);
+    if (seg_it == new_segment_block_index_.end()) {
+        return nullptr;
+    }
+    const auto &blocks_info = seg_it->second;
+    if (blocks_info.block_map_.size() <= block_id) {
+        return nullptr;
+    }
+    return blocks_info.block_map_[block_id].get();
+}
+
 void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {
     index_snapshots_vec_.push_back(index_snapshot.get());
     index_snapshots_.emplace(std::move(index_name), index_snapshot);
+}
+
+void IndexIndex::Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index_snapshot) {
+    new_index_snapshots_vec_.push_back(new_index_snapshot.get());
+    new_index_snapshots_.emplace(std::move(index_name), new_index_snapshot);
 }
 
 SharedPtr<IndexSnapshot> IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
@@ -99,6 +198,22 @@ SharedPtr<IndexSnapshot> IndexIndex::Insert(TableIndexEntry *table_index_entry, 
         return index_snapshot;
     }
     return nullptr;
+}
+
+SharedPtr<NewIndexSnapshot> IndexIndex::Insert(const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta) {
+    auto index_snapshot = MakeShared<NewIndexSnapshot>();
+    index_snapshot->table_index_meta_ = table_index_meta;
+
+    auto [segment_ids_ptr, status] = table_index_meta->GetSegmentIndexIDs1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        index_snapshot->segment_index_metas_.emplace(segment_id, MakeUnique<SegmentIndexMeta>(segment_id, *table_index_meta));
+    }
+
+    Insert(index_name, index_snapshot);
+    return index_snapshot;
 }
 
 void IndexIndex::Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry) {

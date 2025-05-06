@@ -34,6 +34,10 @@ import physical_filter_scan_base;
 
 namespace infinity {
 
+class BlockMeta;
+class TableIndexMeeta;
+class SegmentIndexMeta;
+
 export class PhysicalKnnScan final : public PhysicalFilterScanBase {
 public:
     explicit PhysicalKnnScan(u64 id,
@@ -43,18 +47,9 @@ public:
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
-                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalFilterScanBase(id,
-                                 PhysicalOperatorType::kKnnScan,
-                                 nullptr,
-                                 nullptr,
-                                 knn_table_index,
-                                 base_table_ref,
-                                 common_query_filter,
-                                 load_metas),
-          knn_expression_(std::move(knn_expression)), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
+                             SharedPtr<Vector<LoadMeta>> load_metas);
 
-    ~PhysicalKnnScan() override = default;
+    ~PhysicalKnnScan() override;
 
     void Init(QueryContext* query_context) override;
 
@@ -64,7 +59,7 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-//    [[nodiscard]] TableInfo *table_info() const;
+    //    [[nodiscard]] TableInfo *table_info() const;
 
     [[nodiscard]] String TableAlias() const;
 
@@ -99,6 +94,10 @@ public:
     u32 index_entries_size_ = 0;
     UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
     UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
+
+    UniquePtr<Vector<BlockMeta *>> block_metas_{};
+    UniquePtr<TableIndexMeeta> table_index_meta_{};
+    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
 
 private:
     void InitBlockParallelOption();

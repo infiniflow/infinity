@@ -82,7 +82,7 @@ protected:
 
 TEST_F(LSGBuildTest, test_avg) {
     element_size = 128;
-    lsg_config->sample_raito_ = 0.1;
+    lsg_config->sample_ratio_ = 0.1;
 
     auto data = MakeUnique<float[]>(dim * element_size);
     std::mt19937 rng;
@@ -135,7 +135,7 @@ TEST_F(LSGBuildTest, test_avg) {
 
 TEST_F(LSGBuildTest, test1) {
     dim = 16;
-    lsg_config->sample_raito_ = 0.1;
+    lsg_config->sample_ratio_ = 0.1;
 
     auto data = MakeUnique<float[]>(dim * element_size);
 

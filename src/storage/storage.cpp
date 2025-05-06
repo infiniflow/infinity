@@ -27,12 +27,16 @@ import buffer_manager;
 import default_values;
 import wal_manager;
 import catalog;
+import new_catalog;
 import txn_manager;
+import new_txn_manager;
 import builtin_functions;
 import third_party;
 import logger;
+import kv_store;
 
 import txn;
+import new_txn;
 import infinity_exception;
 import status;
 import background_process;
@@ -54,6 +58,8 @@ import virtual_store;
 import result_cache_manager;
 import global_resource_usage;
 import txn_state;
+
+import wal_entry;
 
 namespace infinity {
 
@@ -254,14 +260,46 @@ Status Storage::AdminToWriter() {
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
-    TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
-    if (system_start_ts == 0) {
-        // Init database, need to create default_db
-        LOG_INFO(fmt::format("Init a new catalog"));
-        catalog_ = Catalog::NewCatalog();
+    kv_store_ = MakeUnique<KVStore>();
+    kv_store_->Init(config_ptr_->CatalogDir());
+    new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
+
+    Vector<SharedPtr<WalEntry>> replay_entries;
+    LOG_INFO("Read WAL files");
+    auto [system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
+    // Init database, need to create default_db
+    LOG_INFO(fmt::format("Init a new catalog"));
+    catalog_ = Catalog::NewCatalog();
+    this->AttachCatalog(max_checkpoint_ts);
+
+    if (new_txn_mgr_) {
+        UnrecoverableError("New transaction manager was initialized before.");
+    }
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
+    new_txn_mgr_->Start();
+
+    // start WalManager after TxnManager since it depends on TxnManager.
+    wal_mgr_->Start();
+
+    if (config_ptr_->ReplayWal()) {
+        wal_mgr_->ReplayWalEntries(replay_entries);
     }
 
-    i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+    if (memory_index_tracer_ != nullptr) {
+        UnrecoverableError("Memory index tracer was initialized before.");
+    }
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+
+    if (bg_processor_ != nullptr) {
+        UnrecoverableError("Background processor was initialized before.");
+    }
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
+
+    if (system_start_ts == 0) {
+        CreateDefaultDB();
+    }
+
+    i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
     if (compact_interval > 0) {
         LOG_INFO(fmt::format("Init compaction alg"));
         catalog_->InitCompactionAlg(system_start_ts);
@@ -272,29 +310,7 @@ Status Storage::AdminToWriter() {
     BuiltinFunctions builtin_functions(catalog_);
     builtin_functions.Init();
     // Catalog finish init here.
-    if (bg_processor_ != nullptr) {
-        UnrecoverableError("Background processor was initialized before.");
-    }
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
 
-    // Construct txn manager
-    if (txn_mgr_ != nullptr) {
-        UnrecoverableError("Transaction manager was initialized before.");
-    }
-    txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
-    txn_mgr_->Start();
-
-    // start WalManager after TxnManager since it depends on TxnManager.
-    wal_mgr_->Start();
-
-    if (system_start_ts == 0) {
-        CreateDefaultDB();
-    }
-
-    if (memory_index_tracer_ != nullptr) {
-        UnrecoverableError("Memory index tracer was initialized before.");
-    }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     bg_processor_->Start();
@@ -315,34 +331,85 @@ Status Storage::AdminToWriter() {
     catalog_->StartMemoryIndexCommit();
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
-    if (periodic_trigger_thread_ != nullptr) {
-        UnrecoverableError("periodic trigger was initialized before.");
+    if (new_txn_mgr_) {
+        this->RecoverMemIndex();
+
+        auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+
+        Status status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
+        if (!status.ok()) {
+            UnrecoverableError("Failed to checkpoint");
+        }
+        status = new_txn_mgr_->CommitTxn(new_txn);
+        if (!status.ok()) {
+            UnrecoverableError("Failed to commit txn for checkpoint");
+        }
+
+        status = new_catalog_->RestoreCatalogCache(this);
+        if (!status.ok()) {
+            UnrecoverableError("Failed to restore catalog cache");
+        }
+
+        if (periodic_trigger_thread_ != nullptr) {
+            UnrecoverableError("periodic trigger was initialized before.");
+        }
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+        periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+
+        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
+
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
+        if (!full_checkpoint_interval_sec && delta_checkpoint_interval_sec) {
+            full_checkpoint_interval_sec = delta_checkpoint_interval_sec;
+        }
+        periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
+
+        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
+
+        periodic_trigger_thread_->Start();
+    } else {
+        if (periodic_trigger_thread_ != nullptr) {
+            UnrecoverableError("periodic trigger was initialized before.");
+        }
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
+
+        periodic_trigger_thread_->full_checkpoint_trigger_ =
+            MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+        periodic_trigger_thread_->delta_checkpoint_trigger_ =
+            MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+
+        periodic_trigger_thread_->cleanup_trigger_ =
+            MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
+        bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+        if (wal_mgr_->IsCheckpointing()) {
+            UnrecoverableError("There is a running checkpoint task at start phase");
+        }
+
+        TxnTimeStamp max_commit_ts{};
+        i64 wal_size{};
+        std::tie(max_commit_ts, wal_size) = wal_mgr_->GetCommitState();
+        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("Checkpoint"), TransactionType::kNewCheckpoint);
+        txn->SetReaderAllowed(true);
+        bg_processor_->Submit(checkpoint_task);
+        checkpoint_task->Wait();
+        txn_mgr_->CommitTxn(txn);
+
+        periodic_trigger_thread_->Start();
     }
-    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-    i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-    i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-
-    periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-    periodic_trigger_thread_->delta_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-
-    periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
-    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
-
-    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
-    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-    bg_processor_->Submit(force_ckp_task);
-    force_ckp_task->Wait();
-    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
-    txn->SetReaderAllowed(true);
-    txn_mgr_->CommitTxn(txn);
-
-    periodic_trigger_thread_->Start();
     return Status::OK();
 }
 
@@ -367,6 +434,9 @@ Status Storage::UnInitFromReader() {
         }
 
         catalog_.reset();
+        new_catalog_.reset();
+        kv_store_->Uninit();
+        kv_store_.reset();
 
         if (memory_index_tracer_ != nullptr) {
             memory_index_tracer_.reset();
@@ -383,6 +453,14 @@ Status Storage::UnInitFromReader() {
             }
             txn_mgr_->Stop();
             txn_mgr_.reset();
+        }
+
+        if (new_txn_mgr_ != nullptr) {
+            if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                UnrecoverableError("Error reader init phase");
+            }
+            new_txn_mgr_->Stop();
+            new_txn_mgr_.reset();
         }
 
         switch (config_ptr_->StorageType()) {
@@ -485,6 +563,9 @@ Status Storage::WriterToAdmin() {
     }
 
     catalog_.reset();
+    new_catalog_.reset();
+    kv_store_->Uninit();
+    kv_store_.reset();
 
     memory_index_tracer_.reset();
 
@@ -496,6 +577,11 @@ Status Storage::WriterToAdmin() {
     if (txn_mgr_ != nullptr) {
         txn_mgr_->Stop();
         txn_mgr_.reset();
+    }
+
+    if (new_txn_mgr_ != nullptr) {
+        new_txn_mgr_->Stop();
+        new_txn_mgr_.reset();
     }
 
     if (buffer_mgr_ != nullptr) {
@@ -564,6 +650,7 @@ Status Storage::UnInitFromWriter() {
     }
 
     catalog_.reset();
+    new_catalog_.reset();
 
     memory_index_tracer_.reset();
 
@@ -595,6 +682,13 @@ Status Storage::UnInitFromWriter() {
         txn_mgr_.reset();
     }
 
+    if (new_txn_mgr_ != nullptr) {
+        new_txn_mgr_->Stop();
+        new_txn_mgr_.reset();
+    }
+    kv_store_->Uninit();
+    kv_store_.reset();
+
     if (buffer_mgr_ != nullptr) {
         buffer_mgr_->Stop();
         buffer_mgr_.reset();
@@ -616,6 +710,8 @@ Status Storage::UnInitFromWriter() {
     current_storage_mode_ = StorageMode::kUnInitialized;
     return Status::OK();
 }
+
+UniquePtr<KVInstance> Storage::KVInstance() { return kv_store_->GetInstance(); }
 
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCache() != "on") {
@@ -727,13 +823,17 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
     txn_mgr_->Start();
 
+    // TODO: new txn manager
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
+    new_txn_mgr_->Start();
+
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     catalog_->StartMemoryIndexCommit();
@@ -762,6 +862,46 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
     catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
+void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
+    auto kv_instance = this->KVInstance();
+
+    Status status = NewCatalog::InitCatalog(kv_instance.get(), checkpoint_ts);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Init catalog failed: {}", status.message()));
+    }
+
+    if (persistence_manager_) {
+        persistence_manager_->Deserialize(kv_instance.get());
+    }
+
+    status = kv_instance->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Commit catalog failed: {}", status.message()));
+    }
+}
+
+void Storage::RecoverMemIndex() {
+    //    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("recover mem index"), TransactionType::kNormal);
+    //    txn->SetReplay(true);
+    //    Status status = NewCatalog::MemIndexRecover(txn);
+    //    if (!status.ok()) {
+    //        UnrecoverableError("Failed to recover mem index in new catalog");
+    //    }
+    //    status = new_txn_mgr_->CommitTxn(txn);
+    //    if (!status.ok()) {
+    //        UnrecoverableError("Failed to commit mem index in new catalog");
+    //    }
+    UniquePtr<NewTxn> recovery_txn = new_txn_mgr_->BeginRecoveryTxn();
+    Status status = NewCatalog::MemIndexRecover(recovery_txn.get());
+    if (!status.ok()) {
+        UnrecoverableError("Failed to recover mem index in new catalog");
+    }
+    status = recovery_txn->CommitRecovery();
+    if (!status.ok()) {
+        UnrecoverableError("Failed to commit mem index in new catalog");
+    }
+}
+
 void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
     if (catalog_.get() != nullptr) {
         UnrecoverableError("Catalog was already initialized before.");
@@ -771,6 +911,27 @@ void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
 void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { catalog_->AttachDeltaCheckpoint(checkpoint_path); }
 
 void Storage::CreateDefaultDB() {
+    if (new_txn_mgr_) {
+        NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create default_db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase("default_db", ConflictType::kError, MakeShared<String>());
+        if (!status.ok()) {
+            if (status.code_ == ErrorCode::kDuplicateDatabaseName) {
+                // Only valid for unit test
+                status = new_txn_mgr_->RollBackTxn(txn);
+                if (!status.ok()) {
+                    UnrecoverableError("Can't rollback txn for creating 'default_db'");
+                }
+                return;
+            }
+            UnrecoverableError("Can't create 'default_db'");
+        }
+        status = new_txn_mgr_->CommitTxn(txn);
+        if (!status.ok()) {
+            UnrecoverableError("Can't commit txn for 'default_db'");
+        }
+        return;
+    }
+
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK

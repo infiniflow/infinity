@@ -21,6 +21,7 @@ module term_doc_iterator;
 import stl;
 import column_length_io;
 import logger;
+import infinity_exception;
 
 namespace infinity {
 
@@ -48,6 +49,9 @@ TermDocIterator::~TermDocIterator() {
 void TermDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
     column_length_reader_ = std::move(column_length_reader);
     avg_column_len_ = column_length_reader_->GetAvgColumnLength();
+    if (avg_column_len_ <= 1e-6f) {
+        UnrecoverableError("avg_column_len_ is 0.0f");
+    }
     total_df_ = column_length_reader_->GetTotalDF();
     const float smooth_idf = std::log1p((total_df_ - doc_freq_ + 0.5F) / (doc_freq_ + 0.5F));
     bm25_common_score_ = weight_ * smooth_idf * (k1 + 1.0F);

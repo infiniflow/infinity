@@ -249,11 +249,13 @@ target_sources(infinity_core
         ${network_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2 pcre2-8-static)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2 pcre2-8-static rocksdb)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
+#target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cli11")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
@@ -359,6 +361,7 @@ target_link_libraries(infinity
         crypto.a
         re2.a
         pcre2-8-static
+        rocksdb.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -371,6 +374,7 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(infinity PUBLIC "/usr/local/openssl30/lib64")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -429,6 +433,7 @@ if (SKBUILD)
             crypto.a
             re2.a
             pcre2-8-static
+            rocksdb.a
     )
 
     # WARN: python modules shall not link to static libstdc++!!!
@@ -446,6 +451,7 @@ if (SKBUILD)
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
     target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
     target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
     nanobind_disable_stack_protector(embedded_infinity_ext)
     nanobind_opt_size(embedded_infinity_ext)
@@ -522,6 +528,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         unit_test/base_test.cppm
         unit_test/test_helper/sql_runner.cppm
+        unit_test/*.cppm
 )
 
 add_executable(unit_test
@@ -550,7 +557,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb)
 
 target_link_libraries(unit_test
         gtest
@@ -585,6 +592,7 @@ target_link_libraries(unit_test
         libcurl_static
         ssl.a
         crypto.a
+        rocksdb.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -597,6 +605,7 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 
@@ -608,6 +617,8 @@ target_sources(unit_test
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
+#target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")

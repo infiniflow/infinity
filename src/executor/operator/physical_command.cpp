@@ -19,7 +19,7 @@ module;
 
 import compilation_config;
 
-#ifdef ENABLE_JEMALLOC
+#ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
@@ -50,12 +50,16 @@ import bg_task;
 import wal_manager;
 import result_cache_manager;
 import snapshot;
+import periodic_trigger_thread;
+import new_txn;
 
 namespace infinity {
 
-void PhysicalCommand::Init(QueryContext* query_context) {}
+void PhysicalCommand::Init(QueryContext *query_context) {}
 
 bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+
     DeferFn defer_fn([&]() { operator_state->SetComplete(); });
     switch (command_info_->type()) {
         case CommandType::kUse: {
@@ -110,8 +114,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
                         }
                         case GlobalVariable::kJeProf: {
-#ifdef ENABLE_JEMALLOC
-                            // dump jeprof
+#ifdef ENABLE_JEMALLOC_PROF
+                            // http://jemalloc.net/jemalloc.3.html
+                            malloc_stats_print(nullptr, nullptr, "admp");
                             int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
                             if (ret != 0) {
                                 Status status = Status::UnexpectedError(fmt::format("mallctl prof1.dump failed {}", ret));
@@ -329,7 +334,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             config->SetOptimizeInterval(interval);
                             break;
                         }
-                        case GlobalOptionIndex::kTimeZone:{
+                        case GlobalOptionIndex::kTimeZone: {
                             if (set_command->value_type() != SetVarType::kString) {
                                 Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
                                 RecoverableError(status);
@@ -452,21 +457,58 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             }
 
             auto *bg_process = query_context->storage()->bg_processor();
-            {
-                Txn *txn = query_context->GetTxn();
-                auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, false /*is_full_checkpoint*/);
-                bg_process->Submit(checkpoint_task);
-                checkpoint_task->Wait();
-            }
-            {
-                CleanupPeriodicTrigger *cleanup_trigger = query_context->storage()->bg_processor()->cleanup_trigger();
-                SharedPtr<CleanupTask> cleanup_task = cleanup_trigger->CreateCleanupTask();
-                if (cleanup_task.get() != nullptr) {
+
+            if (use_new_catalog) {
+                NewCleanupPeriodicTrigger *new_cleanup_trigger =
+                    InfinityContext::instance().storage()->periodic_trigger_thread()->new_cleanup_trigger_.get();
+                auto cleanup_task = new_cleanup_trigger->CreateNewCleanupTask();
+                if (cleanup_task) {
                     bg_process->Submit(cleanup_task);
                     cleanup_task->Wait();
                 } else {
                     LOG_DEBUG("Skip cleanup");
                 }
+            } else {
+                {
+                    Txn *txn = query_context->GetTxn();
+                    auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, false /*is_full_checkpoint*/);
+                    bg_process->Submit(checkpoint_task);
+                    checkpoint_task->Wait();
+                }
+                {
+                    CleanupPeriodicTrigger *cleanup_trigger = query_context->storage()->bg_processor()->cleanup_trigger();
+                    SharedPtr<CleanupTask> cleanup_task = cleanup_trigger->CreateCleanupTask();
+                    if (cleanup_task.get() != nullptr) {
+                        bg_process->Submit(cleanup_task);
+                        cleanup_task->Wait();
+                    } else {
+                        LOG_DEBUG("Skip cleanup");
+                    }
+                }
+            }
+            break;
+        }
+        case CommandType::kDumpIndex: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            if (storage_mode != StorageMode::kWritable) {
+                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+                operator_state->SetComplete();
+                return true;
+            }
+
+            if (use_new_catalog) {
+                auto *dump_index_cmd = static_cast<DumpIndexCmd *>(command_info_.get());
+                NewTxn *new_txn = query_context->GetNewTxn();
+                Status status = new_txn->DumpMemIndex(dump_index_cmd->db_name(), dump_index_cmd->table_name(), dump_index_cmd->index_name());
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+            } else {
+                UnrecoverableError("Not implemented");
             }
             break;
         }

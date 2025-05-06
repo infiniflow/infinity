@@ -60,6 +60,7 @@ import peer_task;
 import infinity_exception;
 import node_info;
 import catalog_delta_entry;
+import persistence_manager;
 
 namespace infinity {
 
@@ -971,7 +972,8 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext *query_context, const AdminS
                                                InfinityContext::instance().config()->DataDir(),
                                                checkpoint_cmd->catalog_path_,
                                                checkpoint_cmd->catalog_name_);
-                UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(file_path);
+                auto *pm_ptr{InfinityContext::instance().persistence_manager()};
+                UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(file_path, pm_ptr);
                 Value value = Value::MakeVarchar(catalog_delta_entry->ToString());
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3402,6 +3404,48 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
     {
         {
             // option name
+            Value value = Value::MakeVarchar(CATALOG_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->CatalogDir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Catalog directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(SNAPSHOT_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->SnapshotDir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Snapshot directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
             Value value = Value::MakeVarchar(SNAPSHOT_DIR_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -3419,7 +3463,6 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
     }
-
 
     {
         {

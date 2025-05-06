@@ -43,23 +43,28 @@ import infinity_exception;
 import wal_manager;
 import compaction_process;
 import txn_state;
+import new_txn_manager;
+import new_txn;
+import data_block;
 
 using namespace infinity;
 
 class CleanupTaskTest : public BaseTestParamStr {
 protected:
     void WaitCleanup(Storage *storage) {
-        Catalog *catalog = storage->catalog();
-        BufferManager *buffer_mgr = storage->buffer_manager();
-        TxnManager *txn_mgr = storage->txn_manager();
-        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
-        cleanup_task->Execute();
+        NewTxnManager *new_txn_mgr = storage->new_txn_manager();
+        Status status = new_txn_mgr->Cleanup();
+        EXPECT_TRUE(status.ok());
     }
 
-    void WaitFlushDeltaOp(Storage *storage) {
-        WalManager *wal_mgr = storage->wal_manager();
-        wal_mgr->Checkpoint(false /*is_full_checkpoint*/);
+    void WaitCheckpoint(Storage *storage) {
+        NewTxnManager *new_txn_mgr = storage->new_txn_manager();
+        WalManager *wal_manager = storage->wal_manager();
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        Status status = txn2->Checkpoint(wal_manager->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
     }
 };
 
@@ -73,15 +78,15 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
+        txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
-    WaitFlushDeltaOp(storage);
+    WaitCheckpoint(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
@@ -91,7 +96,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
-        Status status = txn->GetDatabase(*db_name);
+        auto [db_info, status] = txn->GetDatabaseInfo(*db_name);
         EXPECT_FALSE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
@@ -102,12 +107,12 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     auto db_name = MakeShared<String>("db1");
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
+        txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -118,12 +123,12 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
+        txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->RollBackTxn(txn);
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-        txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
+        txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -135,7 +140,7 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
-        Status status = txn->GetDatabase(*db_name);
+        auto [db_info, status] = txn->GetDatabaseInfo(*db_name);
         EXPECT_FALSE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
@@ -146,7 +151,7 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -164,11 +169,11 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
-    WaitFlushDeltaOp(storage);
+    WaitCheckpoint(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"), TransactionType::kNormal);
 
-        Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         txn_mgr->CommitTxn(txn);
@@ -177,8 +182,8 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
     WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"), TransactionType::kRead);
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_EQ(table_entry, nullptr);
+        auto [table_info, status] = txn->GetTableInfo(*db_name, *table_name);
+        EXPECT_FALSE(status.ok());
 
         txn_mgr->CommitTxn(txn);
     }
@@ -189,7 +194,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
-    TxnManager *txn_mgr = storage->txn_manager();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -210,7 +215,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"), TransactionType::kNormal);
 
-        Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         txn_mgr->CommitTxn(txn);
@@ -233,15 +238,15 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"), TransactionType::kNormal);
 
-        Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         WaitCleanup(storage);
         txn_mgr->CommitTxn(txn);
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"), TransactionType::kRead);
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_EQ(table_entry, nullptr);
+        auto [table_info, status] = txn->GetTableInfo(*db_name, *table_name);
+        EXPECT_FALSE(status.ok());
 
         txn_mgr->CommitTxn(txn);
     }
@@ -249,15 +254,12 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
 
 TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
     constexpr int kImportN = 5;
-    constexpr int kImportSize = 100;
 
     // disable auto cleanup task
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
-    TxnManager *txn_mgr = storage->txn_manager();
-    BufferManager *buffer_mgr = storage->buffer_manager();
-    CompactionProcessor *compaction_processor = storage->compaction_processor();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -276,63 +278,53 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"), TransactionType::kRead);
-        auto [table_info, status] = txn->GetTableInfo("default_db", *table_name);
-        EXPECT_TRUE(table_info != nullptr);
-        // table_entry->SetCompactionAlg(nullptr);
-
-        for (int i = 0; i < kImportN; ++i) {
-            Vector<SharedPtr<ColumnVector>> column_vectors;
+        u32 block_row_cnt = 8192;
+        auto make_input_block = [&] {
+            auto input_block = MakeShared<DataBlock>();
+            auto append_to_col = [&](ColumnVector &col, Value v1) {
+                for (u32 i = 0; i < block_row_cnt; ++i) {
+                    col.AppendValue(v1);
+                }
+            };
+            // Initialize input block
             {
-                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
-                column_vector->Initialize();
-                Value v = Value::MakeInt(i);
-                for (int i = 0; i < kImportSize; ++i) {
-                    column_vector->AppendValue(v);
-                }
-                column_vectors.push_back(column_vector);
+                auto col1 = ColumnVector::Make(MakeShared<DataType>(DataType(LogicalType::kInteger)));
+                col1->Initialize();
+                append_to_col(*col1, Value::MakeInt(2));
+                input_block->InsertVector(col1, 0);
             }
-            SizeT column_count = column_vectors.size();
+            input_block->Finalize();
+            return input_block;
+        };
 
-            auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info->db_name_, *table_info->table_name_);
-            auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
-            SizeT row_count = std::numeric_limits<SizeT>::max();
-            for (SizeT i = 0; i < column_count; ++i) {
-                auto *column_vector = column_vectors[i].get();
-                // auto column_block_entry = block_entry->GetColumnBlockEntry(i);
-                if (row_count == std::numeric_limits<SizeT>::max()) {
-                    row_count = column_vector->Size();
-                } else {
-                    EXPECT_EQ(row_count, column_vector->Size());
-                }
-                ColumnVector col = block_entry->GetColumnVector(buffer_mgr, i);
-                col.AppendWith(*column_vector, 0, row_count);
-            }
-            block_entry->IncreaseRowCount(row_count);
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-
-            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
+        // Import two segments, each segments contains two blocks
+        for (SizeT i = 0; i < kImportN; ++i) {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+            Status status = txn->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
-        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
-        EXPECT_NE(commit_ts, 0u);
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        Status status = txn->Compact(*db_name, *table_name, {0, 1, 2, 3, 4});
+        EXPECT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     WaitCleanup(storage);
 }
 
 TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     constexpr int kImportN = 5;
-    constexpr int kImportSize = 100;
 
     // close auto cleanup task
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
-    TxnManager *txn_mgr = storage->txn_manager();
-    BufferManager *buffer_mgr = storage->buffer_manager();
-    CompactionProcessor *compaction_processor = storage->compaction_processor();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
 
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
@@ -353,69 +345,51 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"), TransactionType::kRead);
-        auto [table_info, status] = txn->GetTableInfo(*db_name, *table_name);
-        EXPECT_TRUE(table_info != nullptr);
-        // table_entry->SetCompactionAlg(nullptr);
-
-        for (int i = 0; i < kImportN; ++i) {
-            Vector<SharedPtr<ColumnVector>> column_vectors;
+        u32 block_row_cnt = 8192;
+        auto make_input_block = [&] {
+            auto input_block = MakeShared<DataBlock>();
+            auto append_to_col = [&](ColumnVector &col, Value v1) {
+                for (u32 i = 0; i < block_row_cnt; ++i) {
+                    col.AppendValue(v1);
+                }
+            };
+            // Initialize input block
             {
-                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
-                column_vector->Initialize();
-                Value v = Value::MakeInt(i);
-                for (int i = 0; i < kImportSize; ++i) {
-                    column_vector->AppendValue(v);
-                }
-                column_vectors.push_back(column_vector);
+                auto col1 = ColumnVector::Make(MakeShared<DataType>(DataType(LogicalType::kInteger)));
+                col1->Initialize();
+                append_to_col(*col1, Value::MakeInt(2));
+                input_block->InsertVector(col1, 0);
             }
-            SizeT column_count = column_vectors.size();
+            input_block->Finalize();
+            return input_block;
+        };
 
-            auto [segment_entry, segment_status] = txn->MakeNewSegment(*db_name, *table_name);
-            if (!segment_status.ok()) {
-                RecoverableError(segment_status);
-            }
-            auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
-            SizeT row_count = std::numeric_limits<SizeT>::max();
-            for (SizeT i = 0; i < column_count; ++i) {
-                auto *column_vector = column_vectors[i].get();
-                if (row_count == std::numeric_limits<SizeT>::max()) {
-                    row_count = column_vector->Size();
-                } else {
-                    EXPECT_EQ(row_count, column_vector->Size());
-                }
-                ColumnVector col = block_entry->GetColumnVector(buffer_mgr, i);
-                col.AppendWith(*column_vector, 0, row_count);
-            }
-            block_entry->IncreaseRowCount(row_count);
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-
-            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
+        // Import two segments, each segments contains two blocks
+        for (SizeT i = 0; i < kImportN; ++i) {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+            Status status = txn->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-
         SharedPtr<IndexBase> index_base =
             IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
 
-        auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_TRUE(status1.ok());
-
-        auto table_ref = BaseTableRef::FakeTableRef(txn, *db_name, *table_name);
-        auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
-        EXPECT_TRUE(status2.ok());
-
-        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
-        txn->CreateIndexFinish(table_entry, table_index_entry);
-        EXPECT_TRUE(status3.ok());
-
-        txn_mgr->CommitTxn(txn);
+        auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        Status status = txn3->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
     }
     {
-        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
-        EXPECT_NE(commit_ts, 0u);
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        Status status = txn->Compact(*db_name, *table_name, {0, 1, 2, 3, 4});
+        EXPECT_TRUE(status.ok());
+        status = txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 
     WaitCleanup(storage);

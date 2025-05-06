@@ -34,6 +34,7 @@ import table_entry;
 
 import wal_manager;
 import infinity_context;
+import new_txn;
 
 namespace infinity {
 
@@ -64,6 +65,19 @@ bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *opera
 void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState *operator_state) {
     // Get tables from catalog
     LOG_INFO(fmt::format("OptimizeIndex {}.{} begin", db_name_, table_name_));
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->OptimizeTableIndexes(db_name_, table_name_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            RecoverableError(status);
+            return;
+        }
+        return;
+    }
+
     auto txn = query_context->GetTxn();
     Status status = txn->OptimizeTableIndexes(db_name_, table_name_);
     if (!status.ok()) {
@@ -76,6 +90,19 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
 
 void PhysicalOptimize::OptIndex(QueryContext *query_context, OperatorState *operator_state) {
     LOG_INFO(fmt::format("OptimizeIndex {}.{}::{} begin", db_name_, table_name_, index_name_));
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->OptimizeIndexByParams(db_name_, table_name_, index_name_, std::move(opt_params_));
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            RecoverableError(status);
+            return;
+        }
+        return;
+    }
+
     auto txn = query_context->GetTxn();
     Status status = txn->OptimizeIndexByName(db_name_, table_name_, index_name_, std::move(opt_params_));
     if (!status.ok()) {

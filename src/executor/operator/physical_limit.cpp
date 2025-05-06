@@ -17,7 +17,6 @@ module;
 module physical_limit;
 
 import stl;
-import txn;
 import base_expression;
 import default_values;
 import load_meta;

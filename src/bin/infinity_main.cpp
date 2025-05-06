@@ -170,6 +170,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
 #ifdef ENABLE_JEMALLOC_PROF
         case SIGUSR2: {
             // http://jemalloc.net/jemalloc.3.html
+            malloc_stats_print(nullptr, nullptr, "admp");
             int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
             printf("Dump memory profile %d\n", rc);
             break;
@@ -223,12 +224,12 @@ void TerminateHandler() {
 auto main(int argc, char **argv) -> int {
     using namespace infinity;
 
-    fmt::print(" __  .__   __.  _______  __  .__   __.  __  .___________.____    ____ \n"
+    fmt::print(" __  .__    __.  _______  __  .__    __.  __  .___________. ____     ____ \n"
                "|  | |  \\ |  | |   ____||  | |  \\ |  | |  | |           |\\   \\  /   / \n"
                "|  | |   \\|  | |  |__   |  | |   \\|  | |  | `---|  |----` \\   \\/   /  \n"
-               "|  | |  . `  | |   __|  |  | |  . `  | |  |     |  |       \\_    _/   \n"
-               "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
-               "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
+               "|  | |  . `   | |   __|  |  | |  . `   | |  |     |  |       \\_    __/   \n"
+               "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |   |      \n"
+               "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |___|      \n");
 
     fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
                version_major(),

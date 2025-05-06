@@ -655,6 +655,13 @@ struct DropColumnsRequest {
 4:  i64 session_id,
 }
 
+struct DumpIndexRequest {
+1:  string db_name,
+2:  string table_name,
+3:  string index_name,
+4:  i64 session_id,
+}
+
 struct ShowTablesRequest{
 1: i64 session_id,
 2: string db_name,
@@ -809,6 +816,7 @@ CommonResponse AddColumns(1:AddColumnsRequest request),
 CommonResponse DropColumns(1:DropColumnsRequest request),
 
 CommonResponse Cleanup(1:CommonRequest request),
+CommonResponse DumpIndex(1:DumpIndexRequest request),
 
 CommonResponse Command(1: CommandRequest request),
 

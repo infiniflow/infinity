@@ -78,6 +78,7 @@ class TestInfinity:
         print(res)
 
         test_export_csv_file_path = common_values.TEST_TMP_DIR + suffix +"test_export_csv.csv"
+        delete_file(test_export_csv_file_path)
         res = table_obj.export_data(test_export_csv_file_path, {"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         assert count_lines(test_export_csv_file_path) == 9999
@@ -128,6 +129,7 @@ class TestInfinity:
         print(res)
 
         test_export_jsonl_file_path = common_values.TEST_TMP_DIR + suffix + "test_export_jsonl.jsonl"
+        delete_file(test_export_jsonl_file_path)
         res = table_obj.export_data(test_export_jsonl_file_path, {"file_type": "jsonl", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         assert count_lines(test_export_jsonl_file_path) == 9999
@@ -178,6 +180,7 @@ class TestInfinity:
         print(res)
 
         test_export_fvecs_file_path = common_values.TEST_TMP_DIR + suffix + "test_export_fvecs.fvecs"
+        delete_file(test_export_fvecs_file_path)
         res = table_obj.export_data(test_export_fvecs_file_path, {"file_type": "fvecs"}, ["vec"])
         assert res.error_code == ErrorCode.OK
         assert len(read_fvecs_file(test_export_fvecs_file_path)) == 9999

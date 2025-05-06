@@ -59,7 +59,11 @@ class TestAlter:
             pd.testing.assert_frame_equal(
                 res,
                 pd.DataFrame(
-                    {"c1": [1, 2], "c3": ["test", "test"], "c4": ["default", "test2"]}
+                    {
+                        "c1": [1, 2],
+                        "c3": ["test", "test"],
+                        "c4": ["default", "test2"],
+                    }
                 ).astype(
                     {
                         "c1": dtype("int32"),
@@ -134,6 +138,8 @@ class TestAlter:
 
         @decorator
         def part2(infinity_obj):
+            time.sleep(1) # wait some time or match_text is not available
+
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
             res, extra_result = table_obj.output(["*"]).to_df()
@@ -157,11 +163,18 @@ class TestAlter:
                     }
                 ),
             )
+
+            infinity_obj.cleanup()
+
             dropped_column_dirs = pathlib.Path("/var/infinity/data").rglob("1.col")
             assert len(list(dropped_column_dirs)) == 0
 
             res = table_obj.list_indexes()
             assert len(res.index_names) == 1
+
+            data, _, _ = table_obj.output(["*"]).to_result()
+            assert len(data) == 5
+            assert len(data["c1"]) == 2
 
             data_dict, _, _ = (
                 table_obj.output(["c1"])
@@ -204,6 +217,7 @@ class TestAlter:
             res = table_obj.drop_columns(["c2"])
             assert res.error_code == ErrorCode.OK
 
+            infinity_obj.flush_data()
             infinity_obj.cleanup()
 
             dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col")
@@ -223,7 +237,7 @@ class TestAlter:
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
 
-            dropped_column_dirs = pathlib.Path(data_dir).rglob("2.col")
+            dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col")
             assert len(list(dropped_column_dirs)) == 0
 
             db_obj.drop_table(table_name)
@@ -262,11 +276,13 @@ class TestAlter:
             table_obj.drop_columns(["c3"])
 
             infinity_obj.flush_delta()
-        
+
         part1()
 
         @decorator
         def part2(infinity_obj):
+            infinity_obj.cleanup()
+
             dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col")
             assert len(list(dropped_column_dirs)) == 0
 

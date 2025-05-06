@@ -38,7 +38,7 @@ namespace infinity {
 template <typename T>
 using MathOperation = std::function<T(T, T)>;
 
-void PhysicalMergeAggregate::Init(QueryContext* query_context) {}
+void PhysicalMergeAggregate::Init(QueryContext *query_context) {}
 
 bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
@@ -81,6 +81,11 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
 
         hash_table.Init(groupby_types);
     }
+
+    if (input_block == nullptr) {
+        return;
+    }
+
     Vector<SharedPtr<ColumnVector>> input_groupby_columns(input_block->column_vectors.begin(), input_block->column_vectors.begin() + group_count);
     if (op_state->data_block_array_.empty()) {
         hash_table.Append(input_groupby_columns, 0, input_block->row_count());

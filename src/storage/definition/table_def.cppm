@@ -32,7 +32,7 @@ public:
     }
 
 public:
-    explicit TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment, Vector<SharedPtr<ColumnDef>> columns)
+    explicit TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment,  Vector<SharedPtr<ColumnDef>> columns)
         : schema_name_(std::move(schema)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)),
           columns_(std::move(columns)) {
         SizeT column_count = columns_.size();
@@ -93,7 +93,6 @@ private:
     SharedPtr<String> table_comment_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    Vector<IndexBase> indexes_{};
 };
 
 } // namespace infinity

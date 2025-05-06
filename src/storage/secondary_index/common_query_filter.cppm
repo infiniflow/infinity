@@ -28,9 +28,11 @@ class QueryContext;
 class BufferManager;
 class Txn;
 struct TableIndexEntry;
+class NewTxn;
 
 export struct CommonQueryFilter {
     Txn* txn_ptr_;
+    NewTxn *new_txn_ptr_ = nullptr;
     SharedPtr<BaseExpression> original_filter_;
     SharedPtr<BaseTableRef> base_table_ref_;
     // input filter
@@ -63,6 +65,8 @@ export struct CommonQueryFilter {
 
 public:
     CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, Txn* txn);
+
+    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, NewTxn* new_txn);
 
     // 1. try to finish building the filter
     // 2. return true if the filter is available for query
@@ -105,6 +109,8 @@ private:
     RowID EqualOrLarger(RowID doc_id);
 
     void BuildFilter(u32 task_id);
+
+    void NewBuildFilter(u32 task_id);
 
     // for PassFilter
     SegmentID current_segment_id_ = INVALID_SEGMENT_ID;

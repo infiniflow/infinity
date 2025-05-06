@@ -21,3 +21,4 @@ curlpp  0.8.1
 pugixml 1.14
 inih r58
 curl 8.10.1
+rocksdb 9.10.0

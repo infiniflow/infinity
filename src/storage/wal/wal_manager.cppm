@@ -17,8 +17,6 @@ module;
 export module wal_manager;
 
 import stl;
-import bg_task;
-import wal_entry;
 import options;
 import catalog_delta_entry;
 import blocking_queue;
@@ -30,8 +28,30 @@ class Storage;
 class BGTaskProcessor;
 struct TableEntry;
 class Txn;
+class NewTxn;
 struct SegmentEntry;
 class Catalog;
+class CheckpointTaskBase;
+class ForceCheckpointTask;
+
+struct WalEntry;
+struct WalCmdCreateDatabase;
+struct WalCmdDropDatabase;
+struct WalCmdCreateTable;
+struct WalCmdDropTable;
+struct WalCmdCreateIndex;
+struct WalCmdDropIndex;
+struct WalCmdAppend;
+struct WalCmdImport;
+struct WalCmdDelete;
+struct WalCmdCheckpoint;
+struct WalCmdCompact;
+struct WalCmdOptimize;
+struct WalCmdDumpIndex;
+struct WalCmdRenameTable;
+struct WalCmdAddColumns;
+struct WalCmdDropColumns;
+struct WalSegmentInfo;
 
 export enum class StorageMode {
     kUnInitialized,
@@ -80,16 +100,22 @@ public:
     void Stop();
 
     void SubmitTxn(Vector<Txn *> &txn_batch);
+    void SubmitTxn(Vector<NewTxn *> &txn_batch);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
     // ~10s. So it's necessary to sync for a batch of transactions, and to
     // checkpoint for a batch of sync.
     void Flush();
+    void NewFlush();
 
     void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
 
     bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
+
+    bool SetCheckpointing();
+    bool UnsetCheckpoint();
+    bool IsCheckpointing() const;
 
     void Checkpoint(bool is_full_checkpoint);
 
@@ -101,6 +127,10 @@ public:
 
     i64 ReplayWalFile(StorageMode targe_storage_mode);
 
+    Pair<TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
+
+    void ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
+
     Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> GetCatalogFiles() const;
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
@@ -108,6 +138,7 @@ public:
     void ReplayWalEntry(const WalEntry &entry, ReplayWalOptions options);
 
     TxnTimeStamp LastCheckpointTS() const;
+    void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
     Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
@@ -116,15 +147,18 @@ private:
     // Checkpoint Helper
     void FullCheckpointInner(Txn *txn);
     void DeltaCheckpointInner(Txn *txn);
+    void FullCheckpointInner(NewTxn *txn);
+    void DeltaCheckpointInner(NewTxn *txn);
 
 public:
     void CommitFullCheckpoint(TxnTimeStamp max_commit_ts);
     void CommitDeltaCheckpoint(TxnTimeStamp max_commit_ts);
 
-private:
     Tuple<TxnTimeStamp, i64> GetCommitState();
-    i64 GetLastCkpWalSize();
     void SetLastCkpWalSize(i64 wal_size);
+
+private:
+    i64 GetLastCkpWalSize();
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
@@ -168,10 +202,11 @@ private:
 
     // WalManager state
     Atomic<bool> running_{};
-    Thread flush_thread_{};
+    Thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members
     BlockingQueue<Txn *> wait_flush_{"WalManager"};
+    BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};
@@ -186,7 +221,8 @@ private:
     Atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint/Cleanup thread access following members
-    Atomic<TxnTimeStamp> last_ckp_ts_{};
+    mutable std::mutex last_ckp_ts_mutex_{};
+    TxnTimeStamp last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
 };
 

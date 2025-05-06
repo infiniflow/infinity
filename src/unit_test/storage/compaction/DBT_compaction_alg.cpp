@@ -16,6 +16,7 @@
 import base_test;
 
 import stl;
+import txn;
 import segment_entry;
 import DBT_compaction_alg;
 

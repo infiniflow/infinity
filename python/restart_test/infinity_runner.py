@@ -8,13 +8,20 @@ import time
 import infinity
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
+from util import *
 
 PYTEST_LOG_FILE = "restart_test.py.log"
 
+
 class InfinityRunner:
-    def __init__(self, infinity_path: str, *, logger=None):
+    def __init__(self, infinity_path: str, config_path: str, *, logger=None):
         self.data_dir = "/var/infinity"
-        self.default_config_path = "./conf/infinity_conf.toml"
+        self.default_config_path = config_path
+
+        self.use_new_catalog = False
+        if "new" in self.default_config_path:
+            self.use_new_catalog = True
+
         self.script_path = "./scripts/timeout_kill.sh"
         self.infinity_path = infinity_path
 
@@ -43,7 +50,7 @@ class InfinityRunner:
 
     def clear(self):
         os.system(
-            f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
+            f"rm -rf {self.data_dir}/catalog {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
         )
         os.system(f"rm -rf restart_test.log.*")
         os.system(f"rm -rf {PYTEST_LOG_FILE}")
@@ -54,6 +61,9 @@ class InfinityRunner:
         init_timeout = 60
         if config_path is None:
             config_path = self.default_config_path
+        elif self.use_new_catalog:
+            config_path = make_new_config(config_path)
+
         cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
 
         pids = [
@@ -137,7 +147,7 @@ def infinity_runner_decorator_factory(
     shutdown_out: bool = False,
     kill: bool = False,
     terminate_timeout: int = 60,
-    check_kill: bool = True
+    check_kill: bool = True,
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
