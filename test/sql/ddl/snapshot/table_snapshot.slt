@@ -1,0 +1,45 @@
+# test for table
+statement ok
+DROP TABLE IF EXISTS test_table;
+
+statement ok
+CREATE TABLE test_table (c1 int);
+
+statement ok
+INSERT INTO test_table VALUES (42);
+
+statement ok
+INSERT INTO test_table VALUES (47);
+
+query I
+SELECT COUNT(*) FROM test_table;
+----
+2
+
+statement ok
+CREATE SNAPSHOT snapshot_backup ON TABLE test_table;
+
+statement ok
+DROP TABLE test_table;
+
+statement ok
+RESTORE TABLE SNAPSHOT snapshot_backup;
+
+query I
+SELECT COUNT(*) FROM test_table;
+----
+2
+
+statement ok
+DROP TABLE test_table;
+
+statement ok
+RESTORE TABLE SNAPSHOT snapshot_backup;
+
+query I
+SELECT COUNT(*) FROM test_table;
+----
+2
+
+statement ok
+DROP TABLE test_table;
