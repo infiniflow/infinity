@@ -84,12 +84,8 @@ bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *op
         return true;
     }
 
-    Txn *txn = query_context->GetTxn();
-    txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
-    DeferFn defer_fn([&]() { txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_); });
-
-    Status status = txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
-
+    NewTxn *new_txn = query_context->GetNewTxn();
+    Status status = new_txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
     if (!status.ok()) {
         RecoverableError(status);
     }

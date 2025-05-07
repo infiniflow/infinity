@@ -40,7 +40,12 @@ VarFileWorker::VarFileWorker(SharedPtr<String> data_dir,
 VarFileWorker::~VarFileWorker() {
     if (data_ != nullptr) {
         FreeInMemory();
-        data_ = nullptr;
+    }
+
+    if (mmap_data_ != nullptr) {
+        auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
+        delete var_buffer;
+        mmap_data_ = nullptr;
     }
 }
 
