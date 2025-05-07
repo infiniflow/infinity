@@ -27,6 +27,7 @@ import logger;
 import wal_manager;
 import wal_entry;
 import infinity_exception;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -113,7 +114,7 @@ Status ClusterManager::RegisterToLeaderNoLock() {
                                                           this_node_->node_role(),
                                                           this_node_->node_ip(),
                                                           this_node_->node_port(),
-                                                          storage_ptr->txn_manager()->CurrentTS());
+                                                          storage_ptr->new_txn_manager()->CurrentTS());
     } else {
         register_peer_task =
             MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
@@ -198,7 +199,7 @@ void ClusterManager::HeartBeatToLeaderThread() {
 
             // Send heartbeat
             hb_task =
-                MakeShared<HeartBeatPeerTask>(this_node_name, this_node_role, this_node_ip, this_node_port, storage_ptr->txn_manager()->CurrentTS());
+                MakeShared<HeartBeatPeerTask>(this_node_name, this_node_role, this_node_ip, this_node_port, storage_ptr->new_txn_manager()->CurrentTS());
         }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
@@ -302,7 +303,7 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
     storage_ptr->catalog()->next_txn_id_ = last_txn_id;
     storage_ptr->wal_manager()->UpdateCommitState(last_commit_ts, 0);
-    storage_ptr->txn_manager()->SetStartTS(last_commit_ts);
+    storage_ptr->new_txn_manager()->SetStartTS(last_commit_ts);
     return Status::OK();
 }
 

@@ -176,92 +176,50 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 
     ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        Vector<SharedPtr<DataBlock>> data_blocks;
-
-        switch (file_type_) {
-            case CopyFileType::kCSV: {
-                NewImportCSV(query_context, import_op_state, data_blocks);
-                break;
-            }
-            case CopyFileType::kJSON: {
-                NewImportJSON(query_context, import_op_state, data_blocks);
-                break;
-            }
-            case CopyFileType::kJSONL: {
-                NewImportJSONL(query_context, import_op_state, data_blocks);
-                break;
-            }
-            case CopyFileType::kFVECS: {
-                NewImportFVECS(query_context, import_op_state, data_blocks);
-                break;
-            }
-            case CopyFileType::kCSR: {
-                NewImportCSR(query_context, import_op_state, data_blocks);
-                break;
-            }
-            case CopyFileType::kBVECS: {
-                NewImportBVECS(query_context, import_op_state, data_blocks);
-                break;
-            }
-            case CopyFileType::kPARQUET: {
-                NewImportPARQUET(query_context, import_op_state, data_blocks);
-                break;
-            }
-            default: {
-                UnrecoverableError("Unimplemented");
-            }
-        }
-
-        NewTxn *new_txn = query_context->GetNewTxn();
-        new_txn->SetTxnType(TransactionType::kImport);
-        Status status = new_txn->Import(*table_info_->db_name_, *table_info_->table_name_, data_blocks);
-        if (!status.ok()) {
-            import_op_state->status_ = status;
-        }
-
-        import_op_state->SetComplete();
-        return true;
-    }
+    Vector<SharedPtr<DataBlock>> data_blocks;
 
     switch (file_type_) {
         case CopyFileType::kCSV: {
-            ImportCSV(query_context, import_op_state);
+            NewImportCSV(query_context, import_op_state, data_blocks);
             break;
         }
         case CopyFileType::kJSON: {
-            ImportJSON(query_context, import_op_state);
+            NewImportJSON(query_context, import_op_state, data_blocks);
             break;
         }
         case CopyFileType::kJSONL: {
-            ImportJSONL(query_context, import_op_state);
+            NewImportJSONL(query_context, import_op_state, data_blocks);
             break;
         }
         case CopyFileType::kFVECS: {
-            ImportFVECS(query_context, import_op_state);
+            NewImportFVECS(query_context, import_op_state, data_blocks);
             break;
         }
         case CopyFileType::kCSR: {
-            ImportCSR(query_context, import_op_state);
+            NewImportCSR(query_context, import_op_state, data_blocks);
             break;
         }
         case CopyFileType::kBVECS: {
-            ImportBVECS(query_context, import_op_state);
+            NewImportBVECS(query_context, import_op_state, data_blocks);
             break;
         }
         case CopyFileType::kPARQUET: {
-            ImportPARQUET(query_context, import_op_state);
+            NewImportPARQUET(query_context, import_op_state, data_blocks);
             break;
         }
-        case CopyFileType::kInvalid: {
-            Status status = Status::ImportFileFormatError("Invalid import file type");
-            RecoverableError(status);
+        default: {
+            UnrecoverableError("Unimplemented");
         }
     }
+
+    NewTxn *new_txn = query_context->GetNewTxn();
+    new_txn->SetTxnType(TransactionType::kImport);
+    Status status = new_txn->Import(*table_info_->db_name_, *table_info_->table_name_, data_blocks);
+    if (!status.ok()) {
+        import_op_state->status_ = status;
+    }
+
     import_op_state->SetComplete();
-    Txn *txn = query_context->GetTxn();
-    txn->BeginTS();
     return true;
 }
 

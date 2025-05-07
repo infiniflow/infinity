@@ -45,12 +45,8 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<L
         return;
     }
     TxnTimeStamp begin_ts;
-    bool use_new_catalog = query_context_ptr->global_config()->UseNewCatalog();
-    if  (use_new_catalog) {
-        begin_ts = query_context_ptr->GetNewTxn()->BeginTS();
-    } else {
-        begin_ts = query_context_ptr->GetTxn()->BeginTS();
-    }
+    begin_ts = query_context_ptr->GetNewTxn()->BeginTS();
+
     std::function<void(SharedPtr<LogicalNode> &)> visit_node = [&](SharedPtr<LogicalNode> &op) {
         if (!op) {
             return;

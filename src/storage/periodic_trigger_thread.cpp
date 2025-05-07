@@ -65,10 +65,6 @@ void PeriodicTriggerThread::Run() {
             full_checkpoint_trigger_->Trigger();
         }
 
-        if (delta_checkpoint_trigger_ != nullptr && delta_checkpoint_trigger_->Check()) {
-            delta_checkpoint_trigger_->Trigger();
-        }
-
         if (compact_segment_trigger_ != nullptr && compact_segment_trigger_->Check()) {
             compact_segment_trigger_->Trigger();
         }

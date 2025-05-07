@@ -61,8 +61,6 @@ public:
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
 
-    [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
-
     [[nodiscard]] inline NewTxnManager *new_txn_manager() const noexcept { return new_txn_mgr_.get(); }
 
     [[nodiscard]] inline WalManager *wal_manager() const noexcept { return wal_mgr_.get(); }

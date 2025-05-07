@@ -55,10 +55,7 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
 }
 
 ForceCheckpointTask::ForceCheckpointTask(Txn *txn, bool full_checkpoint, TxnTimeStamp cleanup_ts)
-    : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
-
-ForceCheckpointTask::ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint, TxnTimeStamp cleanup_ts)
-    : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), new_txn_(new_txn), is_full_checkpoint_(full_checkpoint), cleanup_ts_(cleanup_ts) {}
+    : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), cleanup_ts_(cleanup_ts) {}
 
 ForceCheckpointTask::~ForceCheckpointTask() = default;
 

@@ -146,13 +146,9 @@ public:
 private:
     // Checkpoint Helper
     void FullCheckpointInner(Txn *txn);
-    void DeltaCheckpointInner(Txn *txn);
-    void FullCheckpointInner(NewTxn *txn);
-    void DeltaCheckpointInner(NewTxn *txn);
 
 public:
     void CommitFullCheckpoint(TxnTimeStamp max_commit_ts);
-    void CommitDeltaCheckpoint(TxnTimeStamp max_commit_ts);
 
     Tuple<TxnTimeStamp, i64> GetCommitState();
     void SetLastCkpWalSize(i64 wal_size);

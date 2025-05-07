@@ -50,7 +50,6 @@ public:
     inline FlushType flush_type() const { return flush_type_; }
 
 private:
-    void FlushData(QueryContext *query_context, OperatorState *operator_state);
     void FlushData1(QueryContext *query_context, OperatorState *operator_state);
 
     void FlushLog(QueryContext *query_context, OperatorState *operator_state);

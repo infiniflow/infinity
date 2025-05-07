@@ -137,21 +137,12 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
 
 export struct ForceCheckpointTask final : public CheckpointTaskBase {
     explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
-    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
 
     ~ForceCheckpointTask();
 
-    String ToString() const override {
-        if (is_full_checkpoint_) {
-            return fmt::format("Force full checkpoint, txn: ", txn_->TxnID());
-        } else {
-            return fmt::format("Force delta checkpoint, txn: ", txn_->TxnID());
-        }
-    }
+    String ToString() const override { return fmt::format("Force checkpoint, txn: ", txn_->TxnID()); }
 
     Txn *txn_{};
-    NewTxn *new_txn_{};
-    bool is_full_checkpoint_{};
     TxnTimeStamp cleanup_ts_ = 0;
 };
 

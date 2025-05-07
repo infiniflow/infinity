@@ -54,23 +54,15 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
         return true;
     }
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     Status status;
-    if (!use_new_catalog) {
-        Txn *txn = query_context->GetTxn();
-        txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
-        DeferFn defer_fn([&]() { txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_); });
-
-        status = txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
-    } else {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        for (auto &column_def : column_defs_) {
-            if (column_def->id() != -1) {
-                column_def->id_ = -1;
-            }
+    NewTxn *new_txn = query_context->GetNewTxn();
+    for (auto &column_def : column_defs_) {
+        if (column_def->id() != -1) {
+            column_def->id_ = -1;
         }
-        status = new_txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
     }
+    status = new_txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
+
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -92,18 +84,11 @@ bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *op
         return true;
     }
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    Status status;
-    if (!use_new_catalog) {
-        Txn *txn = query_context->GetTxn();
-        txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
-        DeferFn defer_fn([&]() { txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_); });
+    Txn *txn = query_context->GetTxn();
+    txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
+    DeferFn defer_fn([&]() { txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_); });
 
-        status = txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
-    } else {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        status = new_txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
-    }
+    Status status = txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
 
     if (!status.ok()) {
         RecoverableError(status);

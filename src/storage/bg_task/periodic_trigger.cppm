@@ -89,8 +89,7 @@ private:
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CheckpointPeriodicTrigger(i64 interval, WalManager *wal_mgr, bool full_checkpoint)
-        : PeriodicTrigger(interval), wal_mgr_(wal_mgr), is_full_checkpoint_(full_checkpoint) {}
+    explicit CheckpointPeriodicTrigger(i64 interval, WalManager *wal_mgr) : PeriodicTrigger(interval), wal_mgr_(wal_mgr) {}
 
     CheckpointPeriodicTrigger(i64 interval) : PeriodicTrigger(interval), new_checkpoint_(true) {}
 
@@ -98,7 +97,6 @@ public:
 
 private:
     WalManager *const wal_mgr_{};
-    bool is_full_checkpoint_{};
 
     bool new_checkpoint_ = false;
 };
