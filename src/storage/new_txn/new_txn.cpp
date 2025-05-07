@@ -2094,13 +2094,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
-                //            case WalCommandType::APPEND_V2: {
-                //                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
-                //                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
-                //                    conflict = true;
-                //                }
-                //                break;
-                //            }
             default: {
                 // No conflict
                 break;
