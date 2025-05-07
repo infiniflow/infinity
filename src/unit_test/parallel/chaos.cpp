@@ -165,7 +165,7 @@ TEST_P(ParallelTest, ChaosTest) {
 
     String data_path = "/var/infinity";
 
-    std::string fulltext_file_path = std::__fs::filesystem::current_path().string() + "/test/data/csv/enwiki_99.csv";
+    String fulltext_file_path = std::__fs::filesystem::current_path().string() + "/test/data/csv/enwiki_99.csv";
 
     auto data = data_preprocessing(fulltext_file_path);
 
