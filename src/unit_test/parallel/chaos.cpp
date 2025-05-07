@@ -166,7 +166,7 @@ void insert(const String &db_name, const String &table_name, Vector<DataRow> dat
     SizeT max_start = data.size() > insert_delete_size ? data.size() - insert_delete_size : 0;
     SizeT pos = RandInt(0, max_start);
 
-    auto insert_rows = MakeShared<Vector<InsertRowExpr*>>();
+    auto insert_rows = new Vector<InsertRowExpr *>();
     insert_rows->reserve(insert_delete_size);
 
     for (SizeT i = 0; i < insert_delete_size && (pos + i) < data.size(); ++i) {
@@ -189,7 +189,7 @@ void insert(const String &db_name, const String &table_name, Vector<DataRow> dat
         insert_rows->emplace_back(insert_row.release());
     }
 
-    auto result = infinity->Insert(db_name, table_name, insert_rows.get());
+    auto result = infinity->Insert(db_name, table_name, insert_rows);
     if (result.IsOk()) {
         result = infinity->Flush();
     } else {
