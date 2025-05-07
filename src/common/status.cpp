@@ -491,6 +491,11 @@ Status Status::TxnConflict(u64 txn_id, const String &conflict_reason) {
                   MakeUnique<String>(fmt::format("Transaction: {} is conflicted, detailed info: {}", txn_id, conflict_reason)));
 }
 
+Status Status::TxnConflictNoRetry(u64 txn_id, const String &conflict_reason) {
+    return Status(ErrorCode::kTxnConflictNoRetry,
+                  MakeUnique<String>(fmt::format("Transaction: {} is conflicted, detailed info: {}", txn_id, conflict_reason)));
+}
+
 Status Status::TxnWWConflict(const String &detailed_message) { return Status(ErrorCode::kTxnWWConflict, MakeUnique<String>(detailed_message)); }
 
 Status Status::TxnRWConflict(const String &detailed_message) { return Status(ErrorCode::kTxnRWConflict, MakeUnique<String>(detailed_message)); }

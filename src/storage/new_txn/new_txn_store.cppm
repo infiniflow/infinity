@@ -25,6 +25,7 @@ import extra_ddl_info;
 import column_def;
 import third_party;
 import logger;
+import meta_key;
 
 namespace infinity {
 
@@ -295,6 +296,10 @@ public:
 
     const Vector<UniquePtr<std::binary_semaphore>> &semas() const { return semas_; }
 
+    void AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key) { object_meta_keys_.push_back(std::move(object_meta_key)); }
+
+    const Vector<UniquePtr<MetaKey>> &GetMetaKeyForBufferObject() const { return object_meta_keys_; };
+
 private:
     // Txn store
     NewTxn *txn_{}; // TODO: remove this
@@ -319,6 +324,9 @@ public:
 
 private:
     HashMap<String, UniquePtr<NewTxnTableStore1>> txn_tables_store1_{};
+
+    // Includes Block, ChunkIndex and Column, used for removing object buffer.
+    Vector<UniquePtr<MetaKey>> object_meta_keys_{};
 };
 
 } // namespace infinity

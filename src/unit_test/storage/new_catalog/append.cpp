@@ -1524,7 +1524,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |----------------------|----------|
-    //                    t2                  add column   commit (success)
+    //                    t2                  add column   commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1559,7 +1559,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         status = txn4->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1584,7 +1584,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  add column (fail)       rollback (success)
+    //                    t2                  add column              commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1613,14 +1613,13 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1642,10 +1641,10 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
-    //                    t2        add column (fail)   rollback (success)
+    //                    t2        add column        commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1674,13 +1673,13 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1702,7 +1701,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                      append (fail)                               rollback (success)
+    //    t1                                      append                                 commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
@@ -1735,13 +1734,13 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1763,7 +1762,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column  commit (success)
@@ -1798,9 +1797,9 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1822,7 +1821,7 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
@@ -1858,9 +1857,9 @@ TEST_P(TestTxnAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2038,7 +2037,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |----------------------|----------|
-    //                    t2                  drop column   commit (success)
+    //                    t2                  drop column   commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -2068,7 +2067,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         status = txn4->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2093,7 +2092,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  drop column (fail)       rollback (success)
+    //                    t2                  drop column           commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -2117,13 +2116,13 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2145,10 +2144,10 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
-    //                    t2        drop column (fail)   rollback (success)
+    //                    t2        drop column      commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -2172,17 +2171,17 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         SizeT row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(row_count, insert_row);
+        EXPECT_EQ(row_count, 0);
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2204,7 +2203,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                      append (fail)                               rollback (success)
+    //    t1                                      append                                commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|------------------------------|
     //                    t2                drop column                 commit (success)
@@ -2232,13 +2231,13 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2260,7 +2259,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                                   append                                   commit (conflict)
+    //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  drop column  commit (success)
@@ -2290,14 +2289,14 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
         SizeT row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, 0);
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2319,7 +2318,7 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  drop column   commit (success)
@@ -2355,9 +2354,9 @@ TEST_P(TestTxnAppend, test_append_drop_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);

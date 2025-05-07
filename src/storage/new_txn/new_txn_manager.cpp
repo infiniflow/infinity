@@ -285,13 +285,13 @@ TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
-bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason) {
+bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
-        if (txn->CheckConflict1(check_txn, conflict_reason)) {
+        if (txn->CheckConflict1(check_txn, conflict_reason, retry_query)) {
             return true;
         }
     }

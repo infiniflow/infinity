@@ -55,4 +55,18 @@ export struct AppendTxnStore : public BaseTxnStore {
     Vector<Pair<RowID, u64>> row_ranges_{};
 };
 
+export struct ImportTxnStore : public BaseTxnStore {
+    explicit ImportTxnStore() : BaseTxnStore(TxnStoreType::kImport) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+
+    Vector<SharedPtr<DataBlock>> input_blocks_{};
+    SegmentID segment_id_{};
+};
+
 } // namespace infinity

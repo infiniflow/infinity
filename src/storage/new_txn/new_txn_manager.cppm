@@ -75,7 +75,7 @@ public:
 
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
-    bool CheckConflict1(NewTxn *txn, String &conflict_reason);
+    bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
 
     void SendToWAL(NewTxn *txn);
 
