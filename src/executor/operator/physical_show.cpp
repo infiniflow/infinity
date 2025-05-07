@@ -90,6 +90,7 @@ import snapshot_brief;
 import command_statement;
 import chunk_index_meta;
 import new_txn_manager;
+import storage;
 
 namespace infinity {
 

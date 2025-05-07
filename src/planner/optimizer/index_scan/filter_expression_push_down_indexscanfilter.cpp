@@ -64,6 +64,7 @@ import segment_index_meta;
 import table_meeta;
 import db_meeta;
 import kv_store;
+import storage;
 
 namespace infinity {
 

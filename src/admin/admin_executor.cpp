@@ -61,6 +61,7 @@ import infinity_exception;
 import node_info;
 import catalog_delta_entry;
 import persistence_manager;
+import storage;
 
 namespace infinity {
 

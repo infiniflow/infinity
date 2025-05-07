@@ -32,6 +32,7 @@ import logical_node_type;
 import base_statement;
 import result_cache_getter;
 import global_resource_usage;
+import storage;
 
 module optimizer;
 

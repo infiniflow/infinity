@@ -76,6 +76,7 @@ import new_catalog;
 import index_base;
 import column_meta;
 import mem_index;
+import storage;
 
 namespace infinity {
 

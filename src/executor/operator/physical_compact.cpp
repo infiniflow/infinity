@@ -44,6 +44,7 @@ import table_meeta;
 import segment_meta;
 import bg_task;
 import compaction_process;
+import storage;
 
 namespace infinity {
 

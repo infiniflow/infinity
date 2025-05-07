@@ -45,6 +45,7 @@ import status;
 import new_catalog;
 import new_txn;
 import segment_meta;
+import storage;
 
 namespace infinity {
 

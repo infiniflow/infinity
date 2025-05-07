@@ -35,6 +35,7 @@ import logger;
 import base_table_ref;
 import knn_expression;
 import new_txn;
+import storage;
 
 namespace infinity {
 

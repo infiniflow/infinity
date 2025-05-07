@@ -113,6 +113,7 @@ import meta_info;
 import db_meeta;
 import table_meeta;
 import new_catalog;
+import storage;
 
 namespace infinity {
 

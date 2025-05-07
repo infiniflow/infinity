@@ -53,6 +53,7 @@ import block_meta;
 import column_meta;
 import new_catalog;
 import roaring_bitmap;
+import storage;
 
 namespace infinity {
 

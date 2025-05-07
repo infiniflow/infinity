@@ -44,6 +44,7 @@ import block_meta;
 import column_meta;
 import new_catalog;
 import status;
+import storage;
 
 namespace infinity {
 

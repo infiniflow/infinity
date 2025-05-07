@@ -55,6 +55,7 @@ import physical_match_tensor_scan;
 import physical_knn_scan;
 import physical_merge_knn;
 import physical_read_cache;
+import storage;
 
 namespace infinity {
 

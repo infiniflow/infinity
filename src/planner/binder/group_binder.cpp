@@ -35,6 +35,7 @@ import column_expr;
 import function_expr;
 import subquery_expr;
 import knn_expr;
+import storage;
 
 namespace infinity {
 

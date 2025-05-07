@@ -25,6 +25,7 @@ import function;
 import status;
 import infinity_exception;
 import logger;
+import storage;
 
 namespace infinity {
 

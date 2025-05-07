@@ -36,6 +36,7 @@ import status;
 import logical_type;
 import array_info;
 import data_type;
+import storage;
 
 namespace {
 

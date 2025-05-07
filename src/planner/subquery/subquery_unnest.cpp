@@ -57,6 +57,7 @@ import infinity_exception;
 import join_reference;
 import data_type;
 import logger;
+import storage;
 
 namespace infinity {
 

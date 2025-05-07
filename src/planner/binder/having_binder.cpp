@@ -28,6 +28,7 @@ import third_party;
 import function_set;
 import bind_alias_proxy;
 import logger;
+import storage;
 
 namespace infinity {
 

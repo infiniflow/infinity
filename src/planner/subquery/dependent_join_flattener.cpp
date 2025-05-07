@@ -47,6 +47,7 @@ import join_reference;
 import data_type;
 import logger;
 import block_index;
+import storage;
 
 namespace infinity {
 

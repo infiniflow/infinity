@@ -52,6 +52,7 @@ import result_cache_manager;
 import snapshot;
 import periodic_trigger_thread;
 import new_txn;
+import storage;
 
 namespace infinity {
 

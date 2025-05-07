@@ -34,6 +34,7 @@ import cached_match_scan;
 import result_cache_manager;
 import meta_info;
 import new_txn;
+import storage;
 
 namespace infinity {
 

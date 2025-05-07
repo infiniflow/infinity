@@ -33,6 +33,7 @@ import infinity_context;
 import background_process;
 import new_txn;
 import new_txn_manager;
+import storage;
 
 namespace infinity {
 

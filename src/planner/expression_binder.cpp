@@ -86,6 +86,7 @@ import expression_type;
 import catalog;
 import meta_info;
 import column_vector;
+import storage;
 
 namespace infinity {
 

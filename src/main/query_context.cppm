@@ -22,7 +22,6 @@ import resource_manager;
 import session_manager;
 import persistence_manager;
 import profiler;
-import storage;
 import txn;
 import data_table;
 import sql_parser;
@@ -38,6 +37,7 @@ namespace infinity {
 
 class NewTxn;
 
+class Storage;
 class LogicalPlanner;
 class PhysicalPlanner;
 class FragmentBuilder;
