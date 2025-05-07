@@ -2287,8 +2287,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_t
                 }
                 break;
             }
-
-
             default: {
                 //
             }
@@ -2674,75 +2672,6 @@ void NewTxn::CancelCommitBottom() {
 }
 
 Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
-    const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
-    for (auto &meta : metas) {
-        switch (meta->type_) {
-            case MetaType::kBlock: {
-                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts);
-                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-
-                auto [version_buffer, status1] = block_meta.GetVersionBuffer();
-                if (!status1.ok()) {
-                    return status1;
-                }
-                Vector<String> object_paths{version_buffer->GetFilename()};
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-
-                String block_lock_key = block_meta.GetBlockTag("lock");
-                Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kBlockColumn: {
-                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts);
-                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
-                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-
-                BufferObj *buffer_obj = nullptr;
-                BufferObj *outline_buffer_obj = nullptr;
-                Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-
-                Vector<String> object_paths;
-                object_paths.reserve(2);
-                object_paths.push_back(buffer_obj->GetFilename());
-                if (outline_buffer_obj != nullptr) {
-                    object_paths.push_back(outline_buffer_obj->GetFilename());
-                }
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-                break;
-            }
-            case MetaType::kChunkIndex: {
-                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts);
-                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
-                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
-                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
-
-                BufferObj *index_buffer = nullptr;
-                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
-                if (!status.ok()) {
-                    return status;
-                }
-                Vector<String> object_paths{index_buffer->GetFilename()};
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-                break;
-            }
-            default: {
-                UnrecoverableError("Unexpected meta key type for buffer object.");
-                break;
-            }
-        }
-    }
-
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -2812,6 +2741,75 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             default: {
+                break;
+            }
+        }
+    }
+
+    const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
+    for (auto &meta : metas) {
+        switch (meta->type_) {
+            case MetaType::kBlock: {
+                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
+                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
+
+                auto [version_buffer, status1] = block_meta.GetVersionBuffer();
+                if (!status1.ok()) {
+                    return status1;
+                }
+                Vector<String> object_paths{version_buffer->GetFilename()};
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+
+                String block_lock_key = block_meta.GetBlockTag("lock");
+                Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kBlockColumn: {
+                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
+                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
+                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
+
+                BufferObj *buffer_obj = nullptr;
+                BufferObj *outline_buffer_obj = nullptr;
+                Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                Vector<String> object_paths;
+                object_paths.reserve(2);
+                object_paths.push_back(buffer_obj->GetFilename());
+                if (outline_buffer_obj != nullptr) {
+                    object_paths.push_back(outline_buffer_obj->GetFilename());
+                }
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+                break;
+            }
+            case MetaType::kChunkIndex: {
+                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
+                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
+                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
+
+                BufferObj *index_buffer = nullptr;
+                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                if (!status.ok()) {
+                    return status;
+                }
+                Vector<String> object_paths{index_buffer->GetFilename()};
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+                break;
+            }
+            default: {
+                UnrecoverableError("Unexpected meta key type for buffer object.");
                 break;
             }
         }
