@@ -55,12 +55,19 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ParallelTest,
                          ::testing::Values(ParallelTest::NEW_CONFIG_PATH, ParallelTest::NEW_VFS_OFF_CONFIG_PATH));
 
-const int data_size = 100000;
+constexpr SizeT kDataSize = 100000;
 
 struct DataRow {
+    int index_;
     String body_;
-    Vector<float> others_;
+    Vector<double> others_;
 };
+
+SizeT RandInt(SizeT low, SizeT high) {
+    static thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<SizeT> dist(low, high);
+    return dist(gen);
+}
 
 Vector<DataRow> DataPreprocessing(const String &filepath) {
     Vector<std::string> texts;
@@ -80,7 +87,7 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     }
     fin.close();
 
-    Vector<std::vector<float>> vectors = {{0.0, 0.0, 0.0, 0.0},
+    Vector<std::vector<double>> vectors = {{0.0, 0.0, 0.0, 0.0},
                                           {1.1, 1.1, 1.1, 1.1},
                                           {2.2, 2.2, 2.2, 2.2},
                                           {3.3, 3.3, 3.3, 3.3},
@@ -94,9 +101,9 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     Vector<DataRow> data_rows;
 
     int base_size = std::min((int)texts.size(), (int)vectors.size());
-    int repeat_times = data_size / base_size;
+    int repeat_times = kDataSize / base_size;
 
-    data_rows.reserve(data_size);
+    data_rows.reserve(kDataSize);
     for (int i = 0; i < repeat_times; ++i) {
         for (int j = 0; j < base_size; ++j) {
             DataRow row;
@@ -106,7 +113,7 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
         }
     }
 
-    for (size_t i = 0; i < data_size - data_rows.size(); ++i) {
+    for (size_t i = 0; i < kDataSize - data_rows.size(); ++i) {
         DataRow row;
         row.body_ = texts[i % texts.size()];
         row.others_ = vectors[i % vectors.size()];
@@ -152,11 +159,46 @@ void FullTextSearch(SharedPtr<Infinity> infinity, const String &db, const String
     infinity->Search(db, table, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
 }
 
-// void insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
-//     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-//
-//     infinity->LocalDisconnect();
-// }
+void insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+
+    const SizeT insert_delete_size = 100;
+    SizeT max_start = data.size() > insert_delete_size ? data.size() - insert_delete_size : 0;
+    SizeT pos = RandInt(0, max_start);
+
+    auto insert_rows = MakeShared<Vector<InsertRowExpr*>>();
+    insert_rows->reserve(insert_delete_size);
+
+    for (SizeT i = 0; i < insert_delete_size && (pos + i) < data.size(); ++i) {
+        const auto& row = data[pos + i];
+        auto insert_row = MakeUnique<InsertRowExpr>();
+        insert_row->columns_ = {"index", "body", "other_vector"};
+
+        auto index_expr = MakeUnique<ConstantExpr>(LiteralType::kInteger);
+        index_expr->integer_value_ = row.index_;
+        insert_row->values_.emplace_back(std::move(index_expr));
+
+        auto body_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
+        body_expr->str_value_ = const_cast<char*>(row.body_.c_str());
+        insert_row->values_.emplace_back(std::move(body_expr));
+
+        auto vector_expr = MakeUnique<ConstantExpr>(LiteralType::kDoubleArray);
+        vector_expr->double_array_ = row.others_;
+        insert_row->values_.emplace_back(std::move(vector_expr));
+
+        insert_rows->emplace_back(insert_row.release());
+    }
+
+    auto result = infinity->Insert(db_name, table_name, insert_rows.get());
+    if (result.IsOk()) {
+        result = infinity->Flush();
+    } else {
+        LOG_ERROR(fmt::format("Insert failed: {}", result.ToString()));
+        return;
+    }
+
+    infinity->LocalDisconnect();
+}
 
 TEST_P(ParallelTest, ChaosTest) {
     auto db_name = "default_db";
