@@ -50,6 +50,7 @@ import index_full_text;
 import statement_common;
 import mem_index;
 import index_base;
+import logger;
 
 class TestTxnReplayCompact : public NewReplayTest {
 public:
@@ -174,6 +175,7 @@ TEST_P(TestTxnReplayCompact, test_compact_with_index) {
     using namespace infinity;
 
     new_txn_mgr->PrintAllKeyValue();
+    LOG_WARN(fmt::format("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
