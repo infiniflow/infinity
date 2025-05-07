@@ -456,14 +456,22 @@ void WalManager::NewFlush() {
             }
 
             TxnState txn_state = txn->GetTxnState();
-            if (txn_state == TxnState::kRollbacking) {
-                // rollback txn
-                // need calls CommitBottom to update NewTxnManager::current_ts_ to NewTxnManager::prepare_commit_ts_
-                continue;
-            } else if (txn_state != TxnState::kCommitting) {
-                String error_message = fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state));
-                UnrecoverableError(error_message);
+
+            switch (txn_state) {
+                case TxnState::kCommitting: {
+                    break;
+                }
+                case TxnState::kRollbacking: {
+                    // rollback txn
+                    // need calls CommitBottom to update NewTxnManager::current_ts_ to NewTxnManager::prepare_commit_ts_
+                    continue;
+                }
+                default: {
+                    String error_message = fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state));
+                    UnrecoverableError(error_message);
+                }
             }
+
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             WalEntry *entry = txn->GetWALEntry();
 
@@ -533,7 +541,12 @@ void WalManager::NewFlush() {
 
         // Commit bottom
         for (const auto &txn : txn_batch) {
-            txn->CommitBottom();
+            TxnState txn_state = txn->GetTxnState();
+            if (txn_state == TxnState::kCommitting) {
+                txn->CommitBottom();
+            } else {
+                txn->RollbackBottom();
+            }
             // TODO: if txn is checkpoint, swap WAL file
         }
         txn_batch.clear();

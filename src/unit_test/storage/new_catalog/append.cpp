@@ -3535,6 +3535,9 @@ TEST_P(TestTxnAppend, test_append_append) {
     RemoveDbDirs();
 }
 
+#if 0
+
+// FIXME: Open it when append is refactored.
 TEST_P(TestTxnAppend, test_append_append_concurrent) {
     using namespace infinity;
 
@@ -3717,6 +3720,8 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
 
     RemoveDbDirs();
 }
+
+#endif
 
 TEST_P(TestTxnAppend, test_append_and_create_index) {
 

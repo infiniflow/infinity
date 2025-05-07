@@ -66,6 +66,8 @@ import defer_op;
 namespace infinity {
 
 Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name) {
+    this->SetTxnType(TransactionType::kDumpMemIndex);
+
     Status status;
 
     Optional<DBMeeta> db_meta;
@@ -237,6 +239,8 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
 }
 
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    this->SetTxnType(TransactionType::kOptimizeIndex);
+
     Status status = Status::OK();
 
     Optional<DBMeeta> db_meta;
