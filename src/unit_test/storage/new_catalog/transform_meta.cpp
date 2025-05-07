@@ -64,24 +64,9 @@ public:
         }
         infinity::InfinityContext::instance().InitPhase1(config_path_);
         infinity::InfinityContext::instance().InitPhase2();
-        std::cerr << "init done!\n";
     }
 
-    void Init(const String &config_path) {
-        std::string config_path_str = config_path;
-        config_path_ = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path_ = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
-        }
-        infinity::InfinityContext::instance().InitPhase1(config_path_);
-        infinity::InfinityContext::instance().InitPhase2();
-        std::cerr << "init with path done!\n";
-    }
-
-    void UnInit() {
-        infinity::InfinityContext::instance().UnInit();
-        std::cerr << "uninit done!\n";
-    }
+    void UnInit() { infinity::InfinityContext::instance().UnInit(); }
 
 protected:
     std::shared_ptr<String> config_path_;
@@ -100,7 +85,7 @@ TEST_P(TransformMeta, db_meta_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/db_meta_00.json";
     // Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
     //    String full_ckp_path = "/home/inf/Downloads/infinity/0000002/data/catalog/FULL.90745.json";
     //    Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
@@ -147,7 +132,7 @@ TEST_P(TransformMeta, db_meta_transform_01) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/db_meta_01.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/db_meta_01.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -190,7 +175,7 @@ TEST_P(TransformMeta, db_meta_transform_02) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/db_meta_02.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/db_meta_02.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -233,7 +218,7 @@ TEST_P(TransformMeta, table_meta_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/table_meta_00.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/table_meta_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -271,7 +256,7 @@ TEST_P(TransformMeta, table_index_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/table_index_00.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/table_index_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -290,11 +275,7 @@ TEST_P(TransformMeta, table_index_transform_00) {
         Optional<TableMeeta> table_meta;
         status = txn->GetTableMeta("default_db", "student", db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        // // Status GetTableMeta(const String &db_name,
-        // //                     const String &table_name,
-        // //                     Optional<DBMeeta> &db_meta,
-        // //                     Optional<TableMeeta> &table_meta,
-        // //                     String *table_key = nullptr);
+
         Optional<TableIndexMeeta> table_index_meta;
 
         status = txn->GetTableIndexMeta("idx_student_name", table_meta.value(), table_index_meta);
@@ -310,7 +291,6 @@ TEST_P(TransformMeta, table_index_transform_00) {
 
     UnInit();
 }
-#if 0
 
 TEST_P(TransformMeta, table_index_transform_01) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
@@ -321,7 +301,7 @@ TEST_P(TransformMeta, table_index_transform_01) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/table_index_01.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/table_index_01.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -374,7 +354,7 @@ TEST_P(TransformMeta, segment_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/segment_00.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/segment_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -393,8 +373,6 @@ TEST_P(TransformMeta, segment_transform_00) {
 
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
     auto [table_info, get_status] = txn->GetTableInfo("db1", "test_table");
-    std::cout << "---------------------" << table_info->db_id_ << std::endl;
-    std::cout << "---------------------" << table_info->table_id_ << std::endl;
     EXPECT_TRUE(get_status.ok());
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
@@ -423,7 +401,7 @@ TEST_P(TransformMeta, block_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/segment_00.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/segment_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -488,7 +466,7 @@ TEST_P(TransformMeta, block_column_transform_00) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = String(test_data_path()) + "/json/segment_00.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/segment_00.json";
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
@@ -520,8 +498,6 @@ TEST_P(TransformMeta, block_column_transform_00) {
             EXPECT_FALSE(status.ok());
         }
     }
-    //     Tuple<SharedPtr<BlockColumnInfo>, Status>
-    // GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
 
     status = new_txn_mgr->CommitTxn(txn);
     EXPECT_TRUE(status.ok());
@@ -538,7 +514,7 @@ TEST_P(TransformMeta, block_column_transform_01) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    String full_ckp_path = "/home/infiniflow/Downloads/FULL.2000764.json";
+    String full_ckp_path = String(test_data_path()) + "/json/meta/big_data_meta.json";
 
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
@@ -607,10 +583,10 @@ TEST_P(TransformMeta, block_column_transform_02) {
     EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    // String full_ckp_path = "/home/infiniflow/Downloads/FULL.52.json";
-    String full_ckp_path = "/home/inf/Downloads/infinity/0000002/data/catalog/FULL.90745.json";
-    Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
-
+    String full_ckp_path = String(test_data_path()) + "/json/meta/hybrid_column_type_meta.json";
+    // String full_ckp_path = "/home/inf/Downloads/infinity/0000002/data/catalog/FULL.90745.json";
+    // Vector<String> delta_ckp_path_array{"/home/inf/Downloads/infinity/0000002/data/catalog/DELTA.95457"};
+    Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
     kv_store_ptr->Uninit();
@@ -669,4 +645,3 @@ TEST_P(TransformMeta, block_column_transform_02) {
     kv_instance->Commit();
     UnInit();
 }
-#endif
