@@ -479,7 +479,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                     continue;
                 }
 
-                MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_iter->second.get());
+                MetaTableIndexObject *table_index_object = static_cast<MetaTableIndexObject *>(table_index_iter->second.get());
                 auto &segment_map = table_index_object->segment_map_;
                 auto segment_index_iter = segment_map.find(chunk_index_key->segment_id_);
                 if (segment_index_iter == segment_map.end()) {
@@ -554,7 +554,7 @@ nlohmann::json MetaTree::ToJson() const {
     for (const auto &pm : pm_object_map_) {
         json_res["objects"].push_back(pm.second->ToJson());
     }
-    return json_res.dump();
+    return json_res;
 }
 
 Vector<MetaTableObject *> MetaTree::ListTables() const {

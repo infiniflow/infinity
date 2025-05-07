@@ -92,6 +92,10 @@ String ToString(ShowStmtType type) {
             return "Show delta logs";
         case ShowStmtType::kCatalogs:
             return "Show catalogs";
+        case ShowStmtType::kCatalog:
+            return "Show catalog";
+        case ShowStmtType::kCatalogToFile:
+            return "Show catalog to file";
         case ShowStmtType::kPersistenceFiles:
             return "Show persistence files";
         case ShowStmtType::kPersistenceObjects:
