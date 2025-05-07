@@ -54,6 +54,11 @@ protected:
         SessionManager *session_manager = InfinityContext::instance().session_manager();
         session_manager->RemoveSessionByID(session_->session_id());
         session_manager->RemoveSessionByID(session2_->session_id());
+
+        session_.reset();
+        session2_.reset();
+
+        BaseTestParamStr::TearDown();
     }
 
     UniquePtr<QueryContext> MakeQueryContext() {
