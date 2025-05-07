@@ -137,7 +137,9 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
 }
 
 void Infinity::LocalDisconnect() {
-    //    fmt::print("To disconnect the database.\n");
+    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    session_mgr->RemoveSessionByID(session_->session_id());
+    session_.reset();
 }
 
 SharedPtr<Infinity> Infinity::RemoteConnect() {
