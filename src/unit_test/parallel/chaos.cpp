@@ -19,10 +19,6 @@ import base_test;
 #include <definition/column_def.h>
 #include <filesystem>
 #include <random>
-#include <statement/extra/create_index_info.h>
-#include <statement/extra/extra_ddl_info.h>
-#include <thread>
-#include <type/info/embedding_info.h>
 #include <vector>
 #include <fstream>
 import new_txn_manager;
@@ -39,6 +35,20 @@ import parsed_expr;
 import query_options;
 import logger;
 import third_party;
+import compilation_config;
+import profiler;
+import internal_types;
+import logical_type;
+import create_index_info;
+import column_def;
+import data_type;
+import extra_ddl_info;
+import statement_common;
+import constant_expr;
+import column_expr;
+import virtual_store;
+import insert_row_expr;
+import embedding_info;
 
 using namespace infinity;
 
@@ -50,21 +60,18 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ParallelTest,
                          ::testing::Values(ParallelTest::NEW_CONFIG_PATH, ParallelTest::NEW_VFS_OFF_CONFIG_PATH));
 
-// const int DATA_SIZE = 100000;
-// const int TEXT_ROWS = 99;
-// const int VECTOR_ROWS = 10;
+const int data_size = 100000;
 
 struct DataRow {
     String body;
     Vector<float> others;
 };
 
-Vector<String> readTextData(const String &filepath) {
+Vector<DataRow> data_preprocessing(const String &filepath) {
     std::vector<std::string> texts;
     std::ifstream fin(filepath);
     if (!fin) {
         std::cerr << "Cannot open text data: " << filepath << std::endl;
-        return texts;
     }
     std::string line;
     while (std::getline(fin, line)) {
@@ -77,37 +84,37 @@ Vector<String> readTextData(const String &filepath) {
         }
     }
     fin.close();
-    return texts;
-}
 
-std::vector< std::vector<float> > readVectorData(const std::string &filepath) {
-    std::vector< std::vector<float> > vectors;
-    std::ifstream fin(filepath);
-    if (!fin) {
-        std::cerr << "Cannot open vector data: " << filepath << std::endl;
-        return vectors;
-    }
-    std::string line;
-    while (std::getline(fin, line)) {
-        std::istringstream ss(line);
-        std::vector<float> vec;
-        std::string token;
-        while (std::getline(ss, token, ',')) {
-            try {
-                vec.push_back(std::stof(token));
-            } catch (const std::exception &e) {
-                std::cerr << "Convert failed: " << token << std::endl;
-            }
-        }
+    Vector<std::vector<float>> vectors = {
+        {0.0, 0.0, 0.0, 0.0}, {1.1, 1.1, 1.1, 1.1}, {2.2, 2.2, 2.2, 2.2},
+        {3.3, 3.3, 3.3, 3.3}, {4.4, 4.4, 4.4, 4.4}, {5.5, 5.5, 5.5, 5.5},
+        {6.6, 6.6, 6.6, 6.6}, {7.7, 7.7, 7.7, 7.7}, {8.8, 8.8, 8.8, 8.8},
+        {9.9, 9.9, 9.9, 9.9}
+    };
 
-        if (vec.size() == 4) {
-            vectors.push_back(vec);
-        } else {
-            std::cerr << "Lines amount isn't available." << std::endl;
+    Vector<DataRow> data_rows;
+
+    int base_size = std::min((int)texts.size(), (int)vectors.size());
+    int repeat_times = data_size / base_size;
+
+    data_rows.reserve(data_size);
+    for (int i = 0; i < repeat_times; ++i) {
+        for (int j = 0; j < base_size; ++j) {
+            DataRow row;
+            row.body = texts[j % texts.size()];
+            row.others = vectors[j % vectors.size()];
+            data_rows.push_back(row);
         }
     }
-    fin.close();
-    return vectors;
+
+    for (size_t i = 0; i < data_size - data_rows.size(); ++i) {
+        DataRow row;
+        row.body = texts[i % texts.size()];
+        row.others = vectors[i % vectors.size()];
+        data_rows.push_back(row);
+    }
+
+    return data_rows;
 }
 
 void FullTextSearch(SharedPtr<Infinity> infinity, const std::string &db, const std::string &table, const std::string &text) {
@@ -146,13 +153,21 @@ void FullTextSearch(SharedPtr<Infinity> infinity, const std::string &db, const s
     infinity->Search(db, table, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
 }
 
-
+// void insert(const String &db_name, const String &table_name, Vector<DataRow> data){
+//     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+//
+//     infinity->LocalDisconnect();
+// }
 
 TEST_P(ParallelTest, ChaosTest) {
     auto db_name = "default_db";
     auto table_name = "chaos_test";
 
     String data_path = "/var/infinity";
+
+    std::string fulltext_file_path = std::__fs::filesystem::current_path().string() + "/test/data/csv/enwiki_99.csv";
+
+    auto data = data_preprocessing(fulltext_file_path);
 
     Infinity::LocalInit(data_path);
     CreateTableOptions create_tb_options;
