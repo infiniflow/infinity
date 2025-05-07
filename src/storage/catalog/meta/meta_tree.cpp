@@ -484,7 +484,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto segment_index_iter = segment_map.find(chunk_index_key->segment_id_);
                 if (segment_index_iter == segment_map.end()) {
                     String error_message = fmt::format("Segment index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    continue;
                 }
 
                 MetaSegmentIndexObject *segment_index_object = static_cast<MetaSegmentIndexObject *>(segment_index_iter->second.get());
