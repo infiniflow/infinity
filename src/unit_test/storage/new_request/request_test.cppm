@@ -50,6 +50,12 @@ protected:
         session2_ = std::move(remote_session2);
     }
 
+    void TearDown() override {
+        SessionManager *session_manager = InfinityContext::instance().session_manager();
+        session_manager->RemoveSessionByID(session_->session_id());
+        session_manager->RemoveSessionByID(session2_->session_id());
+    }
+
     UniquePtr<QueryContext> MakeQueryContext() {
         UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
         query_context_ptr->Init(InfinityContext::instance().config(),
