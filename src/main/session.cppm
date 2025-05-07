@@ -43,11 +43,11 @@ public:
     [[nodiscard]] inline String &current_database() { return current_database_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
-    [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
-    inline void SetTxn(Txn *txn) { txn_ = txn; }
+    [[nodiscard]] inline Txn *GetTxn() const { return nullptr; }
+    inline void SetTxn(Txn *txn) { txn_ = nullptr; }
 
-    [[nodiscard]] inline NewTxn *GetNewTxn() const { return new_txn_; }
-    inline void SetNewTxn(NewTxn *new_txn) { new_txn_ = new_txn; }
+    [[nodiscard]] inline NewTxn *GetNewTxn() const { return new_txn_.get(); }
+    inline void SetNewTxn(const SharedPtr<NewTxn> &new_txn) { new_txn_ = new_txn; }
 
     void IncreaseQueryCount() { ++query_count_; }
 
@@ -71,7 +71,7 @@ protected:
 
     // Txn is session level.
     Txn *txn_{};
-    NewTxn *new_txn_{};
+    SharedPtr<NewTxn> new_txn_{};
 
     SessionType session_type_{SessionType::kRemote};
 

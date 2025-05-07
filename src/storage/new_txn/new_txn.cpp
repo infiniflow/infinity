@@ -622,6 +622,8 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
 // Index OPs
 
 Status NewTxn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kCreateIndex);
+
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -1210,12 +1212,25 @@ Status NewTxn::Commit() {
 
     if (NeedToAllocate()) {
         // If the txn is 'append' / 'import' / 'dump index' / 'create index' go to id generator;
-        // LOG_INFO(fmt::format("To allocation task: {}", *this->GetTxnText()));
-        SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
-        txn_mgr_->SubmitForAllocation(txn_allocator_task);
-        txn_allocator_task->Wait();
-        status = txn_allocator_task->status();
-        // LOG_INFO(fmt::format("Finish allocation task: {}", *this->GetTxnText()));
+        TxnState txn_state = this->GetTxnState();
+        switch (txn_state) {
+            case TxnState::kCommitting: {
+                // LOG_INFO(fmt::format("To allocation task: {}, transaction: {}", *this->GetTxnText(), txn_context_ptr_->txn_id_));
+                SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
+                txn_mgr_->SubmitForAllocation(txn_allocator_task);
+                txn_allocator_task->Wait();
+                status = txn_allocator_task->status();
+                // LOG_INFO(fmt::format("Finish allocation task: {}, transaction: {}", *this->GetTxnText(), txn_context_ptr_->txn_id_));
+                break;
+            }
+            case TxnState::kRollbacking: {
+                txn_mgr_->RemoveFromAllocation(commit_ts);
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
+            }
+        }
     }
 
     if (status.ok()) {
@@ -1247,7 +1262,9 @@ Status NewTxn::Commit() {
 
     if (NeedToAllocate()) {
         // Wait the commit task finish.
+        LOG_TRACE(fmt::format("Wait task finish: transaction: {}", txn_context_ptr_->txn_id_));
         txn_committer_task_->Wait();
+        LOG_TRACE(fmt::format("Task finish: transaction: {}", txn_context_ptr_->txn_id_));
     }
     PostCommit();
 
@@ -2375,28 +2392,27 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
 void NewTxn::CommitBottom() {
     // update txn manager ts to commit_ts
     // erase txn_id from not_committed_txns_
-
-    LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
+    TransactionID txn_id = this->TxnID();
+    LOG_TRACE(fmt::format("Transaction commit bottom: {} start.", txn_id));
     TxnState txn_state = this->GetTxnState();
+    if (txn_state != TxnState::kCommitting) {
+        UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
+    }
 
-    // both rollback and commit will run CommitBottom, but rollback doesn't commit rocksdb, but commit state does.
-    if (txn_state == TxnState::kCommitting) {
-        // Try to commit rocksdb transaction
-        Status status = kv_instance_->Commit();
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
-        }
-    } else if (txn_state != TxnState::kRollbacking) {
-        UnrecoverableError(fmt::format("Unexptected transaction state: {}", TxnState2Str(txn_state)));
+    // Try to commit rocksdb transaction
+    Status status = kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
     }
 
     if (NeedToAllocate()) {
         // Submit commit task to commit thread
+        LOG_TRACE(fmt::format("Submit task to commit: transaction: {}", txn_context_ptr_->txn_id_));
         txn_committer_task_ = MakeShared<TxnCommitterTask>(this);
         txn_mgr_->SubmitForCommit(txn_committer_task_);
+        LOG_TRACE(fmt::format("Task is committed: transaction: {}", txn_context_ptr_->txn_id_));
     }
 
-    TransactionID txn_id = this->TxnID();
     TxnTimeStamp commit_ts = this->CommitTS();
     txn_mgr_->CommitBottom(commit_ts, txn_id);
 
@@ -2404,7 +2420,27 @@ void NewTxn::CommitBottom() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_bottom_done_ = true;
     commit_cv_.notify_one();
-    LOG_TRACE(fmt::format("NewTxn bottom: {} is finished.", txn_context_ptr_->txn_id_));
+    LOG_TRACE(fmt::format("Transaction commit bottom: {} complete.", txn_id));
+}
+
+void NewTxn::RollbackBottom() {
+    // update txn manager ts to commit_ts
+    // erase txn_id from not_committed_txns_
+    TransactionID txn_id = this->TxnID();
+    LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
+    TxnState txn_state = this->GetTxnState();
+    if (txn_state != TxnState::kRollbacking) {
+        UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
+    }
+
+    TxnTimeStamp commit_ts = this->CommitTS();
+    txn_mgr_->CommitBottom(commit_ts, txn_id);
+
+    // Notify the top half
+    std::unique_lock<std::mutex> lk(commit_lock_);
+    commit_bottom_done_ = true;
+    commit_cv_.notify_one();
+    LOG_TRACE(fmt::format("Transaction rollback bottom: {} complete.", txn_id));
 }
 
 void NewTxn::PostCommit() {

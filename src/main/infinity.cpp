@@ -137,7 +137,9 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
 }
 
 void Infinity::LocalDisconnect() {
-    //    fmt::print("To disconnect the database.\n");
+    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    session_mgr->RemoveSessionByID(session_->session_id());
+    session_.reset();
 }
 
 SharedPtr<Infinity> Infinity::RemoteConnect() {
@@ -896,7 +898,7 @@ QueryResult Infinity::ShowFunction(const String &function_name) {
     return result;
 }
 
-QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows) {
+QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *&insert_rows) {
     DeferFn free_insert_rows([&]() {
         if (insert_rows != nullptr) {
             for (auto *insert_row : *insert_rows) {
@@ -922,6 +924,7 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
         insert_statement->insert_rows_.emplace_back(insert_row_expr_ptr);
         insert_row_expr_ptr = nullptr;
     }
+    insert_rows = nullptr;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
 }

@@ -103,19 +103,11 @@ public:
 
     void RollbackTxn();
 
-    [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
+    [[nodiscard]] Txn *GetTxn() const { return nullptr; }
 
-    bool SetTxn(Txn *txn) const {
-        if (session_ptr_->GetTxn() == nullptr) {
-            session_ptr_->SetTxn(txn);
-            return true;
-        }
-        return false;
-    }
+    bool SetTxn(Txn *txn) const { return false; }
 
     [[nodiscard]] NewTxn *GetNewTxn() const;
-
-    bool SetNewTxn(NewTxn *txn) const;
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
 

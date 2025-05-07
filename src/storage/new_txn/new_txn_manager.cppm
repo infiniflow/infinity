@@ -48,6 +48,7 @@ public:
 
     bool Stopped();
 
+    SharedPtr<NewTxn> BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type);
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
@@ -138,6 +139,8 @@ public:
     Vector<SharedPtr<NewTxn>> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
+
+    void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
     void SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task);
 
