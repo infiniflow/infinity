@@ -117,7 +117,7 @@ Vector<DataRow> data_preprocessing(const String &filepath) {
     return data_rows;
 }
 
-void FullTextSearch(SharedPtr<Infinity> infinity, const std::string &db, const std::string &table, const std::string &text) {
+void FullTextSearch(SharedPtr<Infinity> infinity, const String &db, const String &table) {
     auto *search_expr = new SearchExpr();
     auto *exprs = new std::vector<ParsedExpr *>();
     auto *match_expr = new MatchExpr();
