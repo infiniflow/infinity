@@ -289,10 +289,13 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
     } catch (RecoverableException &e) {
 
         // If txn has been rollbacked, do not rollback again here.
-        if (GetTxn() != nullptr) {
+        NewTxn *new_txn = this->GetNewTxn();
+        if (new_txn != nullptr) {
             StopProfile();
             StartProfile(QueryPhase::kRollback);
-            this->RollbackTxn();
+            if (new_txn->GetTxnState() == TxnState::kRollbacking) {
+                this->RollbackTxn();
+            }
             StopProfile(QueryPhase::kRollback);
         }
         query_result.result_table_ = nullptr;
@@ -458,46 +461,35 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
-    if (session_ptr_->GetTxn() == nullptr) {
-        NewTxnManager *txn_manager = storage_->new_txn_manager();
-        UniquePtr<String> txn_text = MakeUnique<String>(base_statement ? base_statement->ToString() : "");
+    NewTxnManager *txn_manager = storage_->new_txn_manager();
+    UniquePtr<String> txn_text = MakeUnique<String>(base_statement ? base_statement->ToString() : "");
 
-        NewTxn *new_txn{};
-        if (base_statement->type_ == StatementType::kFlush) {
-            new_txn = txn_manager->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNewCheckpoint);
-            if (new_txn == nullptr) {
-                RecoverableError(Status::FailToStartTxn("System is checkpointing"));
-            }
-        } else {
-            new_txn = txn_manager->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
-        }
-
+    SharedPtr<NewTxn> new_txn{};
+    if (base_statement->type_ == StatementType::kFlush) {
+        new_txn = txn_manager->BeginTxnShared(MakeUnique<String>(base_statement->ToString()), TransactionType::kNewCheckpoint);
         if (new_txn == nullptr) {
-            UnrecoverableError("Cannot get new transaction.");
+            RecoverableError(Status::FailToStartTxn("System is checkpointing"));
         }
-
-        session_ptr_->SetNewTxn(new_txn);
+    } else {
+        new_txn = txn_manager->BeginTxnShared(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
     }
+
+    if (new_txn == nullptr) {
+        UnrecoverableError("Cannot get new transaction.");
+    }
+
+    session_ptr_->SetNewTxn(new_txn);
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
-    if (global_config_->UseNewCatalog()) {
-        TxnTimeStamp commit_ts = 0;
-        NewTxn *new_txn = session_ptr_->GetNewTxn();
-        Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        session_ptr_->SetNewTxn(nullptr);
-        session_ptr_->IncreaseCommittedTxnCount();
-
-        return commit_ts;
+    TxnTimeStamp commit_ts = 0;
+    NewTxn *new_txn = session_ptr_->GetNewTxn();
+    Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
+    if (!status.ok()) {
+        RecoverableError(status);
     }
-    Txn *txn = session_ptr_->GetTxn();
-    TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
-    session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseCommittedTxnCount();
-    storage_->txn_manager()->IncreaseCommittedTxnCount();
+
     return commit_ts;
 }
 
@@ -508,7 +500,6 @@ void QueryContext::RollbackTxn() {
         if (!status.ok()) {
             RecoverableError(status);
         }
-        session_ptr_->SetNewTxn(nullptr);
         session_ptr_->IncreaseRollbackedTxnCount();
         return;
     }
@@ -520,13 +511,5 @@ void QueryContext::RollbackTxn() {
 }
 
 NewTxn *QueryContext::GetNewTxn() const { return session_ptr_->GetNewTxn(); }
-
-bool QueryContext::SetNewTxn(NewTxn *txn) const {
-    if (session_ptr_->GetNewTxn() == nullptr) {
-        session_ptr_->SetNewTxn(txn);
-        return true;
-    }
-    return false;
-}
 
 } // namespace infinity

@@ -42,6 +42,7 @@ import infinity_context;
 import status;
 import txn;
 import new_txn;
+import txn_state;
 
 namespace infinity {
 
@@ -61,6 +62,7 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
 
     Txn *txn = query_context->GetTxn();
     NewTxn *new_txn = query_context->GetNewTxn();
+    new_txn->SetTxnType(TransactionType::kUpdate);
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
     SizeT input_data_block_count = prev_op_state->data_block_array_.size();

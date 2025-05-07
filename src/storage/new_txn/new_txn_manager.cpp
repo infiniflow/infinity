@@ -128,7 +128,7 @@ void NewTxnManager::Stop() {
 
 bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
-NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) {
+SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "NewTxnManager is not running, cannot create txn";
@@ -170,8 +170,10 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
     txn_map_[new_txn_id] = new_txn;
     begin_txns_.emplace(begin_ts, new_txn_id);
 
-    return new_txn.get();
+    return new_txn;
 }
+
+NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) { return BeginTxnShared(std::move(txn_text), txn_type).get(); }
 
 UniquePtr<NewTxn> NewTxnManager::BeginReplayTxn(const SharedPtr<WalEntry> &wal_entry) {
     // Check if the is_running_ is true
@@ -588,14 +590,38 @@ void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocato
     }
 
     allocator_map_.at(commit_ts) = txn_allocator_task;
+    //    for (const auto &pair : allocator_map_) {
+    //        if (pair.second == nullptr) {
+    //            LOG_INFO(fmt::format("Suspended null task: commit_ts: {}", pair.first));
+    //        } else {
+    //            NewTxn *txn_ptr = pair.second->txn_ptr();
+    //            LOG_INFO(
+    //                fmt::format("Suspended task: {}, transaction id: {}, commit_ts: {}", *txn_ptr->GetTxnText(), txn_ptr->TxnID(),
+    //                txn_ptr->CommitTS()));
+    //        }
+    //    }
     while (!allocator_map_.empty() && allocator_map_.begin()->second != nullptr) {
-        // LOG_INFO(fmt::format("Before submit: {}", *allocator_map_.begin()->second->txn_ptr()->GetTxnText()));
+        //        NewTxn *txn_ptr = allocator_map_.begin()->second->txn_ptr();
+        //        LOG_INFO(
+        //            fmt::format("Before submit task: {}, transaction id: {}, commit_ts: {}", *txn_ptr->GetTxnText(), txn_ptr->TxnID(),
+        //            txn_ptr->CommitTS()));
         txn_allocator_->Submit(allocator_map_.begin()->second);
         allocator_map_.erase(allocator_map_.begin());
     }
-} // namespace infinity
+}
 
-void NewTxnManager::SubmitForCommit(const SharedPtr<TxnCommitterTask>& txn_committer_task) {
+void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
+    std::lock_guard guard(locker_);
+    auto iter = allocator_map_.find(commit_ts);
+    if (iter == allocator_map_.end()) {
+        String error_message = fmt::format("NewTxnManager::RemoveFromAllocation commit_ts {} not found in allocator_map_", commit_ts);
+        UnrecoverableError(error_message);
+    }
+    allocator_map_.erase(commit_ts);
+    return;
+}
+
+void NewTxnManager::SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "NewTxnManager is not running, cannot put wal entry";

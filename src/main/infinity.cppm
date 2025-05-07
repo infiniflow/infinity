@@ -161,7 +161,7 @@ public:
     QueryResult ShowMemoryAllocations();
     QueryResult ShowFunction(const String &function_name);
 
-    QueryResult Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows);
+    QueryResult Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *&insert_rows);
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 

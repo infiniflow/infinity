@@ -71,6 +71,7 @@ import wal_manager;
 import infinity_context;
 import statement_common;
 import new_txn;
+import txn_state;
 
 namespace infinity {
 
@@ -214,6 +215,7 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
 
         NewTxn *new_txn = query_context->GetNewTxn();
+        new_txn->SetTxnType(TransactionType::kImport);
         Status status = new_txn->Import(*table_info_->db_name_, *table_info_->table_name_, data_blocks);
         if (!status.ok()) {
             import_op_state->status_ = status;
