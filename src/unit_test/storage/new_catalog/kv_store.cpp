@@ -30,9 +30,9 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(TestTxnKVStoreTest, kv_store0) {
     using namespace infinity;
-
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-    Status status = kv_store->Init("/tmp/rocksdb_transaction_example1");
+    Status status = kv_store->Init(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 
     std::string value;
@@ -62,16 +62,16 @@ TEST_P(TestTxnKVStoreTest, kv_store0) {
     status = kv_store->Uninit();
     EXPECT_TRUE(status.ok());
 
-    status = kv_store->Destroy("/tmp/rocksdb_transaction_example1");
+    status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 }
 
 TEST_P(TestTxnKVStoreTest, kv_store1) {
     using namespace infinity;
-
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     // Test multi-version
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-    kv_store->Init("/tmp/rocksdb_transaction_example");
+    kv_store->Init(rocksdb_tmp_path);
     UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
     std::string value;
@@ -131,17 +131,17 @@ TEST_P(TestTxnKVStoreTest, kv_store1) {
 
     status = kv_store->Uninit();
     EXPECT_TRUE(status.ok());
-    status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+    status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 }
 
 TEST_P(TestTxnKVStoreTest, kv_store2) {
     using namespace infinity;
-
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     // Test disable WAL
     {
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init("/tmp/rocksdb_transaction_example");
+        kv_store->Init(rocksdb_tmp_path);
         UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
         std::string value;
@@ -161,7 +161,7 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
         EXPECT_TRUE(status.ok());
 
         kv_store = MakeUnique<KVStore>();
-        kv_store->Init("/tmp/rocksdb_transaction_example");
+        kv_store->Init(rocksdb_tmp_path);
         kv_instance1 = kv_store->GetInstance();
 
         status = kv_instance1->Get("abc", value);
@@ -174,7 +174,7 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
 
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
-        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+        status = kv_store->Destroy(rocksdb_tmp_path);
         EXPECT_TRUE(status.ok());
     }
 
@@ -231,11 +231,11 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
 
 TEST_P(TestTxnKVStoreTest, kv_store3) {
     using namespace infinity;
-
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     // Test disable WAL
     {
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init("/tmp/rocksdb_transaction_example");
+        kv_store->Init(rocksdb_tmp_path);
 
         {
             UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
@@ -278,18 +278,19 @@ TEST_P(TestTxnKVStoreTest, kv_store3) {
 
         Status status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
-        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+        status = kv_store->Destroy(rocksdb_tmp_path);
         EXPECT_TRUE(status.ok());
     }
 }
 
 TEST_P(TestTxnKVStoreTest, kv_store4) {
     using namespace infinity;
-
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
+    const auto rocksdb_backup_path = fmt::format("{}/rocksdb_example_backup", GetFullTmpDir());
     // Backup
     {
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init("/tmp/rocksdb_transaction_example");
+        kv_store->Init(rocksdb_tmp_path);
         UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
         Status status = kv_instance1->Put("db|db1|10", "10");
@@ -304,7 +305,7 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
         kv_store->Flush();
 
         Vector<rocksdb::BackupInfo> backup_info_list;
-        status = kv_store->CreateBackup("/tmp/rocksdb_example_backup", backup_info_list);
+        status = kv_store->CreateBackup(rocksdb_backup_path, backup_info_list);
         EXPECT_TRUE(status.ok());
 
         for (const auto &backup_info : backup_info_list) {
@@ -315,13 +316,13 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
 
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
-        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+        status = kv_store->Destroy(rocksdb_tmp_path);
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = KVStore::RestoreFromBackup("/tmp/rocksdb_example_backup", "/tmp/rocksdb_transaction_example");
+        Status status = KVStore::RestoreFromBackup(rocksdb_backup_path, rocksdb_tmp_path);
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init("/tmp/rocksdb_transaction_example");
+        kv_store->Init(rocksdb_tmp_path);
         {
             UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
             const String prefix = "db|db1|";
@@ -343,7 +344,7 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
         }
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
-        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+        status = kv_store->Destroy(rocksdb_tmp_path);
         EXPECT_TRUE(status.ok());
     }
 }
@@ -364,7 +365,7 @@ TEST_P(TestTxnKVStoreTest, kv_store5) {
     using rocksdb::TransactionOptions;
     using rocksdb::WriteOptions;
 
-    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_two_phases_transaction", GetFullTmpDir());
 
     {
         // open DB
@@ -377,7 +378,7 @@ TEST_P(TestTxnKVStoreTest, kv_store5) {
         TransactionOptions txn_options;
         txn_options.set_snapshot = true;
 
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        Status s = TransactionDB::Open(options, txn_db_options, rocksdb_tmp_path, &txn_db);
         EXPECT_TRUE(s.ok());
 
         WriteOptions write_options;
@@ -431,14 +432,15 @@ TEST_P(TestTxnKVStoreTest, kv_store5) {
 
         // Cleanup
         delete txn_db;
-        KVStore::Destroy(db_path);
+        KVStore::Destroy(rocksdb_tmp_path);
     }
 }
 
 TEST_P(TestTxnKVStoreTest, kv_store6) {
     using namespace infinity;
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-    kv_store->Init("/tmp/rocksdb_transaction_example");
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
+    kv_store->Init(rocksdb_tmp_path);
     {
 
         UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
@@ -475,7 +477,7 @@ TEST_P(TestTxnKVStoreTest, kv_store6) {
     }
     Status status = kv_store->Uninit();
     EXPECT_TRUE(status.ok());
-    status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+    status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 }
 
