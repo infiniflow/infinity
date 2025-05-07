@@ -345,7 +345,7 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
                                 return status;
                             }
                             auto obj_addr_path_key = KeyEncode::PMObjectPathKey(fine_path);
-                            obj_addr_path_key = "more|" + obj_addr_path_key;
+                            // obj_addr_path_key = "more|" + obj_addr_path_key;
                             auto &obj_addr = obj_addrs_[i];
                             nlohmann::json json_obj;
                             json_obj["obj_key"] = obj_addr.obj_key_;
@@ -562,12 +562,20 @@ Status NewCatalog::TransformData(const String &data_path, KVInstance *kv_instanc
         for (auto &obj_addr_json : (*full_ckp_json)["obj_addr_map"]["obj_addr_array"]) {
             String path_key = obj_addr_json["local_path"];
             String fine_path;
-            status = RefactorPath(path_key, fine_path, '|');
+            status = RefactorPath(path_key, fine_path, '/');
             if (!status.ok()) {
                 return status;
             }
-            auto ob_addr_key = KeyEncode::PMObjectPathKey(fine_path);
+            auto ob_addr_key = KeyEncode::PMObjectKey(fine_path);
             kv_instance->Put(ob_addr_key, obj_addr_json["obj_addr"].dump());
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        for (auto &obj_json : (*full_ckp_json)["obj_addr_map"]["objects"]["obj_stat_array"]) {
+            String obj_key = obj_json["obj_key"];
+            auto ob_addr_key = KeyEncode::PMObjectStatKey(obj_key);
+            kv_instance->Put(ob_addr_key, obj_json["obj_stat"].dump());
             if (!status.ok()) {
                 return status;
             }
@@ -609,15 +617,15 @@ Status NewCatalog::TransformData(const String &data_path, KVInstance *kv_instanc
 
 Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_paths) {
     // Read full checkpoint file
-    Status status;
-    // String value;
-    // Status status = kv_store_->Get(LATEST_DATABASE_ID.data(), value);
-    // if (status.ok()) {
-    //     return status;
-    // }
-    // if (status.code() != ErrorCode::kNotFound) {
-    //     UnrecoverableError("Get element from kv failed.");
-    // }
+    // Status status;
+    String value;
+    Status status = kv_store_->Get(LATEST_DATABASE_ID.data(), value);
+    if (status.ok()) {
+        return status;
+    }
+    if (status.code() != ErrorCode::kNotFound) {
+        UnrecoverableError("Get element from kv failed.");
+    }
 
     UniquePtr<nlohmann::json> full_ckp_json = Catalog::LoadFullCheckpointToJson(config_ptr, full_ckp_path);
     status = NewCatalog::Init(kv_store_);
@@ -628,8 +636,8 @@ Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_p
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
     dir_set_.insert(".");
-    // auto data_path = config_ptr->DataDir();
-    auto data_path = "/home/inf/Downloads/infinity_vfs_off1/data";
+    auto data_path = config_ptr->DataDir();
+    // auto data_path = "/home/inf/Downloads/infinity_vfs_off1/data";
     bool is_vfs = full_ckp_json->contains("obj_addr_map") && (*full_ckp_json)["obj_addr_map"].contains("obj_addr_size");
 
     if (full_ckp_json->contains("databases")) {
@@ -647,6 +655,7 @@ Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_p
     TransformData(data_path, kv_instance.get(), full_ckp_json.get(), is_vfs);
 
     // Rename the filename
+    // if (is_vfs) {}
     status = kv_instance->Commit();
     if (!status.ok()) {
         return status;
@@ -1738,22 +1747,37 @@ SharedPtr<MetaTree> NewCatalog::MakeMetaTree() const {
 
 Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
+    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
-    auto meta_tree_ptr = this->MakeMetaTree();
-    // auto json = meta_tree_ptr->ToJson();
-    LOG_INFO(meta_tree_ptr->ToJson().dump());
-
-    Vector<MetaTableObject *> table_ptrs = meta_tree_ptr->ListTables();
-    for (const auto &table_ptr : table_ptrs) {
-        SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
-        SegmentID next_segment_id = table_ptr->GetNextSegmentID();
-        SizeT current_segment_row_count = table_ptr->GetCurrentSegmentRowCount(storage_ptr);
-        LOG_INFO(fmt::format("Table: {}, unsealed_segment_id: {}, next_segment_id: {}, current_segment_row_count: {}",
-                             table_ptr->GetTableName(),
-                             unsealed_segment_id,
-                             next_segment_id,
-                             current_segment_row_count));
+    Vector<Pair<String, String>> all_key_values = kv_instance->GetAllKeyValue();
+    SizeT meta_count = all_key_values.size();
+    Vector<SharedPtr<MetaKey>> meta_keys;
+    meta_keys.reserve(meta_count);
+    for (SizeT idx = 0; idx < meta_count; ++idx) {
+        const auto &pair = all_key_values[idx];
+        SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
+        if (meta_key == nullptr) {
+            LOG_ERROR(fmt::format("Can't parse {}: {}: {}", idx, pair.first, pair.second));
+        } else {
+            LOG_INFO(fmt::format("META[{}] KEY: {}", idx, meta_key->ToString()));
+        }
+        meta_keys.emplace_back(meta_key);
     }
+    kv_instance->Commit();
+    SharedPtr<MetaTree> meta_tree = MetaTree::MakeMetaTree(meta_keys);
+    LOG_INFO(meta_tree->ToJson().dump());
+
+    // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
+    // for (const auto &table_ptr : table_ptrs) {
+    //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
+    //     SegmentID next_segment_id = table_ptr->GetNextSegmentID();
+    //     SizeT current_segment_row_count = table_ptr->GetCurrentSegmentRowCount(storage_ptr);
+    //     LOG_INFO(fmt::format("Table: {}, unsealed_segment_id: {}, next_segment_id: {}, current_segment_row_count: {}",
+    //                          table_ptr->GetTableName(),
+    //                          unsealed_segment_id,
+    //                          next_segment_id,
+    //                          current_segment_row_count));
+    // }
 
     return Status::OK();
 }
