@@ -45,13 +45,8 @@ bool String2UInt64AddOperator::Merge(const rocksdb::Slice & /*key*/,
 }
 
 u64 String2UInt64AddOperator::DecodeInteger(const rocksdb::Slice &value, rocksdb::Logger *logger) const {
-    char *end_ptr = nullptr;
-    u64 result = std::strtoul(value.data(), &end_ptr, 0);
-    if (end_ptr != value.data() + value.size()) {
-        UnrecoverableError(fmt::format("uint64 value corruption: {}.", value.ToString()));
-        return 0;
-    }
-    return result;
+    String value_str = value.ToString();
+    return std::stoull(value_str);
 }
 
 } // namespace infinity

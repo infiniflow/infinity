@@ -94,14 +94,14 @@ export struct MetaSegmentIndexObject final : public MetaObject {
     MetaSegmentIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kSegmentIndex, meta_key) {}
     nlohmann::json ToJson() const final;
 
-    Map<ChunkID, SharedPtr<MetaKey>> chunk_map_;
+    Map<ChunkID, SharedPtr<MetaKey>> chunk_map_{};
 };
 
 export struct MetaChunkIndexObject final : public MetaObject {
     MetaChunkIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kChunkIndex, meta_key) {}
     nlohmann::json ToJson() const final;
 
-    Map<String, SharedPtr<MetaKey>> tag_map_;
+    Map<String, SharedPtr<MetaKey>> tag_map_{};
 };
 
 export struct MetaPmObject final : public MetaObject {

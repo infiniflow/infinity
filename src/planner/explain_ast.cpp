@@ -733,6 +733,14 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW CATALOGS"));
             break;
         }
+        case ShowStmtType::kCatalog: {
+            result->emplace_back(MakeShared<String>("SHOW CATALOG"));
+            break;
+        }
+        case ShowStmtType::kCatalogToFile: {
+            result->emplace_back(MakeShared<String>("SHOW CATALOG TO FILE"));
+            break;
+        }
         case ShowStmtType::kPersistenceFiles: {
             result->emplace_back(MakeShared<String>("SHOW PERSISTENCE FILES"));
             break;

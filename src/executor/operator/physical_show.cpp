@@ -90,6 +90,8 @@ import snapshot_brief;
 import command_statement;
 import chunk_index_meta;
 import new_txn_manager;
+import kv_store;
+import meta_tree;
 
 namespace infinity {
 
@@ -507,6 +509,20 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kCatalog: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("meta_data_json");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowStmtType::kCatalogToFile: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("operator_status");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowStmtType::kPersistenceFiles: {
             output_names_->reserve(4);
             output_types_->reserve(4);
@@ -740,6 +756,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kCatalogs: {
             ExecuteShowCatalogs(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kCatalog: {
+            ExecuteShowCatalog(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kCatalogToFile: {
+            ExecuteShowCatalogToFile(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kPersistenceFiles: {
@@ -6322,7 +6346,68 @@ void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperator
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return;
+}
+
+void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    auto *new_catalog = query_context->storage()->new_catalog();
+    auto meta_tree_ptr = new_catalog->MakeMetaTree();
+    auto meta_json = meta_tree_ptr->ToJson();
+
+    constexpr int json_intent = 4;
+    auto meta_str = meta_json.dump(json_intent);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    {
+        Value value = Value::MakeVarchar(meta_str);
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    }
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    String status_message;
+    if (std::filesystem::exists(*file_path_)) {
+        status_message = fmt::format("'{}' already exists", *file_path_);
+    } else {
+        std::ofstream file;
+        file.open(*file_path_);
+        if (!file.is_open()) {
+            status_message = fmt::format("Failed to open '{}' as file", *file_path_);
+        } else {
+            auto *new_catalog = query_context->storage()->new_catalog();
+            auto meta_tree_ptr = new_catalog->MakeMetaTree();
+            auto meta_json = meta_tree_ptr->ToJson();
+
+            constexpr int json_intent = 4;
+            auto meta_str = meta_json.dump(json_intent);
+            file << meta_str;
+            file.close();
+            status_message = "OK";
+        }
+    }
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    {
+        Value value = Value::MakeVarchar(status_message);
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    }
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, ShowOperatorState *operator_state) {

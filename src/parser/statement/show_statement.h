@@ -54,6 +54,8 @@ enum class ShowStmtType {
     kLogs,
     kDeltaLogs,
     kCatalogs,
+    kCatalog,
+    kCatalogToFile,
     kPersistenceFiles,
     kPersistenceObjects,
     kPersistenceObject,
@@ -76,6 +78,7 @@ public:
     std::string table_name_{};
     std::optional<std::string> index_name_{};
     std::optional<std::string> file_name_{};
+    std::optional<std::string> file_path_{};
     std::optional<std::string> function_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};

@@ -28,6 +28,7 @@ import profiler;
 import third_party;
 import storage;
 import catalog_delta_entry;
+import meta_tree;
 
 namespace infinity {
 
@@ -212,6 +213,7 @@ public:
     Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;
 
+    SharedPtr<MetaTree> MakeMetaTree() const;
     Status RestoreCatalogCache(Storage *storage_ptr);
     SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const; // used by append in allocation
     Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id);                   // used by append in allocation
