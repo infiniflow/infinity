@@ -58,15 +58,15 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 const int data_size = 100000;
 
 struct DataRow {
-    String body;
-    Vector<float> others;
+    String body_;
+    Vector<float> others_;
 };
 
 Vector<DataRow> DataPreprocessing(const String &filepath) {
-    std::vector<std::string> texts;
+    Vector<std::string> texts;
     std::ifstream fin(filepath);
     if (!fin) {
-        std::cerr << "Cannot open text data: " << filepath << std::endl;
+        LOG_ERROR(fmt::format("Cannot open text data: {}", filepath));
     }
     std::string line;
     while (std::getline(fin, line)) {
@@ -100,16 +100,16 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     for (int i = 0; i < repeat_times; ++i) {
         for (int j = 0; j < base_size; ++j) {
             DataRow row;
-            row.body = texts[j % texts.size()];
-            row.others = vectors[j % vectors.size()];
+            row.body_ = texts[j % texts.size()];
+            row.others_ = vectors[j % vectors.size()];
             data_rows.push_back(row);
         }
     }
 
     for (size_t i = 0; i < data_size - data_rows.size(); ++i) {
         DataRow row;
-        row.body = texts[i % texts.size()];
-        row.others = vectors[i % vectors.size()];
+        row.body_ = texts[i % texts.size()];
+        row.others_ = vectors[i % vectors.size()];
         data_rows.push_back(row);
     }
 
@@ -162,7 +162,7 @@ TEST_P(ParallelTest, ChaosTest) {
     auto db_name = "default_db";
     auto table_name = "chaos_test";
 
-    String data_path = "/var/infinity";
+    String data_path = GetHomeDir();
 
     String fulltext_file_path = String(test_data_path()) + "/csv/enwiki_99.csv";
 
