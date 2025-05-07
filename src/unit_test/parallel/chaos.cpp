@@ -17,10 +17,6 @@ import base_test;
 
 #include <chrono>
 #include <definition/column_def.h>
-#include <filesystem>
-#include <random>
-#include <vector>
-#include <fstream>
 import new_txn_manager;
 import new_txn;
 import status;
@@ -49,12 +45,11 @@ import column_expr;
 import virtual_store;
 import insert_row_expr;
 import embedding_info;
+import compilation_config;
 
 using namespace infinity;
 
-class ParallelTest : public BaseTestParamStr {
-
-};
+class ParallelTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ParallelTest,
@@ -67,7 +62,7 @@ struct DataRow {
     Vector<float> others;
 };
 
-Vector<DataRow> data_preprocessing(const String &filepath) {
+Vector<DataRow> DataPreprocessing(const String &filepath) {
     std::vector<std::string> texts;
     std::ifstream fin(filepath);
     if (!fin) {
@@ -85,12 +80,16 @@ Vector<DataRow> data_preprocessing(const String &filepath) {
     }
     fin.close();
 
-    Vector<std::vector<float>> vectors = {
-        {0.0, 0.0, 0.0, 0.0}, {1.1, 1.1, 1.1, 1.1}, {2.2, 2.2, 2.2, 2.2},
-        {3.3, 3.3, 3.3, 3.3}, {4.4, 4.4, 4.4, 4.4}, {5.5, 5.5, 5.5, 5.5},
-        {6.6, 6.6, 6.6, 6.6}, {7.7, 7.7, 7.7, 7.7}, {8.8, 8.8, 8.8, 8.8},
-        {9.9, 9.9, 9.9, 9.9}
-    };
+    Vector<std::vector<float>> vectors = {{0.0, 0.0, 0.0, 0.0},
+                                          {1.1, 1.1, 1.1, 1.1},
+                                          {2.2, 2.2, 2.2, 2.2},
+                                          {3.3, 3.3, 3.3, 3.3},
+                                          {4.4, 4.4, 4.4, 4.4},
+                                          {5.5, 5.5, 5.5, 5.5},
+                                          {6.6, 6.6, 6.6, 6.6},
+                                          {7.7, 7.7, 7.7, 7.7},
+                                          {8.8, 8.8, 8.8, 8.8},
+                                          {9.9, 9.9, 9.9, 9.9}};
 
     Vector<DataRow> data_rows;
 
@@ -153,7 +152,7 @@ void FullTextSearch(SharedPtr<Infinity> infinity, const String &db, const String
     infinity->Search(db, table, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
 }
 
-// void insert(const String &db_name, const String &table_name, Vector<DataRow> data){
+// void insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
 //     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
 //
 //     infinity->LocalDisconnect();
@@ -165,9 +164,9 @@ TEST_P(ParallelTest, ChaosTest) {
 
     String data_path = "/var/infinity";
 
-    String fulltext_file_path = std::__fs::filesystem::current_path().string() + "/test/data/csv/enwiki_99.csv";
+    String fulltext_file_path = String(test_data_path()) + "/csv/enwiki_99.csv";
 
-    auto data = data_preprocessing(fulltext_file_path);
+    auto data = DataPreprocessing(fulltext_file_path);
 
     Infinity::LocalInit(data_path);
     CreateTableOptions create_tb_options;
@@ -219,7 +218,7 @@ TEST_P(ParallelTest, ChaosTest) {
         index_info->index_type_ = IndexType::kHnsw;
         index_info->column_name_ = "other_vector";
         auto index_param_list = new std::vector<InitParameter *>();
-        index_param_list->emplace_back(new InitParameter("m","16"));
+        index_param_list->emplace_back(new InitParameter("m", "16"));
         index_param_list->emplace_back(new InitParameter("ef_construction", "50"));
         index_param_list->emplace_back(new InitParameter("metric", "l2"));
         index_info->index_param_list_ = index_param_list;
