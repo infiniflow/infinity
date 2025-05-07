@@ -561,6 +561,8 @@ Status NewTxn::PrintVersion(const String &db_name, const String &table_name, con
 
 Status NewTxn::Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
 
+    this->SetTxnType(TransactionType::kCompact);
+
     this->CheckTxn(db_name);
     if (segment_ids.empty()) {
         return Status::UnexpectedError("No segment is given in compact operation");

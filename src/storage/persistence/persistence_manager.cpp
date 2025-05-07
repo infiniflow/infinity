@@ -131,16 +131,16 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
 
     SizeT src_size = fs::file_size(src_fp, ec);
     if (ec) {
-        String error_message = fmt::format("Failed to get file size of {}.", file_path);
+        String error_message = fmt::format("Failed to get file size of {}", file_path);
         UnrecoverableError(error_message);
     }
     if (src_size == 0) {
-        String error_message = fmt::format("Persist empty local path {}.", file_path);
+        String error_message = fmt::format("Persist empty local path {}", file_path);
         LOG_WARN(error_message);
         ObjAddr obj_addr(ObjAddr::KeyEmpty, 0, 0);
         fs::remove(tmp_file_path, ec);
         if (ec) {
-            String error_message = fmt::format("Failed to remove {}.", tmp_file_path);
+            String error_message = fmt::format("Failed to remove {}", tmp_file_path);
             UnrecoverableError(error_message);
         }
         std::lock_guard<std::mutex> lock(mtx_);
@@ -156,7 +156,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         dst_fp.append(obj_key);
         fs::rename(src_fp, dst_fp, ec);
         if (ec) {
-            String error_message = fmt::format("Failed to rename {} to {}.", src_fp.string(), dst_fp.string());
+            String error_message = fmt::format("Failed to rename {} to {}", src_fp.string(), dst_fp.string());
             UnrecoverableError(error_message);
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
@@ -185,7 +185,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         CurrentObjAppendNoLock(tmp_file_path, src_size);
         fs::remove(tmp_file_path, ec);
         if (ec) {
-            String error_message = fmt::format("Failed to remove {}.", tmp_file_path);
+            String error_message = fmt::format("Failed to remove {}", tmp_file_path);
             UnrecoverableError(error_message);
         }
 
