@@ -77,10 +77,22 @@ String SegmentIndexMetaKey::ToString() const {
     return fmt::format("table_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
 }
 
+String SegmentIndexTagMetaKey::ToString() const {
+    return fmt::format("table_index_tag: {}:{}",
+                       KeyEncode::CatalogIdxSegmentTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, tag_name_),
+                       value_);
+}
+
 String ChunkIndexMetaKey::ToString() const {
     return fmt::format("table_index: {}:{}",
                        KeyEncode::CatalogIdxChunkKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_),
                        commit_ts_);
+}
+
+String ChunkIndexTagMetaKey::ToString() const {
+    return fmt::format("table_index: {}:{}",
+                       KeyEncode::CatalogIdxChunkTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_, tag_name_),
+                       value_);
 }
 
 String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
@@ -91,7 +103,7 @@ String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}"
 
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res["db_id"] = db_id_str_;
+    json_res["db_id"] = std::stoull(db_id_str_);
     json_res["db_name"] = db_name_;
     if (commit_ts_ != UNCOMMIT_TS) {
         json_res["commit_ts"] = commit_ts_;
@@ -102,7 +114,7 @@ nlohmann::json DBMetaKey::ToJson() const {
 
 nlohmann::json TableMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res["table_id"] = table_id_str_;
+    json_res["table_id"] = std::stoull(table_id_str_);
     json_res["table_name"] = table_name_;
     if (commit_ts_ != UNCOMMIT_TS) {
         json_res["commit_ts"] = commit_ts_;
@@ -112,14 +124,14 @@ nlohmann::json TableMetaKey::ToJson() const {
 
 nlohmann::json TableColumnMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res["column_name"] = table_id_str_;
-    json_res["column_definition"] = value_;
+    // json_res["column_definition"] = nlohmann::json::parse(value_);
+    json_res.push_back(nlohmann::json::parse(value_));
     return json_res;
 }
 
 nlohmann::json TableTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = value_;
+    json_res[tag_name_] = nlohmann::json::parse(value_);
     return json_res;
 }
 
@@ -151,7 +163,7 @@ nlohmann::json BlockMetaKey::ToJson() const {
 
 nlohmann::json BlockTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = value_;
+    json_res[tag_name_] = nlohmann::json::parse(value_);
     return json_res;
 }
 
@@ -172,7 +184,7 @@ nlohmann::json TableIndexMetaKey::ToJson() const {
 
 nlohmann::json TableIndexTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = value_;
+    json_res[tag_name_] = nlohmann::json::parse(value_);
     return json_res;
 }
 
@@ -185,6 +197,12 @@ nlohmann::json SegmentIndexMetaKey::ToJson() const {
     return json_res;
 }
 
+nlohmann::json SegmentIndexTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = nlohmann::json::parse(value_);
+    return json_res;
+}
+
 nlohmann::json ChunkIndexMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["chunk_id"] = chunk_id_;
@@ -194,28 +212,36 @@ nlohmann::json ChunkIndexMetaKey::ToJson() const {
     return json_res;
 }
 
+nlohmann::json ChunkIndexTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = nlohmann::json::parse(value_);
+    return json_res;
+}
+
 nlohmann::json SystemTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = value_;
+    json_res[tag_name_] = nlohmann::json::parse(value_);
     return json_res;
 }
 
 nlohmann::json PmPathMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["path"] = path_key_;
-    json_res["description"] = value_;
+    json_res["description"] = nlohmann::json::parse(value_);
     return json_res;
 }
 
 nlohmann::json PmObjectMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["object"] = object_key_;
-    json_res["stat"] = value_;
+    json_res["stat"] = nlohmann::json::parse(value_);
     return json_res;
 }
 
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     Vector<String> fields = infinity::Partition(key, '|');
+
+    auto fields_size = fields.size();
 
     if (fields[0] == "catalog" && fields[1] == "db") {
         const String &db_name_str = fields[2];
@@ -243,7 +269,7 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         const String &segment_id_str = fields[4];
         const String &commit_ts_str = value;
         SegmentID segment_id = std::stoul(segment_id_str);
-        SharedPtr<SegmentMetaKey> segment_meta_key = MakeShared<SegmentMetaKey>(db_id_str, table_id_str, segment_id);
+        auto segment_meta_key = MakeShared<SegmentMetaKey>(db_id_str, table_id_str, segment_id);
         segment_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return segment_meta_key;
     }
@@ -255,7 +281,7 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         const String &segment_id_str = fields[3];
         const String &tag_name_str = fields[4];
         SegmentID segment_id = std::stoul(segment_id_str);
-        SharedPtr<SegmentTagMetaKey> segment_tag_meta_key = MakeShared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
+        auto segment_tag_meta_key = MakeShared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
         segment_tag_meta_key->value_ = value;
         return segment_tag_meta_key;
     }
@@ -268,7 +294,7 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         const String &commit_ts_str = value;
         SegmentID segment_id = std::stoul(segment_id_str);
         BlockID block_id = std::stoul(block_id_str);
-        SharedPtr<BlockMetaKey> block_meta_key = MakeShared<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
+        auto block_meta_key = MakeShared<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
         block_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return block_meta_key;
     }
@@ -312,6 +338,42 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             MakeShared<TableIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, tag_name_str);
         table_index_tag_meta_key->value_ = value;
         return table_index_tag_meta_key;
+    }
+
+    if (fields[0] == "idx_seg") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &index_id_str = fields[3];
+        SegmentID segment_id = std::stoull(fields[4]);
+        if (fields_size == 6) {
+            const String &tag_name_str = fields[5];
+            auto segment_index_tag_meta_key = MakeShared<SegmentIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, tag_name_str);
+            segment_index_tag_meta_key->value_ = value;
+            return segment_index_tag_meta_key;
+        } else {
+            auto segment_index_meta_key = MakeShared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
+            segment_index_meta_key->commit_ts_ = std::stoull(value);
+            return segment_index_meta_key;
+        }
+    }
+
+    if (fields[0] == "idx_chunk") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &index_id_str = fields[3];
+        SegmentID segment_id = std::stoull(fields[4]);
+        ChunkID chunk_id = std::stoull(fields[5]);
+        if (fields_size == 7) {
+            const String &tag_name_str = fields[6];
+            auto chunk_index_tag_meta_key =
+                MakeShared<ChunkIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id, tag_name_str);
+            chunk_index_tag_meta_key->value_ = value;
+            return chunk_index_tag_meta_key;
+        } else {
+            auto chunk_index_meta_key = MakeShared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
+            chunk_index_meta_key->commit_ts_ = std::stoull(value);
+            return chunk_index_meta_key;
+        }
     }
 
     if (fields[0] == "pm") {

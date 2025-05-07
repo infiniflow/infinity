@@ -35,6 +35,7 @@ public:
                          String schema_name,
                          Optional<String> object_name,
                          u64 table_index,
+                         Optional<String> file_path = None,
                          Optional<SegmentID> segment_id = None,
                          Optional<BlockID> block_id = None,
                          Optional<ChunkID> chunk_id = None,
@@ -44,8 +45,8 @@ public:
                          Optional<u64> txn_id = None,
                          Optional<String> function_name = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), show_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
-          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
-          index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
+          table_index_(table_index), file_path_(std::move(file_path)), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id),
+          column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id), function_name_(function_name) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -67,6 +68,8 @@ public:
 
     [[nodiscard]] inline const Optional<u64> session_id() const { return session_id_; }
 
+    [[nodiscard]] inline const Optional<String> file_path() const { return file_path_; }
+
     [[nodiscard]] inline const Optional<SegmentID> segment_id() const { return segment_id_; }
 
     [[nodiscard]] inline const Optional<TransactionID> transaction_id() const { return txn_id_; }
@@ -87,6 +90,7 @@ private:
     Optional<String> object_name_; // It could be table/collection/view name
     u64 table_index_{};
 
+    Optional<String> file_path_;
     Optional<SegmentID> segment_id_{};
     Optional<BlockID> block_id_{};
     Optional<ChunkID> chunk_id_{};

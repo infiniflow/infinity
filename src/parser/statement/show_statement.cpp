@@ -156,6 +156,14 @@ std::string ShowStatement::ToString() const {
             ss << "Show catalogs";
             break;
         }
+        case ShowStmtType::kCatalog: {
+            ss << "Show catalog";
+            break;
+        }
+        case ShowStmtType::kCatalogToFile: {
+            ss << "Show catalog to file";
+            break;
+        }
         case ShowStmtType::kPersistenceFiles: {
             ss << "Show persistence files";
             break;

@@ -2082,6 +2082,16 @@ show_statement: SHOW DATABASES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kCatalogs;
 }
+| SHOW CATALOG {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kCatalog;
+}
+| SHOW CATALOG TO file_path {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kCatalogToFile;
+      $$->file_path_ = $4;
+      free($4);
+}
 | SHOW PERSISTENCE FILES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kPersistenceFiles;
