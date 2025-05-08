@@ -185,11 +185,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     TableMeeta &table_meta = *table_meta_opt;
 
     // SegmentID segment_id = 0;
@@ -411,11 +406,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     return AppendInner(db_name, table_name, table_key, *table_meta, input_block);
 }
 
@@ -513,11 +503,6 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, db_meta->db_id_str(), table_name, table_meta_opt->table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
@@ -582,11 +567,6 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     Optional<TableMeeta> table_meta_opt;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }

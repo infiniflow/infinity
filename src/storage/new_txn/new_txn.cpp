@@ -67,8 +67,6 @@ import buffer_obj;
 import data_file_worker;
 import version_file_worker;
 import block_version;
-import extra_command;
-
 import catalog_meta;
 import db_meeta;
 import table_meeta;
@@ -378,11 +376,6 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         }
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     // Generate add column cmd
     auto wal_command = MakeShared<WalCmdAddColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_defs);
     wal_command->table_key_ = table_key;
@@ -456,11 +449,6 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         }
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     auto wal_command =
         MakeShared<WalCmdDropColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_names, column_ids);
     wal_command->table_key_ = table_key;
@@ -496,11 +484,6 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
         return status;
     }
 
@@ -543,11 +526,6 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     auto wal_command = MakeShared<WalCmdRenameTableV2>(db_name, db_meta->db_id_str(), old_table_name, table_id_str, new_table_name);
     wal_command->old_table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
@@ -555,45 +533,6 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
 
     LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
-}
-
-Status NewTxn::LockTable(const String &db_name, const String &table_name) {
-    this->CheckTxnStatus();
-
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = new_catalog_->LockTable(table_key, txn_context_ptr_->txn_id_);
-    if (status.ok()) {
-        SharedPtr<LockTableCommand> extra_command = MakeShared<LockTableCommand>(table_key);
-        extra_commands_.push_back(extra_command);
-    }
-    return status;
-}
-
-Status NewTxn::UnlockTable(const String &db_name, const String &table_name) {
-    this->CheckTxnStatus();
-
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = new_catalog_->UnlockTable(table_key, txn_context_ptr_->txn_id_);
-    if (status.ok()) {
-        SharedPtr<UnlockTableCommand> extra_command = MakeShared<UnlockTableCommand>(table_key);
-        extra_commands_.push_back(extra_command);
-    }
-
-    return status;
 }
 
 Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
@@ -630,11 +569,6 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -682,11 +616,6 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -1471,40 +1400,6 @@ Status NewTxn::CommitRecovery() {
 }
 
 Status NewTxn::PostReadTxnCommit() {
-    for (const auto &extra_command : extra_commands_) {
-        switch (extra_command->GetType()) {
-            case ExtraCommandType::kLockTable: {
-                // Not check the unlock result
-                LockTableCommand *lock_table_command = static_cast<LockTableCommand *>(extra_command.get());
-                Status status = new_catalog_->CommitLockTable(lock_table_command->table_key(), txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case ExtraCommandType::kUnlockTable: {
-                // Not check the lock result
-                UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
-                Status status = new_catalog_->CommitUnlockTable(unlock_table_command->table_key(), txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-        }
-    }
-
-    // Restore the table write reference count
-    for (const auto &ref_cnt_pair : table_write_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        //        LOG_INFO(fmt::format("DecreaseTableReferenceCount (commit): txn_id: {}, table_key: {}", this->TxnID(), table_key));
-        Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-        }
-    }
-
     // Restore the mem index reference count
     for (const auto &ref_cnt_pair : mem_index_reference_count_) {
         const auto &table_key = ref_cnt_pair.first;
@@ -2630,17 +2525,6 @@ void NewTxn::PostCommit() {
         }
     }
 
-    // Restore the table write reference count
-    for (const auto &ref_cnt_pair : table_write_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        //        LOG_INFO(fmt::format("DecreaseTableReferenceCount (commit): txn_id: {}, table_key: {}", this->TxnID(), table_key));
-        Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-        }
-    }
-
     // Restore the mem index reference count
     for (const auto &ref_cnt_pair : mem_index_reference_count_) {
         const auto &table_key = ref_cnt_pair.first;
@@ -2815,39 +2699,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
     }
 
-    for (const auto &extra_command : extra_commands_) {
-        switch (extra_command->GetType()) {
-            case ExtraCommandType::kLockTable: {
-                // Not check the unlock result
-                LockTableCommand *lock_table_command = static_cast<LockTableCommand *>(extra_command.get());
-                new_catalog_->RollbackLockTable(lock_table_command->table_key(), txn_context_ptr_->txn_id_);
-                break;
-            }
-            case ExtraCommandType::kUnlockTable: {
-                // Not check the lock result
-                UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
-                new_catalog_->RollbackUnlockTable(unlock_table_command->table_key(), txn_context_ptr_->txn_id_);
-                break;
-            }
-        }
-    }
-
     Status status = kv_instance_->Rollback();
     if (!status.ok()) {
         return status;
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
-
-    // Restore the table write reference count
-    for (const auto &ref_cnt_pair : table_write_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        //        LOG_INFO(fmt::format("DecreaseTableReferenceCount (rollback): txn_id: {}, table_key: {}", this->TxnID(), table_key));
-        status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease table write count on post rollback phase: {}", status.message()));
-        }
-    }
 
     // Restore the mem index reference count
     for (const auto &ref_cnt_pair : mem_index_reference_count_) {
@@ -3253,22 +3109,6 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, file_paths);
-}
-
-Status NewTxn::IncreaseTableReferenceCount(const String &table_key) {
-    //    LOG_INFO(fmt::format("IncreaseTableReferenceCount: txn_id: {}, table_key: {}", this->TxnID(), table_key));
-    Status status = new_catalog_->IncreaseTableWriteCount(table_key);
-    if (status.ok()) {
-        ++table_write_reference_count_[table_key];
-    }
-    return status;
-}
-
-SizeT NewTxn::GetTableReferenceCount(const String &table_key) {
-    if (table_write_reference_count_.find(table_key) == table_write_reference_count_.end()) {
-        return 0;
-    }
-    return table_write_reference_count_[table_key];
 }
 
 Status NewTxn::IncreaseMemIndexReferenceCount(const String &table_key) {

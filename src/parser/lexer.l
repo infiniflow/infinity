@@ -131,7 +131,6 @@ LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
-LOCK            { return LOCK; }
 LOG             { return LOG; }
 LOGS            { return LOGS; }
 LSEG            { return LSEG; }
@@ -206,7 +205,6 @@ TRUE            { return TRUE; }
 TUPLE           { return TUPLE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
-UNLOCK          { return UNLOCK; }
 UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }

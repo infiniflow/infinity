@@ -1466,48 +1466,6 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             }
             break;
         }
-        case CommandType::kLockTable: {
-            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Uninitialized storage mode");
-            }
-
-            if (storage_mode != StorageMode::kWritable) {
-                return Status::InvalidNodeRole("Attempt to write on non-writable node");
-            }
-            auto *lock_table = static_cast<LockCmd *>(command_statement->command_info_.get());
-            if (lock_table->db_name().empty()) {
-                lock_table->SetDBName(query_context_ptr_->schema_name());
-            }
-            auto [table_entry, status] = txn->GetTableByName(lock_table->db_name(), lock_table->table_name());
-            if (!status.ok()) {
-                return status;
-            }
-            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
-            this->logical_plan_ = logical_command;
-            break;
-        }
-        case CommandType::kUnlockTable: {
-            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Uninitialized storage mode");
-            }
-
-            if (storage_mode != StorageMode::kWritable) {
-                return Status::InvalidNodeRole("Attempt to write on non-writable node");
-            }
-            auto *unlock_table = static_cast<UnlockCmd *>(command_statement->command_info_.get());
-            if (unlock_table->db_name().empty()) {
-                unlock_table->SetDBName(query_context_ptr_->schema_name());
-            }
-            Status status = txn->CheckTableExist(unlock_table->db_name(), unlock_table->table_name());
-            if (!status.ok()) {
-                return status;
-            }
-            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
-            this->logical_plan_ = logical_command;
-            break;
-        }
         case CommandType::kCleanup: {
             StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
             if (storage_mode == StorageMode::kUnInitialized) {

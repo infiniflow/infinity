@@ -64,14 +64,6 @@ template <bool init_all_true>
 struct RoaringBitmap;
 using Bitmask = RoaringBitmap<true>;
 
-export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
-
-export struct TableMemoryContext {
-    LockType locker{LockType::kUnlocked};
-    TransactionID locked_txn_{MAX_TXN_ID};
-    SizeT write_txn_num_{0};
-};
-
 export struct TableLockForMemIndex {
     std::mutex mtx_;
     bool dumping_mem_index_ = false;
@@ -198,18 +190,6 @@ private:
     //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    Status LockTable(const String &table_key, TransactionID txn_id);
-    Status CommitLockTable(const String &table_key, TransactionID txn_id);
-    Status RollbackLockTable(const String &table_key, TransactionID txn_id);
-
-    Status UnlockTable(const String &table_key, TransactionID txn_id);
-    Status CommitUnlockTable(const String &table_key, TransactionID txn_id);
-    Status RollbackUnlockTable(const String &table_key, TransactionID txn_id);
-
-    Status IncreaseTableWriteCount(const String &table_key);
-    Status DecreaseTableWriteCount(const String &table_key, SizeT count);
-    SizeT GetTableWriteCount() const;
-
     SharedPtr<MetaTree> MakeMetaTree() const;
     Status RestoreCatalogCache(Storage *storage_ptr);
     SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const; // used by append in allocation
@@ -221,10 +201,6 @@ private:
 
     mutable std::mutex table_cache_mtx_{};
     HashMap<u64, SharedPtr<HashMap<u64, SharedPtr<TableCache>>>> table_cache_map_{};
-
-private:
-    mutable std::mutex mtx_{};
-    HashMap<String, SharedPtr<TableMemoryContext>> table_memory_context_map_{};
 
 public:
     Status AddBlockLock(String block_key);
