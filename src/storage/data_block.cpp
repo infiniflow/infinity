@@ -264,6 +264,7 @@ void DataBlock::Finalize() {
     }
     row_count_ = row_count;
     finalized = true;
+    initialized = true;
     if (capacity_ == 0) {
         capacity_ = row_count;
     }

@@ -206,9 +206,6 @@ public:
     Status CommitUnlockTable(const String &table_key, TransactionID txn_id);
     Status RollbackUnlockTable(const String &table_key, TransactionID txn_id);
 
-    Status ImmutateTable(const String &table_key, TransactionID txn_id);
-    Status MutateTable(const String &table_key, TransactionID txn_id);
-
     Status IncreaseTableWriteCount(const String &table_key);
     Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;

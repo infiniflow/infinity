@@ -83,6 +83,7 @@ import segment_entry;
 import txn_allocator_task;
 import txn_committer_task;
 import meta_type;
+import base_txn_store;
 
 namespace infinity {
 
@@ -363,11 +364,6 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         column_name_set.insert(column_def->name());
     }
 
-    status = new_catalog_->ImmutateTable(table_key, txn_context_ptr_->txn_id_);
-    if (!status.ok()) {
-        return status;
-    }
-
     SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
     std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
@@ -380,6 +376,11 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         if (column_idx_set.contains(column_def->id())) {
             return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", column_def->id()));
         }
+    }
+
+    status = this->IncreaseTableReferenceCount(table_key);
+    if (!status.ok()) {
+        return status;
     }
 
     // Generate add column cmd
@@ -436,11 +437,6 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return Status::NotSupport("Cannot delete all the columns of a table");
     }
 
-    status = new_catalog_->ImmutateTable(table_key, txn_context_ptr_->txn_id_);
-    if (!status.ok()) {
-        return status;
-    }
-
     Vector<String> *index_id_strs_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_id_strs_ptr);
     if (!status.ok()) {
@@ -451,21 +447,18 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         TableIndexMeeta table_index_meta(index_id, *table_meta);
         auto [index_base, index_status] = table_index_meta.GetIndexBase();
         if (!index_status.ok()) {
-            status = new_catalog_->MutateTable(table_key, txn_context_ptr_->txn_id_);
-            if (!status.ok()) {
-                UnrecoverableError(fmt::format("Can't mutable table: {}, cause: {}", table_name, status.message()));
-            }
             return index_status;
         }
         for (const String &column_name : column_names) {
             if (IsEqual(index_base->column_name(), column_name)) {
-                status = new_catalog_->MutateTable(table_key, txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Can't mutable table: {}, cause: {}", table_name, status.message()));
-                }
                 return Status::IndexOnColumn(column_name);
             }
         }
+    }
+
+    status = this->IncreaseTableReferenceCount(table_key);
+    if (!status.ok()) {
+        return status;
     }
 
     auto wal_command =
@@ -1204,9 +1197,15 @@ Status NewTxn::Commit() {
 
     Status status;
     String conflict_reason;
-    bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason);
+    bool retry_query = true;
+    bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason, retry_query);
     if (conflict) {
-        status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        if (retry_query) {
+            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        } else {
+            status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        }
+
         this->SetTxnRollbacking(commit_ts);
     }
 
@@ -1571,6 +1570,9 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
                 auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
                 Status status = CommitAddColumns(add_column_cmd);
                 if (!status.ok()) {
+                    if (status.code_ == ErrorCode::kRocksDBError) {
+                        return Status::TxnConflict(txn_context_ptr_->txn_id_, "NewTxn conflict reason: Add column.");
+                    }
                     return status;
                 }
                 break;
@@ -1966,7 +1968,7 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
     return new_catalog_->IncrLatestID(id_str, id_name);
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     switch (cmd.GetType()) {
         case WalCommandType::CREATE_DATABASE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause);
@@ -1981,16 +1983,16 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
             return CheckConflictCmd(static_cast<const WalCmdImportV2 &>(cmd), previous_txn, cause);
         }
         case WalCommandType::ADD_COLUMNS_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdAddColumnsV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdAddColumnsV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DROP_COLUMNS_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdDropColumnsV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdDropColumnsV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::COMPACT_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCompactV2 &>(cmd), previous_txn, cause);
         }
         case WalCommandType::CREATE_INDEX_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCreateIndexV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCreateIndexV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DUMP_INDEX_V2: {
             return CheckConflictCmd(static_cast<const WalCmdDumpIndexV2 &>(cmd), previous_txn, cause);
@@ -2094,6 +2096,27 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
+                //            case WalCommandType::APPEND_V2: {
+                //                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
+                //                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                //                    conflict = true;
+                //                }
+                //                break;
+                //            }
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_columns_cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
+                if (add_columns_cmd->db_name_ == db_name && add_columns_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
+                if (drop_columns_cmd->db_name_ == db_name && drop_columns_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 // No conflict
                 break;
@@ -2122,6 +2145,21 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_columns_cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
+                if (add_columns_cmd->db_name_ == db_name && add_columns_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
+                if (drop_columns_cmd->db_name_ == db_name && drop_columns_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+
             default: {
                 //
             }
@@ -2134,7 +2172,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -2145,6 +2183,36 @@ bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_tx
             case WalCommandType::COMPACT_V2: {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
+                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(wal_cmd.get());
+                if (import_cmd->db_name_ == db_name && import_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
                     conflict = true;
                 }
                 break;
@@ -2161,7 +2229,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_tx
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -2169,9 +2237,51 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_t
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(wal_cmd.get());
+                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(wal_cmd.get());
+                if (import_cmd->db_name_ == db_name && import_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
             case WalCommandType::COMPACT_V2: {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(wal_cmd.get());
+                if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
+                    for (const auto &column_name : cmd.column_names_) {
+                        if (create_index_cmd->index_base_->ContainsColumn(column_name)) {
+                            retry_query = false;
+                            conflict = true;
+                        }
+                    }
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
                     conflict = true;
                 }
                 break;
@@ -2259,7 +2369,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     const String &index_name = *cmd.index_base_->index_name_;
@@ -2295,6 +2405,18 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
                 }
                 break;
             }
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_columns_cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
+                if (drop_columns_cmd->db_name_ == db_name && drop_columns_cmd->table_name_ == table_name) {
+                    for (const auto &column_name : drop_columns_cmd->column_names_) {
+                        if (cmd.index_base_->ContainsColumn(column_name)) {
+                            retry_query = false;
+                            conflict = true;
+                        }
+                    }
+                }
+            }
+
             default: {
                 //
             }
@@ -2370,10 +2492,10 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason) {
+bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
-        bool conflict = this->CheckConflictCmd(*wal_cmd, check_txn.get(), conflict_reason);
+        bool conflict = this->CheckConflictCmd(*wal_cmd, check_txn.get(), conflict_reason, retry_query);
         if (conflict) {
             conflicted_txn_ = check_txn;
             return true;
@@ -2481,23 +2603,11 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::ADD_COLUMNS_V2: {
-                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
-                if (!IsReplay()) {
-                    Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get())
                 break;
             }
             case WalCommandType::DROP_COLUMNS_V2: {
-                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
-                if (!IsReplay()) {
-                    Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
@@ -2565,19 +2675,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::ADD_COLUMNS_V2: {
-                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
-                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DROP_COLUMNS_V2: {
-                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
-                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DROP_TABLE_V2: {
@@ -2608,7 +2710,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case WalCommandType::IMPORT_V2: {
-                //                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+                ImportTxnStore *append_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+
+                SizeT data_block_count = append_txn_store->input_blocks_.size();
+                for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+                    append_txn_store->input_blocks_[block_idx]->UnInit();
+                }
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
@@ -2633,6 +2740,76 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             default: {
+                break;
+            }
+        }
+    }
+
+    // We will remove buffer objects for block, blockColumn and chunkIndex added in this txn.
+    const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
+    for (auto &meta : metas) {
+        switch (meta->type_) {
+            case MetaType::kBlock: {
+                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
+                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
+
+                auto [version_buffer, status1] = block_meta.GetVersionBuffer();
+                if (!status1.ok()) {
+                    return status1;
+                }
+                Vector<String> object_paths{version_buffer->GetFilename()};
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+
+                String block_lock_key = block_meta.GetBlockTag("lock");
+                Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kBlockColumn: {
+                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
+                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
+                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
+
+                BufferObj *buffer_obj = nullptr;
+                BufferObj *outline_buffer_obj = nullptr;
+                Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                Vector<String> object_paths;
+                object_paths.reserve(2);
+                object_paths.push_back(buffer_obj->GetFilename());
+                if (outline_buffer_obj != nullptr) {
+                    object_paths.push_back(outline_buffer_obj->GetFilename());
+                }
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+                break;
+            }
+            case MetaType::kChunkIndex: {
+                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
+                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
+                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
+
+                BufferObj *index_buffer = nullptr;
+                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                if (!status.ok()) {
+                    return status;
+                }
+                Vector<String> object_paths{index_buffer->GetFilename()};
+                buffer_mgr_->RemoveBufferObjects(object_paths);
+                break;
+            }
+            default: {
+                UnrecoverableError("Unexpected meta key type for buffer object.");
                 break;
             }
         }

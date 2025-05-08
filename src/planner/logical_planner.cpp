@@ -1327,7 +1327,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         }
         case AlterStatementType::kAddColumns: {
             auto *add_columns_statement = static_cast<AddColumnsStatement *>(statement);
-            std::vector<std::shared_ptr<ColumnDef>> column_defs = std::move(add_columns_statement->column_defs_);
+            std::vector<std::shared_ptr<ColumnDef>> column_defs = add_columns_statement->column_defs_;
             for (const auto &column_def : column_defs) {
                 if (!column_def->has_default_value()) {
                     RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
@@ -1361,7 +1361,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         }
         case AlterStatementType::kDropColumns: {
             auto *drop_columns_statement = static_cast<DropColumnsStatement *>(statement);
-            Vector<String> column_names = std::move(drop_columns_statement->column_names_);
+            Vector<String> column_names = drop_columns_statement->column_names_;
             for (const auto &column_name : column_names) {
                 if (!use_new_catalog) {
                     i64 column_id = table_entry->GetColumnIdByName(column_name);

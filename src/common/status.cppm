@@ -154,6 +154,7 @@ export enum class ErrorCode : long {
     kTxnConflict = 4002,
     kTxnWWConflict = 4003,
     kTxnRWConflict = 4004,
+    kTxnConflictNoRetry = 4005,
 
     // 5. Insufficient resource or exceed limits
     kDiskFull = 5001,
@@ -347,6 +348,7 @@ public:
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);
     static Status TxnWWConflict(const String &detailed_message);
     static Status TxnRWConflict(const String &detailed_message);
+    static Status TxnConflictNoRetry(u64 txn_id, const String &conflict_reason);
 
     // 5. Insufficient resource or exceed limits
     static Status DiskFull(const String &detailed_info);
