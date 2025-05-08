@@ -404,46 +404,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kCheckTable: {
             break;
         }
-        case CommandType::kLockTable: {
-            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Uninitialized storage mode");
-            }
-
-            if (storage_mode != StorageMode::kWritable) {
-                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
-                operator_state->SetComplete();
-                return true;
-            }
-
-            [[maybe_unused]] auto *lock_table_command = static_cast<LockCmd *>(command_info_.get());
-            auto *txn = query_context->GetTxn();
-            Status status = txn->LockTable(lock_table_command->db_name(), lock_table_command->table_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            break;
-        }
-        case CommandType::kUnlockTable: {
-            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Uninitialized storage mode");
-            }
-
-            if (storage_mode != StorageMode::kWritable) {
-                operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
-                operator_state->SetComplete();
-                return true;
-            }
-
-            [[maybe_unused]] auto *unlock_table_command = static_cast<UnlockCmd *>(command_info_.get());
-            auto *txn = query_context->GetTxn();
-            Status status = txn->UnLockTable(unlock_table_command->db_name(), unlock_table_command->table_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            break;
-        }
         case CommandType::kCleanup: {
             StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
             if (storage_mode == StorageMode::kUnInitialized) {

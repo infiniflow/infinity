@@ -393,7 +393,7 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK ADD RENAME
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT ADD RENAME
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
@@ -2294,24 +2294,6 @@ command_statement: USE IDENTIFIER {
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kDouble, $3, $4);
     free($3);
-}
-| LOCK TABLE table_name {
-    $$ = new infinity::CommandStatement();
-    ParserHelper::ToLower($3->schema_name_ptr_);
-    ParserHelper::ToLower($3->table_name_ptr_);
-    $$->command_info_ = std::make_shared<infinity::LockCmd>($3->schema_name_ptr_, $3->table_name_ptr_);
-    free($3->schema_name_ptr_);
-    free($3->table_name_ptr_);
-    delete $3;
-}
-| UNLOCK TABLE table_name {
-    $$ = new infinity::CommandStatement();
-    ParserHelper::ToLower($3->schema_name_ptr_);
-    ParserHelper::ToLower($3->table_name_ptr_);
-    $$->command_info_ = std::make_shared<infinity::UnlockCmd>($3->schema_name_ptr_, $3->table_name_ptr_);
-    free($3->schema_name_ptr_);
-    free($3->table_name_ptr_);
-    delete $3;
 }
 | CREATE SNAPSHOT IDENTIFIER ON TABLE IDENTIFIER {
     ParserHelper::ToLower($3);

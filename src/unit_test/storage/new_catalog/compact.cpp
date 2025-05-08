@@ -783,9 +783,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
