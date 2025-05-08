@@ -143,12 +143,12 @@ jobs:
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug.log 2> debug_error.log" &
 
-      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
+      - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
 
-      - name: Stop infinity pysdk & http_api & sqllogictest debug
+      - name: Stop sqllogictest debug
         if: ${{ !cancelled() }}
         id: stop_tests_debug
         run: |
@@ -421,12 +421,12 @@ jobs:
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > release.log 2> release_error.log" &
 
-      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
+      - name: Run sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_release
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
 
-      - name: Stop infinity release
+      - name: Stop sqllogictest release
         if: ${{ !cancelled() }}
         id: stop_tests_release
         run: |

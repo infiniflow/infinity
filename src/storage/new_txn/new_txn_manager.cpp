@@ -549,6 +549,7 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
+        res.reserve(check_txns_.size());
         for (SizeT i = 0; i < check_txns_.size(); ++i) {
             SharedPtr<NewTxn> &check_txn = check_txns_[i];
             TxnTimeStamp check_commit_ts = check_txn->CommitTS();
