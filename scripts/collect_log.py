@@ -7,28 +7,31 @@ import collect_thread_sanitizer_log
 
 
 def collect_log(
-    log_path,
-    stdout_path,
-    stderror_path,
-    executable_path,
-    output_dir,
-    failure,
-    show_lines,
+        log_path,
+        stdout_path,
+        stderror_path,
+        executable_path,
+        output_dir,
+        failure,
+        show_lines,
+        run_id,
+        run_attempt,
 ):
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
+    name_prefix = f'{run_id}_{run_attempt}'
     if failure:
-        random_name = "".join(
+        name_prefix = "".join(
             random.choices(string.ascii_lowercase + string.digits, k=8)
         )
-        print(f"Random log file name: {random_name}")
+        print(f"Random log file name: {name_prefix}")
 
     if not os.path.isfile(stdout_path):
         print("Error: stdout file not found")
     else:
         if failure:
-            shutil.copy(stdout_path, f"{output_dir}/{random_name}_stdout.log")
+            shutil.copy(stdout_path, f"{output_dir}/{name_prefix}_stdout.log")
         print(f"Last {show_lines} lines from {stdout_path}:")
         with open(stdout_path, "r") as f:
             lines = f.readlines()
@@ -39,7 +42,7 @@ def collect_log(
         print("Error: stderror file not found")
     else:
         if failure:
-            shutil.copy(stderror_path, f"{output_dir}/{random_name}_stderror.log")
+            shutil.copy(stderror_path, f"{output_dir}/{name_prefix}_stderror.log")
         print(f"Last {show_lines} lines from {stderror_path}:")
         with open(stderror_path, "r") as f:
             lines = f.readlines()
@@ -50,7 +53,7 @@ def collect_log(
         print("Error: /var/infinity/log/infinity.log not found")
     else:
         if failure:
-            shutil.copy(log_path, f"{output_dir}/{random_name}.log")
+            shutil.copy(log_path, f"{output_dir}/{name_prefix}.log")
         print(f"Last {show_lines} lines from {log_path}:")
         with open(log_path, "r") as f:
             lines = f.readlines()
@@ -61,7 +64,7 @@ def collect_log(
         print("Error: Executable file not found")
     else:
         if failure:
-            shutil.copy(executable_path, f"{output_dir}/{random_name}.exe")
+            shutil.copy(executable_path, f"{output_dir}/{name_prefix}.exe")
 
     run_parallel_test_log = "run_parallel_test.log"
 
@@ -69,12 +72,26 @@ def collect_log(
         print("Error: run_parallel_test log file not found")
     elif failure:
         shutil.copy(
-            run_parallel_test_log, f"{output_dir}/{random_name}_{run_parallel_test_log}"
+            run_parallel_test_log, f"{output_dir}/{name_prefix}_{run_parallel_test_log}"
         )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Collect and copy log files.")
+    parser.add_argument(
+        "--run_id",
+        type=str,
+        required=True,
+        help="A unique number for each workflow run within a repository. This number does not change if you re-run the workflow run.",
+        default=None
+    )
+    parser.add_argument(
+        "--run_attempt",
+        type=str,
+        required=True,
+        help="A unique number for each attempt of a particular workflow run in a repository. This number begins at 1 for the workflow run's first attempt, and increments with each re-run.",
+        default=None
+    )
     parser.add_argument(
         "--log_path", type=str, required=True, help="Path to the infinity log file"
     )
@@ -114,6 +131,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    run_id = args.run_id
+    run_attempt = args.run_attempt
     log_path = args.log_path
     stdout_path = args.stdout_path
     stderror_path = args.stderror_path
@@ -127,6 +146,8 @@ if __name__ == "__main__":
         collect_thread_sanitizer_log.collect_log(tsan_log, output_dir, show_lines)
     else:
         collect_log(
+            run_id,
+            run_attempt,
             log_path,
             stdout_path,
             stderror_path,
