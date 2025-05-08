@@ -19,7 +19,7 @@
 
 namespace infinity {
 
-class FixHeapManager;
+struct FixHeapManager;
 
 // varchar related constants
 constexpr uint64_t VARCHAR_PREFIX_LENGTH = 5;
