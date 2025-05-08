@@ -21,11 +21,7 @@ def collect_log(
         os.makedirs(output_dir)
 
     name_prefix = f'{run_id}_{run_attempt}'
-    if failure:
-        name_prefix = "".join(
-            random.choices(string.ascii_lowercase + string.digits, k=8)
-        )
-        print(f"Random log file name: {name_prefix}")
+    print(f"log file name prefix: {name_prefix}")
 
     if not os.path.isfile(stdout_path):
         print("Error: stdout file not found")
@@ -146,8 +142,6 @@ if __name__ == "__main__":
         collect_thread_sanitizer_log.collect_log(tsan_log, output_dir, show_lines)
     else:
         collect_log(
-            run_id,
-            run_attempt,
             log_path,
             stdout_path,
             stderror_path,
@@ -155,4 +149,6 @@ if __name__ == "__main__":
             output_dir,
             failure,
             show_lines,
+            run_id,
+            run_attempt,
         )
