@@ -552,7 +552,9 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
         for (SizeT i = 0; i < check_txns_.size(); ++i) {
             SharedPtr<NewTxn> &check_txn = check_txns_[i];
             TxnTimeStamp check_commit_ts = check_txn->CommitTS();
-            if (check_commit_ts < begin_ts) {
+            TxnState check_txn_state = check_txn->GetTxnState();
+            bool is_rollback = (check_txn_state == TxnState::kRollbacking) || (check_txn_state == TxnState::kRollbacked);
+            if (check_commit_ts < begin_ts || is_rollback) {
                 continue;
             }
             if (check_commit_ts >= commit_ts) {

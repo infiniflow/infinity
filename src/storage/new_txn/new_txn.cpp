@@ -2117,7 +2117,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
-
             default: {
                 // No conflict
                 break;

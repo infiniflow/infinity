@@ -204,6 +204,22 @@ export struct SegmentIndexMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
+export struct SegmentIndexTagMetaKey final : public MetaKey {
+    SegmentIndexTagMetaKey(String db_id_str, String table_id_str, String index_id_str, SegmentID segment_id, String tag_name)
+        : MetaKey(MetaType::kSegmentIndexTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+          index_id_str_(std::move(index_id_str)), segment_id_(segment_id), tag_name_(std::move(tag_name)) {}
+
+    String db_id_str_{};
+    String table_id_str_{};
+    String index_id_str_{};
+    SegmentID segment_id_{};
+    String tag_name_{};
+    String value_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
 export struct ChunkIndexMetaKey final : public MetaKey {
     ChunkIndexMetaKey(String db_id_str, String table_id_str, String index_id_str, SegmentID segment_id, ChunkID chunk_id)
         : MetaKey(MetaType::kChunkIndex), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
@@ -215,6 +231,23 @@ export struct ChunkIndexMetaKey final : public MetaKey {
     SegmentID segment_id_{};
     ChunkID chunk_id_{};
     TxnTimeStamp commit_ts_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
+export struct ChunkIndexTagMetaKey final : public MetaKey {
+    ChunkIndexTagMetaKey(String db_id_str, String table_id_str, String index_id_str, SegmentID segment_id, ChunkID chunk_id, String tag_name)
+        : MetaKey(MetaType::kChunkIndexTag), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
+          index_id_str_(std::move(index_id_str)), segment_id_(segment_id), chunk_id_(chunk_id), tag_name_(std::move(tag_name)) {}
+
+    String db_id_str_{};
+    String table_id_str_{};
+    String index_id_str_{};
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+    String tag_name_{};
+    String value_{};
 
     String ToString() const final;
     nlohmann::json ToJson() const final;

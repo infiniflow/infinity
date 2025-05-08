@@ -1591,6 +1591,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None,
                                                           None,
                                                           None,
+                                                          None,
                                                           statement->index_name_);
             break;
         }
@@ -1600,6 +1601,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           statement->segment_id_,
                                                           None,
                                                           None,
@@ -1613,6 +1615,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           statement->segment_id_,
                                                           None,
                                                           statement->chunk_id_,
@@ -1697,6 +1700,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None,
                                                           None,
                                                           None,
+                                                          None,
                                                           statement->session_id_);
             break;
         }
@@ -1714,6 +1718,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           None,
                                                           None,
                                                           None,
@@ -1745,6 +1750,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           statement->segment_id_);
 
             break;
@@ -1755,6 +1761,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           statement->segment_id_);
             break;
         }
@@ -1764,6 +1771,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           statement->segment_id_,
                                                           statement->block_id_);
             break;
@@ -1774,6 +1782,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->table_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           statement->segment_id_,
                                                           statement->block_id_,
                                                           statement->chunk_id_,
@@ -1864,6 +1873,25 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
 
             break;
         }
+        case ShowStmtType::kCatalog: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kCatalog,
+                                                          statement->schema_name_,
+                                                          statement->var_name_,
+                                                          bind_context_ptr->GenerateTableIndex());
+
+            break;
+        }
+        case ShowStmtType::kCatalogToFile: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kCatalogToFile,
+                                                          statement->schema_name_,
+                                                          statement->var_name_,
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          statement->file_path_);
+
+            break;
+        }
         case ShowStmtType::kPersistenceFiles: {
             this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                           ShowStmtType::kPersistenceFiles,
@@ -1931,6 +1959,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None,
                                                           None,
                                                           None,
+                                                          None,
                                                           statement->function_name_);
             break;
         }
@@ -1947,6 +1976,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None,
                                                           None,
                                                           None,
+                                                          None,
                                                           statement->function_name_);
             break;
         }
@@ -1956,6 +1986,7 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           "",
                                                           statement->snapshot_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
+                                                          None,
                                                           None,
                                                           None,
                                                           None,

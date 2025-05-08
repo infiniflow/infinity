@@ -516,6 +516,11 @@ file(GLOB_RECURSE
         unit_test/function/*.cpp
 )
 
+file(GLOB_RECURSE
+        ut_function_cpp
+        CONFIGURE_DEPENDS
+        unit_test/parallel/*.cpp
+)
 
 file(GLOB_RECURSE
         ut_thirdparty_cpp
