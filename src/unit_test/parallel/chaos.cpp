@@ -46,6 +46,11 @@ import virtual_store;
 import insert_row_expr;
 import embedding_info;
 import compilation_config;
+import global_resource_usage;
+import expression_parser_result;
+import expr_parser;
+import update_statement;
+import knn_expr;
 
 using namespace infinity;
 
@@ -56,6 +61,10 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(ParallelTest::NEW_CONFIG_PATH, ParallelTest::NEW_VFS_OFF_CONFIG_PATH));
 
 constexpr SizeT kDataSize = 100000;
+constexpr SizeT kRunningTime = 30;
+constexpr SizeT kNumThread = 4;
+constexpr SizeT data_size = 100000;
+constexpr SizeT insert_delete_size = 100;
 
 struct DataRow {
     int index_;
@@ -88,15 +97,15 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     fin.close();
 
     Vector<std::vector<double>> vectors = {{0.0, 0.0, 0.0, 0.0},
-                                          {1.1, 1.1, 1.1, 1.1},
-                                          {2.2, 2.2, 2.2, 2.2},
-                                          {3.3, 3.3, 3.3, 3.3},
-                                          {4.4, 4.4, 4.4, 4.4},
-                                          {5.5, 5.5, 5.5, 5.5},
-                                          {6.6, 6.6, 6.6, 6.6},
-                                          {7.7, 7.7, 7.7, 7.7},
-                                          {8.8, 8.8, 8.8, 8.8},
-                                          {9.9, 9.9, 9.9, 9.9}};
+                                           {1.1, 1.1, 1.1, 1.1},
+                                           {2.2, 2.2, 2.2, 2.2},
+                                           {3.3, 3.3, 3.3, 3.3},
+                                           {4.4, 4.4, 4.4, 4.4},
+                                           {5.5, 5.5, 5.5, 5.5},
+                                           {6.6, 6.6, 6.6, 6.6},
+                                           {7.7, 7.7, 7.7, 7.7},
+                                           {8.8, 8.8, 8.8, 8.8},
+                                           {9.9, 9.9, 9.9, 9.9}};
 
     Vector<DataRow> data_rows;
 
@@ -104,9 +113,12 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     int repeat_times = kDataSize / base_size;
 
     data_rows.reserve(kDataSize);
+    int index_counter = 0;
+
     for (int i = 0; i < repeat_times; ++i) {
         for (int j = 0; j < base_size; ++j) {
             DataRow row;
+            row.index_ = index_counter++;
             row.body_ = texts[j % texts.size()];
             row.others_ = vectors[j % vectors.size()];
             data_rows.push_back(row);
@@ -115,6 +127,7 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
 
     for (size_t i = 0; i < kDataSize - data_rows.size(); ++i) {
         DataRow row;
+        row.index_ = index_counter++;
         row.body_ = texts[i % texts.size()];
         row.others_ = vectors[i % vectors.size()];
         data_rows.push_back(row);
@@ -123,7 +136,8 @@ Vector<DataRow> DataPreprocessing(const String &filepath) {
     return data_rows;
 }
 
-void FullTextSearch(SharedPtr<Infinity> infinity, const String &db, const String &table) {
+void FullTextSearch(const String &db_name, const String &table_name) {
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
     auto *search_expr = new SearchExpr();
     auto *exprs = new std::vector<ParsedExpr *>();
     auto *match_expr = new MatchExpr();
@@ -135,15 +149,6 @@ void FullTextSearch(SharedPtr<Infinity> infinity, const String &db, const String
 
     auto *output_columns = new std::vector<ParsedExpr *>();
 
-    auto *select_index_expr = new FunctionExpr();
-    select_index_expr->func_name_ = "index";
-
-    auto *select_body_expr = new FunctionExpr();
-    select_body_expr->func_name_ = "body";
-
-    auto *select_other_vector_expr = new FunctionExpr();
-    select_other_vector_expr->func_name_ = "other_vector";
-
     auto *select_rowid_expr = new FunctionExpr();
     select_rowid_expr->func_name_ = "row_id";
 
@@ -152,17 +157,50 @@ void FullTextSearch(SharedPtr<Infinity> infinity, const String &db, const String
 
     output_columns->emplace_back(select_rowid_expr);
     output_columns->emplace_back(select_score_expr);
-    output_columns->emplace_back(select_index_expr);
-    output_columns->emplace_back(select_body_expr);
-    output_columns->emplace_back(select_other_vector_expr);
 
-    infinity->Search(db, table, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
+    auto result =
+        infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
+    if (!result.IsOk()) {
+        LOG_ERROR(fmt::format("Search failed: {}", result.ToString()));
+        return;
+    }
+    infinity->LocalDisconnect();
 }
 
-void insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
+void VectorSearch(const String &db_name, const String &table_name) {
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    KnnExpr *knn_expr = new KnnExpr();
+    knn_expr->dimension_ = 4;
+    knn_expr->distance_type_ = KnnDistanceType::kL2;
+    knn_expr->topn_ = 3;
+    knn_expr->opt_params_ = new std::vector<InitParameter *>();
+    knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
+    auto embedding_data_ptr = new float[4];
+    knn_expr->embedding_data_ptr_ = embedding_data_ptr;
+    std::unique_ptr<float[]> queries_ptr(new float[4]);
+    auto src_ptr = queries_ptr.get();
+    memmove(knn_expr->embedding_data_ptr_, src_ptr, 4 * sizeof(float));
+
+    ColumnExpr *column_expr = new ColumnExpr();
+    column_expr->names_.emplace_back("other_vector");
+    knn_expr->column_expr_ = column_expr;
+    std::vector<ParsedExpr *> *exprs = new std::vector<ParsedExpr *>();
+    exprs->emplace_back(knn_expr);
+    SearchExpr *search_expr = new SearchExpr();
+    search_expr->SetExprs(exprs);
+
+    std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>;
+    auto select_rowid_expr = new FunctionExpr();
+    select_rowid_expr->func_name_ = "row_id";
+    output_columns->emplace_back(select_rowid_expr);
+    auto result =
+        infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
+    infinity->LocalDisconnect();
+}
+
+void Insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
 
-    const SizeT insert_delete_size = 100;
     SizeT max_start = data.size() > insert_delete_size ? data.size() - insert_delete_size : 0;
     SizeT pos = RandInt(0, max_start);
 
@@ -170,7 +208,7 @@ void insert(const String &db_name, const String &table_name, Vector<DataRow> dat
     insert_rows->reserve(insert_delete_size);
 
     for (SizeT i = 0; i < insert_delete_size && (pos + i) < data.size(); ++i) {
-        const auto& row = data[pos + i];
+        const auto &row = data[pos + i];
         auto insert_row = MakeUnique<InsertRowExpr>();
         insert_row->columns_ = {"index", "body", "other_vector"};
 
@@ -179,7 +217,7 @@ void insert(const String &db_name, const String &table_name, Vector<DataRow> dat
         insert_row->values_.emplace_back(std::move(index_expr));
 
         auto body_expr = MakeUnique<ConstantExpr>(LiteralType::kString);
-        body_expr->str_value_ = const_cast<char*>(row.body_.c_str());
+        body_expr->str_value_ = const_cast<char *>(row.body_.c_str());
         insert_row->values_.emplace_back(std::move(body_expr));
 
         auto vector_expr = MakeUnique<ConstantExpr>(LiteralType::kDoubleArray);
@@ -198,6 +236,119 @@ void insert(const String &db_name, const String &table_name, Vector<DataRow> dat
     }
 
     infinity->LocalDisconnect();
+}
+
+void Delete(const String &db_name, const String &table_name) {
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    SizeT pos = RandInt(0, data_size / insert_delete_size - 1);
+    pos = pos * insert_delete_size;
+
+    std::string filter = fmt::format("index >= {} and index < {}", pos, pos + insert_delete_size);
+
+    auto expr_parsed_result = MakeUnique<ExpressionParserResult>();
+    ExprParser expr_parser;
+    expr_parser.Parse(filter, expr_parsed_result.get());
+
+    if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+        LOG_ERROR(fmt::format("Invalid filter expression: {}", filter));
+        return;
+    }
+
+    auto result = infinity->Delete(db_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
+    if (!result.IsOk()) {
+        LOG_ERROR(fmt::format("Delete failed: {}", result.ToString()));
+    }
+    expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+    infinity->LocalDisconnect();
+}
+
+void Update(const String &db_name, const String &table_name) {
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+    SizeT pos = RandInt(0, data_size - 1);
+
+    std::string filter = fmt::format("index = {}", pos);
+
+    auto expr_parsed_result = MakeUnique<ExpressionParserResult>();
+    ExprParser expr_parser;
+    expr_parser.Parse(filter, expr_parsed_result.get());
+
+    if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+        LOG_ERROR(fmt::format("Invalid filter expression: {}", filter));
+        return;
+    }
+
+    Vector<UpdateExpr *> *values = new Vector<UpdateExpr *>();
+
+    Vector<String> *columns = new Vector<String>();
+    columns->emplace_back("index");
+    columns->emplace_back("body");
+    columns->emplace_back("other_vector");
+
+    auto *value1 = new ConstantExpr(LiteralType::kInteger);
+    value1->integer_value_ = pos;
+    UpdateExpr *update_expr1 = new UpdateExpr();
+    update_expr1->column_name = "index";
+    update_expr1->value = value1;
+
+    auto *value2 = new ConstantExpr(LiteralType::kString);
+    value2->str_value_ = const_cast<char *>("infinity");
+    UpdateExpr *update_expr2 = new UpdateExpr();
+    update_expr2->column_name = "body";
+    update_expr2->value = value2;
+
+    auto *value3 = new ConstantExpr(LiteralType::kDoubleArray);
+    value3->double_array_ = {0.0, 0.0, 0.0, 0.0};
+    UpdateExpr *update_expr3 = new UpdateExpr();
+    update_expr3->column_name = "other_vector";
+    update_expr3->value = value3;
+
+    values->push_back(update_expr1);
+    values->push_back(update_expr2);
+    values->push_back(update_expr3);
+
+    auto result = infinity->Update(db_name, table_name, expr_parsed_result->exprs_ptr_->at(0), values);
+    if (!result.IsOk()) {
+        LOG_ERROR(fmt::format("Update failed: {}", result.ToString()));
+    }
+
+    expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+    infinity->LocalDisconnect();
+}
+
+void ChaosTestExecution(const String &db_name, const String &table_name) {
+    auto start_time = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - start_time < std::chrono::seconds(kRunningTime)) {
+        int rand_op = RandInt(0, 3);
+
+        switch (rand_op) {
+            case 0:
+                Delete(db_name, table_name);
+                break;
+            case 1:
+                VectorSearch(db_name, table_name);
+                break;
+            case 2:
+                // Update(db_name, table_name);
+                break;
+            default:
+                FullTextSearch(db_name, table_name);
+                break;
+        }
+    }
+}
+
+void RunChaosTestInParallel(const String &db_name, const String &table_name) {
+    std::vector<std::thread> threads;
+
+    for (SizeT i = 0; i < kNumThread; ++i) {
+        threads.emplace_back([&]() { ChaosTestExecution(db_name, table_name); });
+    }
+
+    for (auto &t : threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
 }
 
 TEST_P(ParallelTest, ChaosTest) {
@@ -232,7 +383,7 @@ TEST_P(ParallelTest, ChaosTest) {
         if (result.IsOk()) {
             result = infinity->Flush();
         } else {
-            LOG_ERROR(fmt::format("Fail to create index {}", result.ToString()));
+            LOG_ERROR(fmt::format("Fail to create table {}", result.ToString()));
             return;
         }
         infinity->LocalDisconnect();
@@ -269,6 +420,23 @@ TEST_P(ParallelTest, ChaosTest) {
             result = infinity->Flush();
         } else {
             LOG_ERROR(fmt::format("Fail to create index {}", result.ToString()));
+            return;
+        }
+        infinity->LocalDisconnect();
+    }
+
+    RunChaosTestInParallel("default_db", "chaos_test");
+    // Update(db_name, table_name);
+
+    {
+        SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+        DropTableOptions drop_tb_options;
+        drop_tb_options.conflict_type_ = ConflictType::kError;
+        auto result = infinity->DropTable(db_name, table_name, drop_tb_options);
+        if (result.IsOk()) {
+            result = infinity->Flush();
+        } else {
+            LOG_ERROR(fmt::format("Fail to drop table {}", result.ToString()));
             return;
         }
         infinity->LocalDisconnect();
