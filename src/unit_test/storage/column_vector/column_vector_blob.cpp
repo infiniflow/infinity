@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #include "gtest/gtest.h"
 import base_test;
 
@@ -30,7 +32,7 @@ import infinity_context;
 import global_resource_usage;
 import internal_types;
 import logical_type;
-#if 0
+
 using namespace infinity;
 class ColumnVectorBlobTest : public BaseTest {};
 
