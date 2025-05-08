@@ -657,26 +657,6 @@ Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetCollectionByName"};
 }
 
-Status Txn::LockTable(const String &db_name, const String &table_name) {
-    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-    status = table_entry->SetLocked();
-    LOG_INFO(fmt::format("Table {}.{} is locked", db_name, table_name));
-    return status;
-}
-
-Status Txn::UnLockTable(const String &db_name, const String &table_name) {
-    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-    status = table_entry->SetUnlock();
-    LOG_INFO(fmt::format("Table {}.{} is unlocked", db_name, table_name));
-    return status;
-}
-
 Status Txn::AddWriteTxnNum(const String &db_name, const String &table_name) {
     auto [table_entry, status] = this->GetTableByName(db_name, table_name);
     if (!status.ok()) {

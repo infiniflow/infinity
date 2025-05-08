@@ -30,8 +30,6 @@ export using infinity::SetCmd;
 export using infinity::UseCmd;
 export using infinity::CheckTable;
 export using infinity::ExportCmd;
-export using infinity::LockCmd;
-export using infinity::UnlockCmd;
 export using infinity::CleanupCmd;
 export using infinity::DumpIndexCmd;
 export using infinity::TestCmd;

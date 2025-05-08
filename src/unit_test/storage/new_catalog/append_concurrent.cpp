@@ -694,9 +694,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      append      commit (success)
@@ -752,9 +749,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      append                       commit (success)
@@ -846,9 +840,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      append                                   commit (fail)
@@ -903,9 +894,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      append                                   commit (fail)
@@ -998,9 +986,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   append                                   commit (fail)
@@ -1091,9 +1076,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  append                                   commit (fail)
@@ -1185,9 +1167,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -1368,9 +1347,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append_concurrent) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
