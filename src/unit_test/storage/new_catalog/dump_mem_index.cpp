@@ -1138,6 +1138,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     auto column4_typeinfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
     auto column_def4 =
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kSparse, column4_typeinfo), "col4", std::set<ConstraintType>());
+    auto column_def5 =
+           std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def3, column_def4});
@@ -1245,6 +1247,61 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
         Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    auto input_block_4_columns = MakeShared<DataBlock>();
+    {
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block_4_columns->InsertVector(col1, 0);
+        }
+        {
+            auto col3 = ColumnVector::Make(column_def3->type());
+            col3->Initialize();
+            append_to_col(*col3, Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}), Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
+            input_block_4_columns->InsertVector(col3, 1);
+        }
+        {
+            auto col4 = ColumnVector::Make(column_def4->type());
+            col4->Initialize();
+            Pair<Vector<float>, Vector<int32_t>> vec{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 1000, 10000, 20000}};
+            Pair<Vector<float>, Vector<int32_t>> vec2{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 2000, 10000, 20000}};
+            auto v1 = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                        reinterpret_cast<const char *>(vec.second.data()),
+                                        vec.first.size(),
+                                        column4_typeinfo);
+            auto v2 = Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
+                                        reinterpret_cast<const char *>(vec2.second.data()),
+                                        vec2.first.size(),
+                                        column4_typeinfo);
+            append_to_col(*col4, std::move(v1), std::move(v2));
+            input_block_4_columns->InsertVector(col4, 2);
+        }
+        {
+            auto col5 = ColumnVector::Make(column_def5->type());
+            col5->Initialize();
+            append_to_col(*col5, Value::Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block_4_columns->InsertVector(col5, 3);
+
+        }
+        input_block_4_columns->Finalize();
+    }
+    auto append_a_block_after_add_column = [&] {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+        Status status = txn->Append(*db_name, *table_name, input_block_4_columns);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1411,7 +1468,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                         |------------------|----------|
-    //                        t2                add column  commit
+    //                        t2                add column  commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -1429,16 +1486,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
-
-        append_a_block();
-
-        check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-            return std::make_pair(begin_id, row_cnt);
-        });
 
         auto column_def4 =
             std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>(), default_varchar);
@@ -1449,6 +1496,16 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        append_a_block_after_add_column();
+
+        check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
+
         drop_db(*db_name);
 
         NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
@@ -1458,7 +1515,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     //  t1            dump index                 commit (success)
     //  |--------------|------------------------------|
     //                         |------------------|------------------|
-    //                        t2                add column (fail)  commit
+    //                        t2                add column        commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -1478,12 +1535,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         Vector<SharedPtr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -1497,7 +1554,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     //  t1            dump index                                               commit (success)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
-    //                        t2                add column (fail)   rollback
+    //                        t2                add column        commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -1517,12 +1574,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         Vector<SharedPtr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -1536,7 +1593,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     //  t1            dump index                             commit (success)
     //  |--------------|------------------------------------------|
     //         |------------------|----------------------|
-    //         t2                add column (fail)    commit
+    //         t2                add column       commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -1558,12 +1615,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         Vector<SharedPtr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -1574,10 +1631,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //  t1                                  dump index (fail)                           rollback
+    //  t1                                  dump index                               commit (success)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|--------------------|
-    //         t2                add column         commit
+    //         t2                add column         commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -1598,12 +1655,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         drop_db(*db_name);
@@ -1857,6 +1914,48 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         EXPECT_TRUE(status.ok());
     };
 
+    auto input_block_2_columns = MakeShared<DataBlock>();
+    {
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block_2_columns->InsertVector(col1, 0);
+        }
+        {
+            auto col4 = ColumnVector::Make(column_def4->type());
+            col4->Initialize();
+            Pair<Vector<float>, Vector<int32_t>> vec{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 1000, 10000, 20000}};
+            Pair<Vector<float>, Vector<int32_t>> vec2{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 2000, 10000, 20000}};
+            auto v1 = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                        reinterpret_cast<const char *>(vec.second.data()),
+                                        vec.first.size(),
+                                        column4_typeinfo);
+            auto v2 = Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
+                                        reinterpret_cast<const char *>(vec2.second.data()),
+                                        vec2.first.size(),
+                                        column4_typeinfo);
+            append_to_col(*col4, std::move(v1), std::move(v2));
+            input_block_2_columns->InsertVector(col4, 1);
+        }
+        input_block_2_columns->Finalize();
+    }
+    auto append_a_block_after_drop_column = [&] {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+        Status status = txn->Append(*db_name, *table_name, input_block_2_columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
     //    auto dump_index = [&](const String &index_name) {
     //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
     //        SegmentID segment_id = 0;
@@ -2015,7 +2114,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                         |------------------|----------|
-    //                        t2                drop column  commit
+    //                        t2                drop column  commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -2034,9 +2133,16 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
+        Vector<String> column_names;
+        column_names.push_back("col3");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
-        append_a_block();
+        append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
             RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
@@ -2044,12 +2150,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
             return std::make_pair(begin_id, row_cnt);
         });
 
-        Vector<String> column_names;
-        column_names.push_back("col3");
-        status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
 
         drop_db(*db_name);
 
@@ -2060,7 +2160,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     //  t1            dump index                 commit (success)
     //  |--------------|------------------------------|
     //                         |------------------|------------------|
-    //                        t2                drop column (fail)  commit
+    //                        t2                drop column     commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -2078,23 +2178,23 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col3");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
-        append_a_block();
+        append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
             RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
             u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
-
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
 
         drop_db(*db_name);
 
@@ -2105,7 +2205,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     //  t1            dump index                                               commit (success)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
-    //                        t2                drop column (fail)   rollback
+    //                        t2                drop column       commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -2123,8 +2223,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col3");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -2132,7 +2232,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
-        append_a_block();
+        append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
             RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
@@ -2149,7 +2249,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     //  t1            dump index                             commit (success)
     //  |--------------|------------------------------------------|
     //         |------------------|----------------------|
-    //         t2                drop column (fail)    commit
+    //         t2                drop column      commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -2169,8 +2269,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col3");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -2178,7 +2278,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
-        append_a_block();
+        append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
             RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
@@ -2192,10 +2292,10 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //  t1                                  dump index (fail)                           rollback (success)
+    //  t1                                  dump index                            commit (success)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|--------------------|
-    //         t2                drop column       commit
+    //         t2                drop column       commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -2214,12 +2314,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
         drop_db(*db_name);
@@ -2231,7 +2331,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     //  t1                                  dump index                             commit (success)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|-----------|
-    //         t2                drop column  commit
+    //         t2                drop column  commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);

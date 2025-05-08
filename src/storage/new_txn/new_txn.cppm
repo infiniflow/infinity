@@ -161,7 +161,7 @@ public:
 
     Status PostReadTxnCommit();
 
-    bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason);
+    bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
 
     Status PrepareCommit(TxnTimeStamp commit_ts);
 
@@ -582,15 +582,15 @@ private:
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 
     // Check transaction conflicts
-    bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause);
 

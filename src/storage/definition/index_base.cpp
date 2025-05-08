@@ -329,4 +329,13 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
     return res;
 }
 
+bool IndexBase::ContainsColumn(const String &column_name) const {
+    for (SizeT i = 0; i < column_names_.size(); ++i) {
+        if (column_names_[i] == column_name) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace infinity

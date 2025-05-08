@@ -619,7 +619,7 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         //  t1            compact     commit (success)
         //  |--------------|---------------|
         //         |------------------|----------|
-        //        t2                add column    commit
+        //        t2                add column    commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
@@ -629,13 +629,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
 
         CheckTable({0, 1});
         DropDB();
@@ -643,10 +643,10 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
     {
         PrepareForCompact();
 
-        //  t1            compact     commit (success)
+        //  t1            compact     commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
-        //        t2   add column    commit
+        //        t2   add column    commit (success)
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
@@ -654,13 +654,13 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
 
         CheckTable1({0, 1, 2});
         DropDB();
@@ -668,23 +668,23 @@ TEST_P(TestTxnCompact, compact_and_add_columns) {
     {
         PrepareForCompact();
 
-        //                  t1                     compact     commit (success)
+        //                  t1                     compact     commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
-        //        t2   add column    commit
+        //        t2   add column    commit (success)
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
         status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
 
         CheckTable1({0, 1, 2});
         DropDB();
@@ -826,7 +826,7 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         //  t1            compact     commit (success)
         //  |--------------|---------------|
         //         |------------------|----------|
-        //        t2                drop column    commit
+        //        t2                drop column    commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
@@ -836,13 +836,13 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
 
         CheckTable({0, 1}, {2});
         DropDB();
@@ -850,10 +850,10 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
     {
         PrepareForCompact();
 
-        //  t1            compact     commit (success)
+        //  t1            compact     commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
-        //        t2   drop column    commit
+        //        t2   drop column    commit (success)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
@@ -862,13 +862,13 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
 
         CheckTable({0}, {0, 1});
         DropDB();
