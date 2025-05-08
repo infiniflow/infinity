@@ -546,7 +546,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_parallel_test_release.outcome == 'failure' || steps.stop_parallel_test_release.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
 #      - name: Prepare sift dataset
 #        if: ${{ !cancelled() && !failure() }}
