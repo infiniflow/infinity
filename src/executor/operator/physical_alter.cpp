@@ -46,11 +46,6 @@ bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *op
         return true;
     }
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (!use_new_catalog) {
-        UnrecoverableError("Not implemented");
-    }
-
     NewTxn *new_txn = query_context->GetNewTxn();
     Status status = new_txn->RenameTable(*table_info_->db_name_, *table_info_->table_name_, new_table_name_);
 

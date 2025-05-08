@@ -2746,6 +2746,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
     }
 
+    // We will remove buffer objects for block, blockColumn and chunkIndex added in this txn.
     const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
     for (auto &meta : metas) {
         switch (meta->type_) {
