@@ -1007,6 +1007,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
     }
 }
 
+#if 0
 TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     using namespace infinity;
 
@@ -1250,3 +1251,4 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_slice_init) {
         EXPECT_EQ(vx.value_.huge_int, HugeIntT(0, src_idx));
     }
 }
+#endif

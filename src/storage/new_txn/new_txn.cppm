@@ -33,7 +33,6 @@ import value;
 import snapshot_info;
 import txn_context;
 import column_def;
-import extra_command;
 import column_vector;
 import buffer_handle;
 namespace infinity {
@@ -161,7 +160,7 @@ public:
 
     Status PostReadTxnCommit();
 
-    bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason);
+    bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
 
     Status PrepareCommit(TxnTimeStamp commit_ts);
 
@@ -210,10 +209,6 @@ public:
     Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
 
     Status RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name);
-
-    Status LockTable(const String &db_name, const String &table_name);
-
-    Status UnlockTable(const String &db_name, const String &table_name);
 
     Status ListTable(const String &db_name, Vector<String> &table_names);
 
@@ -582,15 +577,15 @@ private:
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 
     // Check transaction conflicts
-    bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause);
 
@@ -625,9 +620,6 @@ public:
                                   ChunkID chunk_id,
                                   Vector<String> &file_paths);
 
-    Status IncreaseTableReferenceCount(const String &table_key);
-    SizeT GetTableReferenceCount(const String &table_key);
-
     Status IncreaseMemIndexReferenceCount(const String &table_key);
     SizeT GetMemIndexReferenceCount(const String &table_key);
 
@@ -635,8 +627,6 @@ public:
     void SetWalSize(i64 wal_size);
 
 private:
-    // To record the access table reference count for release in txn committing or rollbacking phase
-    HashMap<String, SizeT> table_write_reference_count_{};
     HashMap<String, SizeT> mem_index_reference_count_{};
 
 private:
@@ -662,7 +652,6 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
 
-    Vector<SharedPtr<BaseExtraCommand>> extra_commands_{};
     // TODO: remove this
     UniquePtr<CatalogDeltaEntry> txn_delta_ops_entry_{};
 

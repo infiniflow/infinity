@@ -92,6 +92,8 @@ public:
 
     inline String column_name() const { return column_names_[0]; }
 
+    bool ContainsColumn(const String &column_name) const;
+
 public:
     IndexType index_type_{IndexType::kInvalid};
     SharedPtr<String> index_name_{};

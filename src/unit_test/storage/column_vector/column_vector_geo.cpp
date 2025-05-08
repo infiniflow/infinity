@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #include "gtest/gtest.h"
 import base_test;
 
@@ -33,7 +35,7 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-#if 0
+
 class ColumnVectorGeoTest : public BaseTest {
 };
 

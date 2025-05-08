@@ -1760,15 +1760,12 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                          commit (success)
     //    |----------|--------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  add columns    commit (success)
+    //                           t2                  add columns    commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -1804,7 +1801,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         status = txn4->AddColumns(*db_name, *table_name, columns);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1823,15 +1820,12 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                               commit (success)
     //    |----------|-----------------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  add column    commit (success)
+    //                           t2                  add column    commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -1861,13 +1855,13 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1886,12 +1880,9 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //                            |----------------------|----------|
     //                           t2                  add columns   commit (success)
@@ -1923,12 +1914,12 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1945,12 +1936,9 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //          |----------------------|---------------|
     //         t2                  add columns    commit (success)
@@ -1985,12 +1973,12 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn6->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2007,9 +1995,6 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                t1      import                                          commit (fail)
@@ -2047,12 +2032,12 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn6->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2068,12 +2053,9 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                           t1      import                                          rollback (fail)
+    //                           t1      import                                          commit (fail)
     //                           |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  add columns   commit (success)
@@ -2108,13 +2090,13 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2130,12 +2112,9 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                                     t1      import (fail)                                       rollback
+    //                                     t1      import                                          commit (fail)
     //                                     |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  add columns  commit (success)
@@ -2168,13 +2147,13 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2189,9 +2168,6 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                               t1      import                                           commit (success)
@@ -2238,9 +2214,6 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 }
 
@@ -2400,15 +2373,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                          commit (success)
     //    |----------|--------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  drop columns    commit (success)
+    //                           t2                  drop columns    commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2439,7 +2409,7 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         status = txn4->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2458,15 +2428,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                               commit (success)
     //    |----------|-----------------------------------------|
     //                            |----------------------|--------------------|
-    //                           t2                  drop column (fail)    rollback (success)
+    //                           t2                  drop column     commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2491,13 +2458,13 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2516,15 +2483,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      import                                                     commit (success)
+    //    t1      import                                                     commit (fail)
     //    |----------|--------------------------------------------------------------|
     //                            |----------------------|-------------------|
-    //                           t2                  drop column (fail)  rollback (success)
+    //                           t2                  drop column   commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2548,12 +2512,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2570,15 +2534,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //          |----------------------|-----------------------|
-    //         t2                  drop columns (fail)    rollback (success)
+    //         t2                  drop columns        commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2605,12 +2566,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2627,15 +2588,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                t1      import                                          commit (fail)
     //                |----------|---------------------------------------------------|
     //          |----------------------|----------------------|
-    //         t2                  drop columns          rollback (success)
+    //         t2                  drop columns          commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2662,12 +2620,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2683,12 +2641,9 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                           t1      import                                          rollback (fail)
+    //                           t1      import                                          commit (fail)
     //                           |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  drop columns   commit (success)
@@ -2718,13 +2673,13 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2740,12 +2695,9 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                                     t1      import (fail)                                       rollback
+    //                                     t1      import                                          commit (fail)
     //                                     |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  drop columns  commit (success)
@@ -2775,16 +2727,12 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         // Import two segments, each segments contains two blocks
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
 
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
@@ -2798,8 +2746,6 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                               t1      import                                           commit (success)
@@ -2841,9 +2787,6 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 }
 
@@ -2982,9 +2925,6 @@ TEST_P(TestTxnImport, test_import) {
 
         check_table(*table_meta);
     }
-
-    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 }
 
 TEST_P(TestTxnImport, test_import_append_table) {
@@ -3164,9 +3104,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                          commit (success)
@@ -3221,9 +3158,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                               commit (success)
@@ -3278,9 +3212,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                          commit (success)
@@ -3334,9 +3265,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                          commit (success)
@@ -3392,9 +3320,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                t1      import                                          commit (success)
@@ -3450,9 +3375,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                           t1      import                                          commit (success)
@@ -3508,9 +3430,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                     t1      import                                          commit (success)
@@ -3564,9 +3483,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                               t1      import (fail)                                         rollback
@@ -3618,9 +3534,6 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 }
 
@@ -3801,9 +3714,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                          commit (success)
@@ -3858,9 +3768,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                               commit (success)
@@ -3918,9 +3825,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                               commit (success)
@@ -3974,9 +3878,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                          commit (success)
@@ -4032,9 +3933,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                t1      import                                          commit (fail)
@@ -4090,9 +3988,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     RemoveDbDirs();
 }
@@ -4177,9 +4072,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import      commit (success)
@@ -4224,9 +4116,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                       commit (success)
@@ -4270,9 +4159,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                   commit (success)
@@ -4316,9 +4202,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      import                                    commit (success)
@@ -4363,9 +4246,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   import                                   commit (success)
@@ -4409,9 +4289,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  import                                   commit (success)
@@ -4456,9 +4333,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  import(fail)                          rollback (success)
@@ -4503,9 +4377,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -4734,9 +4605,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import      commit (success)
@@ -4793,9 +4661,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                       commit (success)
@@ -4852,9 +4717,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                   commit (success)
@@ -4910,9 +4772,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      import                                    commit (success)
@@ -4971,9 +4830,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   import                                   commit (success)
@@ -5030,9 +4886,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  import                                   commit (success)
@@ -5090,9 +4943,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  import                             commit (success)
@@ -5148,9 +4998,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -5359,9 +5206,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import      commit (success)
@@ -5425,9 +5269,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                       commit (success)
@@ -5491,9 +5332,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                   commit (success)
@@ -5556,9 +5394,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      import                                    commit (success)
@@ -5623,9 +5458,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   import                                   commit (success)
@@ -5688,9 +5520,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  import                                   commit (success)
@@ -5754,9 +5583,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  import                             commit (success)
@@ -5818,9 +5644,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -5956,9 +5779,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import      commit (success)
@@ -5991,9 +5811,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({0, 1, 2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                       commit (success)
@@ -6024,9 +5841,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({0, 1, 2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                   commit (success)
@@ -6056,9 +5870,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({0, 1, 2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      import                                    commit (success)
@@ -6090,9 +5901,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   import                                   commit (success)
@@ -6123,9 +5931,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  import                                   commit (success)
@@ -6156,9 +5961,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  import                             commit (success)
@@ -6187,9 +5989,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         CheckTable({2, 3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -6370,9 +6169,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import      commit (success)
@@ -6402,9 +6198,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                       commit (success)
@@ -6434,9 +6227,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      import                                   commit (success)
@@ -6465,9 +6255,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      import                                    commit (success)
@@ -6498,9 +6285,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   import                                   commit (success)
@@ -6529,9 +6313,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  import                                   commit (success)
@@ -6561,9 +6342,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  import                             commit (success)
@@ -6591,9 +6369,6 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
         CheckTable({3});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();

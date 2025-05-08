@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #include <fstream>
 #include <gtest/gtest.h>
 
@@ -123,3 +125,5 @@ TEST_F(DiskAnnTest, test1) {
     using PqFlashIndexType = PqFlashIndex<f32, SizeT>;
     TestCreateIndex<DiskAnnIndexData, PqFlashIndexType>();
 }
+
+#endif

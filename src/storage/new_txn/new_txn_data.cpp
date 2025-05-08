@@ -185,11 +185,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     TableMeeta &table_meta = *table_meta_opt;
 
     // SegmentID segment_id = 0;
@@ -235,6 +230,24 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         status = NewCatalog::AddNewBlock1(*segment_meta, fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
+        }
+
+        txn_store_.AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(block_meta->segment_meta().table_meta().db_id_str(),
+                                                                      block_meta->segment_meta().table_meta().table_id_str(),
+                                                                      block_meta->segment_meta().segment_id(),
+                                                                      block_meta->block_id()));
+
+        SharedPtr<Vector<SharedPtr<ColumnDef> > > column_defs_ptr;
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        for (SizeT i = 0; i < column_defs_ptr->size(); ++i) {
+            txn_store_.AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(block_meta->segment_meta().table_meta().db_id_str(),
+                                                                           block_meta->segment_meta().table_meta().table_id_str(),
+                                                                           block_meta->segment_meta().segment_id(),
+                                                                           block_meta->block_id(),
+                                                                           (*column_defs_ptr)[i]));
         }
 
         if (j < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
@@ -294,6 +307,18 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     // if (!status.ok()) {
     //     return status;
     // }
+
+    // Put the data into local txn store
+    base_txn_store_ = MakeShared<ImportTxnStore>();
+    ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+    import_txn_store->db_name_ = db_name;
+    import_txn_store->db_id_str_ = table_meta.db_id_str();
+    import_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
+    import_txn_store->table_name_ = table_name;
+    import_txn_store->table_id_str_ = table_meta.table_id_str();
+    import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
+    import_txn_store->input_blocks_ = input_blocks;
+    import_txn_store->segment_id_ = segment_meta->segment_id();
 
     { // Add import wal;
         auto import_command =
@@ -381,11 +406,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     return AppendInner(db_name, table_name, table_key, *table_meta, input_block);
 }
 
@@ -407,10 +427,6 @@ Status NewTxn::AppendInner(const String &db_name,
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance_validation = kv_store->GetInstance();
     TableMeeta table_meta_validation(table_meta.db_id_str(), table_meta.table_id_str(), *kv_instance_validation, begin_ts);
-    auto [column_defs_validation, column_defs_validation_status] = table_meta_validation.GetColumnDefs();
-    if (!column_defs_validation_status.ok()) {
-        return column_defs_validation_status;
-    }
 
     {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
@@ -430,15 +446,6 @@ Status NewTxn::AppendInner(const String &db_name,
             return Status::ColumnCountMismatch(err_msg);
         }
 
-        if (column_defs_validation->size() != column_count) {
-            String err_msg = fmt::format("Insert data conflicts with alter columns, expected column count: {}, actual column count: {}",
-                                         column_count,
-                                         column_defs_validation->size());
-            LOG_ERROR(err_msg);
-
-            return Status::ColumnCountMismatch(err_msg);
-        }
-
         Vector<SharedPtr<DataType>> column_types;
         for (SizeT col_id = 0; col_id < column_count; ++col_id) {
             column_types.emplace_back((*column_defs)[col_id]->type());
@@ -447,15 +454,6 @@ Status NewTxn::AppendInner(const String &db_name,
                 LOG_ERROR(err_msg);
 
                 return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
-            }
-            if (*column_types.back() != *(*column_defs_validation)[col_id]->type()) {
-                String err_msg = fmt::format("Insert data conflicts with alter column: column_id: {}, left_type:{}, right_type{}",
-                                             col_id,
-                                             column_types.back()->ToString(),
-                                             (*column_defs_validation)[col_id]->type()->ToString());
-                LOG_ERROR(err_msg);
-
-                return Status::DataTypeMismatch(column_types.back()->ToString(), (*column_defs_validation)[col_id]->type()->ToString());
             }
         }
     }
@@ -501,11 +499,6 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     Optional<TableMeeta> table_meta_opt;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -574,11 +567,6 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     Optional<TableMeeta> table_meta_opt;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -1019,6 +1007,11 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                 if (!status.ok()) {
                     return status;
                 }
+
+                txn_store_.AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(compact_state.block_meta_->segment_meta().table_meta().db_id_str(),
+                                                                              compact_state.block_meta_->segment_meta().table_meta().table_id_str(),
+                                                                              compact_state.block_meta_->segment_meta().segment_id(),
+                                                                              compact_state.block_meta_->block_id()));
             }
             append_size = std::min(SizeT(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
@@ -1030,9 +1023,28 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                 if (!status.ok()) {
                     return status;
                 }
+                txn_store_.AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(compact_state.block_meta_->segment_meta().table_meta().db_id_str(),
+                                                                              compact_state.block_meta_->segment_meta().table_meta().table_id_str(),
+                                                                              compact_state.block_meta_->segment_meta().segment_id(),
+                                                                              compact_state.block_meta_->block_id()));
+
             } else {
                 break;
             }
+        }
+
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        TableMeeta &table_meta = block_meta.segment_meta().table_meta();
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        for (SizeT i = 0; i < column_defs_ptr->size(); ++i) {
+            txn_store_.AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(compact_state.block_meta_->segment_meta().table_meta().db_id_str(),
+                                                                           compact_state.block_meta_->segment_meta().table_meta().table_id_str(),
+                                                                           compact_state.block_meta_->segment_meta().segment_id(),
+                                                                           compact_state.block_meta_->block_id(),
+                                                                           (*column_defs_ptr)[i]));
         }
 
         for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
@@ -1147,6 +1159,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         for (SizeT i = 0; i < block_row_count; ++i) {
             column_vector.AppendValue(default_value);
         }
+
+        txn_store_.AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(block_meta.segment_meta().table_meta().db_id_str(),
+                                                                       block_meta.segment_meta().table_meta().table_id_str(),
+                                                                       block_meta.segment_meta().segment_id(),
+                                                                       block_meta.block_id(),
+                                                                       column_defs[i]));
     }
 
     return Status::OK();
@@ -1288,22 +1306,6 @@ Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
     const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-
-    {
-        KVStore *kv_store = txn_mgr_->kv_store();
-        UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
-        TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
-        auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
-        if (!col_def_status.ok()) {
-            return col_def_status;
-        }
-
-        if (segment_info.column_count_ != col_defs->size()) {
-            return Status::ColumnCountMismatch(
-                fmt::format("Column count mismatch, expect: {}, actual: {}", col_defs->size(), segment_info.column_count_));
-        }
-    }
-
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
@@ -1384,6 +1386,25 @@ Status NewTxn::CommitAppend(WalCmdAppendV2 *append_cmd, KVInstance *kv_instance)
         if (!status.ok()) {
             return status;
         }
+
+        txn_store_.AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(block_meta->segment_meta().table_meta().db_id_str(),
+                                                                      block_meta->segment_meta().table_meta().table_id_str(),
+                                                                      block_meta->segment_meta().segment_id(),
+                                                                      block_meta->block_id()));
+
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        for (SizeT i = 0; i < column_defs_ptr->size(); ++i) {
+            txn_store_.AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(block_meta->segment_meta().table_meta().db_id_str(),
+                                                                           block_meta->segment_meta().table_meta().table_id_str(),
+                                                                           block_meta->segment_meta().segment_id(),
+                                                                           block_meta->block_id(),
+                                                                           (*column_defs_ptr)[i]));
+        }
+
     } else {
         BlockID block_id = block_ids_ptr->back();
         block_meta.emplace(block_id, segment_meta.value());

@@ -166,8 +166,6 @@ TEST_P(TestTxnColumn, test_add_columns) {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 }
 
 TEST_P(TestTxnColumn, alter_column) {
@@ -179,7 +177,7 @@ TEST_P(TestTxnColumn, alter_column) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     String table_name = "tb1";
     {
-        // lock table and drop table
+        // add column and drop table
         //  t1            drop table    commit (success)
         //  |--------------|---------------|
         //                                  |------|------------|
@@ -235,9 +233,6 @@ TEST_P(TestTxnColumn, alter_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -252,7 +247,7 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     String table_name = "tb1";
     {
-        // lock table and drop table
+        // add column and drop table
         //  t1            add column     commit (success)
         //  |--------------|---------------|
         //                                     |------------------|----------|
@@ -289,13 +284,10 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // add column and drop table
         //  t1            add column     commit (success)
         //  |--------------|---------------|
         //         |------------------|----------|
@@ -335,13 +327,10 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // add column and drop table
         //  t1            add column     commit (success)
         //  |--------------|---------------|
         //         |----|----------|
@@ -381,9 +370,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -438,13 +424,10 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // add column and drop table
         //  t1            add column    commit (success)
         //  |--------------|---------------|
         //                            |------|------------|
@@ -489,17 +472,14 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // add column and drop table
         //  t1            add column        commit (success)
         //  |--------------|---------------------|
         //                            |------|-----------------|
-        //                            t2    drop table (fail) rollback
+        //                            t2    drop table      commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -526,62 +506,9 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
 
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn5);
-        EXPECT_TRUE(status.ok());
-
-        // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        status = txn6->DropDatabase("db1", ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    }
-
-    {
-        // lock table and drop table
-        //  t1            add column(fail)      commit (success)
-        //  |--------------|---------------------|
-        //       |------|---------------------------|
-        //      t2    drop table              commit
-        // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-
-        status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
-        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
-        Vector<SharedPtr<ColumnDef>> columns;
-        columns.emplace_back(column_def3);
-        columns.emplace_back(column_def4);
-        status = txn3->AddColumns(*db_name, table_name, columns);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
@@ -593,14 +520,61 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
-        //                      t1         add column(fail)      commit (success)
+        // add column and drop table
+        //  t1            add column       commit (success)
+        //  |--------------|---------------------|
+        //       |------|---------------------------|
+        //      t2    drop table              commit (success)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table tb1
+        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+
+        status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn3->AddColumns(*db_name, table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // add column and drop table
+        //                      t1         add column        commit (fail)
         //                      |--------------|---------------------|
         //       |------|---------------------------|
         //      t2    drop table              commit
@@ -632,13 +606,13 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn3->AddColumns(*db_name, table_name, columns);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -646,14 +620,11 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
-        //                      t1         add column(fail)      commit (success)
+        // add column and drop table
+        //                      t1         add column        commit (fail)
         //                      |--------------|---------------------|
         //       |------|------------------|
         //      t2    drop table        commit
@@ -672,11 +643,14 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
@@ -685,13 +659,10 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn3->AddColumns(*db_name, table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn5);
-        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -699,9 +670,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -755,9 +723,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -800,9 +765,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -845,9 +807,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -897,9 +856,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -907,7 +863,7 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         //    t1         add column      commit (success)
         //    |--------------|---------------------|
         //                       |------|------------------|
-        //                      t2    add column (fail)  commit (success)
+        //                      t2    add column     commit (fail)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -935,13 +891,13 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         Vector<SharedPtr<ColumnDef>> columns4;
         columns4.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, table_name, columns4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -949,14 +905,11 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
         // add column and add column
-        //    t1         add column(fail)      rollback (success)
+        //    t1         add column           commit (fail)
         //    |--------------|---------------------|
         //         |------|------------------|
         //        t2    add column        commit (success)
@@ -988,13 +941,13 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         Vector<SharedPtr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn3->AddColumns(*db_name, table_name, columns3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1002,9 +955,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }
@@ -1018,7 +968,7 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     String table_name = "tb1";
     {
-        // lock table and drop table
+        // drop column and drop table
         //  t1            drop column     commit (success)
         //  |--------------|---------------|
         //                                     |------------------|----------|
@@ -1053,13 +1003,10 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // drop column and drop table
         //  t1            drop column     commit (success)
         //  |--------------|---------------|
         //         |------------------|----------|
@@ -1098,13 +1045,10 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // drop column and drop table
         //  t1            drop column     commit (success)
         //  |--------------|---------------|
         //         |----|----------|
@@ -1142,9 +1086,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -1196,13 +1137,10 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // drop column and drop table
         //  t1            drop column    commit (success)
         //  |--------------|---------------|
         //                            |------|------------|
@@ -1244,17 +1182,14 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
+        // drop column and drop table
         //  t1            drop column        commit (success)
         //  |--------------|---------------------|
         //                            |------|-----------------|
-        //                            t2    drop table (fail) rollback
+        //                            t2    drop table      commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -1278,59 +1213,9 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
 
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn5);
-        EXPECT_TRUE(status.ok());
-
-        // drop database
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        status = txn6->DropDatabase("db1", ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    }
-
-    {
-        // lock table and drop table
-        //  t1            drop column(fail)      commit (success)
-        //  |--------------|---------------------|
-        //       |------|---------------------------|
-        //      t2    drop table              commit
-        // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // create table tb1
-        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-
-        status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        Vector<String> column_names;
-        column_names.push_back("col2");
-        status = txn4->DropColumns(*db_name, table_name, column_names);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
@@ -1342,14 +1227,58 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
-        //                      t1         drop column(fail)      commit (success)
+        // drop column and drop table
+        //  t1            drop column      commit (success)
+        //  |--------------|---------------------|
+        //       |------|---------------------------|
+        //      t2    drop table              commit (success)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table tb1
+        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+
+        status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, table_name, column_names);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop column and drop table
+        //                      t1         drop column         commit (fail)
         //                      |--------------|---------------------|
         //       |------|---------------------------|
         //      t2    drop table              commit
@@ -1375,19 +1304,16 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
-        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
-        Vector<SharedPtr<ColumnDef>> columns;
-        columns.emplace_back(column_def3);
-        columns.emplace_back(column_def4);
-        status = txn3->AddColumns(*db_name, table_name, columns);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn3);
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn3->DropColumns(*db_name, table_name, column_names);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1395,14 +1321,11 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
-        // lock table and drop table
-        //                      t1         drop column(fail)      commit (success)
+        // drop column and drop table
+        //                      t1         drop column        commit (fail)
         //                      |--------------|---------------------|
         //       |------|------------------|
         //      t2    drop table        commit
@@ -1427,16 +1350,17 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        Vector<String> column_names;
-        column_names.push_back("col2");
-        status = txn4->DropColumns(*db_name, table_name, column_names);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, table_name, column_names);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1444,9 +1368,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -1508,9 +1429,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1568,9 +1486,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1578,7 +1493,7 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         //    t1         add column      commit (success)
         //    |--------------|---------------------|
         //                       |------|------------------|
-        //                      t2    add column (fail)  commit (success)
+        //                      t2    drop column   commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -1605,12 +1520,12 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // drop database
@@ -1619,14 +1534,11 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
         // add column and drop column
-        //    t1         add column(fail)      rollback (success)
+        //    t1         add column          commit (success)
         //    |--------------|---------------------|
         //         |------|------------------|
         //        t2    drop column        commit (success)
@@ -1648,21 +1560,22 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
-        Vector<SharedPtr<ColumnDef>> columns4;
-        columns4.emplace_back(column_def4);
-        status = txn4->AddColumns(*db_name, table_name, columns4);
-        EXPECT_TRUE(status.ok());
 
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, table_name, column_names);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
+
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns4;
+        columns4.emplace_back(column_def4);
+        status = txn3->AddColumns(*db_name, table_name, columns4);
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // drop database
@@ -1671,9 +1584,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }
@@ -1739,9 +1649,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1797,9 +1704,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1860,9 +1764,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1916,9 +1817,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1973,9 +1871,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }

@@ -285,13 +285,13 @@ TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
-bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason) {
+bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
-        if (txn->CheckConflict1(check_txn, conflict_reason)) {
+        if (txn->CheckConflict1(check_txn, conflict_reason, retry_query)) {
             return true;
         }
     }
@@ -549,10 +549,13 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
+        res.reserve(check_txns_.size());
         for (SizeT i = 0; i < check_txns_.size(); ++i) {
             SharedPtr<NewTxn> &check_txn = check_txns_[i];
             TxnTimeStamp check_commit_ts = check_txn->CommitTS();
-            if (check_commit_ts < begin_ts) {
+            TxnState check_txn_state = check_txn->GetTxnState();
+            bool is_rollback = (check_txn_state == TxnState::kRollbacking) || (check_txn_state == TxnState::kRollbacked);
+            if (check_commit_ts < begin_ts || is_rollback) {
                 continue;
             }
             if (check_commit_ts >= commit_ts) {

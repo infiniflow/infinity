@@ -431,9 +431,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete           commit (success)
@@ -490,9 +487,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                            commit (success)
@@ -546,9 +540,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                        delete                                            commit (success)
@@ -602,9 +593,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 }
 
@@ -742,9 +730,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete           commit (success)
@@ -808,9 +793,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                            commit (success)
@@ -871,9 +853,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                        delete                                            commit (success)
@@ -934,9 +913,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 }
 
@@ -1087,9 +1063,6 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -1163,15 +1136,12 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  add column (fail)       rollback (success)
+    //                    t2                  add column          commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1213,12 +1183,12 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn5->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn5);
+        status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         // Check data
@@ -1239,15 +1209,12 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
-    //                    t2        add column (fail)   rollback (success)
+    //                    t2        add column       commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1289,8 +1256,8 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn5->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn5);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
@@ -1314,12 +1281,9 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                      delete (fail)                               rollback (success)
+    //    t1                                      delete                               commit (success)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)
@@ -1365,12 +1329,12 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
             row_ids.push_back(RowID(0, row_id));
         }
         status = txn4->Delete(*db_name, *table_name, row_ids);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // drop database
@@ -1388,9 +1352,6 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -1460,9 +1421,6 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -1533,9 +1491,6 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  append(fail)                          rollback (success)
@@ -1604,9 +1559,6 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -1754,9 +1706,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -1825,15 +1774,12 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  drop column (fail)       rollback (success)
+    //                    t2                  drop column         commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1870,12 +1816,12 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn5->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn5);
+        status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         // Check data
@@ -1896,15 +1842,12 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
-    //                    t2        drop column (fail)   rollback (success)
+    //                    t2        drop column     commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -1941,8 +1884,8 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn5->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn5);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
@@ -1966,12 +1909,9 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                      delete (fail)                               rollback (success)
+    //    t1                                      delete                               commit (success)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|------------------------------|
     //                    t2                drop column                 commit (success)
@@ -2012,12 +1952,12 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
             row_ids.push_back(RowID(0, row_id));
         }
         status = txn4->Delete(*db_name, *table_name, row_ids);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // drop database
@@ -2035,9 +1975,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   append                                   commit (success)
@@ -2105,9 +2042,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -2176,9 +2110,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                          t1                  delete(fail)                          rollback (success)
@@ -2245,9 +2176,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -2393,9 +2321,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -2462,9 +2387,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -2531,9 +2453,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
@@ -2599,9 +2518,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -2669,9 +2585,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -2737,9 +2650,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -2806,9 +2716,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -2873,9 +2780,6 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -3023,9 +2927,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -3094,9 +2995,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -3165,9 +3063,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
@@ -3235,9 +3130,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -3307,9 +3199,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -3377,9 +3266,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -3448,9 +3334,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -3517,9 +3400,6 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -3674,9 +3554,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -3752,9 +3629,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -3830,9 +3704,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
@@ -3907,9 +3778,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -3986,9 +3854,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -4063,9 +3928,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -4141,9 +4003,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -4217,9 +4076,6 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -4432,9 +4288,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -4511,9 +4364,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -4590,9 +4440,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
@@ -4668,9 +4515,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -4748,9 +4592,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -4827,9 +4668,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -4907,9 +4745,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -4985,9 +4820,6 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -5190,9 +5022,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -5268,9 +5097,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -5346,9 +5172,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (success)
@@ -5423,9 +5246,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -5502,9 +5322,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -5580,9 +5397,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -5659,9 +5473,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -5736,9 +5547,6 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -5916,9 +5724,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -5996,9 +5801,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -6075,9 +5877,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                   commit (fail)
@@ -6152,9 +5951,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (fail)
@@ -6232,9 +6028,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -6312,9 +6105,6 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
         EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
         status = new_txn_mgr->RollBackTxn(txn8);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -6494,9 +6284,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTable({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -6530,9 +6317,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableNoCompact({0, 1});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -6566,9 +6350,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableNoCompact({0, 1});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                     commit (fail)
@@ -6601,9 +6382,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableCompactedWithoutDelete({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -6638,9 +6416,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableCompactedWithoutDelete({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -6673,9 +6448,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableCompactedWithoutDelete({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -6709,9 +6481,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableCompactedWithoutDelete({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -6745,9 +6514,6 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         CheckTableCompactedWithoutDelete({2});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();
@@ -6923,9 +6689,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete      commit (success)
@@ -6959,9 +6722,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                       commit (success)
@@ -6995,9 +6755,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1      delete                                     commit (fail)
@@ -7030,9 +6787,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                      delete                                    commit (success)
@@ -7067,9 +6821,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //    t1                                                   delete                                   commit (success)
@@ -7102,9 +6853,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                  t1                  delete                                   commit (success)
@@ -7138,9 +6886,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     //                                                           t1                  delete                             commit (success)
@@ -7172,9 +6917,6 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         CheckTable({0});
 
         DropDB();
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     RemoveDbDirs();

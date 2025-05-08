@@ -2366,7 +2366,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         //    t1      rename            commit (success)
         //    |----------|--------------------|
         //            |-------|-----------------|
-        //           t2     add columns (fail) rollback
+        //           t2     add columns       commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2394,12 +2394,12 @@ TEST_P(TestTxnTable, rename_table_test) {
         columns.emplace_back(column_def3);
         columns.emplace_back(column_def4);
         status = txn4->AddColumns(*db_name, *table_name, columns);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // drop db1
@@ -2412,7 +2412,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
     // with add columns 2
     {
-        //    t1                rename (fail)       rollback
+        //    t1                rename         commit (success)
         //    |-------------------|--------------------|
         //            |-------|-----------------|
         //           t2     add columns    commit(success)
@@ -2443,12 +2443,12 @@ TEST_P(TestTxnTable, rename_table_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->RenameTable(*db_name, *table_name, new_table_name);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // drop db1
@@ -2461,7 +2461,7 @@ TEST_P(TestTxnTable, rename_table_test) {
 
     // with drop columns 1
     {
-        //    t1                rename (fail)       rollback
+        //    t1                rename             commit (success)
         //    |-------------------|--------------------|
         //            |-------|-----------------|
         //           t2     drop columns    commit(success)
@@ -2489,12 +2489,12 @@ TEST_P(TestTxnTable, rename_table_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->RenameTable(*db_name, *table_name, new_table_name);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // drop db1
@@ -2507,10 +2507,10 @@ TEST_P(TestTxnTable, rename_table_test) {
 
     // with drop columns 2
     {
-        //    t1          rename (success)                     commit
+        //    t1          rename                           commit (success)
         //    |-------------|------------------------------------|
         //            |-------|---------------------------|
-        //           t2     drop columns (fail)       commit(success)
+        //           t2     drop columns           commit(success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2536,102 +2536,12 @@ TEST_P(TestTxnTable, rename_table_test) {
         Vector<String> column_names;
         column_names.push_back("col2");
         status = txn4->DropColumns(*db_name, *table_name, column_names);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn4);
         EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
-
-        // drop db1
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        status = txn6->DropDatabase("db1", ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
-    }
-
-    // with lock table 1
-    {
-        //    t1          rename (success)                     commit
-        //    |-------------|------------------------------------|
-        //            |-------|---------------------------|
-        //           t2     lock table (fail)         rollback
-        // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // create table
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        // rename table
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-        // drop columns
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = txn4->LockTable(*db_name, *table_name);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn4);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
-
-        // drop db1
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        status = txn6->DropDatabase("db1", ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
-    }
-
-    // with lock table 2
-    {
-        //    t1                rename (fail)                        rollback
-        //    |--------------------|------------------------------------|
-        //            |-------|---------------------------|
-        //           t2     lock table           commit(success)
-        // create db1
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // create table
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        // rename table
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-        // drop columns
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-
-        status = txn4->LockTable(*db_name, *table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = txn3->RenameTable(*db_name, *table_name, new_table_name);
-        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // drop db1

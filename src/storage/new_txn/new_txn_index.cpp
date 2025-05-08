@@ -90,7 +90,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
     DeferFn defer_fn([&] {
         if (status.ok()) {
             return;
@@ -100,9 +99,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
         }
     });
-    if (!status.ok()) {
-        return status;
-    }
+
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         ChunkID new_chunk_id = 0;
@@ -138,7 +135,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
     DeferFn defer_fn([&] {
         if (status.ok()) {
             return;
@@ -148,9 +144,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
         }
     });
-    if (!status.ok()) {
-        return status;
-    }
 
     ChunkID new_chunk_id = 0;
     status = this->DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
@@ -253,11 +246,6 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         return status;
     }
 
-    status = this->IncreaseTableReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta_opt);
 
     return OptimizeIndexInner(segment_index_meta, index_name, table_name, db_name, table_key);
@@ -339,6 +327,13 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             return status;
         }
     }
+
+    txn_store_.AddMetaKeyForBufferObject(MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
+                                                                       chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
+                                                                       chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
+                                                                       chunk_index_meta->segment_index_meta().segment_id(),
+                                                                       chunk_index_meta->chunk_id()));
+
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             Vector<Pair<u32, BufferObj *>> old_buffers;

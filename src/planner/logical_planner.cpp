@@ -1327,7 +1327,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         }
         case AlterStatementType::kAddColumns: {
             auto *add_columns_statement = static_cast<AddColumnsStatement *>(statement);
-            std::vector<std::shared_ptr<ColumnDef>> column_defs = std::move(add_columns_statement->column_defs_);
+            std::vector<std::shared_ptr<ColumnDef>> column_defs = add_columns_statement->column_defs_;
             for (const auto &column_def : column_defs) {
                 if (!column_def->has_default_value()) {
                     RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
@@ -1361,7 +1361,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         }
         case AlterStatementType::kDropColumns: {
             auto *drop_columns_statement = static_cast<DropColumnsStatement *>(statement);
-            Vector<String> column_names = std::move(drop_columns_statement->column_names_);
+            Vector<String> column_names = drop_columns_statement->column_names_;
             for (const auto &column_name : column_names) {
                 if (!use_new_catalog) {
                     i64 column_id = table_entry->GetColumnIdByName(column_name);
@@ -1464,48 +1464,6 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             } else {
                 return status;
             }
-            break;
-        }
-        case CommandType::kLockTable: {
-            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Uninitialized storage mode");
-            }
-
-            if (storage_mode != StorageMode::kWritable) {
-                return Status::InvalidNodeRole("Attempt to write on non-writable node");
-            }
-            auto *lock_table = static_cast<LockCmd *>(command_statement->command_info_.get());
-            if (lock_table->db_name().empty()) {
-                lock_table->SetDBName(query_context_ptr_->schema_name());
-            }
-            auto [table_entry, status] = txn->GetTableByName(lock_table->db_name(), lock_table->table_name());
-            if (!status.ok()) {
-                return status;
-            }
-            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
-            this->logical_plan_ = logical_command;
-            break;
-        }
-        case CommandType::kUnlockTable: {
-            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
-                UnrecoverableError("Uninitialized storage mode");
-            }
-
-            if (storage_mode != StorageMode::kWritable) {
-                return Status::InvalidNodeRole("Attempt to write on non-writable node");
-            }
-            auto *unlock_table = static_cast<UnlockCmd *>(command_statement->command_info_.get());
-            if (unlock_table->db_name().empty()) {
-                unlock_table->SetDBName(query_context_ptr_->schema_name());
-            }
-            Status status = txn->CheckTableExist(unlock_table->db_name(), unlock_table->table_name());
-            if (!status.ok()) {
-                return status;
-            }
-            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
-            this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kCleanup: {

@@ -200,7 +200,6 @@ void VectorSearch(const String &db_name, const String &table_name) {
 
 void Insert(const String &db_name, const String &table_name, Vector<DataRow> data) {
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-
     SizeT max_start = data.size() > insert_delete_size ? data.size() - insert_delete_size : 0;
     SizeT pos = RandInt(0, max_start);
 
