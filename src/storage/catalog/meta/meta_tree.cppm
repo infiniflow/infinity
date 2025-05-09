@@ -113,7 +113,7 @@ export struct MetaPmObject final : public MetaObject {
 };
 
 export struct MetaTree {
-    static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
+    static SharedPtr<MetaTree> MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys);
 
 public:
     Vector<MetaTableObject *> ListTables() const;
