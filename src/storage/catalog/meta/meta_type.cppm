@@ -21,6 +21,7 @@ namespace infinity {
 export enum class MetaType {
     kInvalid,
     kDB,
+    kDBTag,
     kTable,
     kTableTag,
     kTableColumn,

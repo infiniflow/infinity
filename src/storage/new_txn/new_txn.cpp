@@ -324,11 +324,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return status;
     }
 
-    String table_id;
-    status = IncrLatestID(table_id, LATEST_TABLE_ID);
-    if (!status.ok()) {
-        return status;
-    }
+    String table_id = db_meta->GetNextTableID();
 
     SharedPtr<String> local_table_dir = DetermineRandomPath(*table_def->table_name());
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id, table_def);

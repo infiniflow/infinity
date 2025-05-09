@@ -66,6 +66,8 @@ public:
 
     Status GetDatabaseInfo(DatabaseInfo &db_info);
 
+    String GetNextTableID();
+
 private:
     Status LoadComment();
 

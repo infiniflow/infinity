@@ -23,6 +23,14 @@ namespace infinity {
 
 class DataBlock;
 
+export struct MemIndexRange {
+    String index_id_{};
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+    SegmentOffset start_offset_{};
+    SizeT row_count_{};
+};
+
 enum class TxnStoreType {
     kInvalid,
     kAppend,
@@ -52,7 +60,14 @@ export struct AppendTxnStore : public BaseTxnStore {
     u64 table_id_{};
 
     SharedPtr<DataBlock> input_block_{};
+    Vector<String> index_ids_{}; // indexes will be appended
+
+    // For data append
     Vector<Pair<RowID, u64>> row_ranges_{};
+
+    // For mem index
+    Vector<MemIndexRange> mem_indexes_to_append_{};
+    Vector<MemIndexRange> mem_indexes_to_dump_{};
 };
 
 export struct ImportTxnStore : public BaseTxnStore {
