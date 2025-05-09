@@ -274,148 +274,76 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
         return false;
     };
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        TxnTimeStamp begin_ts = new_txn->BeginTS();
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
 
-        const Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
-        LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
+    const Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
+    LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
 
-        for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-            SizeT block_count = segment_snapshot.block_map_.size();
-            LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
-            for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
-                LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-
-                BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
-                Vector<ColumnVector> column_vectors;
-                column_vectors.resize(select_column_count);
-                auto [block_row_count, status] = block_meta->GetRowCnt1();
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-
-                for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
-                    ColumnID select_column_idx = select_columns[block_column_idx];
-                    switch (select_column_idx) {
-                        case COLUMN_IDENTIFIER_ROW_ID: {
-                            column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
-                            column_vectors[block_column_idx].Initialize();
-                            BlockID block_id = block_meta->block_id();
-                            u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-                            column_vectors[block_column_idx].AppendWith(RowID(segment_id, segment_offset), block_row_count);
-                            break;
-                        }
-                        case COLUMN_IDENTIFIER_CREATE: {
-                            column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
-                            column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
-                            Status status = NewCatalog::GetCreateTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
-                            if (!status.ok()) {
-                                RecoverableError(status);
-                            }
-                            break;
-                        }
-                        case COLUMN_IDENTIFIER_DELETE: {
-                            column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
-                            column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
-                            Status status = NewCatalog::GetDeleteTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
-                            if (!status.ok()) {
-                                RecoverableError(status);
-                            }
-                            break;
-                        }
-                        default: {
-                            ColumnMeta column_meta(select_column_idx, *block_meta);
-                            Status status = NewCatalog::GetColumnVector(column_meta,
-                                                                        block_row_count,
-                                                                        ColumnVectorTipe::kReadOnly,
-                                                                        column_vectors[block_column_idx]);
-                            if (!status.ok()) {
-                                UnrecoverableError("Failed to get column vector");
-                            }
-                        }
-                    }
-                }
-
-                Bitmask bitmask(block_row_count);
-                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-
-                for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                    if (!bitmask.IsTrue(row_idx)) {
-                        continue;
-                    }
-                    if (offset > 0) {
-                        --offset;
-                        continue;
-                    }
-
-                    String line = line_to_string(column_vectors, row_idx);
-                    bool end = append_line(line);
-                    if (end) {
-                        goto new_label_return;
-                    }
-                }
-            }
-        }
-    new_label_return:
-        LOG_DEBUG(fmt::format("Export to file, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
-        return row_count;
-    }
-
-    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-    Txn *txn = query_context->GetTxn();
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
-        LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
+        LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-            BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
-            SegmentOffset seg_off = block_entry->segment_offset();
-            SizeT block_row_count = block_entry->row_count();
 
+            BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
             Vector<ColumnVector> column_vectors;
-            column_vectors.reserve(select_column_count);
+            column_vectors.resize(select_column_count);
+            auto [block_row_count, status] = block_meta->GetRowCnt1();
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
 
             for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                 ColumnID select_column_idx = select_columns[block_column_idx];
                 switch (select_column_idx) {
                     case COLUMN_IDENTIFIER_ROW_ID: {
-                        u16 block_id = block_entry->block_id();
+                        column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
+                        column_vectors[block_column_idx].Initialize();
+                        BlockID block_id = block_meta->block_id();
                         u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-                        auto column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
-                        column_vector.Initialize();
-                        column_vector.AppendWith(RowID(segment_id, segment_offset), block_row_count);
-                        column_vectors.emplace_back(column_vector);
+                        column_vectors[block_column_idx].AppendWith(RowID(segment_id, segment_offset), block_row_count);
                         break;
                     }
                     case COLUMN_IDENTIFIER_CREATE: {
-                        ColumnVector column_vector = block_entry->GetCreateTSVector(buffer_manager, 0, block_row_count);
-                        column_vectors.emplace_back(column_vector);
+                        column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+                        column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
+                        Status status = NewCatalog::GetCreateTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
                         break;
                     }
                     case COLUMN_IDENTIFIER_DELETE: {
-                        ColumnVector column_vector = block_entry->GetDeleteTSVector(buffer_manager, 0, block_row_count);
-                        column_vectors.emplace_back(column_vector);
+                        column_vectors[block_column_idx] = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+                        column_vectors[block_column_idx].Initialize(ColumnVectorType::kFlat, block_row_count);
+                        Status status = NewCatalog::GetDeleteTSVector(*block_meta, 0, block_row_count, column_vectors[block_column_idx]);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetConstColumnVector(buffer_manager, select_column_idx));
-                        if (column_vectors[block_column_idx].Size() != block_row_count) {
-                            String error_message = "Unmatched row_count between block and block_column";
-                            UnrecoverableError(error_message);
+                        ColumnMeta column_meta(select_column_idx, *block_meta);
+                        Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                    block_row_count,
+                                                                    ColumnVectorTipe::kReadOnly,
+                                                                    column_vectors[block_column_idx]);
+                        if (!status.ok()) {
+                            UnrecoverableError("Failed to get column vector");
                         }
                     }
                 }
             }
 
+            Bitmask bitmask(block_row_count);
+            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                if (!visible(seg_off + row_idx)) {
+                if (!bitmask.IsTrue(row_idx)) {
                     continue;
                 }
                 if (offset > 0) {
@@ -426,12 +354,12 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                 String line = line_to_string(column_vectors, row_idx);
                 bool end = append_line(line);
                 if (end) {
-                    goto label_return;
+                    goto new_label_return;
                 }
             }
         }
     }
-label_return:
+new_label_return:
     LOG_DEBUG(fmt::format("Export to file, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -502,95 +430,50 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
         ++row_count;
     };
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        TxnTimeStamp begin_ts = new_txn->BeginTS();
-        Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
-        LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
-        for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
-            SizeT block_count = segment_snapshot.block_map_.size();
-            LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
-            for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
-                LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-                BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
-
-                auto [block_row_count, status] = block_meta->GetRowCnt1();
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-                ColumnMeta column_meta(exported_column_idx, *block_meta);
-                ColumnVector exported_column_vector;
-                status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, exported_column_vector);
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-
-                Bitmask bitmask(block_row_count);
-                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-                for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                    if (!bitmask.IsTrue(row_idx)) {
-                        continue;
-                    }
-                    if (offset > 0) {
-                        --offset;
-                        continue;
-                    }
-                    Value v = exported_column_vector.GetValue(row_idx);
-                    append_line(v);
-                    if (limit_ != 0 && row_count == limit_) {
-                        goto new_label_return;
-                    }
-                }
-            }
-        }
-    new_label_return:
-        LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
-        return row_count;
-    }
-
-    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-    Txn *txn = query_context->GetTxn();
-    // Write header
-    LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
-    for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
+    LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
+    for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-            BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
-            SegmentOffset seg_off = block_entry->segment_offset();
-            SizeT block_row_count = block_entry->row_count();
+            BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
 
-            ColumnVector exported_column_vector = block_entry->GetConstColumnVector(buffer_manager, exported_column_idx);
-            if (exported_column_vector.Size() != block_row_count) {
-                String error_message = "Unmatched row_count between block and block_column";
-                UnrecoverableError(error_message);
+            auto [block_row_count, status] = block_meta->GetRowCnt1();
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            ColumnMeta column_meta(exported_column_idx, *block_meta);
+            ColumnVector exported_column_vector;
+            status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, exported_column_vector);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
             }
 
+            Bitmask bitmask(block_row_count);
+            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
             for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
-                if (!visible(seg_off + row_idx)) {
+                if (!bitmask.IsTrue(row_idx)) {
                     continue;
                 }
                 if (offset > 0) {
                     --offset;
                     continue;
                 }
-
                 Value v = exported_column_vector.GetValue(row_idx);
                 append_line(v);
                 if (limit_ != 0 && row_count == limit_) {
-                    goto label_return;
+                    goto new_label_return;
                 }
             }
         }
     }
-label_return:
+new_label_return:
     LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -716,119 +599,58 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         }
         return true;
     };
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
-        NewTxn *new_txn = query_context->GetNewTxn();
-        TxnTimeStamp begin_ts = new_txn->BeginTS();
 
-        for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-            SizeT block_count = segment_snapshot.block_map_.size();
-            LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
-            for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
-                LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-                BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
-                auto [block_row_count, status] = block_meta->GetRowCnt1();
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
+    Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
 
-                Vector<ColumnVector> column_vectors;
-                column_vectors.resize(select_column_count);
-
-                for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
-                    ColumnID select_column_idx = select_columns[block_column_idx];
-                    switch (select_column_idx) {
-                        case COLUMN_IDENTIFIER_ROW_ID:
-                        case COLUMN_IDENTIFIER_CREATE:
-                        case COLUMN_IDENTIFIER_DELETE: {
-                            UnrecoverableError("Not implemented");
-                            break;
-                        }
-                        default: {
-                            ColumnMeta column_meta(select_column_idx, *block_meta);
-                            Status status = NewCatalog::GetColumnVector(column_meta,
-                                                                        block_row_count,
-                                                                        ColumnVectorTipe::kReadOnly,
-                                                                        column_vectors[block_column_idx]);
-                            if (!status.ok()) {
-                                RecoverableError(status);
-                            }
-                        }
-                    }
-                }
-                Bitmask bitmask(block_row_count);
-                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (!consume_block(column_vectors, &bitmask, nullptr, 0, true, block_row_count)) {
-                    goto new_label_return;
-                }
-            }
-        }
-
-    new_label_return:
-        if (auto status = file_writer->Close(); !status.ok()) {
-            RecoverableError(Status::IOError(fmt::format("Failed to close parquet file: {}", status.ToString())));
-        }
-        LOG_DEBUG(fmt::format("Export to PARQUET, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
-        return row_count;
-    }
-
-    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-    Txn *txn = query_context->GetTxn();
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
-        DeleteFilter visible = DeleteFilter(segment_snapshot.segment_entry_, txn->BeginTS(), segment_snapshot.segment_offset_);
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-            BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
-            SegmentOffset seg_off = block_entry->segment_offset();
-            SizeT block_row_count = block_entry->row_count();
+            BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+            auto [block_row_count, status] = block_meta->GetRowCnt1();
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
 
             Vector<ColumnVector> column_vectors;
-            column_vectors.reserve(select_column_count);
+            column_vectors.resize(select_column_count);
 
             for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                 ColumnID select_column_idx = select_columns[block_column_idx];
                 switch (select_column_idx) {
-                    case COLUMN_IDENTIFIER_ROW_ID: {
-                        u16 block_id = block_entry->block_id();
-                        u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-                        auto column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
-                        column_vector.Initialize();
-                        column_vector.AppendWith(RowID(segment_id, segment_offset), block_row_count);
-                        column_vectors.emplace_back(column_vector);
-                        break;
-                    }
-                    case COLUMN_IDENTIFIER_CREATE: {
-                        ColumnVector column_vector = block_entry->GetCreateTSVector(buffer_manager, 0, block_row_count);
-                        column_vectors.emplace_back(column_vector);
-                        break;
-                    }
+                    case COLUMN_IDENTIFIER_ROW_ID:
+                    case COLUMN_IDENTIFIER_CREATE:
                     case COLUMN_IDENTIFIER_DELETE: {
-                        ColumnVector column_vector = block_entry->GetDeleteTSVector(buffer_manager, 0, block_row_count);
-                        column_vectors.emplace_back(column_vector);
+                        UnrecoverableError("Not implemented");
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetConstColumnVector(buffer_manager, select_column_idx));
-                        if (column_vectors[block_column_idx].Size() != block_row_count) {
-                            String error_message = "Unmatched row_count between block and block_column";
-                            UnrecoverableError(error_message);
+                        ColumnMeta column_meta(select_column_idx, *block_meta);
+                        Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                    block_row_count,
+                                                                    ColumnVectorTipe::kReadOnly,
+                                                                    column_vectors[block_column_idx]);
+                        if (!status.ok()) {
+                            RecoverableError(status);
                         }
                     }
                 }
             }
-            if (!consume_block(column_vectors, nullptr, &visible, seg_off, false, block_row_count)) {
-                goto label_return;
+            Bitmask bitmask(block_row_count);
+            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            if (!consume_block(column_vectors, &bitmask, nullptr, 0, true, block_row_count)) {
+                goto new_label_return;
             }
         }
     }
-label_return:
+
+new_label_return:
     if (auto status = file_writer->Close(); !status.ok()) {
         RecoverableError(Status::IOError(fmt::format("Failed to close parquet file: {}", status.ToString())));
     }
