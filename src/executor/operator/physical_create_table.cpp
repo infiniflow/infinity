@@ -15,7 +15,6 @@
 module;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;
@@ -71,20 +70,8 @@ bool PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *op
         return true;
     }
 
-    bool use_new_meta = query_context->global_config()->UseNewCatalog();
-    if (use_new_meta) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        Status status = new_txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
-        if (!status.ok()) {
-            operator_state->status_ = status;
-        }
-        operator_state->SetComplete();
-        return true;
-    }
-
-    auto txn = query_context->GetTxn();
-
-    Status status = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
+    NewTxn *new_txn = query_context->GetNewTxn();
+    Status status = new_txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
     if (!status.ok()) {
         operator_state->status_ = status;
     }

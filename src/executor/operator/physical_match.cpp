@@ -23,7 +23,6 @@ module;
 module physical_match;
 
 import stl;
-import txn;
 import query_context;
 import operator_state;
 import physical_operator;
@@ -408,15 +407,8 @@ String PhysicalMatch::ToString(i64 &space) const {
 }
 
 void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
-    TxnTimeStamp begin_ts = 0;
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        begin_ts = new_txn->BeginTS();
-    } else {
-        Txn *txn = query_context->GetTxn();
-        begin_ts = txn->BeginTS();
-    }
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
 
     TableInfo *table_info = base_table_ref_->table_info_.get();
     TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);
