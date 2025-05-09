@@ -144,56 +144,19 @@ SizeT PhysicalMatchSparseScan::TaskletCount() {
 void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     SizeT search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        Status status;
+    Status status;
+    TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
 
-        TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
-
-        Vector<String> *index_id_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        if (match_sparse_expr_->index_name_.empty()) {
-            for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-                const String &index_id_str = (*index_id_strs_ptr)[i];
-                const String &index_name = (*index_names_ptr)[i];
-                auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
-
-                SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = table_index_meta->GetIndexBase();
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                SizeT column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != search_column_id) {
-                    continue;
-                }
-                if (index_base->index_type_ != IndexType::kBMP) {
-                    LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                    continue;
-                }
-                if (base_table_ref_->index_index_.get() == nullptr) {
-                    base_table_ref_->index_index_ = MakeShared<IndexIndex>();
-                }
-                IndexIndex *index_index = base_table_ref_->index_index_.get();
-                auto index_snapshot = index_index->Insert(index_name, table_index_meta);
-                break;
-            }
-        } else {
-            auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), match_sparse_expr_->index_name_);
-            if (iter == index_names_ptr->end()) {
-                Status status = Status::IndexNotExist(match_sparse_expr_->index_name_);
-                RecoverableError(std::move(status));
-            }
-            const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-            const String &index_name = match_sparse_expr_->index_name_;
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    if (match_sparse_expr_->index_name_.empty()) {
+        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const String &index_id_str = (*index_id_strs_ptr)[i];
+            const String &index_name = (*index_names_ptr)[i];
             auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
 
             SharedPtr<IndexBase> index_base;
@@ -207,101 +170,62 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(status);
             }
             if (column_id != search_column_id) {
-                // knn_column_id isn't in this table index
-                LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
-                Status error_status = Status::ColumnNotExist(index_base->column_name());
-                RecoverableError(std::move(error_status));
+                continue;
             }
-            // check index type
-            if (auto index_type = index_base->index_type_; index_type != IndexType::kBMP) {
-                LOG_ERROR("Invalid index type");
-                Status error_status = Status::InvalidIndexType("invalid index");
-                RecoverableError(std::move(error_status));
+            if (index_base->index_type_ != IndexType::kBMP) {
+                LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
+                continue;
             }
             if (base_table_ref_->index_index_.get() == nullptr) {
                 base_table_ref_->index_index_ = MakeShared<IndexIndex>();
             }
             IndexIndex *index_index = base_table_ref_->index_index_.get();
             auto index_snapshot = index_index->Insert(index_name, table_index_meta);
+            break;
         }
-        return;
-    }
-    Txn *txn = query_context->GetTxn();
-
-    auto *table_info = base_table_ref_->table_info_.get();
-    auto [table_entry, status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    ColumnExpression *column_expr = static_cast<ColumnExpression *>(match_sparse_expr_->arguments()[0].get());
-    SizeT knn_column_id = column_expr->binding().column_idx;
-    {
-        auto map_guard = table_entry->IndexMetaMap();
-        if (match_sparse_expr_->index_name_.empty()) {
-            for (const auto &[idx_name, table_index_meta] : *map_guard) {
-                auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-                if (!status.ok()) {
-                    // maybe already dropped
-                    LOG_WARN(status.message());
-                    continue;
-                }
-                const String column_name = table_index_entry->index_base()->column_name();
-                SizeT column_id = table_entry->GetColumnIdByName(column_name);
-                if (column_id != knn_column_id) {
-                    continue;
-                }
-                if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kBMP) {
-                    LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                    continue;
-                }
-                if (base_table_ref_->index_index_.get() == nullptr) {
-                    base_table_ref_->index_index_ = MakeShared<IndexIndex>();
-                }
-                IndexIndex *index_index = base_table_ref_->index_index_.get();
-                auto index_snapshot = index_index->Insert(table_index_entry, txn);
-                break;
-            }
-        } else {
-            auto iter = (*map_guard).find(match_sparse_expr_->index_name_);
-            if (iter == (*map_guard).end()) {
-                Status status = Status::IndexNotExist(match_sparse_expr_->index_name_);
-                RecoverableError(std::move(status));
-            }
-
-            auto &table_index_meta = iter->second;
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-            if (!status.ok()) {
-                // already dropped
-                RecoverableError(std::move(status));
-            }
-
-            const String column_name = table_index_entry->index_base()->column_name();
-            SizeT column_id = table_entry->GetColumnIdByName(column_name);
-            if (column_id != knn_column_id) {
-                // knn_column_id isn't in this table index
-                LOG_ERROR(fmt::format("Column {} not found", column_name));
-                Status error_status = Status::ColumnNotExist(column_name);
-                RecoverableError(std::move(error_status));
-            }
-            // check index type
-            if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kBMP) {
-                LOG_ERROR("Invalid index type");
-                Status error_status = Status::InvalidIndexType("invalid index");
-                RecoverableError(std::move(error_status));
-            }
-            if (base_table_ref_->index_index_.get() == nullptr) {
-                base_table_ref_->index_index_ = MakeShared<IndexIndex>();
-            }
-            IndexIndex *index_index = base_table_ref_->index_index_.get();
-            auto index_snapshot = index_index->Insert(table_index_entry, txn);
+    } else {
+        auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), match_sparse_expr_->index_name_);
+        if (iter == index_names_ptr->end()) {
+            Status status = Status::IndexNotExist(match_sparse_expr_->index_name_);
+            RecoverableError(std::move(status));
         }
+        const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
+        const String &index_name = match_sparse_expr_->index_name_;
+        auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta);
+
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta->GetIndexBase();
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        SizeT column_id = 0;
+        std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        if (column_id != search_column_id) {
+            // knn_column_id isn't in this table index
+            LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
+            Status error_status = Status::ColumnNotExist(index_base->column_name());
+            RecoverableError(std::move(error_status));
+        }
+        // check index type
+        if (auto index_type = index_base->index_type_; index_type != IndexType::kBMP) {
+            LOG_ERROR("Invalid index type");
+            Status error_status = Status::InvalidIndexType("invalid index");
+            RecoverableError(std::move(error_status));
+        }
+        if (base_table_ref_->index_index_.get() == nullptr) {
+            base_table_ref_->index_index_ = MakeShared<IndexIndex>();
+        }
+        IndexIndex *index_index = base_table_ref_->index_index_.get();
+        auto index_snapshot = index_index->Insert(index_name, table_index_meta);
     }
+    return;
 }
 
 Vector<SharedPtr<Vector<SegmentID>>>
 PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count, QueryContext *query_context) {
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     Vector<SharedPtr<Vector<SegmentID>>> segment_groups(parallel_count);
     for (i64 i = 0; i < parallel_count; ++i) {
         segment_groups[i] = MakeShared<Vector<SegmentID>>();
@@ -310,29 +234,15 @@ PhysicalMatchSparseScan::PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> 
         UnrecoverableError("block_groups.size() != parallel_count");
     }
     IndexIndex *index_index = base_table_ref_->index_index_.get();
-    if (use_new_catalog) {
-        if (index_index != nullptr && !index_index->new_index_snapshots_.empty()) {
-            block_groups.assign(parallel_count, MakeShared<Vector<GlobalBlockID>>());
-            SizeT group_idx = 0;
-            for (const auto &[idx_name, index_snapshot] : index_index->new_index_snapshots_) {
-                for (const auto &[segment_id, segment_index_meta] : index_snapshot->segment_index_metas_) {
-                    segment_groups[group_idx]->push_back(segment_id);
-                    group_idx = (group_idx + 1) % parallel_count;
-                }
-                break;
+    if (index_index != nullptr && !index_index->new_index_snapshots_.empty()) {
+        block_groups.assign(parallel_count, MakeShared<Vector<GlobalBlockID>>());
+        SizeT group_idx = 0;
+        for (const auto &[idx_name, index_snapshot] : index_index->new_index_snapshots_) {
+            for (const auto &[segment_id, segment_index_meta] : index_snapshot->segment_index_metas_) {
+                segment_groups[group_idx]->push_back(segment_id);
+                group_idx = (group_idx + 1) % parallel_count;
             }
-        }
-    } else {
-        if (index_index != nullptr && !index_index->index_snapshots_.empty()) {
-            block_groups.assign(parallel_count, MakeShared<Vector<GlobalBlockID>>());
-            SizeT group_idx = 0;
-            for (const auto &[idx_name, index_snapshot] : index_index->index_snapshots_) {
-                for (const auto &[segment_id, segment_index_entry] : index_snapshot->segment_index_entries_) {
-                    segment_groups[group_idx]->push_back(segment_id);
-                    group_idx = (group_idx + 1) % parallel_count;
-                }
-                break;
-            }
+            break;
         }
     }
 
@@ -504,16 +414,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                                             QueryContext *query_context,
                                             MatchSparseScanOperatorState *match_sparse_scan_state) {
     Status status;
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    Txn *txn = nullptr;
-    TxnTimeStamp begin_ts = 0;
-    if (use_new_catalog) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        begin_ts = new_txn->BeginTS();
-    } else {
-        txn = query_context->GetTxn();
-        begin_ts = txn->BeginTS();
-    }
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
     if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
@@ -535,7 +437,6 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         function_data.sparse_distance_ = std::move(dist_func_ptr);
     }
 
-    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
     const Vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
     const Vector<SegmentID> &segment_ids = *function_data.segment_ids_;
     auto &block_ids_idx = function_data.current_block_ids_idx_;
@@ -560,39 +461,25 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         ColumnVector column_vector;
         Bitmask bitmask;
 
-        if (use_new_catalog) {
-            BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
-            LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
+        BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
+        LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
 
-            std::tie(row_cnt, status) = block_meta->GetRowCnt1();
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-            if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
-                break;
-            }
-            Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
+        std::tie(row_cnt, status) = block_meta->GetRowCnt1();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
+            break;
+        }
+        Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
 
-            ColumnMeta column_meta(search_column_id_, *block_meta);
-            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-        } else {
-            row_cnt = block_index->GetBlockOffset(segment_id, block_id);
-
-            const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-            LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
-
-            if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
-                break;
-            }
-            block_entry->SetDeleteBitmask(begin_ts, bitmask);
-
-            column_vector = block_entry->GetConstColumnVector(buffer_mgr, search_column_id_);
+        ColumnMeta column_meta(search_column_id_, *block_meta);
+        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
         for (SizeT query_id = 0; query_id < query_n; ++query_id) {
@@ -620,28 +507,12 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
 
         const IndexIndex *index_index = base_table_ref_->index_index_.get();
         const BlockIndex *block_index = base_table_ref_->block_index_.get();
-        SegmentIndexEntry *segment_index_entry = nullptr;
-        SegmentIndexMeta *segment_index_meta = nullptr;
-        if (!use_new_catalog) {
-            IndexSnapshot *index_snapshot = index_index->index_snapshots_vec_[0];
-            auto iter = index_snapshot->segment_index_entries_.find(segment_id);
-            if (iter == index_snapshot->segment_index_entries_.end()) {
-                UnrecoverableError(fmt::format("Cannot find segment index with id: {}", segment_id));
-            }
-            segment_index_entry = iter->second;
-
-            const auto &index_base = segment_index_entry->table_index_entry()->index_base();
-            if (index_base->index_type_ != IndexType::kBMP) {
-                UnrecoverableError(fmt::format("IndexType: {} is not supported.", (i8)index_base->index_type_));
-            }
-        } else {
-            NewIndexSnapshot *index_snapshot = index_index->new_index_snapshots_vec_[0];
-            auto iter = index_snapshot->segment_index_metas_.find(segment_id);
-            if (iter == index_snapshot->segment_index_metas_.end()) {
-                UnrecoverableError(fmt::format("Cannot find segment index with id: {}", segment_id));
-            }
-            segment_index_meta = iter->second.get();
+        NewIndexSnapshot *index_snapshot = index_index->new_index_snapshots_vec_[0];
+        auto iter = index_snapshot->segment_index_metas_.find(segment_id);
+        if (iter == index_snapshot->segment_index_metas_.end()) {
+            UnrecoverableError(fmt::format("Cannot find segment index with id: {}", segment_id));
         }
+        SegmentIndexMeta *segment_index_meta = iter->second.get();
 
         bool has_some_result = false;
         Bitmask bitmask;
@@ -651,20 +522,11 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         } else {
             auto it = common_query_filter_->filter_result_.find(segment_id);
             if (it != common_query_filter_->filter_result_.end()) {
-                SizeT segment_row_count = 0;
-                if (!use_new_catalog) {
-                    auto segment_it = block_index->segment_block_index_.find(segment_id);
-                    if (segment_it == block_index->segment_block_index_.end()) {
-                        UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
-                    }
-                    segment_row_count = segment_it->second.segment_offset_;
-                } else {
-                    auto segment_it = block_index->new_segment_block_index_.find(segment_id);
-                    if (segment_it == block_index->new_segment_block_index_.end()) {
-                        UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
-                    }
-                    segment_row_count = segment_it->second.segment_offset_;
+                auto segment_it = block_index->new_segment_block_index_.find(segment_id);
+                if (segment_it == block_index->new_segment_block_index_.end()) {
+                    UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
                 }
+                SizeT segment_row_count = segment_it->second.segment_offset_;
                 bitmask = it->second;
                 if (bitmask.count() != segment_row_count) {
                     UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));
@@ -705,48 +567,29 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         };
 
         auto bmp_scan = [&](const auto &filter) {
-            if (!use_new_catalog) {
-                const auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetBMPIndexSnapshot();
-                for (SizeT query_id = 0; query_id < query_n; ++query_id) {
-                    for (auto chunk_index_entry : chunk_index_entries) {
-                        if (!chunk_index_entry->CheckVisible(txn)) {
-                            continue;
-                        }
-                        BufferHandle buffer_handle = chunk_index_entry->GetIndex();
-                        const auto *bmp_index = reinterpret_cast<const AbstractBMP *>(buffer_handle.GetData());
-                        bmp_search(*bmp_index, query_id, false, filter);
-                        LOG_TRACE(fmt::format("Search Match Sparse in chunk {}", chunk_index_entry->encode()));
-                    }
-                    if (memory_index_entry.get() != nullptr) {
-                        bmp_search(memory_index_entry->get(), query_id, true, filter);
-                        LOG_TRACE(fmt::format("Search Match Sparse in mem index of {}", segment_index_entry->encode()));
-                    }
-                }
-            } else {
-                auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-                SharedPtr<MemIndex> mem_index;
-                status = segment_index_meta->GetMemIndex(mem_index);
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
+            auto [chunk_ids_ptr, status] = segment_index_meta->GetChunkIDs1();
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            SharedPtr<MemIndex> mem_index;
+            status = segment_index_meta->GetMemIndex(mem_index);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
 
-                for (ChunkID chunk_id : *chunk_ids_ptr) {
-                    ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                    BufferObj *index_buffer = nullptr;
-                    status = chunk_index_meta.GetIndexBuffer(index_buffer);
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                    BufferHandle index_handle = index_buffer->Load();
-                    const auto *bmp_index = reinterpret_cast<const AbstractBMP *>(index_handle.GetData());
-                    bmp_search(*bmp_index, 0, false, filter);
+            for (ChunkID chunk_id : *chunk_ids_ptr) {
+                ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
+                BufferObj *index_buffer = nullptr;
+                status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
                 }
-                if (mem_index && mem_index->memory_bmp_index_) {
-                    bmp_search(mem_index->memory_bmp_index_->get(), 0, true, filter);
-                }
+                BufferHandle index_handle = index_buffer->Load();
+                const auto *bmp_index = reinterpret_cast<const AbstractBMP *>(index_handle.GetData());
+                bmp_search(*bmp_index, 0, false, filter);
+            }
+            if (mem_index && mem_index->memory_bmp_index_) {
+                bmp_search(mem_index->memory_bmp_index_->get(), 0, true, filter);
             }
         };
 
