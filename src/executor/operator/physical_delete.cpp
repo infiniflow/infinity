@@ -35,7 +35,6 @@ import third_party;
 import wal_manager;
 import infinity_context;
 import status;
-import txn;
 
 import new_txn;
 
@@ -72,24 +71,14 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
     }
     if (!row_ids.empty()) {
         LOG_TRACE(fmt::format("Found to delete: row_count {}", row_ids.size()));
-        bool use_new_meta = query_context->global_config()->UseNewCatalog();
-        if (use_new_meta) {
-            NewTxn *new_txn = query_context->GetNewTxn();
-            Status status = new_txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
-            if (!status.ok()) {
-                operator_state->status_ = status;
-                RecoverableError(status);
-                return false;
-            }
-        } else {
-            Txn* txn = query_context->GetTxn();
-            Status status = txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids); // TODO: segment id in `row_ids` is fixed.
-            if (!status.ok()) {
-                operator_state->status_ = status;
-                RecoverableError(status);
-                return false;
-            }
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            RecoverableError(status);
+            return false;
         }
+
         DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(operator_state);
         ++delete_operator_state->count_;
         delete_operator_state->sum_ += row_ids.size();
