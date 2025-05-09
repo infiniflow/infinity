@@ -919,6 +919,10 @@ Status ExplainAST::BuildCheck(const CheckStatement *check_statement, SharedPtr<V
             result->emplace_back(MakeShared<String>("CHECK SYSTEM"));
             break;
         }
+        case CheckStmtType::kTable: {
+            result->emplace_back(MakeShared<String>("CHECK TABLE"));
+            break;
+        }
         case CheckStmtType::kInvalid: {
             String error_message = "Invalid file type";
             UnrecoverableError(error_message);

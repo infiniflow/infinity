@@ -104,9 +104,20 @@ void PhysicalCheck::Init(QueryContext *query_context) {
 
     switch (check_type_) {
         case CheckStmtType::kSystem: {
-            output_names_->reserve(1);
-            output_types_->reserve(1);
-            output_names_->emplace_back("status");
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("meta");
+            output_names_->emplace_back("data");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case CheckStmtType::kTable: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("meta");
+            output_names_->emplace_back("data");
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -127,6 +138,10 @@ bool PhysicalCheck::Execute(QueryContext *query_context, OperatorState *operator
             ExecuteCheckSystem(query_context, check_operator_state);
             break;
         }
+        case CheckStmtType::kTable: {
+            ExecuteCheckTable(query_context, check_operator_state);
+            break;
+        }
         default: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);
@@ -143,48 +158,87 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
 
+    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(true, EntityTag::kSystem, std::nullopt);
+
+    auto meta_mismatch_size = meta_mismatch_entries.size();
+    auto data_mismatch_size = data_mismatch_entries.size();
+
+    Array<SizeT, 2> mismatch_size_array{meta_mismatch_size, data_mismatch_size};
+    auto max_mismatch_size = *std::ranges::max_element(mismatch_size_array);
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(column_types);
 
     {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("OK");
+        for (const auto &meta_mismatch_entry : meta_mismatch_entries) {
+            Value value = Value::MakeVarchar(meta_mismatch_entry);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        for (const auto &data_mismatch_entry : data_mismatch_entries) {
+            Value value = Value::MakeVarchar(data_mismatch_entry);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        auto column_idx = max_mismatch_size == meta_mismatch_size ? 1 : 0;
+
+        for (SizeT idx = mismatch_size_array[column_idx]; idx < max_mismatch_size; ++idx) {
+            Value value = Value::MakeVarchar("NULL");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_idx]);
         }
     }
 
-    // {
-    //     SizeT column_id = 0;
-    //     {
-    //         Value value = Value::MakeVarchar("storage_directory");
-    //         ValueExpression value_expr(value);
-    //         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //     }
-    // }
-    //
-    // {
-    //     SizeT column_id = 0;
-    //     {
-    //         Value value = Value::MakeVarchar("table_count");
-    //         ValueExpression value_expr(value);
-    //         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //     }
-    // }
-    //
-    // {
-    //     SizeT column_id = 0;
-    //     {
-    //         Value value = Value::MakeVarchar("comment");
-    //         ValueExpression value_expr(value);
-    //         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //     }
-    // }
+    output_block_ptr->Finalize();
+    check_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperatorState *check_operator_state) {
+    // Define output database detailed info
+    SizeT tag_id = 0;
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    auto *new_catalog = query_context->storage()->new_catalog();
+    auto meta_tree_ptr = new_catalog->MakeMetaTree();
+
+    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(true, EntityTag::kTable, tag_id);
+
+    auto meta_mismatch_size = meta_mismatch_entries.size();
+    auto data_mismatch_size = data_mismatch_entries.size();
+
+    Array<SizeT, 2> mismatch_size_array{meta_mismatch_size, data_mismatch_size};
+    auto max_mismatch_size = *std::ranges::max_element(mismatch_size_array);
+
+    // Prepare the output data block
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+
+    output_block_ptr->Init(column_types);
+
+    {
+        for (const auto &meta_mismatch_entry : meta_mismatch_entries) {
+            Value value = Value::MakeVarchar(meta_mismatch_entry);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        for (const auto &data_mismatch_entry : data_mismatch_entries) {
+            Value value = Value::MakeVarchar(data_mismatch_entry);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        auto column_idx = max_mismatch_size == meta_mismatch_size ? 1 : 0;
+
+        for (SizeT idx = mismatch_size_array[column_idx]; idx < max_mismatch_size; ++idx) {
+            Value value = Value::MakeVarchar("NULL");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_idx]);
+        }
+    }
 
     output_block_ptr->Finalize();
     check_operator_state->output_.emplace_back(std::move(output_block_ptr));

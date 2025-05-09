@@ -2624,6 +2624,24 @@ Status ExplainLogicalPlan::Explain(const LogicalCheck *check_node, SharedPtr<Vec
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case CheckStmtType::kTable: {
+            String check_ptr;
+            if (intent_size != 0) {
+                check_ptr = String(intent_size - 2, ' ');
+                check_ptr += "-> CHECK TABLE ";
+            } else {
+                check_ptr = "CHECK TABLE ";
+            }
+            check_ptr += "(";
+            check_ptr += std::to_string(check_node->node_id());
+            check_ptr += ")";
+            result->emplace_back(MakeShared<String>(check_ptr));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
     }
 
     return Status::OK();

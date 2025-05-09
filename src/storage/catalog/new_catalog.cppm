@@ -192,11 +192,13 @@ private:
 
 public:
     SharedPtr<MetaTree> MakeMetaTree() const;
+    Vector<SharedPtr<MetaKey>> MakeMetaKeys() const;
     Status RestoreCatalogCache(Storage *storage_ptr);
-    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const; // used by append in allocation
-    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id);                   // used by append in allocation
-    Status DropDbCache(u64 db_id);                                      // used by drop db in post commit
-    Status DropTableCache(u64 db_id, u64 table_id);                     // used by drop table in post commit
+    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;             // used by append in allocation
+    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id); // used by append in allocation
+    Status DropDbCache(u64 db_id);                                                  // used by drop db in post commit
+    Status DropTableCache(u64 db_id, u64 table_id);                                 // used by drop table in post commit
+
 private:
     KVStore *kv_store_{};
 
@@ -287,6 +289,7 @@ private:
 
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
+    // bool is_vfs_{false};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);

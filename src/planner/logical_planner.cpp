@@ -2064,6 +2064,10 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
             this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem);
             break;
         }
+        case CheckStmtType::kTable: {
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kTable);
+            break;
+        }
         default: {
             String error_message = "Unexpected check statement type.";
             UnrecoverableError(error_message);

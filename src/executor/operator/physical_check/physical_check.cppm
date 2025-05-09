@@ -24,8 +24,8 @@ namespace infinity {
 
 export class PhysicalCheck : public PhysicalOperator {
 public:
-    explicit PhysicalCheck(u64 id, CheckStmtType type, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCheck, nullptr, nullptr, id, load_metas), check_type_(type) {}
+    explicit PhysicalCheck(u64 id, CheckStmtType type, Optional<SizeT> tag_id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kCheck, nullptr, nullptr, id, load_metas), check_type_(type), tag_id_(tag_id) {}
 
     ~PhysicalCheck() override = default;
 
@@ -50,8 +50,11 @@ private:
 
     void ExecuteCheckSystem(QueryContext *query_context, CheckOperatorState *operator_state);
 
+    void ExecuteCheckTable(QueryContext *query_context, CheckOperatorState *operator_state);
+
 private:
     CheckStmtType check_type_{CheckStmtType::kInvalid};
+    Optional<SizeT> tag_id_;
     // String db_name_{};
     // Optional<String> object_name_{};
     // u64 table_index_{};

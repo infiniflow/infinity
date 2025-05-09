@@ -2665,6 +2665,11 @@ check_statement : CHECK SYSTEM {
     $$ = new infinity::CheckStatement();
     $$->check_type_ = infinity::CheckStmtType::kSystem;
 }
+| CHECK TABLE LONG_VALUE {
+    $$ = new infinity::CheckStatement();
+    $$->check_type_ = infinity::CheckStmtType::kTable;
+    $$->tag_id_ = $3;
+}
 
 /*
  * EXPRESSION

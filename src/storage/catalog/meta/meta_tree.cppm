@@ -46,10 +46,10 @@ export struct MetaTableObject final : public MetaObject {
     MetaTableObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTable, meta_key) {}
     nlohmann::json ToJson() const final;
 
-    const String& GetTableName() const;
+    const String &GetTableName() const;
     SegmentID GetNextSegmentID() const;
     SegmentID GetUnsealedSegmentID() const;
-    SizeT GetCurrentSegmentRowCount(Storage* storage_ptr) const;
+    SizeT GetCurrentSegmentRowCount(Storage *storage_ptr) const;
 
     Map<String, SharedPtr<MetaKey>> column_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;
@@ -112,10 +112,22 @@ export struct MetaPmObject final : public MetaObject {
     Map<String, SharedPtr<MetaKey>> path_map_{};
 };
 
+export enum class EntityTag {
+    kInvalid,
+    kSystem,
+    kTable,
+};
+
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
 public:
+    static bool PathFilter(std::string_view path, EntityTag tag, Optional<SizeT> tag_id);
+    HashSet<String> GetMetaPathSet();
+    static HashSet<String> GetDataVfsPathSet();
+    static HashSet<String> GetDataVfsOffPathSet();
+    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<SizeT> tag_id);
+
     Vector<MetaTableObject *> ListTables() const;
 
     nlohmann::json ToJson() const;

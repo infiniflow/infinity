@@ -30,6 +30,8 @@ String ToString(CheckStmtType type) {
     switch (type) {
         case CheckStmtType::kSystem:
             return "Check system";
+        case CheckStmtType::kTable:
+            return "Check table";
         case CheckStmtType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);

@@ -3014,6 +3014,24 @@ void ExplainPhysicalPlan::Explain(const PhysicalCheck *check_node, SharedPtr<Vec
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case CheckStmtType::kTable: {
+            String check_str;
+            if (intent_size != 0) {
+                check_str = String(intent_size - 2, ' ');
+                check_str += "-> CHECK TABLE ";
+            } else {
+                check_str = "CHECK TABLE ";
+            }
+            check_str += "(";
+            check_str += std::to_string(check_node->node_id());
+            check_str += ")";
+            result->emplace_back(MakeShared<String>(check_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case CheckStmtType::kInvalid: {
             String error_message = "Invalid check type";
             UnrecoverableError(error_message);
