@@ -61,6 +61,7 @@ import logical_export;
 import logical_import;
 import logical_explain;
 import logical_command;
+import logical_check;
 import explain_logical_plan;
 import explain_ast;
 
@@ -240,6 +241,9 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
                 return Status::InvalidNodeRole("Attempt to write on non-writable node");
             }
             return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
+        }
+        case StatementType::kCheck: {
+            return BuildCheck(static_cast<const CheckStatement *>(statement), bind_context_ptr);
         }
         default: {
             UnrecoverableError("Invalid statement type.");
@@ -1499,7 +1503,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             if (storage_mode == StorageMode::kUnInitialized) {
                 UnrecoverableError("Uninitialized storage mode");
             }
-            
+
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
             this->logical_plan_ = logical_command;
             break;
@@ -2049,6 +2053,23 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     }
 
     this->logical_plan_ = explain_node;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+
+    // BindSchemaName(statement->schema_name_);
+    switch (statement->check_type_) {
+        case CheckStmtType::kSystem: {
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem);
+            break;
+        }
+        default: {
+            String error_message = "Unexpected check statement type.";
+            UnrecoverableError(error_message);
+        }
+    }
+
     return Status::OK();
 }
 

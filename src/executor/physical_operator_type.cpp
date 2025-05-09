@@ -159,6 +159,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Unnest";
         case PhysicalOperatorType::kUnnestAggregate:
             return "UnnestAggregate";
+        case PhysicalOperatorType::kCheck:
+            return "Check";
     }
 
     Status status = Status::NotSupport("Unknown physical operator type");

@@ -71,6 +71,7 @@ import meta_key;
 import catalog_cache;
 import segment_index_entry;
 import chunk_index_entry;
+import table_index_meta;
 
 namespace infinity {
 
@@ -359,165 +360,172 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
                 // -----------------------------
                 // INDEX
                 // -----------------------------
-                // case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
-                //     auto add_table_index_entry_op = static_cast<AddTableIndexEntryOp *>(op.get());
-                //     auto decodes = TableIndexEntry::DecodeIndex(encode);
-                //     auto db_name = String(decodes[0]);
-                //     auto table_name = String(decodes[1]);
-                //     auto index_name = MakeShared<String>(decodes[2]);
-                //     const auto &index_dir = add_table_index_entry_op->index_dir_;
-                //     auto index_base = add_table_index_entry_op->index_base_;
-                //
-                //     auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
-                //     auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
-                //     if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
-                //         table_entry->DropIndexReplay(
-                //             *index_name,
-                //             [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                //                 auto index_base = MakeShared<IndexBase>(index_meta->index_name());
-                //                 auto index_entry = TableIndexEntry::NewTableIndexEntry(index_base, true, nullptr, index_meta, txn_id, begin_ts);
-                //                 index_entry->commit_ts_.store(commit_ts);
-                //                 return index_entry;
-                //             },
-                //             txn_id,
-                //             begin_ts);
-                //     }
-                //     if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
-                //         table_entry->CreateIndexReplay(
-                //             index_name,
-                //             [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                //                 return TableIndexEntry::ReplayTableIndexEntry(index_meta, false, index_base, index_dir, txn_id, begin_ts, commit_ts);
-                //             },
-                //             txn_id,
-                //             begin_ts);
-                //     } else if (merge_flag == MergeFlag::kUpdate) {
-                //         table_entry->UpdateIndexReplay(*index_name, txn_id, begin_ts, commit_ts);
-                //     }
-                //     break;
-                // }
-                // case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
-                //     auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
-                //     auto decodes = SegmentIndexEntry::DecodeIndex(encode);
-                //     auto db_name = String(decodes[0]);
-                //     auto db_id_str = dbname_to_idstr_.contains(db_name) ? dbname_to_idstr_[db_name] : "";
-                //     auto table_name = String(decodes[1]);
-                //     auto table_full_name_str = fmt::format("{}.{}", db_name, table_name);
-                //     auto table_id_str = dbname_to_idstr_.contains(table_full_name_str) ? dbname_to_idstr_[table_full_name_str] : "";
-                //     auto index_name = String(decodes[2]);
-                //     String index_id_str = "";
-                //     SegmentID segment_id = 0;
-                //     std::from_chars(decodes[3].begin(), decodes[3].end(), segment_id);
-                //     // auto min_ts = add_segment_index_entry_op->min_ts_;
-                //     // auto max_ts = add_segment_index_entry_op->max_ts_;
-                //     // auto next_chunk_id = add_segment_index_entry_op->next_chunk_id_;
-                //     // auto deprecate_ts = add_segment_index_entry_op->deprecate_ts_;
-                //
-                //     TableMeeta table_meeta{db_id_str, table_id_str, *kv_instance, begin_ts};
-                //     TableIndexMeeta table_index_meta{index_id_str, table_meeta};
-                //     Optional<SegmentIndexMeta> segment_index_meta;
-                //
-                //     if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
-                //         auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
-                //         auto *segment_entry = iter->second.get();
-                //         if (merge_flag != MergeFlag::kDelete && segment_entry->status() == SegmentStatus::kDeprecated) {
-                //             String error_message = fmt::format("Segment {} is deprecated", segment_id);
-                //             UnrecoverableError(error_message);
-                //         }
-                //         if (merge_flag == MergeFlag::kNew) {
-                //             status = this->AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta);
-                //             if (!status.ok()) {
-                //                 return status;
-                //             }
-                //         } else if (merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDelete) {
-                //             auto iter = table_index_entry->index_by_segment().find(segment_id);
-                //             if (iter == table_index_entry->index_by_segment().end()) {
-                //                 String error_message = fmt::format("Segment index {} is not found", segment_id);
-                //                 UnrecoverableError(error_message);
-                //             }
-                //             status = this->CleanSegmentIndex(*segment_index_meta, UsageFlag::kTransform);
-                //             if (!status.ok()) {
-                //                 return status;
-                //             }
-                //             status = this->AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta);
-                //             if (!status.ok()) {
-                //                 return status;
-                //             }
-                //         }
-                //     }
-                //     break;
-                // }
-                // case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
-                //     auto add_chunk_index_entry_op = static_cast<AddChunkIndexEntryOp *>(op.get());
-                //     auto decodes = ChunkIndexEntry::DecodeIndex(encode);
-                //     auto db_name = String(decodes[0]);
-                //     auto db_id_str = dbname_to_idstr_.contains(db_name) ? dbname_to_idstr_[db_name] : "";
-                //     auto table_name = String(decodes[1]);
-                //     auto table_full_name_str = fmt::format("{}.{}", db_name, table_name);
-                //     auto table_id_str = dbname_to_idstr_.contains(table_full_name_str) ? dbname_to_idstr_[table_full_name_str] : "";
-                //     auto index_name = String(decodes[2]);
-                //     String index_id_str = "";
-                //     SegmentID segment_id = 0;
-                //     std::from_chars(decodes[3].begin(), decodes[3].end(), segment_id);
-                //     ChunkID chunk_id = 0;
-                //     std::from_chars(decodes[4].begin(), decodes[4].end(), chunk_id);
-                //     const auto &base_name = add_chunk_index_entry_op->base_name_;
-                //     auto base_rowid = add_chunk_index_entry_op->base_rowid_;
-                //     auto row_count = add_chunk_index_entry_op->row_count_;
-                //     auto commit_ts = add_chunk_index_entry_op->commit_ts_;
-                //     auto deprecate_ts = add_chunk_index_entry_op->deprecate_ts_;
-                //
-                //     TableIndexMeeta table_index_meeta{db_id_str, table_id_str, *kv_instance, begin_ts};
-                //     SegmentIndexMeta segment_index_meta{, table_index_meeta};
-                //
-                //     auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
-                //     auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
-                //
-                //     if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
-                //         auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
-                //         auto *segment_entry = iter->second.get();
-                //         if (segment_entry->status() == SegmentStatus::kDeprecated) {
-                //             String error_message = fmt::format("Segment {} is deprecated", segment_id);
-                //             UnrecoverableError(error_message);
-                //         }
-                //         auto iter2 = table_index_entry->index_by_segment().find(segment_id);
-                //         if (iter2 == table_index_entry->index_by_segment().end()) {
-                //             String error_message = fmt::format("Segment index {} is not found", segment_id);
-                //             UnrecoverableError(error_message);
-                //         }
-                //         auto *segment_index_entry = iter2->second.get();
-                //         status = this->AddNewChunkIndex(, chunk_id, base_rowid, row_count, base_name, );
-                //         if (!status.ok()) {
-                //             return status;
-                //         }
-                //     }
-                //
-                //     break;
-                // }
-
-
                 case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+                    auto add_table_index_entry_op = static_cast<AddTableIndexEntryOp *>(op.get());
+                    auto decodes = TableIndexEntry::DecodeIndex(encode);
+
+                    auto db_name = String(decodes[0]);
+                    auto db_id_str = dbname_to_idstr_.contains(db_name) ? dbname_to_idstr_[db_name] : "";
+                    auto table_name = String(decodes[1]);
+                    auto table_full_name_str = fmt::format("{}.{}", db_name, table_name);
+                    auto table_id_str = dbname_to_idstr_.contains(table_full_name_str) ? dbname_to_idstr_[table_full_name_str] : "";
+                    auto index_name = static_cast<String>(decodes[2]);
+                    auto index_id_str = indexstr_to_idstr_.contains(index_name) ? indexstr_to_idstr_[index_name] : "";
+
+                    // const auto &index_dir = add_table_index_entry_op->index_dir_;
+                    auto index_base = add_table_index_entry_op->index_base_;
+
+                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                    TableIndexMeeta table_index_meta{index_id_str, table_meta};
+                    Optional<TableIndexMeeta> table_index_meta_opt;
+
+                    if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
+                        status = this->CleanTableIndex(table_index_meta, index_name, UsageFlag::kTransform);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    }
+                    if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
+                        status = this->AddNewTableIndex(table_meta, index_id_str, commit_ts, index_base, table_index_meta_opt);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    } else if (merge_flag == MergeFlag::kUpdate) {
+                        status = this->CleanTableIndex(table_index_meta, index_name, UsageFlag::kTransform);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                        status = this->AddNewTableIndex(table_meta, index_id_str, commit_ts, index_base, table_index_meta_opt);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    }
                     break;
                 }
                 case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
+                    // auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
+                    auto decodes = SegmentIndexEntry::DecodeIndex(encode);
+
+                    auto db_name = String(decodes[0]);
+                    auto db_id_str = dbname_to_idstr_.contains(db_name) ? dbname_to_idstr_[db_name] : "";
+                    auto table_name = String(decodes[1]);
+                    auto table_full_name_str = fmt::format("{}.{}", db_name, table_name);
+                    auto table_id_str = dbname_to_idstr_.contains(table_full_name_str) ? dbname_to_idstr_[table_full_name_str] : "";
+                    auto index_name = static_cast<String>(decodes[2]);
+                    auto index_id_str = indexstr_to_idstr_.contains(index_name) ? indexstr_to_idstr_[index_name] : "";
+
+                    SegmentID segment_id = 0;
+                    std::from_chars(decodes[3].begin(), decodes[3].end(), segment_id);
+                    // auto min_ts = add_segment_index_entry_op->min_ts_;
+                    // auto max_ts = add_segment_index_entry_op->max_ts_;
+                    // auto next_chunk_id = add_segment_index_entry_op->next_chunk_id_;
+                    // auto deprecate_ts = add_segment_index_entry_op->deprecate_ts_;
+
+                    TableMeeta table_meeta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                    TableIndexMeeta table_index_meta{index_id_str, table_meeta};
+                    SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
+                    Optional<SegmentIndexMeta> segment_index_meta_opt;
+
+                    // if (merge_flag != MergeFlag::kDelete && segment_entry->status() == SegmentStatus::kDeprecated) {
+                    //     String error_message = fmt::format("Segment {} is deprecated", segment_id);
+                    //     UnrecoverableError(error_message);
+                    // }
+                    if (merge_flag == MergeFlag::kNew) {
+                        status = this->AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta_opt);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    } else if (merge_flag == MergeFlag::kDelete) {
+                        status = this->CleanSegmentIndex(segment_index_meta, UsageFlag::kTransform);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    } else if (merge_flag == MergeFlag::kUpdate) {
+                        status = this->CleanSegmentIndex(segment_index_meta, UsageFlag::kTransform);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                        status = this->AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta_opt);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    }
                     break;
                 }
                 case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+                    auto add_chunk_index_entry_op = static_cast<AddChunkIndexEntryOp *>(op.get());
+                    auto decodes = ChunkIndexEntry::DecodeIndex(encode);
+
+                    auto db_name = String(decodes[0]);
+                    auto db_id_str = dbname_to_idstr_.contains(db_name) ? dbname_to_idstr_[db_name] : "";
+                    auto table_name = String(decodes[1]);
+                    auto table_full_name_str = fmt::format("{}.{}", db_name, table_name);
+                    auto table_id_str = dbname_to_idstr_.contains(table_full_name_str) ? dbname_to_idstr_[table_full_name_str] : "";
+                    auto index_name = static_cast<String>(decodes[2]);
+                    auto index_id_str = indexstr_to_idstr_.contains(index_name) ? indexstr_to_idstr_[index_name] : "";
+
+                    SegmentID segment_id = 0;
+                    std::from_chars(decodes[3].begin(), decodes[3].end(), segment_id);
+                    ChunkID chunk_id = 0;
+                    std::from_chars(decodes[4].begin(), decodes[4].end(), chunk_id);
+                    const auto &base_name = add_chunk_index_entry_op->base_name_;
+                    auto base_rowid = add_chunk_index_entry_op->base_rowid_;
+                    auto row_count = add_chunk_index_entry_op->row_count_;
+                    // auto commit_ts = add_chunk_index_entry_op->commit_ts_;
+                    // auto deprecate_ts = add_chunk_index_entry_op->deprecate_ts_;
+
+                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                    TableIndexMeeta table_index_meeta{index_id_str, table_meta};
+                    SegmentIndexMeta segment_index_meta{segment_id, table_index_meeta};
+                    Optional<ChunkIndexMeta> chunk_index_meta;
+
+                    SizeT index_size = 100;
+
+                    status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_count, base_name, index_size, chunk_index_meta);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
                     break;
                 }
                 // -----------------------------
                 // SEGMENT STATUS
                 // -----------------------------
-                case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+                //     export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
+                //     WalCmdSetSegmentStatusSealed(String db_name,
+                //                                  String table_name,
+                //                                  SegmentID segment_id,
+                //                                  String segment_filter_binary_data,
+                //                                  Vector<Pair<BlockID, String>> block_filter_binary_data)
+                //         : WalCmd(WalCommandType::SET_SEGMENT_STATUS_SEALED), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
+                //           segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
+                //           block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+                //
+                //     bool operator==(const WalCmd &other) const final;
+                //     i32 GetSizeInBytes() const final;
+                //     void WriteAdv(char *&buf) const final;
+                //     String ToString() const final;
+                //     String CompactInfo() const final;
+                //
+                //     static WalCmdSetSegmentStatusSealed ReadBufferAdv(const char *&ptr);
+                //
+                //     const String db_name_{};
+                //     const String table_name_{};
+                //     const SegmentID segment_id_{};
+                //     const String segment_filter_binary_data_{};
+                //     const Vector<Pair<BlockID, String>> block_filter_binary_data_{};
+                // };
+                // case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+                //     break;
+                // }
+                // case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: {
+                //     break;
+                // }
+                // case CatalogDeltaOpType::INVALID: {
+                //     break;
+                // }
+                default:
                     break;
-                }
-                case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: {
-                    break;
-                }
-                case CatalogDeltaOpType::INVALID: {
-                    break;
-                }
-                    // default:
-                    //     break;
             }
         }
     }
@@ -798,6 +806,7 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
             }
 
             SegmentID unsealed_segment_id = table_entry_json["unsealed_id"];
+            // There might be missing some field.
             table_meta->SetUnsealedSegmentID(unsealed_segment_id);
 
             if (table_entry_json.contains("segments")) {
@@ -908,6 +917,7 @@ Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nloh
     if (!status.ok()) {
         return status;
     }
+
     auto &entries = table_index_entry_json["index_entries"];
     TxnTimeStamp index_commit_ts;
     for (const auto &index_entry_json : entries) {
@@ -916,6 +926,8 @@ Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nloh
 
         auto index_name_str = index_entry_json["index_base"]["index_name"];
         SharedPtr<String> index_name_ptr = MakeShared<String>(index_name_str);
+
+        indexstr_to_idstr_[index_name_str] = index_id_str;
 
         auto index_comment_str = index_entry_json["index_base"]["index_comment"];
         SharedPtr<String> index_comment_ptr = MakeShared<String>(index_comment_str);
@@ -994,6 +1006,7 @@ Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nloh
         if (!status.ok()) {
             return status;
         }
+
     }
     // TxnTimeStamp index_commit_ts = entries["commit_ts"];
     //  Optional<TableIndexMeeta> table_index_meta;

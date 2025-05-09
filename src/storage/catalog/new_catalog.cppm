@@ -158,6 +158,7 @@ private:
     Status RefactorPath(const String &path_key, String &fine_path, char delimiter);
     Status TransformData(const String &data_path, KVInstance *kv_instance, nlohmann::json *full_ckp_json, bool is_vfs);
     Map<String, String> dbname_to_idstr_;
+    Map<String, String> indexstr_to_idstr_;
     Set<String> dir_set_;
     static constexpr SizeT db_prefix_len_ = 14;    // XXXXXXXXXX_db_
     static constexpr SizeT table_prefix_len_ = 17; // XXXXXXXXXX_table_

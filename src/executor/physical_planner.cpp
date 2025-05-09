@@ -88,6 +88,7 @@ import physical_create_index_finish;
 import physical_read_cache;
 import physical_unnest;
 import physical_unnest_aggregate;
+import physical_check;
 
 import logical_node;
 import logical_node_type;
@@ -134,6 +135,7 @@ import logical_fusion;
 import logical_read_cache;
 import logical_unnest;
 import logical_unnest_aggregate;
+import logical_check;
 
 import value;
 import value_expression;
@@ -349,6 +351,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kUnnestAggregate: {
             result = BuildUnnestAggregate(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCheck: {
+            result = BuildCheck(logical_operator);
             break;
         }
         default: {
@@ -1300,6 +1306,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     }
 
     return explain_node;
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCheck(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalCheck> logical_check = static_pointer_cast<LogicalCheck>(logical_operator);
+    return MakeUnique<PhysicalCheck>(logical_check->node_id(), logical_check->check_type(), logical_operator->load_metas());
 }
 
 } // namespace infinity

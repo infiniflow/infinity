@@ -38,6 +38,7 @@ enum class StatementType {
     kOptimize,
     kCommand,
     kCompact,
+    kCheck,
 };
 
 extern std::string StatementType2Str(StatementType statement_type);
