@@ -22,12 +22,10 @@ import stl;
 import logger;
 import txn_manager;
 import new_txn_manager;
-import txn;
 import new_txn;
 import storage;
 import virtual_store;
 import third_party;
-import catalog;
 import table_entry_type;
 import infinity_context;
 import txn_store;
@@ -667,49 +665,25 @@ bool WalManager::IsCheckpointing() const { return checkpoint_in_progress_; }
 
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint) {
-    bool use_new_catalog = InfinityContext::instance().config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxnManager *txn_mgr = storage_->new_txn_manager();
-        NewTxn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
-        if (txn == nullptr) {
-            RecoverableError(Status::FailToStartTxn("System is checkpointing"));
-        }
-        if (is_full_checkpoint) {
-            FullCheckpointInner(txn);
-        } else {
-            DeltaCheckpointInner(txn);
-        }
-        txn_mgr->CommitTxn(txn);
-    } else {
-        TxnManager *txn_mgr = storage_->txn_manager();
-        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
-        if (txn == nullptr) {
-            RecoverableError(Status::FailToStartTxn("System is checkpointing"));
-        }
-        if (is_full_checkpoint) {
-            FullCheckpointInner(txn);
-        } else {
-            DeltaCheckpointInner(txn);
-        }
-        txn_mgr->CommitTxn(txn);
+    NewTxnManager *txn_mgr = storage_->new_txn_manager();
+    NewTxn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
+    if (txn == nullptr) {
+        RecoverableError(Status::FailToStartTxn("System is checkpointing"));
     }
+    if (is_full_checkpoint) {
+        FullCheckpointInner(txn);
+    } else {
+        DeltaCheckpointInner(txn);
+    }
+    txn_mgr->CommitTxn(txn);
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
-    bool use_new_catalog = InfinityContext::instance().config()->UseNewCatalog();
-    if (use_new_catalog) {
-        if (is_full_checkpoint) {
-            FullCheckpointInner(ckp_task->new_txn_);
-        } else {
-            DeltaCheckpointInner(ckp_task->new_txn_);
-        }
+    if (is_full_checkpoint) {
+        FullCheckpointInner(ckp_task->new_txn_);
     } else {
-        if (is_full_checkpoint) {
-            FullCheckpointInner(ckp_task->txn_);
-        } else {
-            DeltaCheckpointInner(ckp_task->txn_);
-        }
+        DeltaCheckpointInner(ckp_task->new_txn_);
     }
 }
 
@@ -1134,7 +1108,6 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     return system_start_ts;
 }
 
-// assumes UseNewCatalog
 Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries) {
     Vector<String> wal_list{};
     {
