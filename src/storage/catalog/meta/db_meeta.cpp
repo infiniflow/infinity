@@ -37,6 +37,14 @@ Status DBMeeta::InitSet(const String *comment) {
             return status;
         }
     }
+
+    // Create next table id;
+    String next_table_id_key = GetDBTag("latest_table_id");
+    Status status = kv_instance_.Put(next_table_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -58,6 +66,13 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
 
     String db_comment_key = GetDBTag("comment");
     status = kv_instance_.Delete(db_comment_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Delete table comment
+    String db_next_table_id_key = GetDBTag("latest_table_id");
+    status = kv_instance_.Delete(db_next_table_id_key);
     if (!status.ok()) {
         return status;
     }
@@ -114,6 +129,23 @@ Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
     db_info.db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id_str_));
 
     return Status::OK();
+}
+
+Tuple<String, Status> DBMeeta::GetNextTableID() {
+    String next_table_id_key = GetDBTag("latest_table_id");
+    String next_table_id_str;
+    Status status = kv_instance_.Get(next_table_id_key, next_table_id_str);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to get next table id from kv store, key: {}, cause: {}", next_table_id_key, status.message()));
+    }
+    u64 next_table_id = std::stoull(next_table_id_str);
+    ++next_table_id;
+    String new_next_table_id_str = std::to_string(next_table_id);
+    status = kv_instance_.Put(next_table_id_key, new_next_table_id_str);
+    if (!status.ok()) {
+        return {"", status};
+    }
+    return {next_table_id_str, Status::OK()};
 }
 
 Status DBMeeta::LoadComment() {

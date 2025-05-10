@@ -17,7 +17,6 @@ module;
 module physical_drop_table;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;
@@ -48,20 +47,10 @@ bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
         return true;
     }
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (!use_new_catalog) {
-        auto txn = query_context->GetTxn();
-
-        Status status = txn->DropTable(*schema_name_, *table_name_, conflict_type_);
-        if (!status.ok()) {
-            operator_state->status_ = status;
-        }
-    } else {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        Status status = new_txn->DropTable(*schema_name_, *table_name_, conflict_type_);
-        if (!status.ok()) {
-            operator_state->status_ = status;
-        }
+    NewTxn *new_txn = query_context->GetNewTxn();
+    Status status = new_txn->DropTable(*schema_name_, *table_name_, conflict_type_);
+    if (!status.ok()) {
+        operator_state->status_ = status;
     }
 
     if (ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager(); cache_mgr != nullptr) {

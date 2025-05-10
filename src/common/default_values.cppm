@@ -300,7 +300,6 @@ export {
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
-    constexpr std::string_view USE_NEW_CATALOG_OPTION_NAME = "use_new_catalog";
     constexpr std::string_view REPLAY_WAL_OPTION_NAME = "replay_wal";
 
     // Variable name

@@ -27,6 +27,24 @@ SELECT * FROM ft_keyword;
 4 another second text xxx not default
 5 another multiple another not
 
+query I
+SELECT * FROM ft_keyword;
+----
+1 first text default text
+2 second text multiple default text
+3 third text many words default text
+4 another second text xxx not default
+5 another multiple another not
+
+query I
+SELECT * FROM ft_keyword;
+----
+1 first text default text
+2 second text multiple default text
+3 third text many words default text
+4 another second text xxx not default
+5 another multiple another not
+
 query I rowsort
 SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another', 'topn=10');
 ----

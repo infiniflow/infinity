@@ -62,6 +62,7 @@ export inline String TxnState2Str(TxnState txn_state) {
 }
 
 export enum class TransactionType {
+    kInvalid,
     kCheckpoint, // Develop know it's a checkpoint txn
     kRead,       // Developer know it's a read txn
     kNormal,     // Developer doesn't know what type is this txn
@@ -76,6 +77,13 @@ export enum class TransactionType {
     kCreateIndex,
     kDelete,
     kCompact,
+    kCreateDB,
+    kCreateTable,
+    kDropDB,
+    kDropTable,
+    kDropIndex,
+    kAddColumn,
+    kDropColumn
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -93,7 +101,7 @@ export inline String TransactionType2Str(TransactionType txn_type) {
             return "Delete";
         }
         case TransactionType::kCreateIndex: {
-            return "Read";
+            return "CreateIndex";
         }
         case TransactionType::kOptimizeIndex: {
             return "optimize_index";
@@ -121,6 +129,30 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kNewCheckpoint: {
             return "NewCheckpoint";
+        }
+        case TransactionType::kCreateDB: {
+            return "CreateDB";
+        }
+        case TransactionType::kCreateTable: {
+            return "CreateTable";
+        }
+        case TransactionType::kDropDB: {
+            return "DropDB";
+        }
+        case TransactionType::kDropTable: {
+            return "DropTable";
+        }
+        case TransactionType::kDropIndex: {
+            return "DropIndex";
+        }
+        case TransactionType::kAddColumn: {
+            return "AddColumn";
+        }
+        case TransactionType::kDropColumn: {
+            return "DropColumn";
+        }
+        case TransactionType::kInvalid: {
+            return "Invalid";
         }
     }
     return "Normal";

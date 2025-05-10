@@ -18,7 +18,6 @@ log_level               = "trace"
 persistence_dir          = "/var/infinity/persistence"
 # dump memory index entry when it reachs the capacity
 mem_index_capacity       = 8192
-use_new_catalog          = true
 
 [buffer]
 buffer_manager_size      = "8GB"

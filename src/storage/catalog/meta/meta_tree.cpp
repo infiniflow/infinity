@@ -33,6 +33,7 @@ import buffer_handle;
 import new_catalog;
 import status;
 import kv_code;
+import catalog_cache;
 
 namespace infinity {
 
@@ -65,6 +66,11 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 }
                 break;
             }
+            case MetaType::kSystemTag: {
+                auto system_tag_key = static_cast<SystemTagMetaKey *>(meta_key.get());
+                meta_tree->system_tag_map_.emplace(system_tag_key->tag_name_, system_tag_key->value_);
+                break;
+            }
             default:
                 break;
         }
@@ -93,6 +99,24 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 }
 
                 table_map.emplace(table_key->table_id_str_, table_object);
+                break;
+            }
+            case MetaType::kDBTag: {
+                auto db_tag_key = static_cast<DBTagMetaKey *>(meta_key.get());
+                auto db_iter = meta_tree->db_map_.find(db_tag_key->db_id_str_);
+                if (db_iter == meta_tree->db_map_.end()) {
+                    String error_message = fmt::format("DB not found for tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    continue;
+                }
+                auto &db_object = db_iter->second;
+                auto &tag_map = db_object->tag_map_;
+                if (tag_map.contains(db_tag_key->tag_name_)) {
+                    String error_message = fmt::format("Duplicate db tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    UnrecoverableError(error_message);
+                }
+                tag_map.emplace(db_tag_key->tag_name_, meta_key);
                 break;
             }
             default:
@@ -568,12 +592,58 @@ Vector<MetaTableObject *> MetaTree::ListTables() const {
     return tables;
 };
 
+SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
+    u64 next_db_id{0};
+    auto tag_iter = system_tag_map_.find("latest_database_id");
+    if (tag_iter != system_tag_map_.end()) {
+        try {
+            next_db_id = std::stoull(tag_iter->second);
+        } catch (const std::exception &e) {
+            String error_message = fmt::format("Latest database id is invalid: {}, cause: {}", tag_iter->second, e.what());
+            UnrecoverableError(error_message);
+        }
+    } else {
+        String error_message = fmt::format("Can't find 'latest database id' in system tag");
+        UnrecoverableError(error_message);
+    }
+
+    SharedPtr<SystemCache> system_cache = MakeShared<SystemCache>(next_db_id);
+    for (const auto &db_pair : db_map_) {
+        MetaDBObject *meta_db_object = static_cast<MetaDBObject *>(db_pair.second.get());
+        SharedPtr<DbCache> db_cache = meta_db_object->RestoreDbCache(storage_ptr);
+        system_cache->AddDbCache(db_cache);
+    }
+    return system_cache;
+}
+
 nlohmann::json MetaDBObject::ToJson() const {
     nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &table_pair : table_map_) {
         json_res["tables"].push_back(table_pair.second->ToJson());
     }
+    for (const auto &tag_pair : tag_map_) {
+        json_res["tags"].push_back(tag_pair.second->ToJson());
+    }
     return json_res;
+}
+
+SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
+    auto db_key = static_cast<DBMetaKey *>(meta_key_.get());
+    u64 db_id{0};
+    try {
+        db_id = std::stoull(db_key->db_id_str_);
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what());
+        UnrecoverableError(error_message);
+    }
+    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, 0);
+    for (const auto &table_pair : table_map_) {
+        MetaTableObject *meta_table_object = static_cast<MetaTableObject *>(table_pair.second.get());
+        SharedPtr<TableCache> table_cache = meta_table_object->RestoreTableCache(storage_ptr);
+        db_cache->AddTableCache(table_cache);
+    }
+
+    return db_cache;
 }
 
 nlohmann::json MetaTableObject::ToJson() const {
@@ -653,7 +723,7 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     BlockID current_block_id = segment_object->GetCurrentBlockID();
     BufferManager *buffer_mgr_ptr = storage_ptr->buffer_manager();
     Config *config_ptr = storage_ptr->config();
-    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/block_{}/{}",
+    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
                                           config_ptr->DataDir(),
                                           table_meta_key->db_id_str_,
                                           table_meta_key->table_id_str_,
@@ -684,6 +754,34 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     }
     SizeT segment_row_count = (block_count - 1) * DEFAULT_BLOCK_CAPACITY + row_cnt;
     return segment_row_count;
+}
+
+SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) const {
+    auto table_key = static_cast<TableMetaKey *>(meta_key_.get());
+    u64 db_id = 0;
+    u64 table_id = 0;
+    SegmentID unsealed_segment_id = 0;
+    SegmentOffset unsealed_segment_offset = 0;
+    SegmentID next_segment_id = 0;
+    try {
+        db_id = std::stoull(table_key->db_id_str_);
+        table_id = std::stoull(table_key->table_id_str_);
+        unsealed_segment_id = this->GetUnsealedSegmentID();
+        unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
+        next_segment_id = this->GetNextSegmentID();
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_key->ToString(), e.what());
+        UnrecoverableError(error_message);
+    }
+
+    SharedPtr<TableCache> table_cache = nullptr;
+    if (unsealed_segment_id == 0 and unsealed_segment_offset == 0) {
+        table_cache = MakeShared<TableCache>(db_id, table_id);
+    } else {
+        table_cache = MakeShared<TableCache>(db_id, table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
+    }
+
+    return table_cache;
 }
 
 nlohmann::json MetaSegmentObject::ToJson() const {
@@ -736,6 +834,23 @@ nlohmann::json MetaTableIndexObject::ToJson() const {
         json_res["segments"].push_back(segment_pair.second->ToJson());
     }
     return json_res;
+}
+
+SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage *storage_ptr) const {
+    auto table_index_key = static_cast<TableIndexMetaKey *>(meta_key_.get());
+    u64 db_id{};
+    u64 table_id{};
+    u64 index_id{};
+    try {
+        db_id = std::stoull(table_index_key->db_id_str_);
+        table_id = std::stoull(table_index_key->table_id_str_);
+        index_id = std::stoull(table_index_key->index_id_str_);
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_index_key->ToString(), e.what());
+        UnrecoverableError(error_message);
+    }
+    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id);
+    return table_index_cache;
 }
 
 nlohmann::json MetaSegmentIndexObject::ToJson() const {
