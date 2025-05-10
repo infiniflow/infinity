@@ -54,19 +54,19 @@ NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp s
 
     // auto kv_instance = kv_store_->GetInstance();
     // String db_string_id;
-    // Status status = kv_instance->Get(LATEST_DATABASE_ID.data(), db_string_id);
+    // Status status = kv_instance->Get(NEXT_DATABASE_ID.data(), db_string_id);
     // if (!status.ok()) {
-    //     kv_instance->Put(LATEST_DATABASE_ID.data(), "0");
+    //     kv_instance->Put(NEXT_DATABASE_ID.data(), "0");
     // }
     // String table_string_id;
-    // status = kv_instance->Get(LATEST_TABLE_ID.data(), table_string_id);
+    // status = kv_instance->Get(NEXT_TABLE_ID.data(), table_string_id);
     // if (!status.ok()) {
-    //     kv_instance->Put(LATEST_TABLE_ID.data(), "0");
+    //     kv_instance->Put(NEXT_TABLE_ID.data(), "0");
     // }
     // String index_string_id;
-    // status = kv_instance->Get(LATEST_INDEX_ID.data(), index_string_id);
+    // status = kv_instance->Get(NEXT_INDEX_ID.data(), index_string_id);
     // if (!status.ok()) {
-    //     kv_instance->Put(LATEST_INDEX_ID.data(), "0");
+    //     kv_instance->Put(NEXT_INDEX_ID.data(), "0");
     // }
     // status = kv_instance->Commit();
     // if (!status.ok()) {

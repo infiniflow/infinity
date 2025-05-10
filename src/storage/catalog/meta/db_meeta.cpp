@@ -24,6 +24,7 @@ import kv_store;
 import third_party;
 import infinity_exception;
 import meta_info;
+import default_values;
 
 namespace infinity {
 
@@ -39,7 +40,7 @@ Status DBMeeta::InitSet(const String *comment) {
     }
 
     // Create next table id;
-    String next_table_id_key = GetDBTag("latest_table_id");
+    String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
     Status status = kv_instance_.Put(next_table_id_key, "0");
     if (!status.ok()) {
         return status;
@@ -71,7 +72,7 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     // Delete table comment
-    String db_next_table_id_key = GetDBTag("latest_table_id");
+    String db_next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
     status = kv_instance_.Delete(db_next_table_id_key);
     if (!status.ok()) {
         return status;
@@ -132,7 +133,7 @@ Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
 }
 
 Tuple<String, Status> DBMeeta::GetNextTableID() {
-    String next_table_id_key = GetDBTag("latest_table_id");
+    String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
     String next_table_id_str;
     Status status = kv_instance_.Get(next_table_id_key, next_table_id_str);
     if (!status.ok()) {

@@ -594,7 +594,7 @@ Vector<MetaTableObject *> MetaTree::ListTables() const {
 
 SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
     u64 next_db_id{0};
-    auto tag_iter = system_tag_map_.find("latest_database_id");
+    auto tag_iter = system_tag_map_.find(NEXT_DATABASE_ID.data());
     if (tag_iter != system_tag_map_.end()) {
         try {
             next_db_id = std::stoull(tag_iter->second);

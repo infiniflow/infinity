@@ -191,7 +191,7 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     }
 
     String db_id;
-    status = IncrLatestID(db_id, LATEST_DATABASE_ID);
+    status = IncrLatestID(db_id, NEXT_DATABASE_ID);
     if (!status.ok()) {
         return status;
     }
@@ -588,7 +588,7 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     // Get latest index id and lock the id
     String index_id_str;
-    status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
+    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1387,7 +1387,7 @@ Status NewTxn::CommitReplayCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd)
     // IncreaseLatestDBID
     SizeT id_num = std::stoull(create_db_cmd->db_id_);
     ++id_num;
-    status = kv_instance_->Put(LATEST_DATABASE_ID.data(), fmt::format("{}", id_num));
+    status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
     return status;
 }
 
