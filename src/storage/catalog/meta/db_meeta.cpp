@@ -131,7 +131,7 @@ Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
     return Status::OK();
 }
 
-String DBMeeta::GetNextTableID() {
+Tuple<String, Status> DBMeeta::GetNextTableID() {
     String next_table_id_key = GetDBTag("latest_table_id");
     String next_table_id_str;
     Status status = kv_instance_.Get(next_table_id_key, next_table_id_str);
@@ -143,9 +143,9 @@ String DBMeeta::GetNextTableID() {
     String new_next_table_id_str = std::to_string(next_table_id);
     status = kv_instance_.Put(next_table_id_key, new_next_table_id_str);
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("Fail to put next table id to kv store, key: {}, cause: {}", next_table_id_key, status.message()));
+        return {"", status};
     }
-    return next_table_id_str;
+    return {next_table_id_str, Status::OK()};
 }
 
 Status DBMeeta::LoadComment() {

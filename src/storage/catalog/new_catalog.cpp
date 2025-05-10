@@ -1468,7 +1468,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     SharedPtr<MetaTree> meta_tree = MetaTree::MakeMetaTree(meta_keys);
     LOG_INFO(meta_tree->ToJson().dump());
 
-    system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
+    // system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {
     //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();

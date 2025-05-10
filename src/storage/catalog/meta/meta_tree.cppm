@@ -93,7 +93,7 @@ export struct MetaBlockColumnObject final : public MetaObject {
 export struct MetaTableIndexObject final : public MetaObject {
     MetaTableIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTableIndex, meta_key) {}
     nlohmann::json ToJson() const final;
-    SharedPtr<TableCache> RestoreTableIndexCache(Storage* storage_ptr) const;
+    SharedPtr<TableIndexCache> RestoreTableIndexCache(Storage* storage_ptr) const;
 
     Map<String, SharedPtr<MetaKey>> tag_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;

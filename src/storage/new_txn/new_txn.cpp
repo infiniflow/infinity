@@ -196,6 +196,11 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
         return status;
     }
 
+    // Put the data into local txn store
+    base_txn_store_ = MakeShared<CreateDBTxnStore>();
+    CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
+    create_db_txn_store->db_name_ = db_name;
+
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name, db_id, *comment);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
@@ -324,10 +329,10 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return status;
     }
 
-    String table_id = db_meta->GetNextTableID();
+    std::tie(table_id_str, status) = db_meta->GetNextTableID();
 
     SharedPtr<String> local_table_dir = DetermineRandomPath(*table_def->table_name());
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id, table_def);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id_str, table_def);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 

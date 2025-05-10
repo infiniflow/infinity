@@ -40,13 +40,28 @@ import internal_types;
 
 namespace infinity {
 
+export class SegmentIndexCache {
+public:
+    explicit SegmentIndexCache(SegmentID segment_id) : segment_id_(segment_id) {}
+
+    SegmentID segment_id() const { return segment_id_; }
+    ChunkID next_chunk_id() const { return next_chunk_id_; }
+
+private:
+    SegmentID segment_id_{};
+    ChunkID next_chunk_id_{};
+    Map<ChunkID, Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
+};
+
 export class TableIndexCache {
 public:
-    TableIndexCache(u64 index_id) : index_id_(index_id) {}
+    explicit TableIndexCache(u64 db_id, u64 table_id, u64 index_id) : db_id_(db_id), table_id_(table_id), index_id_(index_id) {}
 
     u64 index_id() const { return index_id_; }
 
 private:
+    u64 db_id_{};
+    u64 table_id_{};
     u64 index_id_{};
 
     // Used by optimize index and dump mem index
@@ -75,6 +90,7 @@ public:
     SegmentOffset commit_unsealed_segment_offset() const { return commit_unsealed_segment_offset_; }
 
     SegmentID next_segment_id() const { return next_segment_id_; }
+    u64 next_index_id() const { return next_index_id_; }
 
     Vector<Pair<RowID, u64>> PrepareAppendRanges(SizeT row_count, TransactionID txn_id);
     void CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id);
@@ -104,6 +120,9 @@ private:
 
     // Used by append and import
     SegmentID next_segment_id_{0};
+
+    // Used by create index
+    u64 next_index_id_{0};
 
     // Used by append
     Deque<Tuple<RowID, u64, TransactionID>> prepared_append_ranges_{};
