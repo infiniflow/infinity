@@ -35,6 +35,9 @@ ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID se
 ColumnMetaKey::~ColumnMetaKey() = default;
 
 String DBMetaKey::ToString() const { return fmt::format("db: {}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
+
+String DBTagMetaKey::ToString() const { return fmt::format("db_tag: {}:{}", KeyEncode::CatalogDbTagKey(db_id_str_, tag_name_), value_); }
+
 String TableMetaKey::ToString() const {
     return fmt::format("table: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
@@ -109,6 +112,12 @@ nlohmann::json DBMetaKey::ToJson() const {
         json_res["commit_ts"] = commit_ts_;
     }
 
+    return json_res;
+}
+
+nlohmann::json DBTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
     return json_res;
 }
 
@@ -297,6 +306,14 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         auto block_meta_key = MakeShared<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
         block_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return block_meta_key;
+    }
+
+    if (fields[0] == "db") {
+        const String &db_id_str = fields[1];
+        const String &tag_name_str = fields[2];
+        SharedPtr<DBTagMetaKey> db_tag_meta_key = MakeShared<DBTagMetaKey>(db_id_str, tag_name_str);
+        db_tag_meta_key->value_ = value;
+        return db_tag_meta_key;
     }
 
     if (fields[0] == "tbl") {
