@@ -42,6 +42,8 @@ import txn_allocator_task;
 import txn_committer;
 import txn_committer_task;
 import storage;
+import catalog_cache;
+import base_txn_store;
 
 namespace infinity {
 
@@ -339,9 +341,25 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
-            std::lock_guard guard(locker_);
-            ckp_begin_ts_ = UNCOMMIT_TS;
+        switch (txn->GetTxnType()) {
+            case TransactionType::kNewCheckpoint: {
+                std::lock_guard guard(locker_);
+                ckp_begin_ts_ = UNCOMMIT_TS;
+                break;
+            }
+            case TransactionType::kDropDB: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                // base_txn_store means the drop with ignore
+                if(base_txn_store != nullptr) {
+                    DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
+                    system_cache_->DropDbCache(drop_db_txn_store->db_id_);
+                }
+
+                break;
+            }
+            default: {
+                break;
+            }
         }
         this->CleanupTxn(txn, true);
     } else {
@@ -636,6 +654,11 @@ void NewTxnManager::SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_commi
     }
 
     txn_committer_->Submit(txn_committer_task);
+}
+
+void NewTxnManager::SetSystemCache() {
+    system_cache_ = storage_->new_catalog()->GetSystemCache();
+    txn_allocator_->SetSystemCache(system_cache_);
 }
 
 } // namespace infinity

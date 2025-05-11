@@ -36,16 +36,16 @@ TxnCommitter::~TxnCommitter() = default;
 
 void TxnCommitter::Start() {
     processor_thread_ = Thread([this] { Process(); });
-    LOG_INFO("Transaction allocator is started.");
+    LOG_INFO("Transaction committer is started.");
 }
 
 void TxnCommitter::Stop() {
-    LOG_INFO("Transaction allocator is stopping.");
+    LOG_INFO("Transaction committer is stopping.");
     SharedPtr<TxnCommitterTask> stop_task = MakeShared<TxnCommitterTask>(nullptr, true);
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
-    LOG_INFO("Transaction allocator is stopped.");
+    LOG_INFO("Transaction committer is stopped.");
 }
 
 void TxnCommitter::Submit(SharedPtr<TxnCommitterTask> task) {
@@ -95,6 +95,12 @@ void TxnCommitter::Process() {
                         break;
                     }
                     case TransactionType::kCompact: {
+                        break;
+                    }
+                    case TransactionType::kCreateDB: {
+                        break;
+                    }
+                    case TransactionType::kCreateTable: {
                         break;
                     }
                     default: {

@@ -23,6 +23,7 @@ import txn_state;
 namespace infinity {
 
 class DataBlock;
+class IndexBase;
 
 export struct MemIndexRange {
     String index_id_{};
@@ -71,12 +72,14 @@ export struct CreateDBTxnStore : public BaseTxnStore {
 
     String db_name_{};
     u64 db_id_{};
+    SharedPtr<String> comment_ptr_{};
 };
 
 export struct DropDBTxnStore : public BaseTxnStore {
     DropDBTxnStore() : BaseTxnStore(TransactionType::kDropDB) {}
 
     String db_name_{};
+    String db_id_str_{};
     u64 db_id_{};
 };
 
@@ -84,6 +87,7 @@ export struct CreateTableTxnStore : public BaseTxnStore {
     CreateTableTxnStore() : BaseTxnStore(TransactionType::kCreateTable) {}
 
     String db_name_{};
+    String db_id_str_{};
     u64 db_id_{};
     String table_name_{};
     u64 table_id_{};
@@ -93,19 +97,29 @@ export struct DropTableTxnStore : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
 
     String db_name_{};
-    u64 db_id_{};
+    String db_id_str_{};
     String table_name_{};
-    u64 table_id_{};
+    String table_id_str_{};
+};
+
+export struct RenameTableTxnStore : public BaseTxnStore {
+    RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String old_table_name_{};
+    String table_id_str_{};
+    String new_table_name_{};
 };
 
 export struct CreateIndexTxnStore : public BaseTxnStore {
     CreateIndexTxnStore() : BaseTxnStore(TransactionType::kCreateIndex) {}
 
     String db_name_{};
-    u64 db_id_{};
+    String db_id_str_{};
     String table_name_{};
-    u64 table_id_{};
-    String index_name_{};
+    String table_id_str_{};
+    SharedPtr<IndexBase> index_base_{};
     u64 index_id_{};
 };
 
@@ -113,11 +127,11 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     DropIndexTxnStore() : BaseTxnStore(TransactionType::kDropIndex) {}
 
     String db_name_{};
-    u64 db_id_{};
+    String db_id_str_{};
     String table_name_{};
-    u64 table_id_{};
+    String table_id_str_{};
     String index_name_{};
-    u64 index_id_{};
+    String index_id_str_{};
 };
 
 export struct AppendTxnStore : public BaseTxnStore {

@@ -1484,25 +1484,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     return Status::OK();
 }
 
-SharedPtr<SystemCache> NewCatalog::GetSystemCache() const {
-    std::unique_lock lock(catalog_cache_mtx_);
-    return system_cache_;
-}
-
-u64 NewCatalog::AddNewDbCache() {
-    std::unique_lock lock(catalog_cache_mtx_);
-    u64 db_id = system_cache_->RequestNextDbID();
-    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, 0);
-    system_cache_->AddDbCache(db_cache);
-    return db_id;
-}
-
-SharedPtr<DbCache> NewCatalog::GetDbCache(u64 db_id) const {
-    std::unique_lock lock(catalog_cache_mtx_);
-    return system_cache_->GetDbCache(db_id);
-}
-
-void NewCatalog::DropDbCache(u64 db_id) { system_cache_->DropDbCache(db_id); }
+SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_; }
 
 SharedPtr<TableCache> NewCatalog::GetTableCache(u64 db_id, u64 table_id) const {
     std::unique_lock lock(catalog_cache_mtx_);
