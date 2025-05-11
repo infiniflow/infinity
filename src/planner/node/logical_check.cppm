@@ -16,7 +16,9 @@ export String ToString(CheckStmtType type);
 
 export class LogicalCheck : public LogicalNode {
 public:
-    explicit LogicalCheck(u64 node_id, CheckStmtType type) : LogicalNode(node_id, LogicalNodeType::kCheck), check_type_(type) {}
+    explicit LogicalCheck(u64 node_id, CheckStmtType type, const String &schema_name, const String &table_name)
+        : LogicalNode(node_id, LogicalNodeType::kCheck), check_type_(type), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
+    }
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -29,6 +31,10 @@ public:
     inline String name() final { return "LogicalCheck"; }
 
     [[nodiscard]] CheckStmtType check_type() const { return check_type_; }
+
+    [[nodiscard]] const String &schema_name() const { return schema_name_; }
+
+    [[nodiscard]] const String &table_name() const { return table_name_; }
 
     // [[nodiscard]] inline u64 table_index() const { return table_index_; }
     //
@@ -56,6 +62,9 @@ public:
 
 private:
     CheckStmtType check_type_{CheckStmtType::kInvalid};
+
+    String schema_name_;
+    String table_name_;
     // String schema_name_;
     // Optional<String> object_name_; // It could be table/collection/view name
     // u64 table_index_{};

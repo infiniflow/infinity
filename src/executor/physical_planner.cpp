@@ -1310,7 +1310,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCheck(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalCheck> logical_check = static_pointer_cast<LogicalCheck>(logical_operator);
-    return MakeUnique<PhysicalCheck>(logical_check->node_id(), logical_check->check_type(), logical_operator->load_metas());
+    return MakeUnique<PhysicalCheck>(logical_check->node_id(),
+                                     logical_check->check_type(),
+                                     logical_check->schema_name(),
+                                     logical_check->table_name(),
+                                     logical_operator->load_metas());
 }
 
 } // namespace infinity

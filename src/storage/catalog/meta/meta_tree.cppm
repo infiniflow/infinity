@@ -122,11 +122,11 @@ export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
 public:
-    static bool PathFilter(std::string_view path, EntityTag tag, Optional<SizeT> tag_id);
+    static bool PathFilter(std::string_view path, EntityTag tag, Optional<String> db_table_str);
     HashSet<String> GetMetaPathSet();
     static HashSet<String> GetDataVfsPathSet();
     static HashSet<String> GetDataVfsOffPathSet();
-    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<SizeT> tag_id);
+    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<String> db_table_str);
 
     Vector<MetaTableObject *> ListTables() const;
 

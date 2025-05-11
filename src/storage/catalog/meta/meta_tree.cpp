@@ -766,13 +766,13 @@ nlohmann::json MetaPmObject::ToJson() const {
     return json_res;
 }
 
-bool MetaTree::PathFilter(std::string_view path, EntityTag tag, Optional<SizeT> tag_id) {
+bool MetaTree::PathFilter(std::string_view path, EntityTag tag, Optional<String> db_table_str) {
     switch (tag) {
         case EntityTag::kSystem: {
             return true;
         }
         case EntityTag::kTable: {
-            auto table_str = fmt::format("{}_{}", path, tag_id.value());
+            auto table_str = fmt::format("{}", db_table_str.value());
             return path.find(table_str) != String::npos;
         }
         case EntityTag::kInvalid: {
@@ -817,7 +817,7 @@ HashSet<String> MetaTree::GetDataVfsOffPathSet() {
     return data_path_set;
 }
 
-Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<SizeT> tag_id) {
+Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<String> db_table_str) {
     auto meta_path_set = this->GetMetaPathSet();
     auto data_path_set = is_vfs ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
 
@@ -827,13 +827,13 @@ Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs,
     auto &[meta_mismatch_entry, data_mismatch_entry] = mismatch_entries_pair;
 
     for (auto &path : meta_path_set) {
-        if (PathFilter(path, tag, tag_id) && !data_path_set.contains(path)) {
+        if (PathFilter(path, tag, db_table_str) && !data_path_set.contains(path)) {
             data_mismatch_entry.emplace_back(path);
         }
     }
 
     for (auto &path : data_path_set) {
-        if (PathFilter(path, tag, tag_id) && !meta_path_set.contains(path)) {
+        if (PathFilter(path, tag, db_table_str) && !meta_path_set.contains(path)) {
             meta_mismatch_entry.emplace_back(path);
         }
     }

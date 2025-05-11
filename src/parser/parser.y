@@ -2665,10 +2665,16 @@ check_statement : CHECK SYSTEM {
     $$ = new infinity::CheckStatement();
     $$->check_type_ = infinity::CheckStmtType::kSystem;
 }
-| CHECK TABLE LONG_VALUE {
+| CHECK TABLE table_name {
     $$ = new infinity::CheckStatement();
     $$->check_type_ = infinity::CheckStmtType::kTable;
-    $$->tag_id_ = $3;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 }
 
 /*

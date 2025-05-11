@@ -92,6 +92,7 @@ import chunk_index_meta;
 import new_txn_manager;
 import kv_store;
 import meta_tree;
+import db_meeta;
 
 namespace infinity {
 
@@ -199,13 +200,79 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
 
 void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperatorState *check_operator_state) {
     // Define output database detailed info
-    SizeT tag_id = 0;
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
 
-    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(true, EntityTag::kTable, tag_id);
+    auto new_txn = query_context->GetNewTxn();
+    if (!table_name_.empty() && schema_name_.empty()) {
+        schema_name_ = "default_db";
+    }
+    // new_txn->CheckTxn(schema_name_);
+
+    Optional<DBMeeta> db_meta;
+    Status status = new_txn->GetDBMeta(schema_name_, db_meta);
+    String str1, str2;
+    if (status.code() == ErrorCode::kDBNotExist) {
+        str1 = fmt::format("Database: {} is not exists", schema_name_);
+        {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->clear();
+            output_types_->clear();
+            output_names_->emplace_back("check_fail_message");
+            output_types_->emplace_back(varchar_type);
+        }
+
+        {
+            UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+            Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+            output_block_ptr->Init(column_types);
+
+            Value value = Value::MakeVarchar(str1);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+
+            output_block_ptr->Finalize();
+            check_operator_state->output_.emplace_back(std::move(output_block_ptr));
+        }
+        return;
+    }
+    auto db_id_str = db_meta->db_id_str();
+    String table_id_str;
+    String table_key;
+    status = db_meta->GetTableID(table_name_, table_key, table_id_str);
+    if (status.code() == ErrorCode::kTableNotExist) {
+        str2 = fmt::format("Table: {} is not exists", table_name_);
+        {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->clear();
+            output_types_->clear();
+            output_names_->emplace_back("check_fail_message");
+            output_types_->emplace_back(varchar_type);
+        }
+        {
+            UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+            Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+            output_block_ptr->Init(column_types);
+
+            Value value = Value::MakeVarchar(str2);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+
+            output_block_ptr->Finalize();
+            check_operator_state->output_.emplace_back(std::move(output_block_ptr));
+        }
+
+        return;
+    }
+
+    auto db_table_str = fmt::format("db_{}/tbl_{}", db_id_str, table_id_str);
+    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(true, EntityTag::kTable, db_table_str);
 
     auto meta_mismatch_size = meta_mismatch_entries.size();
     auto data_mismatch_size = data_mismatch_entries.size();
@@ -225,6 +292,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
+
         for (const auto &data_mismatch_entry : data_mismatch_entries) {
             Value value = Value::MakeVarchar(data_mismatch_entry);
             ValueExpression value_expr(value);

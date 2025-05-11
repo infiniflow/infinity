@@ -2061,7 +2061,14 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
     // BindSchemaName(statement->schema_name_);
     switch (statement->check_type_) {
         case CheckStmtType::kSystem: {
-            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem);
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem, "", "");
+            break;
+        }
+        case CheckStmtType::kTable: {
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                           CheckStmtType::kTable,
+                                                           statement->schema_name_,
+                                                           statement->table_name_);
             break;
         }
         case CheckStmtType::kTable: {

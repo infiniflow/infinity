@@ -21,7 +21,8 @@ public:
     [[nodiscard]] std::string ToString() const final;
 
     CheckStmtType check_type_{CheckStmtType::kInvalid};
-    std::optional<std::size_t> tag_id_;
+    std::string schema_name_;
+    std::string table_name_;
 };
 
 } // namespace infinity
