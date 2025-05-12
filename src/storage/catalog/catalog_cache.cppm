@@ -22,10 +22,11 @@ import stl;
 // import extra_ddl_info;
 import default_values;
 import internal_types;
+import third_party;
+import status;
 // import buffer_handle;
 // import column_def;
 // import profiler;
-// import third_party;
 // import storage;
 // import catalog_delta_entry;
 
@@ -133,16 +134,18 @@ private:
 
 export class DbCache {
 public:
-    explicit DbCache(u64 db_id, u64 next_table_id_) : db_id_(db_id), next_table_id_(next_table_id_) {};
-    u64 RequestNextTableID();
+    explicit DbCache(u64 db_id, const String &db_name, u64 next_table_id_) : db_id_(db_id), db_name_(db_name), next_table_id_(next_table_id_) {};
+    u64 AddNewTableCache();
 
     void AddTableCache(const SharedPtr<TableCache> &table_cache);
     void DropTableCache(u64 table_id);
 
     u64 db_id() const { return db_id_; }
+    const String &db_name() const { return db_name_; }
 
 private:
     u64 db_id_{};
+    String db_name_{};
     u64 next_table_id_{};
     Map<u64, SharedPtr<TableCache>> table_cache_map_{};
 };
@@ -150,15 +153,20 @@ private:
 export class SystemCache {
 public:
     explicit SystemCache(u64 next_db_id) : next_db_id_(next_db_id) {}
-    u64 RequestNextDbID();
+    void AddNewDbCache(const String &db_name, u64 db_id);
+    u64 AddNewTableCache(u64 db_id);
+    nlohmann::json ToJson() const;
 
-    void AddDbCache(const SharedPtr<DbCache> &db_cache);
+    // Used by restore
+    Status AddDbCacheNolock(const SharedPtr<DbCache> &db_cache);
     SharedPtr<DbCache> GetDbCache(u64 db_id) const;
     void DropDbCache(u64 db_id);
 
 private:
+    mutable std::mutex cache_mtx_{};
     u64 next_db_id_{};
     Map<u64, SharedPtr<DbCache>> db_cache_map_{};
+    Map<String, u64> db_name_map_{};
 };
 
 } // namespace infinity

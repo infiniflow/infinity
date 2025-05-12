@@ -34,6 +34,8 @@ namespace infinity {
 TxnAllocator::TxnAllocator(Storage *storage) : storage_(storage) {}
 TxnAllocator::~TxnAllocator() = default;
 
+void TxnAllocator::SetSystemCache(const SharedPtr<SystemCache> &system_cache) { system_cache_ = system_cache; }
+
 void TxnAllocator::Start() {
     processor_thread_ = Thread([this] { Process(); });
     LOG_INFO("Transaction allocator is started.");
@@ -45,6 +47,7 @@ void TxnAllocator::Stop() {
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
+    system_cache_.reset();
     LOG_INFO("Transaction allocator is stopped.");
 }
 
@@ -97,10 +100,31 @@ void TxnAllocator::Process() {
                     case TransactionType::kOptimizeIndex: {
                         break;
                     }
-                    case TransactionType::kCreateIndex: {
+                    case TransactionType::kCompact: {
                         break;
                     }
-                    case TransactionType::kCompact: {
+                        //                    case TransactionType::kCreateDB: {
+                        //                        CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
+                        //                        std::tie(txn_store->db_id_, txn_allocator_task->status_) =
+                        //                        system_cache_->AddNewDbCache(txn_store->db_name_); if (txn_allocator_task->status_.ok()) {
+                        //                            LOG_DEBUG(fmt::format("CreateDB txn: db: {}, {}", txn_store->db_name_, txn_store->db_id_));
+                        //                        } else {
+                        //                            LOG_DEBUG(txn_allocator_task->status_.message());
+                        //                        }
+                        //
+                        //                        break;
+                        //                    }
+                        //                    case TransactionType::kCreateTable: {
+                        //                        CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store);
+                        //                        txn_store->table_id_ = system_cache_->AddNewTableCache(txn_store->db_id_);
+                        //                        LOG_INFO(fmt::format("CreateTable txn: db: {}, {}, table: {}, {}",
+                        //                                             txn_store->db_name_,
+                        //                                             txn_store->db_id_,
+                        //                                             txn_store->table_name_,
+                        //                                             txn_store->table_id_));
+                        //                        break;
+                        //                    }
+                    case TransactionType::kCreateIndex: {
                         break;
                     }
                     default: {
