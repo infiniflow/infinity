@@ -35,6 +35,7 @@ class Storage;
 class NewTxn;
 class KVStore;
 struct WalEntry;
+class SystemCache;
 
 export class NewTxnManager {
 public:
@@ -144,6 +145,7 @@ public:
 
     void SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task);
 
+    void SetSystemCache();
 private:
     mutable std::mutex locker_{};
     Storage *storage_{};
@@ -174,6 +176,7 @@ private:
     Atomic<u64> total_committed_txn_count_{0};
     Atomic<u64> total_rollbacked_txn_count_{0};
 
+    SharedPtr<SystemCache> system_cache_{};
 private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
