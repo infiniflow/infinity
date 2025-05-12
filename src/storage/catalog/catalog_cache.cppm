@@ -41,35 +41,30 @@ import status;
 
 namespace infinity {
 
-export class SegmentIndexCache {
+class IndexBase;
+
+export struct SegmentIndexCache {
 public:
     explicit SegmentIndexCache(SegmentID segment_id) : segment_id_(segment_id) {}
 
     SegmentID segment_id() const { return segment_id_; }
     ChunkID next_chunk_id() const { return next_chunk_id_; }
 
-private:
     SegmentID segment_id_{};
     ChunkID next_chunk_id_{};
     Map<ChunkID, Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
 };
 
-export class TableIndexCache {
+export struct TableIndexCache {
 public:
-    explicit TableIndexCache(u64 db_id, u64 table_id, u64 index_id) : db_id_(db_id), table_id_(table_id), index_id_(index_id) {}
+    explicit TableIndexCache(u64 db_id, u64 table_id, u64 index_id, const String &index_name)
+        : db_id_(db_id), table_id_(table_id), index_id_(index_id), index_name_(index_name) {}
 
-    u64 index_id() const { return index_id_; }
-
-private:
     u64 db_id_{};
     u64 table_id_{};
     u64 index_id_{};
-
-    // Used by optimize index and dump mem index
-    ChunkID next_chunk_id_{0};
-
-    // Used by dump mem index
-    Vector<Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
+    String index_name_{};
+    Map<SegmentID, SharedPtr<SegmentIndexCache>> segment_index_cache_map_{}; // segment_id -> segment_index_cache
 };
 
 export class TableCache {
@@ -101,12 +96,11 @@ public:
     SegmentID GetCompactSegment();
     Pair<RowID, u64> PrepareDumpIndexRange(u64 index_id); // used by dump mem index and create index
 
-    void AddTableIndexCache(const SharedPtr<TableIndexCache> &table_index_cache);
-    void DropTableIndexCache(u64 index_id);
+    void AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache);
+    void DropTableIndexCacheNolock(u64 index_id);
 
     String ToString() const;
 
-private:
     u64 db_id_{};
     u64 table_id_{};
 
@@ -128,11 +122,12 @@ private:
     // Used by append
     Deque<Tuple<RowID, u64, TransactionID>> prepared_append_ranges_{};
 
-    // Used by dump index / create index
-    Map<u64, SharedPtr<TableIndexCache>> index_cache_map_{};
+    // Used by dump index / create index, index_id -> table_index_cache
+    Map<u64, SharedPtr<TableIndexCache>> index_cache_map_{}; // index_id -> table_index_cache
+    Map<String, u64> index_name_map_{};                      // index_name -> index_id
 };
 
-export class DbCache {
+export struct DbCache {
 public:
     explicit DbCache(u64 db_id, const String &db_name, u64 next_table_id_) : db_id_(db_id), db_name_(db_name), next_table_id_(next_table_id_) {};
     u64 AddNewTableCache();
@@ -143,7 +138,6 @@ public:
     u64 db_id() const { return db_id_; }
     const String &db_name() const { return db_name_; }
 
-private:
     u64 db_id_{};
     String db_name_{};
     u64 next_table_id_{};
@@ -154,19 +148,26 @@ export class SystemCache {
 public:
     explicit SystemCache(u64 next_db_id) : next_db_id_(next_db_id) {}
     void AddNewDbCache(const String &db_name, u64 db_id);
+    void DropDbCache(u64 db_id);
+
     u64 AddNewTableCache(u64 db_id);
+
+    u64 AddNewTableSegment(u64 db_id, u64 table_id);
+
+    Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const SharedPtr<IndexBase> &index_base);
+    void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
+
     nlohmann::json ToJson() const;
 
     // Used by restore
     Status AddDbCacheNolock(const SharedPtr<DbCache> &db_cache);
     SharedPtr<DbCache> GetDbCache(u64 db_id) const;
-    void DropDbCache(u64 db_id);
 
 private:
     mutable std::mutex cache_mtx_{};
     u64 next_db_id_{};
-    Map<u64, SharedPtr<DbCache>> db_cache_map_{};
-    Map<String, u64> db_name_map_{};
+    Map<u64, SharedPtr<DbCache>> db_cache_map_{}; // db_id -> db_cache
+    Map<String, u64> db_name_map_{};              // db_name -> db_id
 };
 
 } // namespace infinity

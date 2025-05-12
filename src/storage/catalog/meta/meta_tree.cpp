@@ -849,7 +849,7 @@ SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage 
         String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_index_key->ToString(), e.what());
         UnrecoverableError(error_message);
     }
-    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id);
+    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, table_index_key->index_name_);
     return table_index_cache;
 }
 
