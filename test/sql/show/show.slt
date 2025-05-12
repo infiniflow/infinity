@@ -60,6 +60,9 @@ INSERT INTO tb1 VALUES (
 );
 
 statement ok
+FLUSH DATA;
+
+statement ok
 SHOW TABLE tb1 COLUMNS;
 
 statement ok

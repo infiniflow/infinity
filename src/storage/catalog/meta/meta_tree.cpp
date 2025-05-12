@@ -892,7 +892,6 @@ bool MetaTree::PathFilter(std::string_view path, EntityTag tag, Optional<String>
         }
         case EntityTag::kInvalid: {
             UnrecoverableError("Invalid entity tag");
-            return false; // just for compile
         }
         default:
             return false;
@@ -914,7 +913,9 @@ HashSet<String> MetaTree::GetMetaPathSet() {
 
 HashSet<String> MetaTree::GetDataVfsPathSet() {
     HashSet<String> data_path_set;
-    const auto *pm = InfinityContext::instance().persistence_manager();
+    // const auto *pm = InfinityContext::instance().persistence_manager();
+    // pm->SaveLocalPath();
+    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
     for (auto files = pm->GetAllFiles(); const auto &path : files | std::views::keys) {
         data_path_set.emplace(path);
     }

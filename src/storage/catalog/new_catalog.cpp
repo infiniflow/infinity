@@ -72,6 +72,7 @@ import catalog_cache;
 import segment_index_entry;
 import chunk_index_entry;
 import table_index_meta;
+import meta_type;
 
 namespace infinity {
 
@@ -345,7 +346,7 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
                             if (!status.ok()) {
                                 return status;
                             }
-                            auto obj_addr_path_key = KeyEncode::PMObjectPathKey(fine_path);
+                            auto obj_addr_path_key = KeyEncode::PMObjectKey(fine_path);
                             // obj_addr_path_key = "more|" + obj_addr_path_key;
                             auto &obj_addr = obj_addrs_[i];
                             nlohmann::json json_obj;
@@ -1444,17 +1445,7 @@ Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
 }
 
 SharedPtr<MetaTree> NewCatalog::MakeMetaTree() const {
-    auto kv_instance_ptr = kv_store_->GetInstance();
-
-    Vector<SharedPtr<MetaKey>> entries;
-    auto kv_pairs = kv_instance_ptr->GetAllKeyValue();
-
-    for (const auto &[key, value] : kv_pairs) {
-        auto meta_key_ptr = infinity::MetaParse(key, value);
-        entries.push_back(std::move(meta_key_ptr));
-    }
-
-    kv_instance_ptr->Commit();
+    auto entries = this->MakeMetaKeys();
     auto meta_tree_ptr = MetaTree::MakeMetaTree(entries);
     return meta_tree_ptr;
 }
@@ -1477,6 +1468,21 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
         }
         meta_keys.emplace_back(meta_key);
     }
+
+    auto new_end = std::remove_if(meta_keys.begin(), meta_keys.end(), [&](const auto &meta_key) {
+        if (meta_key->type_ == MetaType::kPmPath) {
+            auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
+            nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
+            String object_key = pm_path_json["obj_key"];
+            if (object_key == "KEY_EMPTY") {
+                kv_instance_ptr->Delete(KeyEncode::PMObjectKey(pm_path_key->path_key_));
+                return true;
+            }
+        }
+        return false;
+    });
+    meta_keys.erase(new_end, meta_keys.end());
+
     kv_instance_ptr->Commit();
     return meta_keys;
 }
@@ -1484,8 +1490,7 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
 Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
 
-    auto meta_keys = this->MakeMetaKeys();
-    auto meta_tree = MetaTree::MakeMetaTree(meta_keys);
+    auto meta_tree = this->MakeMetaTree();
     // Vector<> = meta_tree->Check();
     LOG_INFO(meta_tree->ToJson().dump());
 
