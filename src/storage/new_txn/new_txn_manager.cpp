@@ -349,15 +349,18 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
             }
             case TransactionType::kCreateDB: {
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                // base_txn_store means the drop with ignore
-                CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
-                system_cache_->AddNewDbCache(txn_store->db_name_, txn_store->db_id_);
+                if (base_txn_store != nullptr) {
+                    // base_txn_store means the drop with ignore
+                    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
+                    system_cache_->AddNewDbCache(txn_store->db_name_, txn_store->db_id_);
+                }
+
                 break;
             }
             case TransactionType::kDropDB: {
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
                 // base_txn_store means the drop with ignore
-                if(base_txn_store != nullptr) {
+                if (base_txn_store != nullptr) {
                     DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
                     system_cache_->DropDbCache(drop_db_txn_store->db_id_);
                 }
