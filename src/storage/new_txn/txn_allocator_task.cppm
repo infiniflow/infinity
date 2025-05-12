@@ -40,12 +40,11 @@ public:
         cv_.notify_one();
     }
 
-    Status status() { return status_; }
-
+    Status status_{};
 private:
     NewTxn *new_txn_{};
     bool stop_task_{false};
-    Status status_{};
+
 
     bool complete_{false};
     std::mutex mutex_{};

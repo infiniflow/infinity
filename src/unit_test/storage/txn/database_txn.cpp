@@ -118,7 +118,7 @@ TEST_P(DBTxnTest, test20) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kNormal);
 
     // Txn3: Get db1, OK
     auto [db_info3, status3] = new_txn->GetDatabaseInfo("db1");
@@ -162,7 +162,7 @@ TEST_P(DBTxnTest, test2) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kNormal);
 
     // Txn3: Get db1, OK
     auto [db_info4, status4] = new_txn->GetDatabaseInfo("db1");

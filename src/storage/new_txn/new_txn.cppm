@@ -548,6 +548,7 @@ private:
     Status CommitReplayCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
 
     Status CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
+    Status CommitCreateDB();
     Status CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
     Status CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
     Status CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd);

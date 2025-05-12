@@ -295,10 +295,6 @@ Status Storage::AdminToWriter() {
     }
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
 
-    if (system_start_ts == 0) {
-        CreateDefaultDB();
-    }
-
     i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
     if (compact_interval > 0) {
         LOG_INFO(fmt::format("Init compaction alg"));
@@ -348,6 +344,12 @@ Status Storage::AdminToWriter() {
         status = new_catalog_->RestoreCatalogCache(this);
         if (!status.ok()) {
             UnrecoverableError("Failed to restore catalog cache");
+        }
+
+        new_txn_mgr_->SetSystemCache();
+
+        if (system_start_ts == 0) {
+            CreateDefaultDB();
         }
 
         if (periodic_trigger_thread_ != nullptr) {
