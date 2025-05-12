@@ -20,77 +20,22 @@ module;
 module physical_check;
 
 import stl;
-import txn;
 import new_txn;
 import query_context;
+import third_party;
 
 import profiler;
 import operator_state;
 import data_block;
 
 import infinity_exception;
-import table_entry_type;
 import value_expression;
-import logical_show;
-import meta_info;
 
-import value;
-import table_def;
-import data_table;
-import third_party;
-import index_base;
-import index_hnsw;
-import index_full_text;
-import database_detail;
-import default_values;
 import defer_op;
-import config;
-import session;
-import options;
+import new_catalog;
 import status;
-import virtual_store;
-import utility;
-import buffer_manager;
-import session_manager;
-import compilation_config;
+import value;
 import logical_type;
-import create_index_info;
-import segment_index_entry;
-import segment_iter;
-import segment_entry;
-import variables;
-import default_values;
-import catalog;
-import txn_manager;
-import wal_manager;
-import logger;
-import chunk_index_entry;
-import memory_indexer;
-import background_process;
-import compaction_process;
-import bg_task;
-import buffer_obj;
-import file_worker_type;
-import system_info;
-import wal_entry;
-import catalog_delta_entry;
-import memindex_tracer;
-import persistence_manager;
-import global_resource_usage;
-import infinity_context;
-import cleanup_scanner;
-import obj_status;
-import admin_statement;
-import result_cache_manager;
-import peer_task;
-import node_info;
-import txn_context;
-import txn_state;
-import snapshot_brief;
-import command_statement;
-import chunk_index_meta;
-import new_txn_manager;
-import kv_store;
 import meta_tree;
 import db_meeta;
 
@@ -205,69 +150,70 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
 
-    auto new_txn = query_context->GetNewTxn();
-    if (!table_name_.empty() && schema_name_.empty()) {
-        schema_name_ = "default_db";
-    }
-    // new_txn->CheckTxn(schema_name_);
+    auto *new_txn = query_context->GetNewTxn();
+    auto schema_name = schema_name_.value();
+    auto table_name = table_name_.value();
+    // if (!table_name.empty() && schema_name.empty()) {
+    //     schema_name = "default_db";
+    // }
 
     Optional<DBMeeta> db_meta;
-    Status status = new_txn->GetDBMeta(schema_name_, db_meta);
-    String str1, str2;
-    if (status.code() == ErrorCode::kDBNotExist) {
-        str1 = fmt::format("Database: {} is not exists", schema_name_);
-        {
-            output_names_->reserve(1);
-            output_types_->reserve(1);
-            output_names_->clear();
-            output_types_->clear();
-            output_names_->emplace_back("check_fail_message");
-            output_types_->emplace_back(varchar_type);
+    Status status = new_txn->GetDBMeta(schema_name, db_meta);
+
+    if (!status.ok()) {
+        output_names_->reserve(1);
+        output_types_->reserve(1);
+        output_names_->clear();
+        output_types_->clear();
+        output_names_->emplace_back("check_fail_message");
+        output_types_->emplace_back(varchar_type);
+
+        UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+        Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+        output_block_ptr->Init(column_types);
+        String message;
+        if (status.code() == ErrorCode::kDBNotExist) {
+            message = fmt::format("Database: {} is not exists", schema_name);
+        } else {
+            message = fmt::format("{}", status.message());
         }
-
-        {
-            UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-            Vector<SharedPtr<DataType>> column_types{varchar_type};
-
-            output_block_ptr->Init(column_types);
-
-            Value value = Value::MakeVarchar(str1);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-
-            output_block_ptr->Finalize();
-            check_operator_state->output_.emplace_back(std::move(output_block_ptr));
-        }
+        Value value = Value::MakeVarchar(message);
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        output_block_ptr->Finalize();
+        check_operator_state->output_.emplace_back(std::move(output_block_ptr));
         return;
     }
+
     auto db_id_str = db_meta->db_id_str();
     String table_id_str;
     String table_key;
-    status = db_meta->GetTableID(table_name_, table_key, table_id_str);
-    if (status.code() == ErrorCode::kTableNotExist) {
-        str2 = fmt::format("Table: {} is not exists", table_name_);
-        {
-            output_names_->reserve(1);
-            output_types_->reserve(1);
-            output_names_->clear();
-            output_types_->clear();
-            output_names_->emplace_back("check_fail_message");
-            output_types_->emplace_back(varchar_type);
+    status = db_meta->GetTableID(table_name, table_key, table_id_str);
+
+    if (!status.ok()) {
+        output_names_->reserve(1);
+        output_types_->reserve(1);
+        output_names_->clear();
+        output_types_->clear();
+        output_names_->emplace_back("check_fail_message");
+        output_types_->emplace_back(varchar_type);
+
+        UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+        Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+        output_block_ptr->Init(column_types);
+        String message;
+        if (status.code() == ErrorCode::kTableNotExist) {
+            message = fmt::format("Table: {}.{} is not exists", schema_name, table_name);
+        } else {
+            message = fmt::format("{}", status.message());
         }
-        {
-            UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-            Vector<SharedPtr<DataType>> column_types{varchar_type};
-
-            output_block_ptr->Init(column_types);
-
-            Value value = Value::MakeVarchar(str2);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-
-            output_block_ptr->Finalize();
-            check_operator_state->output_.emplace_back(std::move(output_block_ptr));
-        }
-
+        Value value = Value::MakeVarchar(message);
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        output_block_ptr->Finalize();
+        check_operator_state->output_.emplace_back(std::move(output_block_ptr));
         return;
     }
 

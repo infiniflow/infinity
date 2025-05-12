@@ -2058,10 +2058,9 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
 
 Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
 
-    // BindSchemaName(statement->schema_name_);
     switch (statement->check_type_) {
         case CheckStmtType::kSystem: {
-            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem, "", "");
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem, None, None);
             break;
         }
         case CheckStmtType::kTable: {
@@ -2069,10 +2068,6 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
                                                            CheckStmtType::kTable,
                                                            statement->schema_name_,
                                                            statement->table_name_);
-            break;
-        }
-        case CheckStmtType::kTable: {
-            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kTable);
             break;
         }
         default: {

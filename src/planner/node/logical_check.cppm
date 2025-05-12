@@ -16,7 +16,7 @@ export String ToString(CheckStmtType type);
 
 export class LogicalCheck : public LogicalNode {
 public:
-    explicit LogicalCheck(u64 node_id, CheckStmtType type, const String &schema_name, const String &table_name)
+    explicit LogicalCheck(u64 node_id, CheckStmtType type, Optional<String> schema_name = None, Optional<String> table_name = None)
         : LogicalNode(node_id, LogicalNodeType::kCheck), check_type_(type), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
     }
 
@@ -32,52 +32,15 @@ public:
 
     [[nodiscard]] CheckStmtType check_type() const { return check_type_; }
 
-    [[nodiscard]] const String &schema_name() const { return schema_name_; }
+    [[nodiscard]] Optional<String> schema_name() const { return schema_name_; }
 
-    [[nodiscard]] const String &table_name() const { return table_name_; }
-
-    // [[nodiscard]] inline u64 table_index() const { return table_index_; }
-    //
-    // [[nodiscard]] inline const String &schema_name() const { return schema_name_; }
-    //
-    // [[nodiscard]] inline const Optional<String> object_name() const { return object_name_; }
-    //
-    // [[nodiscard]] inline const Optional<u64> session_id() const { return session_id_; }
-    //
-    // [[nodiscard]] inline const Optional<String> file_path() const { return file_path_; }
-    //
-    // [[nodiscard]] inline const Optional<SegmentID> segment_id() const { return segment_id_; }
-    //
-    // [[nodiscard]] inline const Optional<TransactionID> transaction_id() const { return txn_id_; }
-    //
-    // [[nodiscard]] inline const Optional<BlockID> block_id() const { return block_id_; }
-    //
-    // [[nodiscard]] inline const Optional<ChunkID> chunk_id() const { return chunk_id_; }
-    //
-    // [[nodiscard]] inline const Optional<ColumnID> column_id() const { return column_id_; }
-    //
-    // [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
-    //
-    // [[nodiscard]] inline const Optional<String> function_name() const { return function_name_; }
+    [[nodiscard]] Optional<String> table_name() const { return table_name_; }
 
 private:
     CheckStmtType check_type_{CheckStmtType::kInvalid};
 
-    String schema_name_;
-    String table_name_;
-    // String schema_name_;
-    // Optional<String> object_name_; // It could be table/collection/view name
-    // u64 table_index_{};
-    //
-    // Optional<String> file_path_;
-    // Optional<SegmentID> segment_id_{};
-    // Optional<BlockID> block_id_{};
-    // Optional<ChunkID> chunk_id_{};
-    // Optional<ColumnID> column_id_{};
-    // Optional<String> index_name_{};
-    // Optional<u64> session_id_{};
-    // Optional<TransactionID> txn_id_{};
-    // Optional<String> function_name_{};
+    Optional<String> schema_name_;
+    Optional<String> table_name_;
 };
 
 } // namespace infinity
