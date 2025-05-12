@@ -47,7 +47,7 @@ void IVFIndexFileWorker::FreeInMemory() {
         auto index = static_cast<IVFIndexInChunk *>(data_);
         delete index;
         data_ = nullptr;
-        LOG_TRACE("Finished FreeInMemory(), deleted data_ ptr.");
+        LOG_TRACE("Finished IVFIndexFileWorker::FreeInMemory(), deleted data_ ptr.");
     } else {
         UnrecoverableError("FreeInMemory: Data is not allocated.");
     }

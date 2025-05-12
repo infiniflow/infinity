@@ -67,7 +67,7 @@ SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
 
 Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
     next_block_id_ = next_block_id;
-    String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+    String next_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
     String next_block_id_str = fmt::format("{}", next_block_id);
     Status status = kv_instance_.Put(next_block_id_key, next_block_id_str);
     if (!status.ok()) {
@@ -164,7 +164,7 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
         block_ids1_.reset();
     }
     {
-        String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+        String next_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
         Status status = kv_instance_.Delete(next_block_id_key);
         if (!status.ok()) {
             return status;
@@ -213,7 +213,7 @@ Status SegmentMeta::LoadBlockIDs1() {
 }
 
 Status SegmentMeta::LoadNextBlockID() {
-    String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+    String next_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
     String next_block_id_str;
     Status status = kv_instance_.Get(next_block_id_key, next_block_id_str);
     if (!status.ok()) {
@@ -254,7 +254,7 @@ Status SegmentMeta::Init() {
     //     table_meta_.AddSegmentID(segment_id_);
     // }
     {
-        String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+        String latest_block_id_key = GetSegmentTag(String(NEXT_BLOCK_ID));
         String latest_block_id_str;
         Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);
         if (!status.ok()) {

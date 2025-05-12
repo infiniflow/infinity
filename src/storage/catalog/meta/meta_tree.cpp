@@ -594,7 +594,7 @@ Vector<MetaTableObject *> MetaTree::ListTables() const {
 
 SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
     u64 next_db_id{0};
-    auto tag_iter = system_tag_map_.find("latest_database_id");
+    auto tag_iter = system_tag_map_.find(NEXT_DATABASE_ID.data());
     if (tag_iter != system_tag_map_.end()) {
         try {
             next_db_id = std::stoull(tag_iter->second);
@@ -611,7 +611,7 @@ SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const 
     for (const auto &db_pair : db_map_) {
         MetaDBObject *meta_db_object = static_cast<MetaDBObject *>(db_pair.second.get());
         SharedPtr<DbCache> db_cache = meta_db_object->RestoreDbCache(storage_ptr);
-        system_cache->AddDbCache(db_cache);
+        system_cache->AddDbCacheNolock(db_cache);
     }
     return system_cache;
 }
@@ -636,7 +636,7 @@ SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
         String error_message = fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what());
         UnrecoverableError(error_message);
     }
-    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, 0);
+    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, db_key->db_name_, 0);
     for (const auto &table_pair : table_map_) {
         MetaTableObject *meta_table_object = static_cast<MetaTableObject *>(table_pair.second.get());
         SharedPtr<TableCache> table_cache = meta_table_object->RestoreTableCache(storage_ptr);

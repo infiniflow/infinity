@@ -313,7 +313,7 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     // Delete table column id;
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     status = kv_instance_.Delete(table_latest_column_id_key);
     if (!status.ok()) {
         return status;
@@ -534,7 +534,7 @@ Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
 }
 
 Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str = fmt::format("{}", next_column_id);
     Status status = kv_instance_.Put(table_latest_column_id_key, next_column_id_str);
     if (!status.ok()) {
@@ -648,7 +648,7 @@ Status TableMeeta::LoadUnsealedSegmentID() {
 }
 
 Status TableMeeta::LoadNextColumnID() {
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str;
     Status status = kv_instance_.Get(table_latest_column_id_key, next_column_id_str);
     if (!status.ok()) {

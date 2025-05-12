@@ -146,9 +146,11 @@ void TableCache::DropTableIndexCache(u64 index_id) {
     index_cache_map_.erase(iter);
 }
 
-u64 DbCache::RequestNextTableID() {
+u64 DbCache::AddNewTableCache() {
     u64 table_id = next_table_id_;
     ++next_table_id_;
+    auto table_cache = MakeShared<TableCache>(db_id_, table_id);
+    this->AddTableCache(table_cache);
     return table_id;
 }
 
@@ -166,20 +168,41 @@ void DbCache::DropTableCache(u64 table_id) {
     table_cache_map_.erase(iter);
 }
 
-u64 SystemCache::RequestNextDbID() {
+Tuple<u64, Status> SystemCache::AddNewDbCache(const String &db_name) {
+    std::unique_lock lock(cache_mtx_);
     u64 db_id = next_db_id_;
+    auto db_cache = MakeShared<DbCache>(db_id, db_name, 0);
+    Status status = this->AddDbCacheNolock(db_cache);
+    if (!status.ok()) {
+        return {std::numeric_limits<u64>::max(), status};
+    }
     ++next_db_id_;
-    return db_id;
+    return {db_id, status};
 }
 
-void SystemCache::AddDbCache(const SharedPtr<DbCache> &db_cache) {
+u64 SystemCache::AddNewTableCache(u64 db_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto iter = db_cache_map_.find(db_id);
+    if (iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    return iter->second->AddNewTableCache();
+}
+
+Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
+    auto [iter2, insert_success2] = db_name_map_.emplace(db_cache->db_name(), db_cache->db_id());
+    if (!insert_success2) {
+        return Status::DuplicateDatabase(db_cache->db_name());
+    }
     auto [iter, insert_success] = db_cache_map_.emplace(db_cache->db_id(), db_cache);
     if (!insert_success) {
         UnrecoverableError(fmt::format("Db cache with id: {} already exists", db_cache->db_id()));
     }
+    return Status::OK();
 }
 
 SharedPtr<DbCache> SystemCache::GetDbCache(u64 db_id) const {
+    std::unique_lock lock(cache_mtx_);
     auto iter = db_cache_map_.find(db_id);
     if (iter == db_cache_map_.end()) {
         return nullptr;
@@ -188,11 +211,24 @@ SharedPtr<DbCache> SystemCache::GetDbCache(u64 db_id) const {
 }
 
 void SystemCache::DropDbCache(u64 db_id) {
-    auto iter = db_cache_map_.find(db_id);
-    if (iter == db_cache_map_.end()) {
+    std::unique_lock lock(cache_mtx_);
+    auto cache_iter = db_cache_map_.find(db_id);
+    if (cache_iter == db_cache_map_.end()) {
         LOG_ERROR(fmt::format("Db cache with id: {} not found", db_id));
     }
-    db_cache_map_.erase(iter);
+    String db_name = cache_iter->second->db_name();
+    db_cache_map_.erase(cache_iter);
+    auto name_iter = db_name_map_.find(db_name);
+    if (name_iter == db_name_map_.end()) {
+        LOG_ERROR(fmt::format("Db name cache with name: {} not found", cache_iter->second->db_name()));
+    }
+    db_name_map_.erase(name_iter);
+}
+
+nlohmann::json SystemCache::ToJson() const {
+    nlohmann::json result;
+    std::unique_lock lock(cache_mtx_);
+    return result;
 }
 
 } // namespace infinity

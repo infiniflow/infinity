@@ -237,7 +237,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
                                                                       block_meta->segment_meta().segment_id(),
                                                                       block_meta->block_id()));
 
-        SharedPtr<Vector<SharedPtr<ColumnDef> > > column_defs_ptr;
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
@@ -309,6 +309,10 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     // }
 
     // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
     base_txn_store_ = MakeShared<ImportTxnStore>();
     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
     import_txn_store->db_name_ = db_name;
@@ -459,6 +463,10 @@ Status NewTxn::AppendInner(const String &db_name,
     }
 
     // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
     base_txn_store_ = MakeShared<AppendTxnStore>();
     AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
     append_txn_store->db_name_ = db_name;
