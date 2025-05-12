@@ -167,6 +167,8 @@ public:
 
     void CommitBottom();
 
+    void NotifyTopHalf();
+
     void PostCommit();
 
     void CancelCommitBottom();

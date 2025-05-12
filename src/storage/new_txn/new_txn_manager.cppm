@@ -113,7 +113,7 @@ public:
     WalManager *wal_manager() const { return wal_mgr_; }
     Storage *storage() const { return storage_; }
 
-    void CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id);
+    void CommitBottom(NewTxn *txn);
 
 private:
     void CleanupTxn(NewTxn *txn, bool commit);
@@ -152,7 +152,7 @@ private:
     KVStore *kv_store_;
 
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
-    Deque<SharedPtr<NewTxn>> check_txns_; //
+    Map<TxnTimeStamp, Pair<SharedPtr<NewTxn>, bool>> check_txns_; // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 

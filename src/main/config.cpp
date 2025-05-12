@@ -544,6 +544,19 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Bottom executor worker
+        i64 bottom_executor_worker = Thread::hardware_concurrency() / 2;
+        if (bottom_executor_worker < 2) {
+            bottom_executor_worker = 2;
+        }
+        UniquePtr<IntegerOption> bottom_executor_worker_option =
+            MakeUnique<IntegerOption>(BOTTOM_EXECUTOR_WORKER_OPTION_NAME, bottom_executor_worker, Thread::hardware_concurrency(), 1);
+        status = global_options_.AddOption(std::move(bottom_executor_worker_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Result Cache
         String result_cache(DEFAULT_RESULT_CACHE);
         auto result_cache_option = MakeUnique<StringOption>(RESULT_CACHE_OPTION_NAME, result_cache);

@@ -2394,49 +2394,41 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
 }
 
 void NewTxn::CommitBottom() {
-    // update txn manager ts to commit_ts
-    // erase txn_id from not_committed_txns_
     TransactionID txn_id = this->TxnID();
     LOG_TRACE(fmt::format("Transaction commit bottom: {} start.", txn_id));
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kCommitting) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
+    // TODO: Append, Update, DumpMemoryIndex
 
-    // Try to commit rocksdb transaction
-    Status status = kv_instance_->Commit();
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
-    }
-
-    TxnTimeStamp commit_ts = this->CommitTS();
-    txn_mgr_->CommitBottom(commit_ts, txn_id);
-
-    // Notify the top half
-    std::unique_lock<std::mutex> lk(commit_lock_);
-    commit_bottom_done_ = true;
-    commit_cv_.notify_one();
-    LOG_TRACE(fmt::format("Transaction commit bottom: {} complete.", txn_id));
+    txn_mgr_->CommitBottom(this);
 }
 
 void NewTxn::RollbackBottom() {
-    // update txn manager ts to commit_ts
-    // erase txn_id from not_committed_txns_
     TransactionID txn_id = this->TxnID();
     LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kRollbacking) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
+    txn_mgr_->CommitBottom(this);
+}
 
-    TxnTimeStamp commit_ts = this->CommitTS();
-    txn_mgr_->CommitBottom(commit_ts, txn_id);
-
+void NewTxn::NotifyTopHalf() {
+    TxnState txn_state = this->GetTxnState();
+    if (txn_state == TxnState::kCommitting) {
+        // Try to commit rocksdb transaction
+        Status status = kv_instance_->Commit();
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
+        }
+    }
     // Notify the top half
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_bottom_done_ = true;
     commit_cv_.notify_one();
-    LOG_TRACE(fmt::format("Transaction rollback bottom: {} complete.", txn_id));
+    LOG_TRACE(fmt::format("Transaction {} notify top half, commit ts {}.", TxnID(), CommitTS()));
 }
 
 void NewTxn::PostCommit() {
