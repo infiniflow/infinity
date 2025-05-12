@@ -189,6 +189,24 @@ u64 SystemCache::AddNewTableCache(u64 db_id) {
     return iter->second->AddNewTableCache();
 }
 
+u64 SystemCache::AddNewTableSegment(u64 db_id, u64 table_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto db_iter = db_cache_map_.find(db_id);
+    if (db_iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    DbCache *db_cache = db_iter->second.get();
+
+    auto table_iter = db_cache->table_cache_map_.find(table_id);
+    if (table_iter == db_cache->table_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
+    }
+    TableCache *table_cache = table_iter->second.get();
+    SegmentID segment_id = table_cache->next_segment_id_;
+    ++table_cache->next_segment_id_;
+    return segment_id;
+}
+
 Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
     auto [iter2, insert_success2] = db_name_map_.emplace(db_cache->db_name(), db_cache->db_id());
     if (!insert_success2) {

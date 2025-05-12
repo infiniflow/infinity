@@ -356,6 +356,9 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         const String &index_name = (*index_names_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
+        u64 index_id = std::stoull(index_id_str);
+        import_txn_store->segment_index_map_.emplace(index_id, ImportSegmentIndex{index_id, 0});
+
         status = this->PopulateIndex(db_name,
                                      table_name,
                                      index_name,

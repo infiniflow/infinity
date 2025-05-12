@@ -92,6 +92,12 @@ void TxnAllocator::Process() {
                         break;
                     }
                     case TransactionType::kImport: {
+                        ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store);
+                        LOG_INFO(fmt::format("TxnAllocator: import txn: db: {}, {}, table: {}, {}",
+                                             import_txn_store->db_name_,
+                                             import_txn_store->db_id_,
+                                             import_txn_store->table_name_,
+                                             import_txn_store->table_id_));
                         break;
                     }
                     case TransactionType::kDumpMemIndex: {

@@ -155,6 +155,11 @@ export struct AppendTxnStore : public BaseTxnStore {
     Vector<MemIndexRange> mem_indexes_to_dump_{};
 };
 
+export struct ImportSegmentIndex {
+    u64 index_id_{};
+    ChunkID chunk_id_{};
+};
+
 export struct ImportTxnStore : public BaseTxnStore {
     ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
 
@@ -167,6 +172,7 @@ export struct ImportTxnStore : public BaseTxnStore {
 
     Vector<SharedPtr<DataBlock>> input_blocks_{};
     SegmentID segment_id_{};
+    Map<u64, ImportSegmentIndex> segment_index_map_{}; // index id -> segment index info
 };
 
 } // namespace infinity

@@ -41,26 +41,24 @@ import status;
 
 namespace infinity {
 
-export class SegmentIndexCache {
+export struct SegmentIndexCache {
 public:
     explicit SegmentIndexCache(SegmentID segment_id) : segment_id_(segment_id) {}
 
     SegmentID segment_id() const { return segment_id_; }
     ChunkID next_chunk_id() const { return next_chunk_id_; }
 
-private:
     SegmentID segment_id_{};
     ChunkID next_chunk_id_{};
     Map<ChunkID, Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
 };
 
-export class TableIndexCache {
+export struct TableIndexCache {
 public:
     explicit TableIndexCache(u64 db_id, u64 table_id, u64 index_id) : db_id_(db_id), table_id_(table_id), index_id_(index_id) {}
 
     u64 index_id() const { return index_id_; }
 
-private:
     u64 db_id_{};
     u64 table_id_{};
     u64 index_id_{};
@@ -72,7 +70,7 @@ private:
     Vector<Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
 };
 
-export class TableCache {
+export struct TableCache {
 public:
     // Used when the table is created
     explicit TableCache(u64 db_id, u64 table_id)
@@ -106,7 +104,6 @@ public:
 
     String ToString() const;
 
-private:
     u64 db_id_{};
     u64 table_id_{};
 
@@ -132,7 +129,7 @@ private:
     Map<u64, SharedPtr<TableIndexCache>> index_cache_map_{};
 };
 
-export class DbCache {
+export struct DbCache {
 public:
     explicit DbCache(u64 db_id, const String &db_name, u64 next_table_id_) : db_id_(db_id), db_name_(db_name), next_table_id_(next_table_id_) {};
     u64 AddNewTableCache();
@@ -143,7 +140,6 @@ public:
     u64 db_id() const { return db_id_; }
     const String &db_name() const { return db_name_; }
 
-private:
     u64 db_id_{};
     String db_name_{};
     u64 next_table_id_{};
@@ -155,9 +151,12 @@ public:
     explicit SystemCache(u64 next_db_id) : next_db_id_(next_db_id) {}
     Tuple<u64, Status> AddNewDbCache(const String &db_name);
     u64 AddNewTableCache(u64 db_id);
+
+    u64 AddNewTableSegment(u64 db_id, u64 table_id);
+
     nlohmann::json ToJson() const;
 
-    // Used by restore
+    // Used by cache restore
     Status AddDbCacheNolock(const SharedPtr<DbCache> &db_cache);
     SharedPtr<DbCache> GetDbCache(u64 db_id) const;
     void DropDbCache(u64 db_id);
