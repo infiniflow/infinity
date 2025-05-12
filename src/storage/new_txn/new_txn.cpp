@@ -3151,4 +3151,68 @@ void NewTxn::WaitForCompletion() {
     finished_cv_.wait(lock, [this] { return finished_; });
 }
 
+String NewTxn::GetTableIdStr() {
+    for (auto &command : wal_entry_->cmds_) {
+        WalCommandType command_type = command->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_TABLE_V2: {
+                auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
+                return create_table_cmd->table_id_;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
+                return drop_table_cmd->table_id_;
+            }
+            case WalCommandType::RENAME_TABLE_V2: {
+                auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
+                return rename_table_cmd->table_id_;
+            }
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
+                return add_column_cmd->table_id_;
+            }
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
+                return drop_column_cmd->table_id_;
+            }
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
+                return create_index_cmd->table_id_;
+            }
+            case WalCommandType::DROP_INDEX_V2: {
+                auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
+                return drop_index_cmd->table_id_;
+            }
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
+                return dump_index_cmd->table_id_;
+            }
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
+                return append_cmd->table_id_;
+            }
+            case WalCommandType::DELETE_V2: {
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
+                return delete_cmd->table_id_;
+            }
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
+                return import_cmd->table_id_;
+            }
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
+                return compact_cmd->table_id_;
+            }
+            case WalCommandType::OPTIMIZE_V2: {
+                auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
+                return optimize_cmd->table_id_;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+    return "";
+}
+
 } // namespace infinity

@@ -1915,6 +1915,26 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(fulltext_index_building_worker_option));
                             break;
                         }
+                        case GlobalOptionIndex::kBottomExecutorWorker: {
+                            i64 bottom_executor_worker = Thread::hardware_concurrency() / 2;
+                            if (bottom_executor_worker < 2) {
+                                bottom_executor_worker = 2;
+                            }
+                            if (elem.second.is_integer()) {
+                                bottom_executor_worker = elem.second.value_or(bottom_executor_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> bottom_executor_worker_option = MakeUnique<IntegerOption>(BOTTOM_EXECUTOR_WORKER_OPTION_NAME,
+                                                                                                               bottom_executor_worker,
+                                                                                                               Thread::hardware_concurrency(),
+                                                                                                               1);
+                            if (!bottom_executor_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid fulltext vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(bottom_executor_worker_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
@@ -2069,6 +2089,19 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                                   Thread::hardware_concurrency(),
                                                   1);
                     Status status = global_options_.AddOption(std::move(fulltext_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kBottomExecutorWorker) == nullptr) {
+                    // bottom executor worker
+                    i64 bottom_executor_worker = Thread::hardware_concurrency() / 2;
+                    if (bottom_executor_worker < 2) {
+                        bottom_executor_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> bottom_executor_worker_option =
+                        MakeUnique<IntegerOption>(BOTTOM_EXECUTOR_WORKER_OPTION_NAME, bottom_executor_worker, Thread::hardware_concurrency(), 1);
+                    Status status = global_options_.AddOption(std::move(bottom_executor_worker_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2814,6 +2847,11 @@ i64 Config::SparseIndexBuildingWorker() {
 i64 Config::FulltextIndexBuildingWorker() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kFulltextIndexBuildingWorker);
+}
+
+i64 Config::BottomExecutorWorker() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kBottomExecutorWorker);
 }
 
 StorageType Config::StorageType() {

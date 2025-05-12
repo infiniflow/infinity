@@ -626,6 +626,9 @@ public:
     Status Dummy();
     void SetWalSize(i64 wal_size);
 
+    // Get the table id which is used in the txn. Return empty string if no table is used.
+    String GetTableIdStr();
+
 private:
     HashMap<String, SizeT> mem_index_reference_count_{};
 
