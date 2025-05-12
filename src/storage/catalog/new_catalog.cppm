@@ -57,6 +57,8 @@ struct WalChunkIndexInfo;
 class Config;
 struct MemIndexID;
 class TableCache;
+class DbCache;
+class SystemCache;
 
 enum class ColumnVectorTipe;
 
@@ -194,16 +196,20 @@ public:
     SharedPtr<MetaTree> MakeMetaTree() const;
     Vector<SharedPtr<MetaKey>> MakeMetaKeys() const;
     Status RestoreCatalogCache(Storage *storage_ptr);
-    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;             // used by append in allocation
-    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id); // used by append in allocation
-    Status DropDbCache(u64 db_id);                                                  // used by drop db in post commit
-    Status DropTableCache(u64 db_id, u64 table_id);                                 // used by drop table in post commit
 
+    SharedPtr<SystemCache> GetSystemCache() const;
+
+    u64 AddNewTableCache(u64 db_id);             // used by create table in allocation
+    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id); // used by append in allocation
+    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;                                                  // used by append in allocation
+    Status DropTableCache(u64 db_id, u64 table_id);                                 // used by drop table in post commit
 private:
     KVStore *kv_store_{};
 
-    mutable std::mutex table_cache_mtx_{};
+    mutable std::mutex catalog_cache_mtx_{};
+
     HashMap<u64, SharedPtr<HashMap<u64, SharedPtr<TableCache>>>> table_cache_map_{};
+    SharedPtr<SystemCache> system_cache_{};
 
 public:
     Status AddBlockLock(String block_key);

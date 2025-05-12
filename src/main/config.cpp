@@ -384,18 +384,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
-        // Use new catalog
-        bool use_new_catalog = true;
-        if (default_config != nullptr) {
-            use_new_catalog = default_config->default_use_new_catalog_;
-        }
-        UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
-        status = global_options_.AddOption(std::move(use_new_catalog_option));
-        if (!status.ok()) {
-            fmt::print("Fatal: {}", status.message());
-            UnrecoverableError(status.message());
-        }
-
         // Data Dir
         String data_dir = "/var/infinity/data";
         if (default_config != nullptr) {
@@ -1549,21 +1537,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
 
                     switch (option_index) {
-                        case GlobalOptionIndex::kUseNewCatalog: {
-                            // Use new catalog
-                            bool use_new_catalog = true;
-                            if (elem.second.is_boolean()) {
-                                use_new_catalog = elem.second.value_or(use_new_catalog);
-                            } else {
-                                return Status::InvalidConfig("'use_new_catalog' field isn't boolean.");
-                            }
-                            UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
-                            Status status = global_options_.AddOption(std::move(use_new_catalog_option));
-                            if (!status.ok()) {
-                                UnrecoverableError(status.message());
-                            }
-                            break;
-                        }
                         case GlobalOptionIndex::kReplayWal: {
                             // Replay wal
                             bool replay_wal = true;
@@ -1945,16 +1918,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
-                    }
-                }
-
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kUseNewCatalog) == nullptr) {
-                    // Use new catalog
-                    bool use_new_catalog = true;
-                    UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
-                    Status status = global_options_.AddOption(std::move(use_new_catalog_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
                     }
                 }
 
@@ -2762,11 +2725,6 @@ LogLevel Config::GetLogLevel() {
 }
 
 // Storage
-bool Config::UseNewCatalog() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetBoolValue(GlobalOptionIndex::kUseNewCatalog);
-}
-
 bool Config::ReplayWal() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetBoolValue(GlobalOptionIndex::kReplayWal);
@@ -2898,6 +2856,12 @@ String Config::PersistenceDir() {
 i64 Config::PersistenceObjectSizeLimit() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPersistenceObjectSizeLimit);
+}
+
+bool Config::is_vfs() {
+    std::lock_guard guard(mutex_);
+    const auto persistence_dir = global_options_.GetStringValue(GlobalOptionIndex::kPersistenceDir);
+    return !persistence_dir.empty();
 }
 
 // Buffer

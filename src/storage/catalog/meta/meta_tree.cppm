@@ -25,6 +25,10 @@ import internal_types;
 namespace infinity {
 
 class Storage;
+class SystemCache;
+class DbCache;
+class TableCache;
+class TableIndexCache;
 
 export struct MetaObject {
     MetaObject(MetaType type, const SharedPtr<MetaKey> &meta_key) : type_(type), meta_key_(meta_key) {}
@@ -39,7 +43,10 @@ export struct MetaDBObject final : public MetaObject {
     MetaDBObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kDB, meta_key) {}
     nlohmann::json ToJson() const final;
 
+    SharedPtr<DbCache> RestoreDbCache(Storage *storage_ptr) const;
+
     Map<String, SharedPtr<MetaObject>> table_map_;
+    Map<String, SharedPtr<MetaKey>> tag_map_;
 };
 
 export struct MetaTableObject final : public MetaObject {
@@ -50,6 +57,7 @@ export struct MetaTableObject final : public MetaObject {
     SegmentID GetNextSegmentID() const;
     SegmentID GetUnsealedSegmentID() const;
     SizeT GetCurrentSegmentRowCount(Storage *storage_ptr) const;
+    SharedPtr<TableCache> RestoreTableCache(Storage *storage_ptr) const;
 
     Map<String, SharedPtr<MetaKey>> column_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;
@@ -85,6 +93,7 @@ export struct MetaBlockColumnObject final : public MetaObject {
 export struct MetaTableIndexObject final : public MetaObject {
     MetaTableIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTableIndex, meta_key) {}
     nlohmann::json ToJson() const final;
+    SharedPtr<TableIndexCache> RestoreTableIndexCache(Storage *storage_ptr) const;
 
     Map<String, SharedPtr<MetaKey>> tag_map_;
     Map<SegmentID, SharedPtr<MetaObject>> segment_map_;
@@ -129,9 +138,11 @@ public:
     Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<String> db_table_str);
 
     Vector<MetaTableObject *> ListTables() const;
+    SharedPtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
 
     nlohmann::json ToJson() const;
 
+    Map<String, String> system_tag_map_{};
     Map<String, SharedPtr<MetaDBObject>> db_map_{};
     Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
 };

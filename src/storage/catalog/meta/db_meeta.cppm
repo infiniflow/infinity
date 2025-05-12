@@ -66,6 +66,8 @@ public:
 
     Status GetDatabaseInfo(DatabaseInfo &db_info);
 
+    Tuple<String, Status> GetNextTableID();
+
 private:
     Status LoadComment();
 

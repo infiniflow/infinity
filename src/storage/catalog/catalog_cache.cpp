@@ -23,9 +23,22 @@ import internal_types;
 import default_values;
 import infinity_exception;
 import third_party;
-
+import logger;
 
 namespace infinity {
+
+TableCache::TableCache(u64 db_id, u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
+    : db_id_(db_id), table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id),
+      prepare_unsealed_segment_offset_(unsealed_segment_offset), commit_unsealed_segment_id_(unsealed_segment_id),
+      commit_unsealed_segment_offset_(unsealed_segment_offset), next_segment_id_(next_segment_id) {
+    if (unsealed_segment_offset == DEFAULT_SEGMENT_CAPACITY) {
+        all_segments_sealed_prepare_ = true;
+        all_segments_sealed_commit_ = true;
+    } else {
+        all_segments_sealed_prepare_ = false;
+        all_segments_sealed_commit_ = false;
+    }
+}
 
 Vector<Pair<RowID, u64>> TableCache::PrepareAppendRanges(SizeT row_count, TransactionID transaction_id) {
     if (row_count > MAX_BLOCK_CAPACITY) {
@@ -33,21 +46,21 @@ Vector<Pair<RowID, u64>> TableCache::PrepareAppendRanges(SizeT row_count, Transa
     }
 
     Vector<Pair<RowID, u64>> ranges;
-    if (has_prepare_unsealed_segment_) {
+    if (all_segments_sealed_prepare_) {
         prepare_unsealed_segment_id_ = next_segment_id_;
         prepare_unsealed_segment_offset_ = row_count;
         ++next_segment_id_;
         ranges.emplace_back(RowID(prepare_unsealed_segment_id_, 0), row_count);
-        has_prepare_unsealed_segment_ = false;
+        all_segments_sealed_prepare_ = false;
     } else {
         if (prepare_unsealed_segment_offset_ + row_count < DEFAULT_SEGMENT_CAPACITY) {
             ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), row_count);
             prepare_unsealed_segment_offset_ += row_count;
-            has_prepare_unsealed_segment_ = false;
+            all_segments_sealed_prepare_ = false;
         } else if (prepare_unsealed_segment_offset_ + row_count == DEFAULT_SEGMENT_CAPACITY) {
             ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), row_count);
             prepare_unsealed_segment_offset_ += row_count;
-            has_prepare_unsealed_segment_ = true;
+            all_segments_sealed_prepare_ = true;
         } else {
             SizeT remaining = DEFAULT_SEGMENT_CAPACITY - prepare_unsealed_segment_offset_;
             ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), remaining);
@@ -55,7 +68,7 @@ Vector<Pair<RowID, u64>> TableCache::PrepareAppendRanges(SizeT row_count, Transa
             ++next_segment_id_;
             prepare_unsealed_segment_offset_ = row_count - remaining; // remaining rows must not exceed DEFAULT_SEGMENT_CAPACITY
             ranges.emplace_back(RowID(prepare_unsealed_segment_id_, 0), prepare_unsealed_segment_offset_);
-            has_prepare_unsealed_segment_ = false;
+            all_segments_sealed_prepare_ = false;
         }
     }
 
@@ -82,18 +95,18 @@ void TableCache::CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, Tran
         commit_unsealed_segment_id_ = range.first.segment_id_;
         commit_unsealed_segment_offset_ += range.second;
         if (commit_unsealed_segment_offset_ == DEFAULT_SEGMENT_CAPACITY) {
-            has_commit_unsealed_segment_ = true;
+            all_segments_sealed_commit_ = true;
         } else if (commit_unsealed_segment_offset_ > DEFAULT_SEGMENT_CAPACITY) {
             commit_unsealed_segment_offset_ -= DEFAULT_SEGMENT_CAPACITY;
-            has_commit_unsealed_segment_ = false;
+            all_segments_sealed_commit_ = false;
         } else {
-            has_commit_unsealed_segment_ = false;
+            all_segments_sealed_commit_ = false;
         }
     }
 }
 
 RowID TableCache::GetCommitUnsealedPosition() {
-    if (has_commit_unsealed_segment_) {
+    if (all_segments_sealed_commit_) {
         UnrecoverableError("No unsealed segment");
     }
     return RowID(commit_unsealed_segment_id_, commit_unsealed_segment_offset_);
@@ -117,4 +130,105 @@ SegmentID TableCache::GetCompactSegment() {
 }
 
 Pair<RowID, u64> TableCache::PrepareDumpIndexRange(u64 index_id) { return {RowID(), 0}; }
+
+void TableCache::AddTableIndexCache(const SharedPtr<TableIndexCache> &table_index_cache) {
+    auto [iter, insert_success] = index_cache_map_.emplace(table_index_cache->index_id(), table_index_cache);
+    if (!insert_success) {
+        UnrecoverableError(fmt::format("Table index cache with id: {} already exists", table_index_cache->index_id()));
+    }
+}
+
+void TableCache::DropTableIndexCache(u64 index_id) {
+    auto iter = index_cache_map_.find(index_id);
+    if (iter == index_cache_map_.end()) {
+        LOG_ERROR(fmt::format("Table index cache with id: {} not found", index_id));
+    }
+    index_cache_map_.erase(iter);
+}
+
+u64 DbCache::AddNewTableCache() {
+    u64 table_id = next_table_id_;
+    ++next_table_id_;
+    auto table_cache = MakeShared<TableCache>(db_id_, table_id);
+    this->AddTableCache(table_cache);
+    return table_id;
+}
+
+void DbCache::AddTableCache(const SharedPtr<TableCache> &table_cache) {
+    auto [iter, insert_success] = table_cache_map_.emplace(table_cache->table_id(), table_cache);
+    if (!insert_success) {
+        UnrecoverableError(fmt::format("Table cache with id: {} already exists", table_cache->table_id()));
+    }
+}
+void DbCache::DropTableCache(u64 table_id) {
+    auto iter = table_cache_map_.find(table_id);
+    if (iter == table_cache_map_.end()) {
+        LOG_ERROR(fmt::format("Table cache with id: {} not found", table_id));
+    }
+    table_cache_map_.erase(iter);
+}
+
+Tuple<u64, Status> SystemCache::AddNewDbCache(const String &db_name) {
+    std::unique_lock lock(cache_mtx_);
+    u64 db_id = next_db_id_;
+    auto db_cache = MakeShared<DbCache>(db_id, db_name, 0);
+    Status status = this->AddDbCacheNolock(db_cache);
+    if (!status.ok()) {
+        return {std::numeric_limits<u64>::max(), status};
+    }
+    ++next_db_id_;
+    return {db_id, status};
+}
+
+u64 SystemCache::AddNewTableCache(u64 db_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto iter = db_cache_map_.find(db_id);
+    if (iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    return iter->second->AddNewTableCache();
+}
+
+Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
+    auto [iter2, insert_success2] = db_name_map_.emplace(db_cache->db_name(), db_cache->db_id());
+    if (!insert_success2) {
+        return Status::DuplicateDatabase(db_cache->db_name());
+    }
+    auto [iter, insert_success] = db_cache_map_.emplace(db_cache->db_id(), db_cache);
+    if (!insert_success) {
+        UnrecoverableError(fmt::format("Db cache with id: {} already exists", db_cache->db_id()));
+    }
+    return Status::OK();
+}
+
+SharedPtr<DbCache> SystemCache::GetDbCache(u64 db_id) const {
+    std::unique_lock lock(cache_mtx_);
+    auto iter = db_cache_map_.find(db_id);
+    if (iter == db_cache_map_.end()) {
+        return nullptr;
+    }
+    return iter->second;
+}
+
+void SystemCache::DropDbCache(u64 db_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto cache_iter = db_cache_map_.find(db_id);
+    if (cache_iter == db_cache_map_.end()) {
+        LOG_ERROR(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    String db_name = cache_iter->second->db_name();
+    db_cache_map_.erase(cache_iter);
+    auto name_iter = db_name_map_.find(db_name);
+    if (name_iter == db_name_map_.end()) {
+        LOG_ERROR(fmt::format("Db name cache with name: {} not found", cache_iter->second->db_name()));
+    }
+    db_name_map_.erase(name_iter);
+}
+
+nlohmann::json SystemCache::ToJson() const {
+    nlohmann::json result;
+    std::unique_lock lock(cache_mtx_);
+    return result;
+}
+
 } // namespace infinity

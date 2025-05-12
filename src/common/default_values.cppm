@@ -300,7 +300,6 @@ export {
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
-    constexpr std::string_view USE_NEW_CATALOG_OPTION_NAME = "use_new_catalog";
     constexpr std::string_view REPLAY_WAL_OPTION_NAME = "replay_wal";
 
     // Variable name
@@ -333,13 +332,11 @@ export {
     constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "profile";                          // global
 
     // Use for meta key encoding
-    constexpr std::string_view LATEST_DATABASE_ID = "latest_database_id";
-    constexpr std::string_view LATEST_TABLE_ID = "latest_table_id";
-    constexpr std::string_view LATEST_COLUMN_ID = "latest_column_id";
-    constexpr std::string_view LATEST_INDEX_ID = "latest_index_id";
-    constexpr std::string_view LATEST_SEGMENT_ID = "latest_segment_id";
-    constexpr std::string_view LATEST_BLOCK_ID = "latest_block_id";
-    constexpr std::string_view LATEST_CHUNK_ID = "latest_chunk_id";
+    constexpr std::string_view NEXT_DATABASE_ID = "next_database_id";
+    constexpr std::string_view NEXT_TABLE_ID = "next_table_id";
+    constexpr std::string_view NEXT_COLUMN_ID = "next_column_id";
+    constexpr std::string_view NEXT_INDEX_ID = "next_index_id";
+    constexpr std::string_view NEXT_BLOCK_ID = "next_block_id";
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;

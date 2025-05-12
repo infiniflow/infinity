@@ -33,7 +33,6 @@ export constexpr std::string_view log_level = "log_level";
 
 export struct DefaultConfig {
     LogLevel default_log_level_{LogLevel::kInfo};
-    bool default_use_new_catalog_{true};
     bool default_log_to_stdout_{false};
     String default_log_dir_ = "/var/infinity/log";
     String default_catalog_dir_ = "/var/infinity/catalog";
@@ -96,7 +95,6 @@ public:
     LogLevel GetLogLevel();
 
     // Storage
-    bool UseNewCatalog();
     bool ReplayWal();
     String DataDir();
     String CatalogDir();
@@ -126,6 +124,7 @@ public:
     // Persistence
     String PersistenceDir();
     i64 PersistenceObjectSizeLimit();
+    bool is_vfs();
 
     // Buffer
     i64 BufferManagerSize();
@@ -186,7 +185,7 @@ private:
 
 
 private:
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     GlobalOptions global_options_;
     // record running query flag
     Atomic<bool> record_running_query_{false};

@@ -724,56 +724,14 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     SizeT task_n = knn_scan_operator->TaskletCount();
     KnnExpression *knn_expr = knn_scan_operator->knn_expression_.get();
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-
-    if (use_new_catalog) {
-        switch (fragment_context->ContextType()) {
-            case FragmentType::kSerialMaterialize: {
-                SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-                serial_materialize_fragment_ctx->knn_scan_shared_data_ =
-                    MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                  std::move(knn_scan_operator->block_metas_),
-                                                  std::move(knn_scan_operator->table_index_meta_),
-                                                  std::move(knn_scan_operator->segment_index_metas_),
-                                                  std::move(knn_expr->opt_params_),
-                                                  knn_expr->topn_,
-                                                  knn_expr->dimension_,
-                                                  1,
-                                                  knn_scan_operator->real_knn_query_embedding_ptr_,
-                                                  knn_scan_operator->real_knn_query_elem_type_,
-                                                  knn_expr->distance_type_);
-                break;
-            }
-            case FragmentType::kParallelMaterialize: {
-                ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
-                parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
-                    MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                  std::move(knn_scan_operator->block_metas_),
-                                                  std::move(knn_scan_operator->table_index_meta_),
-                                                  std::move(knn_scan_operator->segment_index_metas_),
-                                                  std::move(knn_expr->opt_params_),
-                                                  knn_expr->topn_,
-                                                  knn_expr->dimension_,
-                                                  1,
-                                                  knn_scan_operator->real_knn_query_embedding_ptr_,
-                                                  knn_scan_operator->real_knn_query_elem_type_,
-                                                  knn_expr->distance_type_);
-                break;
-            }
-            default: {
-                String error_message = "Invalid fragment type.";
-                UnrecoverableError(error_message);
-            }
-        }
-        return task_n;
-    }
     switch (fragment_context->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
             serial_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              std::move(knn_scan_operator->block_column_entries_),
-                                              std::move(knn_scan_operator->index_entries_),
+                                              std::move(knn_scan_operator->block_metas_),
+                                              std::move(knn_scan_operator->table_index_meta_),
+                                              std::move(knn_scan_operator->segment_index_metas_),
                                               std::move(knn_expr->opt_params_),
                                               knn_expr->topn_,
                                               knn_expr->dimension_,
@@ -787,8 +745,9 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              std::move(knn_scan_operator->block_column_entries_),
-                                              std::move(knn_scan_operator->index_entries_),
+                                              std::move(knn_scan_operator->block_metas_),
+                                              std::move(knn_scan_operator->table_index_meta_),
+                                              std::move(knn_scan_operator->segment_index_metas_),
                                               std::move(knn_expr->opt_params_),
                                               knn_expr->topn_,
                                               knn_expr->dimension_,

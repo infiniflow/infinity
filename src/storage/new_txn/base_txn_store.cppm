@@ -18,31 +18,124 @@ export module base_txn_store;
 
 import stl;
 import internal_types;
+import txn_state;
 
 namespace infinity {
 
 class DataBlock;
+class IndexBase;
 
-enum class TxnStoreType {
-    kInvalid,
-    kAppend,
-    kImport,
-    kDelete,
-    kUpdate,
-    kCreateIndex,
-    kDumpMemIndex,
-    kOptimizeIndex,
-    kCompact,
+export struct MemIndexRange {
+    String index_id_{};
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+    SegmentOffset start_offset_{};
+    SizeT row_count_{};
 };
 
-export struct BaseTxnStore {
-    explicit BaseTxnStore(TxnStoreType type) : type_(type) {};
+// enum class TxnStoreType {
+//     kInvalid,
+//     kCreateDB,
+//     kCreateTable,
+//     kAppend,
+//     kImport,
+//     kDelete,
+//     kUpdate,
+//     kCreateIndex,
+//     kDumpMemIndex,
+//     kOptimizeIndex,
+//     kCompact,
+// };
+// kCheckpoint, // Develop know it's a checkpoint txn
+// kRead,       // Developer know it's a read txn
+// kNormal,     // Developer doesn't know what type is this txn
+// kReplay,
+// kRecovery,
+// kNewCheckpoint,
+// kAppend,
+// kUpdate,
+// kImport,
+// kDumpMemIndex,
+// kOptimizeIndex,
+// kCreateIndex,
+// kDelete,
+// kCompact,
 
-    TxnStoreType type_{TxnStoreType::kInvalid};
+export struct BaseTxnStore {
+    explicit BaseTxnStore(TransactionType type) : type_(type) {};
+
+    TransactionType type_{TransactionType::kInvalid};
+};
+
+export struct CreateDBTxnStore : public BaseTxnStore {
+    CreateDBTxnStore() : BaseTxnStore(TransactionType::kCreateDB) {}
+
+    String db_name_{};
+    u64 db_id_{};
+    SharedPtr<String> comment_ptr_{};
+};
+
+export struct DropDBTxnStore : public BaseTxnStore {
+    DropDBTxnStore() : BaseTxnStore(TransactionType::kDropDB) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+};
+
+export struct CreateTableTxnStore : public BaseTxnStore {
+    CreateTableTxnStore() : BaseTxnStore(TransactionType::kCreateTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    u64 table_id_{};
+};
+
+export struct DropTableTxnStore : public BaseTxnStore {
+    DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+};
+
+export struct RenameTableTxnStore : public BaseTxnStore {
+    RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String old_table_name_{};
+    String table_id_str_{};
+    String new_table_name_{};
+};
+
+export struct CreateIndexTxnStore : public BaseTxnStore {
+    CreateIndexTxnStore() : BaseTxnStore(TransactionType::kCreateIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    SharedPtr<IndexBase> index_base_{};
+    u64 index_id_{};
+};
+
+export struct DropIndexTxnStore : public BaseTxnStore {
+    DropIndexTxnStore() : BaseTxnStore(TransactionType::kDropIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    String index_name_{};
+    String index_id_str_{};
 };
 
 export struct AppendTxnStore : public BaseTxnStore {
-    explicit AppendTxnStore() : BaseTxnStore(TxnStoreType::kAppend) {}
+    AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
 
     String db_name_{};
     String db_id_str_{};
@@ -52,11 +145,18 @@ export struct AppendTxnStore : public BaseTxnStore {
     u64 table_id_{};
 
     SharedPtr<DataBlock> input_block_{};
+    Vector<String> index_ids_{}; // indexes will be appended
+
+    // For data append
     Vector<Pair<RowID, u64>> row_ranges_{};
+
+    // For mem index
+    Vector<MemIndexRange> mem_indexes_to_append_{};
+    Vector<MemIndexRange> mem_indexes_to_dump_{};
 };
 
 export struct ImportTxnStore : public BaseTxnStore {
-    explicit ImportTxnStore() : BaseTxnStore(TxnStoreType::kImport) {}
+    ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
 
     String db_name_{};
     String db_id_str_{};

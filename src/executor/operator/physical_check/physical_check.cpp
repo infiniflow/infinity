@@ -104,7 +104,8 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
 
-    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(true, EntityTag::kSystem, std::nullopt);
+    bool is_vfs = query_context->global_config()->is_vfs();
+    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(is_vfs, EntityTag::kSystem, std::nullopt);
 
     auto meta_mismatch_size = meta_mismatch_entries.size();
     auto data_mismatch_size = data_mismatch_entries.size();
@@ -218,7 +219,8 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     }
 
     auto db_table_str = fmt::format("db_{}/tbl_{}", db_id_str, table_id_str);
-    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(true, EntityTag::kTable, db_table_str);
+    bool is_vfs = query_context->global_config()->is_vfs();
+    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(is_vfs, EntityTag::kTable, db_table_str);
 
     auto meta_mismatch_size = meta_mismatch_entries.size();
     auto data_mismatch_size = data_mismatch_entries.size();

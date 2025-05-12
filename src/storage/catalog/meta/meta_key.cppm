@@ -45,6 +45,17 @@ export struct DBMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
+export struct DBTagMetaKey final : public MetaKey {
+    DBTagMetaKey(String db_id_str, String tag_name) : MetaKey(MetaType::kDBTag), db_id_str_(std::move(db_id_str)), tag_name_(std::move(tag_name)) {}
+
+    String db_id_str_{};
+    String tag_name_{};
+    String value_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
 export struct TableMetaKey final : public MetaKey {
     TableMetaKey(String db_id_str, String table_id_str, const String &table_name)
         : MetaKey(MetaType::kTable), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}

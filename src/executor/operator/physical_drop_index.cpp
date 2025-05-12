@@ -48,21 +48,11 @@ bool PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *oper
         return true;
     }
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (!use_new_catalog) {
-        auto txn = query_context->GetTxn();
-        Status status = txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
+    NewTxn *new_txn = query_context->GetNewTxn();
+    Status status = new_txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
 
-        if (!status.ok()) {
-            operator_state->status_ = status;
-        }
-    } else {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        Status status = new_txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
-
-        if (!status.ok()) {
-            operator_state->status_ = status;
-        }
+    if (!status.ok()) {
+        operator_state->status_ = status;
     }
 
     // Generate the result
