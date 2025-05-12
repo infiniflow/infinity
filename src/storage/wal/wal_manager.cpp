@@ -545,7 +545,6 @@ void WalManager::NewFlush() {
             bottom_executor_->Submit(txn);
             // TODO: if txn is checkpoint, swap WAL file
         }
-        bottom_executor_->Wait();
         txn_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.

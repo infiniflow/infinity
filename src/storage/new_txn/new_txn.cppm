@@ -93,7 +93,6 @@ struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
 struct BaseTxnStore;
-struct TxnCommitterTask;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -677,8 +676,6 @@ private:
     // Used for new checkpoint
     TxnTimeStamp current_ckp_ts_{};
     SizeT wal_size_{};
-
-    SharedPtr<TxnCommitterTask> txn_committer_task_{nullptr};
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};

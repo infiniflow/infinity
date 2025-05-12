@@ -27,9 +27,7 @@ import status;
 namespace infinity {
 
 class TxnAllocator;
-class TxnCommitter;
 class TxnAllocatorTask;
-class TxnCommitterTask;
 class WalManager;
 class Storage;
 class NewTxn;
@@ -142,8 +140,6 @@ public:
 
     void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
-    void SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task);
-
 private:
     mutable std::mutex locker_{};
     Storage *storage_{};
@@ -178,7 +174,6 @@ private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
     SharedPtr<TxnAllocator> txn_allocator_{};
-    SharedPtr<TxnCommitter> txn_committer_{};
 };
 
 } // namespace infinity

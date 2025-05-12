@@ -79,7 +79,6 @@ import chunk_index_meta;
 import meta_key;
 import segment_entry;
 import txn_allocator_task;
-import txn_committer_task;
 import meta_type;
 import base_txn_store;
 
@@ -1189,12 +1188,6 @@ Status NewTxn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-    if (NeedToAllocate()) {
-        // Wait the commit task finish.
-        LOG_TRACE(fmt::format("Wait task finish: transaction: {}", txn_context_ptr_->txn_id_));
-        txn_committer_task_->Wait();
-        LOG_TRACE(fmt::format("Task finish: transaction: {}", txn_context_ptr_->txn_id_));
-    }
     PostCommit();
 
     return Status::OK();
@@ -2414,14 +2407,6 @@ void NewTxn::CommitBottom() {
     Status status = kv_instance_->Commit();
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
-    }
-
-    if (NeedToAllocate()) {
-        // Submit commit task to commit thread
-        LOG_TRACE(fmt::format("Submit task to commit: transaction: {}", txn_context_ptr_->txn_id_));
-        txn_committer_task_ = MakeShared<TxnCommitterTask>(this);
-        txn_mgr_->SubmitForCommit(txn_committer_task_);
-        LOG_TRACE(fmt::format("Task is committed: transaction: {}", txn_context_ptr_->txn_id_));
     }
 
     TxnTimeStamp commit_ts = this->CommitTS();

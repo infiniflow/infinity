@@ -39,8 +39,6 @@ import kv_store;
 import new_catalog;
 import txn_allocator;
 import txn_allocator_task;
-import txn_committer;
-import txn_committer_task;
 import storage;
 
 namespace infinity {
@@ -85,9 +83,6 @@ void NewTxnManager::Start() {
     txn_allocator_ = MakeShared<TxnAllocator>(storage_);
     txn_allocator_->Start();
 
-    txn_committer_ = MakeShared<TxnCommitter>(storage_);
-    txn_committer_->Start();
-
     is_running_.store(true, std::memory_order::relaxed);
     LOG_INFO("NewTxnManager is started.");
 }
@@ -97,9 +92,6 @@ void NewTxnManager::Stop() {
         // FIXME: protect the double stop, the double stop need to be fixed.
         return;
     }
-
-    txn_committer_->Stop();
-    txn_committer_.reset();
 
     txn_allocator_->Stop();
     txn_allocator_.reset();
@@ -623,19 +615,6 @@ void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
     allocator_map_.erase(commit_ts);
     return;
 }
-
-void NewTxnManager::SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task) {
-    // Check if the is_running_ is true
-    if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot put wal entry";
-        UnrecoverableError(error_message);
-    }
-    if (wal_mgr_ == nullptr) {
-        String error_message = "NewTxnManager is null";
-        UnrecoverableError(error_message);
-    }
-
-    txn_committer_->Submit(txn_committer_task);
 }
 
 } // namespace infinity
