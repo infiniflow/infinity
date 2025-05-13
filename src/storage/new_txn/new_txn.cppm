@@ -35,6 +35,8 @@ import txn_context;
 import column_def;
 import column_vector;
 import buffer_handle;
+import base_txn_store;
+
 namespace infinity {
 
 class KVInstance;
@@ -93,6 +95,7 @@ struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
 struct BaseTxnStore;
+struct TxnCommitterTask;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -160,6 +163,7 @@ public:
     Status PostReadTxnCommit();
 
     bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
+    bool CheckConflict2(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
 
     Status PrepareCommit(TxnTimeStamp commit_ts);
 
@@ -592,6 +596,18 @@ private:
     bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause);
+
+    bool CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
