@@ -99,6 +99,9 @@ CREATE TABLE db1.tb1 (
 );
 
 statement ok
+FLUSH DATA;
+
+statement ok
 SHOW TABLE tb1 INDEXES;
 
 statement ok
@@ -161,14 +164,14 @@ SHOW BUFFER;
 statement ok
 SHOW TRANSACTIONS;
 
-# statement ok
-# SHOW CATALOG;
+statement ok
+SHOW CATALOG;
 
-# statement ok
-# CHECK SYSTEM;
+statement ok
+CHECK SYSTEM;
 
-# statement ok
-# CHECK TABLE tb1;
+statement ok
+CHECK TABLE tb1;
 
-# statement ok
-# CHECK TABLE db1.tb1;
+statement ok
+CHECK TABLE db1.tb1;
