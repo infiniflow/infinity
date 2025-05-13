@@ -462,21 +462,6 @@ Status NewTxn::AppendInner(const String &db_name,
         }
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-
-    base_txn_store_ = MakeShared<AppendTxnStore>();
-    AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
-    append_txn_store->db_name_ = db_name;
-    append_txn_store->db_id_str_ = table_meta.db_id_str();
-    append_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
-    append_txn_store->table_name_ = table_name;
-    append_txn_store->table_id_str_ = table_meta.table_id_str();
-    append_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-    append_txn_store->input_block_ = input_block;
-
     auto append_command = MakeShared<WalCmdAppendV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ranges, input_block);
     RowID begin_row_id;
     Status status = table_meta.GetNextRowID(begin_row_id);
@@ -497,6 +482,23 @@ Status NewTxn::AppendInner(const String &db_name,
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<AppendTxnStore>();
+    AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
+    append_txn_store->db_name_ = db_name;
+    append_txn_store->db_id_str_ = table_meta.db_id_str();
+    append_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
+    append_txn_store->table_name_ = table_name;
+    append_txn_store->table_id_str_ = table_meta.table_id_str();
+    append_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
+    append_txn_store->input_block_ = input_block;
+    append_txn_store->row_ranges_ = append_command->row_ranges_;
+
     return Status::OK();
 }
 
@@ -510,6 +512,23 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     if (!status.ok()) {
         return status;
     }
+
+    /*
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<DeleteTxnStore>();
+    DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+    delete_txn_store->db_name_ = db_name;
+    delete_txn_store->db_id_str_ = db_meta->db_id_str();
+    delete_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+    delete_txn_store->table_name_ = table_name;
+    delete_txn_store->table_id_str_ = table_meta_opt->table_id_str();
+    delete_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
+    delete_txn_store->row_ids_ = row_ids;
+    */
 
     auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, db_meta->db_id_str(), table_name, table_meta_opt->table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
@@ -621,6 +640,21 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         return status;
     }
     {
+        // Put the data into local txn store
+        if (base_txn_store_ != nullptr) {
+            return Status::UnexpectedError("txn store is not null");
+        }
+
+        base_txn_store_ = MakeShared<CompactTxnStore>();
+        CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+        compact_txn_store->db_name_ = db_name;
+        compact_txn_store->db_id_str_ = table_meta.db_id_str();
+        compact_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
+        compact_txn_store->table_name_ = table_name;
+        compact_txn_store->table_id_str_ = table_meta.table_id_str();
+        compact_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
+        compact_txn_store->segment_ids_ = segment_ids;
+
         Vector<SegmentID> deprecated_segment_ids = segment_ids;
         Vector<WalSegmentInfo> segment_infos;
         segment_infos.emplace_back(*compact_state.new_segment_meta_, begin_ts);

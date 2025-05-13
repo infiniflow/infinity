@@ -919,10 +919,9 @@ TEST_P(TestTxnTable, createtable_dropdb_test) {
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn5->DropDatabase("db1", ConflictType::kError);
-
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn5);
@@ -936,7 +935,7 @@ TEST_P(TestTxnTable, createtable_dropdb_test) {
         //              t1      create table  commit (success)
         //              |----------|------------|
         //         |--------------------|-------------------------|
-        //        t2                    drop db              commit (fail)
+        //        t2                    drop db              commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -967,7 +966,7 @@ TEST_P(TestTxnTable, createtable_dropdb_test) {
         //              t1           create table  commit (success)
         //              |-----------------|------------|
         //         |--------------------|-------------------------|
-        //        t2                    drop db              commit (fail)
+        //        t2                    drop db              commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -1060,7 +1059,7 @@ TEST_P(TestTxnTable, createtable_dropdb_test) {
         //              t1                                      create table           commit (fail)
         //              |-------------------------------------------|---------------------------|
         //         |--------------------|-------------------------|
-        //        t2                    drop db              commit (success)
+        //        t2                    drop db              commit (sucess)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());

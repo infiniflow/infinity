@@ -397,7 +397,7 @@ TEST_P(TestTxnIndex, create_index_and_drop_db) {
     {
 
         // create index and drop db
-        //  t1            create index   commit (success)
+        //  t1            create index   commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -440,7 +440,7 @@ TEST_P(TestTxnIndex, create_index_and_drop_db) {
     {
 
         // create index and drop db
-        //                  t1                     create index   commit (success)
+        //                  t1                     create index   commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -723,7 +723,7 @@ TEST_P(TestTxnIndex, create_index_and_drop_table) {
     {
 
         // create index and drop db
-        //  t1            create index   commit (success)
+        //  t1            create index   commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop table  commit
@@ -773,7 +773,7 @@ TEST_P(TestTxnIndex, create_index_and_drop_table) {
     {
 
         // create index and drop db
-        //                  t1                     create index   commit (success)
+        //                  t1                     create index   commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop table  commit
