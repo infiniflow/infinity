@@ -2094,7 +2094,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2173,7 +2173,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2285,7 +2285,7 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2377,7 +2377,7 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2486,7 +2486,7 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2607,7 +2607,7 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2736,7 +2736,7 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2856,7 +2856,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2960,7 +2960,7 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
     }
 
     if (conflict) {
-        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->CompactInfo(), txn_store.CompactInfo());
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
     }
     return false;
@@ -2978,7 +2978,7 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
     return false;
 }
 
-bool NewTxn::CheckConflict2(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
+bool NewTxn::CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     bool conflict = this->CheckConflictTxnStore(check_txn.get(), conflict_reason, retry_query);
     if (conflict) {

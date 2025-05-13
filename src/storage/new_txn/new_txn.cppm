@@ -35,7 +35,6 @@ import txn_context;
 import column_def;
 import column_vector;
 import buffer_handle;
-import base_txn_store;
 
 namespace infinity {
 
@@ -96,6 +95,18 @@ enum class DumpIndexCause;
 struct IndexReader;
 struct BaseTxnStore;
 struct TxnCommitterTask;
+
+struct BaseTxnStore;
+struct CreateDBTxnStore;
+struct CreateTableTxnStore;
+struct AppendTxnStore;
+struct ImportTxnStore;
+struct AddColumnsTxnStore;
+struct DropColumnsTxnStore;
+struct CompactTxnStore;
+struct CreateIndexTxnStore;
+struct DumpMemIndexTxnStore;
+struct DeleteTxnStore;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -163,7 +174,7 @@ public:
     Status PostReadTxnCommit();
 
     bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
-    bool CheckConflict2(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
+    bool CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
 
     Status PrepareCommit(TxnTimeStamp commit_ts);
 
