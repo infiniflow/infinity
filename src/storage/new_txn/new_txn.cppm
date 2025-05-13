@@ -370,6 +370,9 @@ public:
 
     void SetTxnRollbacked();
 
+    void SetTxnBottomDone();
+    bool GetTxnBottomDone();
+
     void SetTxnRead();
 
     void SetTxnWrite();
@@ -696,6 +699,8 @@ public:
 
 private:
     Vector<ChunkInfoForCreateIndex> chunk_infos_; // For cleanup when create index is rollbacked
+
+    bool bottom_done_{false}; // TODO: Use a transaction state instead of a bool flag
 };
 
 } // namespace infinity

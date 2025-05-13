@@ -37,7 +37,7 @@ private:
 
 private:
     Atomic<bool> running_{true};
-    Vector<UniquePtr<BlockingQueue<NewTxn *>>> txn_queues_{};
+    Vector<SharedPtr<BlockingQueue<NewTxn *>>> txn_queues_{};
     Vector<Thread> executors_{};
 
     SizeT cnt_{0};

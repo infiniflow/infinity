@@ -22,6 +22,8 @@ import infinity_context;
 import new_txn;
 import txn_state;
 import extra_ddl_info;
+import logger;
+import third_party;
 
 using namespace infinity;
 
@@ -140,8 +142,8 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
 
-    SizeT thread_num = 4;
-    SizeT loop_num = 128;
+    SizeT thread_num = 2;
+    SizeT loop_num = 1280;
     Vector<std::thread> worker_threads;
 
     for (SizeT thread_i = 0; thread_i < thread_num; ++thread_i) {
@@ -151,16 +153,34 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                 Status status;
                 {
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+                    TransactionID txn_id = txn->TxnID();
+                    LOG_INFO(fmt::format("{} {} CreateDatabase", thread_i, txn_id));
                     status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
+                        if (!status.ok()) {
+                            LOG_WARN(fmt::format("{} {} CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                        } else {
+                            LOG_INFO(fmt::format("{} {} CreateDatabase CommitTxn success", thread_i, txn_id));
+                        }
+                    } else {
+                        LOG_WARN(fmt::format("{} {} CreateDatabase failed: {}", thread_i, txn_id, status.message()));
                     }
                 }
                 {
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
+                    TransactionID txn_id = txn->TxnID();
+                    LOG_INFO(fmt::format("{} {} DropDatabase", thread_i, txn->TxnID()));
                     status = txn->DropDatabase(*db_name, ConflictType::kError);
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
+                        if (!status.ok()) {
+                            LOG_WARN(fmt::format("{} {} DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                        } else {
+                            LOG_INFO(fmt::format("{} {} DropDatabase CommitTxn success", thread_i, txn_id));
+                        }
+                    } else {
+                        LOG_WARN(fmt::format("{} {} DropDatabase failed: {}", thread_i, txn_id, status.message()));
                     }
                 }
             }

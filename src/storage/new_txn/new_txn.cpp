@@ -995,6 +995,16 @@ TransactionType NewTxn::GetTxnType() const {
     return txn_context_ptr_->txn_type_;
 }
 
+void NewTxn::SetTxnBottomDone() {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    bottom_done_ = true;
+}
+
+bool NewTxn::GetTxnBottomDone() {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return bottom_done_;
+};
+
 bool NewTxn::NeedToAllocate() const {
     TransactionType txn_type = GetTxnType();
     switch (txn_type) {

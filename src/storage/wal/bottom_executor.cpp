@@ -28,11 +28,11 @@ namespace infinity {
 BottomExecutor::BottomExecutor(SizeT pool_size) {
     for (SizeT i = 0; i < pool_size; ++i) {
         String name = fmt::format("BottomExecutor_{}", i);
-        txn_queues_.emplace_back(MakeUnique<BlockingQueue<NewTxn *>>(name));
+        txn_queues_.emplace_back(MakeShared<BlockingQueue<NewTxn *>>(name));
         auto executor = [&, i] {
             Vector<NewTxn *> txns;
             while (running_.load()) {
-                bool got = txn_queues_[i]->TryDequeueBulk(txns);
+                bool got = txn_queues_[i]->TryDequeueBulkWait(txns, 10);
                 if (got) {
                     SizeT txns_size = txns.size();
                     for (SizeT i = 0; i < txns_size; ++i) {
@@ -49,8 +49,6 @@ BottomExecutor::BottomExecutor(SizeT pool_size) {
                     if (cnt_ == 0) {
                         cv_.notify_one();
                     }
-                } else {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
             }
         };

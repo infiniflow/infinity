@@ -152,7 +152,8 @@ private:
     KVStore *kv_store_;
 
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
-    Map<TxnTimeStamp, Pair<SharedPtr<NewTxn>, bool>> check_txns_; // sorted by commit ts
+    Deque<SharedPtr<NewTxn>> check_txns_;
+    Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
