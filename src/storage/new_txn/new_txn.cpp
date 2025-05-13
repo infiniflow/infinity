@@ -1983,16 +1983,16 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
 bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     switch (cmd.GetType()) {
         case WalCommandType::CREATE_DATABASE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::CREATE_TABLE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCreateTableV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCreateTableV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::APPEND_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdAppendV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdAppendV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::IMPORT_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdImportV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdImportV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::ADD_COLUMNS_V2: {
             return CheckConflictCmd(static_cast<const WalCmdAddColumnsV2 &>(cmd), previous_txn, cause, retry_query);
@@ -2001,19 +2001,19 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
             return CheckConflictCmd(static_cast<const WalCmdDropColumnsV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::COMPACT_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCompactV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCompactV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::CREATE_INDEX_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateIndexV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DUMP_INDEX_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdDumpIndexV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdDumpIndexV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DELETE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DROP_TABLE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdDropTableV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdDropTableV2 &>(cmd), previous_txn, cause, retry_query);
         }
         default: {
             return false;
@@ -2022,7 +2022,7 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
@@ -2048,7 +2048,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const SharedPtr<String> &table_name = cmd.table_def_->table_name();
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -2091,7 +2091,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     Set<SegmentID> segment_ids;
@@ -2140,6 +2140,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 // No conflict
                 break;
@@ -2153,7 +2169,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -2182,7 +2198,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
-
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2321,7 +2352,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     Set<SegmentID> segment_ids;
@@ -2466,7 +2497,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     if (cmd.dump_cause_ != DumpIndexCause::kOptimizeIndex)
@@ -2503,7 +2534,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
@@ -2513,6 +2544,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, S
             case WalCommandType::COMPACT_V2: {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
                     conflict = true;
                 }
                 break;
@@ -2529,7 +2576,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     //    const String &table_name = cmd.table_name_;
     for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
