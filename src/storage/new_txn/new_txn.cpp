@@ -322,6 +322,7 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
 }
 
 Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kCreateTable);
 
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -358,12 +359,17 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return Status::UnexpectedError("txn store is not null");
     }
 
+    if (!status.ok()) {
+        return status;
+    }
+
     base_txn_store_ = MakeShared<CreateTableTxnStore>();
     CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = *table_def->table_name();
+    txn_store->table_id_ = std::stoull(table_id_str);
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id_str, table_def);
     wal_entry_->cmds_.push_back(wal_command);
@@ -374,6 +380,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
 }
 
 Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kDropTable);
 
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -411,8 +418,10 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_id_str;
+    txn_store->table_id_ = std::stoull(table_id_str);
 
     auto wal_command = MakeShared<WalCmdDropTableV2>(db_name, db_meta->db_id_str(), table_name, table_id_str);
     wal_command->table_key_ = table_key;
@@ -424,6 +433,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
 }
 
 Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name) {
+    this->SetTxnType(TransactionType::kRenameTable);
 
     this->CheckTxnStatus();
     this->CheckTxn(db_name);

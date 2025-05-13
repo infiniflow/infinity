@@ -640,7 +640,7 @@ SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
     for (const auto &table_pair : table_map_) {
         MetaTableObject *meta_table_object = static_cast<MetaTableObject *>(table_pair.second.get());
         SharedPtr<TableCache> table_cache = meta_table_object->RestoreTableCache(storage_ptr);
-        db_cache->AddTableCache(table_cache);
+        db_cache->AddTableCacheNolock(table_cache);
     }
 
     return db_cache;
@@ -758,13 +758,11 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
 
 SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) const {
     auto table_key = static_cast<TableMetaKey *>(meta_key_.get());
-    u64 db_id = 0;
     u64 table_id = 0;
     SegmentID unsealed_segment_id = 0;
     SegmentOffset unsealed_segment_offset = 0;
     SegmentID next_segment_id = 0;
     try {
-        db_id = std::stoull(table_key->db_id_str_);
         table_id = std::stoull(table_key->table_id_str_);
         unsealed_segment_id = this->GetUnsealedSegmentID();
         unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
@@ -776,9 +774,9 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
 
     SharedPtr<TableCache> table_cache = nullptr;
     if (unsealed_segment_id == 0 and unsealed_segment_offset == 0) {
-        table_cache = MakeShared<TableCache>(db_id, table_id);
+        table_cache = MakeShared<TableCache>(table_id, table_key->table_name_);
     } else {
-        table_cache = MakeShared<TableCache>(db_id, table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
+        table_cache = MakeShared<TableCache>(table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
     }
 
     return table_cache;

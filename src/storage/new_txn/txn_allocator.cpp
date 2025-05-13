@@ -59,7 +59,6 @@ void TxnAllocator::Submit(SharedPtr<TxnAllocatorTask> task) {
 void TxnAllocator::Process() {
     bool running{true};
     Deque<SharedPtr<TxnAllocatorTask>> tasks;
-    NewCatalog *catalog = storage_->new_catalog();
     while (running) {
         task_queue_.DequeueBulk(tasks);
         // LOG_INFO(fmt::format("Receive tasks: {}", tasks.size()));
@@ -73,19 +72,18 @@ void TxnAllocator::Process() {
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
                 switch (txn_type) {
                     case TransactionType::kAppend: {
-                        AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store);
+                        AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
                         LOG_INFO(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
-                                             append_txn_store->db_name_,
-                                             append_txn_store->db_id_,
-                                             append_txn_store->table_name_,
-                                             append_txn_store->table_id_,
-                                             append_txn_store->input_block_->row_count()));
-                        SharedPtr<TableCache> table_cache = catalog->GetTableCache(append_txn_store->db_id_, append_txn_store->table_id_);
-                        if (table_cache.get() == nullptr) {
-                            Status status;
-                            std::tie(table_cache, status) = catalog->AddNewTableCache(append_txn_store->db_id_, append_txn_store->table_id_);
-                        }
-                        append_txn_store->row_ranges_ = table_cache->PrepareAppendRanges(append_txn_store->input_block_->row_count(), txn->TxnID());
+                                             txn_store->db_name_,
+                                             txn_store->db_id_,
+                                             txn_store->table_name_,
+                                             txn_store->table_id_,
+                                             txn_store->input_block_->row_count()));
+                        txn_store->row_ranges_ = system_cache_->PrepareAppendRanges(txn_store->db_id_,
+                                                                                    txn_store->table_id_,
+                                                                                    txn_store->input_block_->row_count(),
+                                                                                    txn->TxnID());
+
                         break;
                     }
                     case TransactionType::kUpdate: {

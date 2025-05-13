@@ -1500,36 +1500,4 @@ SharedPtr<TableCache> NewCatalog::GetTableCache(u64 db_id, u64 table_id) const {
     return table_iter->second;
 }
 
-Tuple<SharedPtr<TableCache>, Status> NewCatalog::AddNewTableCache(u64 db_id, u64 table_id) {
-    std::unique_lock lock(catalog_cache_mtx_);
-    auto db_iter = table_cache_map_.find(db_id);
-    if (db_iter == table_cache_map_.end()) {
-        table_cache_map_[db_id] = MakeShared<HashMap<u64, SharedPtr<TableCache>>>();
-        //  return Status::NotFound(fmt::format("Table cache with db id: {} not found", db_id));
-    }
-    SharedPtr<HashMap<u64, SharedPtr<TableCache>>> &db_map = table_cache_map_[db_id];
-    auto table_iter = db_map->find(table_id);
-    if (table_iter != db_map->end()) {
-        return {nullptr, Status::DuplicateEntry(fmt::format("Table cache with id: {} already exists", table_id))};
-    }
-    SharedPtr<TableCache> table_cache = MakeShared<TableCache>(db_id, table_id);
-    db_map->emplace(table_id, table_cache);
-    return {table_cache, Status::OK()};
-}
-
-Status NewCatalog::DropTableCache(u64 db_id, u64 table_id) {
-    std::unique_lock lock(catalog_cache_mtx_);
-    auto db_iter = table_cache_map_.find(db_id);
-    if (db_iter == table_cache_map_.end()) {
-        return Status::NotFound(fmt::format("Table cache with db id: {} not found", db_id));
-    }
-    SharedPtr<HashMap<u64, SharedPtr<TableCache>>> db_map = db_iter->second;
-    auto table_iter = db_map->find(table_id);
-    if (table_iter == db_map->end()) {
-        return Status::NotFound(fmt::format("Table cache with id: {} not found", table_id));
-    }
-    db_map->erase(table_iter);
-    return Status::OK();
-}
-
 } // namespace infinity

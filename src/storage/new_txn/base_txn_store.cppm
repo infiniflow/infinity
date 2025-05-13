@@ -98,8 +98,10 @@ export struct DropTableTxnStore : public BaseTxnStore {
 
     String db_name_{};
     String db_id_str_{};
+    u64 db_id_{};
     String table_name_{};
     String table_id_str_{};
+    u64 table_id_{};
 };
 
 export struct RenameTableTxnStore : public BaseTxnStore {

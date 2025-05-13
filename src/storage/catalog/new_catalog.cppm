@@ -197,10 +197,7 @@ public:
 
     SharedPtr<SystemCache> GetSystemCache() const;
 
-    u64 AddNewTableCache(u64 db_id);                                                // used by create table in allocation
-    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id); // used by append in allocation
     SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;             // used by append in allocation
-    Status DropTableCache(u64 db_id, u64 table_id);                                 // used by drop table in post commit
 private:
     KVStore *kv_store_{};
 

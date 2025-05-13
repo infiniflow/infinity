@@ -28,10 +28,9 @@ import index_base;
 
 namespace infinity {
 
-TableCache::TableCache(u64 db_id, u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
-    : db_id_(db_id), table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id),
-      prepare_unsealed_segment_offset_(unsealed_segment_offset), commit_unsealed_segment_id_(unsealed_segment_id),
-      commit_unsealed_segment_offset_(unsealed_segment_offset), next_segment_id_(next_segment_id) {
+TableCache::TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
+    : table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id), prepare_unsealed_segment_offset_(unsealed_segment_offset),
+      commit_unsealed_segment_id_(unsealed_segment_id), commit_unsealed_segment_offset_(unsealed_segment_offset), next_segment_id_(next_segment_id) {
     if (unsealed_segment_offset == DEFAULT_SEGMENT_CAPACITY) {
         all_segments_sealed_prepare_ = true;
         all_segments_sealed_commit_ = true;
@@ -147,21 +146,22 @@ void TableCache::DropTableIndexCacheNolock(u64 index_id) {
     index_cache_map_.erase(iter);
 }
 
-u64 DbCache::AddNewTableCache() {
-    u64 table_id = next_table_id_;
-    ++next_table_id_;
-    auto table_cache = MakeShared<TableCache>(db_id_, table_id);
-    this->AddTableCache(table_cache);
-    return table_id;
-}
-
-void DbCache::AddTableCache(const SharedPtr<TableCache> &table_cache) {
+void DbCache::AddNewTableCacheNolock(u64 table_id, const String &table_name) {
+    SharedPtr<TableCache> table_cache = MakeShared<TableCache>(table_id, table_name);
     auto [iter, insert_success] = table_cache_map_.emplace(table_cache->table_id(), table_cache);
     if (!insert_success) {
         UnrecoverableError(fmt::format("Table cache with id: {} already exists", table_cache->table_id()));
     }
 }
-void DbCache::DropTableCache(u64 table_id) {
+
+void DbCache::AddTableCacheNolock(const SharedPtr<TableCache> &table_cache) {
+    auto [iter, insert_success] = table_cache_map_.emplace(table_cache->table_id(), table_cache);
+    if (!insert_success) {
+        UnrecoverableError(fmt::format("Table cache with id: {} already exists", table_cache->table_id()));
+    }
+}
+
+void DbCache::DropTableCacheNolock(u64 table_id) {
     auto iter = table_cache_map_.find(table_id);
     if (iter == table_cache_map_.end()) {
         LOG_ERROR(fmt::format("Table cache with id: {} not found", table_id));
@@ -193,13 +193,26 @@ void SystemCache::DropDbCache(u64 db_id) {
     db_name_map_.erase(name_iter);
 }
 
-u64 SystemCache::AddNewTableCache(u64 db_id) {
+void SystemCache::AddNewTableCache(u64 db_id, u64 table_id, const String &table_name) {
     std::unique_lock lock(cache_mtx_);
-    auto iter = db_cache_map_.find(db_id);
-    if (iter == db_cache_map_.end()) {
+    auto db_iter = db_cache_map_.find(db_id);
+    if (db_iter == db_cache_map_.end()) {
         UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
     }
-    return iter->second->AddNewTableCache();
+
+    DbCache *db_cache = db_iter->second.get();
+    db_cache->AddNewTableCacheNolock(table_id, table_name);
+}
+
+void SystemCache::DropTableCache(u64 db_id, u64 table_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto db_iter = db_cache_map_.find(db_id);
+    if (db_iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+
+    DbCache *db_cache = db_iter->second.get();
+    db_cache->DropTableCacheNolock(table_id);
 }
 
 u64 SystemCache::AddNewTableSegment(u64 db_id, u64 table_id) {
@@ -241,6 +254,22 @@ Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const 
 }
 
 void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) { std::unique_lock lock(cache_mtx_); }
+
+Vector<Pair<RowID, u64>> SystemCache::PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto db_iter = db_cache_map_.find(db_id);
+    if (db_iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    DbCache *db_cache = db_iter->second.get();
+
+    auto table_iter = db_cache->table_cache_map_.find(table_id);
+    if (table_iter == db_cache->table_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
+    }
+    TableCache *table_cache = table_iter->second.get();
+    return table_cache->PrepareAppendRanges(row_count, txn_id);
+}
 
 Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
     auto [iter2, insert_success2] = db_name_map_.emplace(db_cache->db_name(), db_cache->db_id());

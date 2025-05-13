@@ -70,11 +70,11 @@ public:
 export class TableCache {
 public:
     // Used when the table is created
-    explicit TableCache(u64 db_id, u64 table_id)
-        : db_id_(db_id), table_id_(table_id), all_segments_sealed_prepare_(true), all_segments_sealed_commit_(true) {}
+    explicit TableCache(u64 table_id, const String &table_name_)
+        : table_id_(table_id), table_name_(table_name_), all_segments_sealed_prepare_(true), all_segments_sealed_commit_(true) {}
 
     // Used when system is restarted.
-    TableCache(u64 db_id, u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id);
+    TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id);
 
     // Getter
     bool has_prepared_unsealed_segment() const { return all_segments_sealed_prepare_; }
@@ -101,8 +101,8 @@ public:
 
     String ToString() const;
 
-    u64 db_id_{};
     u64 table_id_{};
+    String table_name_{};
 
     bool all_segments_sealed_prepare_{false};
     bool all_segments_sealed_commit_{false};
@@ -130,10 +130,10 @@ public:
 export struct DbCache {
 public:
     explicit DbCache(u64 db_id, const String &db_name, u64 next_table_id_) : db_id_(db_id), db_name_(db_name), next_table_id_(next_table_id_) {};
-    u64 AddNewTableCache();
 
-    void AddTableCache(const SharedPtr<TableCache> &table_cache);
-    void DropTableCache(u64 table_id);
+    void AddTableCacheNolock(const SharedPtr<TableCache> &table_cache);
+    void AddNewTableCacheNolock(u64 table_id, const String &table_name);
+    void DropTableCacheNolock(u64 table_id);
 
     u64 db_id() const { return db_id_; }
     const String &db_name() const { return db_name_; }
@@ -150,12 +150,15 @@ public:
     void AddNewDbCache(const String &db_name, u64 db_id);
     void DropDbCache(u64 db_id);
 
-    u64 AddNewTableCache(u64 db_id);
+    void AddNewTableCache(u64 db_id, u64 table_id, const String &table_name);
+    void DropTableCache(u64 db_id, u64 table_id);
 
     u64 AddNewTableSegment(u64 db_id, u64 table_id);
 
     Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const SharedPtr<IndexBase> &index_base);
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
+
+    Vector<Pair<RowID, u64>> PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);
 
     nlohmann::json ToJson() const;
 
