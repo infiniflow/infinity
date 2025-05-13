@@ -124,7 +124,7 @@ public:
     // Persistence
     String PersistenceDir();
     i64 PersistenceObjectSizeLimit();
-    bool is_vfs();
+    bool UseVFS();
 
     // Buffer
     i64 BufferManagerSize();

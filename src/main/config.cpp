@@ -2858,7 +2858,7 @@ i64 Config::PersistenceObjectSizeLimit() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPersistenceObjectSizeLimit);
 }
 
-bool Config::is_vfs() {
+bool Config::UseVFS() {
     std::lock_guard guard(mutex_);
     const auto persistence_dir = global_options_.GetStringValue(GlobalOptionIndex::kPersistenceDir);
     return !persistence_dir.empty();
