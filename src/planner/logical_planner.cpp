@@ -19,7 +19,7 @@ module;
 #include <string>
 #include <tuple>
 #include <vector>
-
+#include <optional>
 module logical_planner;
 
 import stl;
@@ -1938,6 +1938,27 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
             break;
         }
         case CheckStmtType::kTable: {
+
+            Optional<String> table_name = statement->table_name_;
+            if (!table_name.has_value()) {
+                String error_message = "Check statement missing table table_name.";
+                UnrecoverableError(error_message);
+            }
+
+            NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            String table_key;
+
+            if (!statement->schema_name_.has_value()) {
+                auto check_statement = const_cast<CheckStatement *>(statement);
+                check_statement->schema_name_ = query_context_ptr_->schema_name();
+            }
+            Optional<String> schema_name = statement->schema_name_;
+            Status status = new_txn->GetTableMeta(schema_name.value(), table_name.value(), db_meta, table_meta, &table_key);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
             this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(),
                                                            CheckStmtType::kTable,
                                                            statement->schema_name_,

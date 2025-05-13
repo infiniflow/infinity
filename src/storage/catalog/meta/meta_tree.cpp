@@ -941,13 +941,13 @@ Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs,
 
     for (auto &path : meta_path_set) {
         if (PathFilter(path, tag, db_table_str) && !data_path_set.contains(path)) {
-            data_mismatch_entry.emplace_back(path);
+            meta_mismatch_entry.emplace_back(path);
         }
     }
 
     for (auto &path : data_path_set) {
         if (PathFilter(path, tag, db_table_str) && !meta_path_set.contains(path)) {
-            meta_mismatch_entry.emplace_back(path);
+            data_mismatch_entry.emplace_back(path);
         }
     }
 
