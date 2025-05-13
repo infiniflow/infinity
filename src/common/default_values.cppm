@@ -289,6 +289,7 @@ export {
     constexpr std::string_view DENSE_INDEX_BUILDING_WORKER_OPTION_NAME = "dense_index_building_worker";
     constexpr std::string_view SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME = "sparse_index_building_worker";
     constexpr std::string_view FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME = "fulltext_index_building_worker";
+    constexpr std::string_view BOTTOM_EXECUTOR_WORKER_OPTION_NAME = "bottom_executor_worker";
 
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";

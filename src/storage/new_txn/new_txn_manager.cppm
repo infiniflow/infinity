@@ -27,9 +27,7 @@ import status;
 namespace infinity {
 
 class TxnAllocator;
-class TxnCommitter;
 class TxnAllocatorTask;
-class TxnCommitterTask;
 class WalManager;
 class Storage;
 class NewTxn;
@@ -116,7 +114,7 @@ public:
     WalManager *wal_manager() const { return wal_mgr_; }
     Storage *storage() const { return storage_; }
 
-    void CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id);
+    void CommitBottom(NewTxn *txn);
 
 private:
     void CleanupTxn(NewTxn *txn, bool commit);
@@ -143,9 +141,8 @@ public:
 
     void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
-    void SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task);
-
     void SetSystemCache();
+
 private:
     mutable std::mutex locker_{};
     Storage *storage_{};
@@ -158,7 +155,8 @@ private:
     KVStore *kv_store_;
 
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
-    Deque<SharedPtr<NewTxn>> check_txns_; //
+    Deque<SharedPtr<NewTxn>> check_txns_;
+    Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
@@ -181,7 +179,6 @@ private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
     SharedPtr<TxnAllocator> txn_allocator_{};
-    SharedPtr<TxnCommitter> txn_committer_{};
 };
 
 } // namespace infinity

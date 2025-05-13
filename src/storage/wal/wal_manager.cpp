@@ -64,6 +64,7 @@ import txn_state;
 import meta_info;
 import wal_entry;
 import block_index;
+import bottom_executor;
 
 module wal_manager;
 
@@ -75,8 +76,9 @@ WalManager::WalManager(Storage *storage,
                        u64 delta_checkpoint_interval_wal_bytes,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
-      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
-      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option),
+      bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
+      last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("WalManager");
 #endif
@@ -90,7 +92,8 @@ WalManager::WalManager(Storage *storage,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir), storage_(storage), running_(false), flush_option_(flush_option),
-      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+      bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
+      last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("WalManager");
 #endif
@@ -539,12 +542,7 @@ void WalManager::NewFlush() {
 
         // Commit bottom
         for (const auto &txn : txn_batch) {
-            TxnState txn_state = txn->GetTxnState();
-            if (txn_state == TxnState::kCommitting) {
-                txn->CommitBottom();
-            } else {
-                txn->RollbackBottom();
-            }
+            bottom_executor_->Submit(txn);
             // TODO: if txn is checkpoint, swap WAL file
         }
         txn_batch.clear();

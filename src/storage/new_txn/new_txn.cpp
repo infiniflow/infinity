@@ -79,7 +79,6 @@ import chunk_index_meta;
 import meta_key;
 import segment_entry;
 import txn_allocator_task;
-import txn_committer_task;
 import meta_type;
 import base_txn_store;
 
@@ -1091,6 +1090,16 @@ TransactionType NewTxn::GetTxnType() const {
     return txn_context_ptr_->txn_type_;
 }
 
+void NewTxn::SetTxnBottomDone() {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    bottom_done_ = true;
+}
+
+bool NewTxn::GetTxnBottomDone() {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return bottom_done_;
+};
+
 bool NewTxn::NeedToAllocate() const {
     TransactionType txn_type = GetTxnType();
     switch (txn_type) {
@@ -1288,12 +1297,6 @@ Status NewTxn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-    if (NeedToAllocate()) {
-        // Wait the commit task finish.
-        LOG_TRACE(fmt::format("Wait task finish: transaction: {}", txn_context_ptr_->txn_id_));
-        txn_committer_task_->Wait();
-        LOG_TRACE(fmt::format("Task finish: transaction: {}", txn_context_ptr_->txn_id_));
-    }
     PostCommit();
 
     return Status::OK();
@@ -2615,57 +2618,41 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
 }
 
 void NewTxn::CommitBottom() {
-    // update txn manager ts to commit_ts
-    // erase txn_id from not_committed_txns_
     TransactionID txn_id = this->TxnID();
     LOG_TRACE(fmt::format("Transaction commit bottom: {} start.", txn_id));
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kCommitting) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
+    // TODO: Append, Update, DumpMemoryIndex
 
-    // Try to commit rocksdb transaction
-    Status status = kv_instance_->Commit();
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
-    }
-
-    if (NeedToAllocate()) {
-        // Submit commit task to commit thread
-        LOG_TRACE(fmt::format("Submit task to commit: transaction: {}", txn_context_ptr_->txn_id_));
-        txn_committer_task_ = MakeShared<TxnCommitterTask>(this);
-        txn_mgr_->SubmitForCommit(txn_committer_task_);
-        LOG_TRACE(fmt::format("Task is committed: transaction: {}", txn_context_ptr_->txn_id_));
-    }
-
-    TxnTimeStamp commit_ts = this->CommitTS();
-    txn_mgr_->CommitBottom(commit_ts, txn_id);
-
-    // Notify the top half
-    std::unique_lock<std::mutex> lk(commit_lock_);
-    commit_bottom_done_ = true;
-    commit_cv_.notify_one();
-    LOG_TRACE(fmt::format("Transaction commit bottom: {} complete.", txn_id));
+    txn_mgr_->CommitBottom(this);
 }
 
 void NewTxn::RollbackBottom() {
-    // update txn manager ts to commit_ts
-    // erase txn_id from not_committed_txns_
     TransactionID txn_id = this->TxnID();
     LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kRollbacking) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
+    txn_mgr_->CommitBottom(this);
+}
 
-    TxnTimeStamp commit_ts = this->CommitTS();
-    txn_mgr_->CommitBottom(commit_ts, txn_id);
-
+void NewTxn::NotifyTopHalf() {
+    TxnState txn_state = this->GetTxnState();
+    if (txn_state == TxnState::kCommitting) {
+        // Try to commit rocksdb transaction
+        Status status = kv_instance_->Commit();
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
+        }
+    }
     // Notify the top half
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_bottom_done_ = true;
     commit_cv_.notify_one();
-    LOG_TRACE(fmt::format("Transaction rollback bottom: {} complete.", txn_id));
+    LOG_TRACE(fmt::format("Transaction {} notify top half, commit ts {}.", TxnID(), CommitTS()));
 }
 
 void NewTxn::PostCommit() {
@@ -3363,6 +3350,70 @@ void NewTxn::SetCompletion() {
 void NewTxn::WaitForCompletion() {
     std::unique_lock<std::mutex> lock(finished_mutex_);
     finished_cv_.wait(lock, [this] { return finished_; });
+}
+
+String NewTxn::GetTableIdStr() {
+    for (auto &command : wal_entry_->cmds_) {
+        WalCommandType command_type = command->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_TABLE_V2: {
+                auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
+                return create_table_cmd->table_id_;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
+                return drop_table_cmd->table_id_;
+            }
+            case WalCommandType::RENAME_TABLE_V2: {
+                auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
+                return rename_table_cmd->table_id_;
+            }
+            case WalCommandType::ADD_COLUMNS_V2: {
+                auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
+                return add_column_cmd->table_id_;
+            }
+            case WalCommandType::DROP_COLUMNS_V2: {
+                auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
+                return drop_column_cmd->table_id_;
+            }
+            case WalCommandType::CREATE_INDEX_V2: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
+                return create_index_cmd->table_id_;
+            }
+            case WalCommandType::DROP_INDEX_V2: {
+                auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
+                return drop_index_cmd->table_id_;
+            }
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
+                return dump_index_cmd->table_id_;
+            }
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
+                return append_cmd->table_id_;
+            }
+            case WalCommandType::DELETE_V2: {
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
+                return delete_cmd->table_id_;
+            }
+            case WalCommandType::IMPORT_V2: {
+                auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
+                return import_cmd->table_id_;
+            }
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
+                return compact_cmd->table_id_;
+            }
+            case WalCommandType::OPTIMIZE_V2: {
+                auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
+                return optimize_cmd->table_id_;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+    return "";
 }
 
 } // namespace infinity

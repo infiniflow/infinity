@@ -39,8 +39,6 @@ import kv_store;
 import new_catalog;
 import txn_allocator;
 import txn_allocator_task;
-import txn_committer;
-import txn_committer_task;
 import storage;
 import catalog_cache;
 import base_txn_store;
@@ -87,9 +85,6 @@ void NewTxnManager::Start() {
     txn_allocator_ = MakeShared<TxnAllocator>(storage_);
     txn_allocator_->Start();
 
-    txn_committer_ = MakeShared<TxnCommitter>(storage_);
-    txn_committer_->Start();
-
     is_running_.store(true, std::memory_order::relaxed);
     LOG_INFO("NewTxnManager is started.");
 }
@@ -99,9 +94,6 @@ void NewTxnManager::Stop() {
         // FIXME: protect the double stop, the double stop need to be fixed.
         return;
     }
-
-    txn_committer_->Stop();
-    txn_committer_.reset();
 
     txn_allocator_->Stop();
     txn_allocator_.reset();
@@ -272,6 +264,7 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     TxnTimeStamp commit_ts = prepare_commit_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     check_txns_.emplace_back(txn);
+    bottom_txns_.emplace(commit_ts, txn);
     if (txn->NeedToAllocate()) {
         allocator_map_.emplace(commit_ts, nullptr);
     }
@@ -292,6 +285,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
+    LOG_DEBUG(fmt::format("txn {} CheckConflict1 check_txns {}", txn->TxnID(), check_txns.size()));
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflict1(check_txn, conflict_reason, retry_query)) {
             return true;
@@ -490,16 +484,43 @@ TxnTimeStamp NewTxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
     std::lock_guard guard(locker_);
-
     return begin_txns_.empty() ? current_ts_ + 1 : begin_txns_.begin()->first;
 }
 
-void NewTxnManager::CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id) {
+void NewTxnManager::CommitBottom(NewTxn *txn) {
+    TxnTimeStamp commit_ts = txn->CommitTS();
+    TransactionID txn_id = txn->TxnID();
     std::lock_guard guard(locker_);
-    if (current_ts_ > commit_ts || commit_ts > prepare_commit_ts_) {
-        UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, commit_ts, prepare_commit_ts_));
+    auto iter = bottom_txns_.find(commit_ts);
+    if (iter == bottom_txns_.end()) {
+        String error_message = fmt::format("NewTxn: {} not found in check_txns_", txn_id);
+        UnrecoverableError(error_message);
     }
-    current_ts_ = commit_ts;
+    if (iter->second == nullptr) {
+        String error_message = fmt::format("NewTxn {} has already done bottom", txn_id);
+        UnrecoverableError(error_message);
+    }
+    if (iter->second->TxnID() != txn_id) {
+        String error_message = fmt::format("NewTxn {} and {} have the same commit ts {}", iter->second->TxnID(), txn_id, commit_ts);
+        UnrecoverableError(error_message);
+    }
+    iter->second->SetTxnBottomDone();
+
+    // ensure notify top half orderly per commit_ts
+    while (!bottom_txns_.empty()) {
+        auto iter = bottom_txns_.begin();
+        TxnTimeStamp it_ts = iter->first;
+        SharedPtr<NewTxn> it_txn = iter->second;
+        if (current_ts_ > it_ts || it_ts > prepare_commit_ts_) {
+            UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, it_ts, prepare_commit_ts_));
+        }
+        if (it_txn->GetTxnBottomDone() == false) {
+            break;
+        }
+        bottom_txns_.erase(iter);
+        current_ts_ = it_ts;
+        it_txn->NotifyTopHalf();
+    }
 }
 
 void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
@@ -549,7 +570,6 @@ void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
     }
     {
         std::lock_guard guard(locker_);
-
         SizeT remove_n = begin_txns_.erase({begin_ts, txn_id});
         if (remove_n == 0) {
             String error_message = fmt::format("NewTxn: {} not found in begin_txns_", txn_id);
@@ -686,20 +706,6 @@ void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
     }
     allocator_map_.erase(commit_ts);
     return;
-}
-
-void NewTxnManager::SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task) {
-    // Check if the is_running_ is true
-    if (is_running_.load() == false) {
-        String error_message = "NewTxnManager is not running, cannot put wal entry";
-        UnrecoverableError(error_message);
-    }
-    if (wal_mgr_ == nullptr) {
-        String error_message = "NewTxnManager is null";
-        UnrecoverableError(error_message);
-    }
-
-    txn_committer_->Submit(txn_committer_task);
 }
 
 void NewTxnManager::SetSystemCache() {

@@ -33,6 +33,7 @@ struct SegmentEntry;
 class Catalog;
 class CheckpointTaskBase;
 class ForceCheckpointTask;
+class BottomExecutor;
 
 struct WalEntry;
 struct WalCmdCreateDatabase;
@@ -211,6 +212,7 @@ private:
     // Only Flush thread access following members
     std::ofstream ofs_{};
     FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
+    UniquePtr<BottomExecutor> bottom_executor_{nullptr};
 
     // Flush and Checkpoint threads access following members
     mutable std::mutex mutex2_{};

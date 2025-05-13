@@ -14,39 +14,35 @@
 
 module;
 
-export module txn_committer;
+export module bottom_executor;
 
 import stl;
 import blocking_queue;
 
 namespace infinity {
 
-class Storage;
 class NewTxn;
-struct TxnCommitterTask;
 
-export class TxnCommitter {
+// BottomExecutor has a pool of threads, and executes transactions of a same table with the same thread orderly.
+export class BottomExecutor {
 public:
-    explicit TxnCommitter(Storage *storage);
-    virtual ~TxnCommitter();
+    explicit BottomExecutor(SizeT pool_size);
+    virtual ~BottomExecutor();
 
-    void Start();
-    void Stop();
-    void Submit(SharedPtr<TxnCommitterTask> task);
+    void Submit(NewTxn *txn);
+    void Wait();
 
 private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<TxnCommitterTask>> task_queue_{"TxnCommitterQueue"};
+    Atomic<bool> running_{true};
+    Vector<SharedPtr<BlockingQueue<NewTxn *>>> txn_queues_{};
+    Vector<Thread> executors_{};
 
-    Thread processor_thread_{};
-
-    Storage *storage_{};
-
-    Atomic<u64> task_count_{};
-
-    mutable std::mutex task_mutex_;
+    SizeT cnt_{0};
+    std::mutex mutex_{};
+    std::condition_variable cv_{};
 };
 
 } // namespace infinity
