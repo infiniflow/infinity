@@ -22,13 +22,8 @@ import infinity_context;
 import new_txn;
 import txn_state;
 import extra_ddl_info;
-<<<<<<< HEAD
 import third_party;
 import logger;
-=======
-import logger;
-import third_party;
->>>>>>> upstream/main
 
 using namespace infinity;
 

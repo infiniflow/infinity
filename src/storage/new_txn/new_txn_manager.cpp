@@ -205,6 +205,9 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
 bool NewTxnManager::SetTxnCheckpoint(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     std::lock_guard guard(locker_);
+    if(txn->txn_context()->txn_type_ == TransactionType::kNewCheckpoint) {
+        return true;
+    }
 
     if (ckp_begin_ts_ == UNCOMMIT_TS) {
         LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
