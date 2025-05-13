@@ -93,7 +93,6 @@ struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
 struct BaseTxnStore;
-struct TxnCommitterTask;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -167,6 +166,8 @@ public:
     void RollbackBottom();
 
     void CommitBottom();
+
+    void NotifyTopHalf();
 
     void PostCommit();
 
@@ -368,6 +369,9 @@ public:
     void SetTxnRollbacking(TxnTimeStamp rollback_ts);
 
     void SetTxnRollbacked();
+
+    void SetTxnBottomDone();
+    bool GetTxnBottomDone();
 
     void SetTxnRead();
 
@@ -626,6 +630,9 @@ public:
     Status Dummy();
     void SetWalSize(i64 wal_size);
 
+    // Get the table id which is used in the txn. Return empty string if no table is used.
+    String GetTableIdStr();
+
 private:
     HashMap<String, SizeT> mem_index_reference_count_{};
 
@@ -675,8 +682,6 @@ private:
     TxnTimeStamp current_ckp_ts_{};
     SizeT wal_size_{};
 
-    SharedPtr<TxnCommitterTask> txn_committer_task_{nullptr};
-
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
 
@@ -694,6 +699,8 @@ public:
 
 private:
     Vector<ChunkInfoForCreateIndex> chunk_infos_; // For cleanup when create index is rollbacked
+
+    bool bottom_done_{false}; // TODO: Use a transaction state instead of a bool flag
 };
 
 } // namespace infinity
