@@ -331,6 +331,8 @@ public:
 
     Status Append(const TableInfo &table_info, const SharedPtr<DataBlock> &input_block);
 
+    Status Update(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block, const Vector<RowID> &row_ids);
+
 private:
     Status AppendInner(const String &db_name,
                        const String &table_name,
@@ -597,28 +599,28 @@ private:
 
     // Check transaction conflicts
     bool CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause);
-    bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
 
     bool CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause);
-    bool CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause);
-    bool CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause);
-    bool CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause);
-    bool CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause);
+    bool CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);

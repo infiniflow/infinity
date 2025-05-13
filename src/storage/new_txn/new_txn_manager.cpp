@@ -285,7 +285,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
     LOG_DEBUG(fmt::format("txn {} CheckConflict1 check_txns {}", txn->TxnID(), check_txns.size()));
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
-        if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
+        if (txn->CheckConflict1(check_txn, conflict_reason, retry_query)) {
             return true;
         }
     }

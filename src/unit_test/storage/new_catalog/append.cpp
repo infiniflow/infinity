@@ -742,7 +742,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
@@ -774,7 +774,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -786,7 +786,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                   commit (success)
+    //    t1                                      append                                   commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
@@ -820,7 +820,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -832,7 +832,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
@@ -865,7 +865,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -877,7 +877,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
@@ -912,7 +912,7 @@ TEST_P(TestTxnAppend, test_append_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1166,7 +1166,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  droptable      commit (success)
@@ -1198,7 +1198,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
@@ -1216,7 +1216,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                   commit (success)
+    //    t1                                      append                                   commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  drop table   commit (success)
@@ -1250,7 +1250,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
@@ -1268,7 +1268,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  drop table   commit (success)
@@ -1302,7 +1302,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
@@ -1320,7 +1320,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  dropdb      commit (success)
@@ -1354,7 +1354,7 @@ TEST_P(TestTxnAppend, test_append_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);

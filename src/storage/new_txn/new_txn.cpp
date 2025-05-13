@@ -416,7 +416,9 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
-    txn_store->column_defs_ = column_defs;
+    for (auto &column_def : column_defs) {
+        txn_store->column_defs_.emplace_back(column_def.get());
+    }
 
     // Generate add column cmd
     auto wal_command = MakeShared<WalCmdAddColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_defs);
@@ -496,7 +498,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return Status::UnexpectedError("txn store is not null");
     }
 
-    base_txn_store_ = MakeShared<AddColumnsTxnStore>();
+    base_txn_store_ = MakeShared<DropColumnsTxnStore>();
     DropColumnsTxnStore *txn_store = static_cast<DropColumnsTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
@@ -1970,28 +1972,28 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
     TransactionType txn_type = base_txn_store_->type_;
     switch (txn_type) {
         case TransactionType::kCreateDB: {
-            return CheckConflictTxnStore(static_cast<const CreateDBTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const CreateDBTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kCreateTable: {
-            return CheckConflictTxnStore(static_cast<const CreateTableTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const CreateTableTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kAppend: {
-            return CheckConflictTxnStore(static_cast<const AppendTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const AppendTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kImport: {
-            return CheckConflictTxnStore(static_cast<const ImportTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const ImportTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kCompact: {
-            return CheckConflictTxnStore(static_cast<const CompactTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const CompactTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kCreateIndex: {
             return CheckConflictTxnStore(static_cast<const CreateIndexTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kDumpMemIndex: {
-            return CheckConflictTxnStore(static_cast<const DumpMemIndexTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const DumpMemIndexTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kDelete: {
-            return CheckConflictTxnStore(static_cast<const DeleteTxnStore &>(*base_txn_store_), previous_txn, cause);
+            return CheckConflictTxnStore(static_cast<const DeleteTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kAddColumn: {
             return CheckConflictTxnStore(static_cast<const AddColumnsTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
@@ -2005,20 +2007,19 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
     }
 }
 
-
 bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     switch (cmd.GetType()) {
         case WalCommandType::CREATE_DATABASE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::CREATE_TABLE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCreateTableV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCreateTableV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::APPEND_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdAppendV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdAppendV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::IMPORT_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdImportV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdImportV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::ADD_COLUMNS_V2: {
             return CheckConflictCmd(static_cast<const WalCmdAddColumnsV2 &>(cmd), previous_txn, cause, retry_query);
@@ -2027,16 +2028,16 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
             return CheckConflictCmd(static_cast<const WalCmdDropColumnsV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::COMPACT_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdCompactV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdCompactV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::CREATE_INDEX_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateIndexV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DUMP_INDEX_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdDumpIndexV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdDumpIndexV2 &>(cmd), previous_txn, cause, retry_query);
         }
         case WalCommandType::DELETE_V2: {
-            return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause);
+            return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause, retry_query);
         }
         default: {
             return false;
@@ -2045,7 +2046,7 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
     for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
@@ -2055,6 +2056,14 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
             case WalCommandType::CREATE_DATABASE_V2: {
                 auto *prev_cmd = static_cast<WalCmdCreateDatabaseV2 *>(wal_cmd.get());
                 if (prev_cmd->db_name_ == db_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
                     conflict = true;
                 }
                 break;
@@ -2071,7 +2080,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
@@ -2085,6 +2094,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2100,7 +2110,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const SharedPtr<String> &table_name = cmd.table_def_->table_name();
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -2123,6 +2133,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
                 }
                 break;
             }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == *table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2135,7 +2161,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -2157,6 +2183,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2164,6 +2191,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2179,7 +2207,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     Set<SegmentID> segment_ids;
@@ -2228,6 +2256,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 // No conflict
                 break;
@@ -2241,9 +2285,14 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
+    Set<SegmentID> segment_ids;
+    for (const auto &row_range : txn_store.row_ranges_) {
+        RowID row_id = row_range.first;
+        segment_ids.insert(row_id.segment_id_);
+    }
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
@@ -2265,10 +2314,20 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
+            break;
+        }
+        case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name &&
+                segment_ids.contains(dump_index_txn_store->segment_id_)) {
+                conflict = true;
+            }
+            break;
         }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2276,6 +2335,7 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2291,7 +2351,7 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
@@ -2320,7 +2380,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, S
                 }
                 break;
             }
-
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2333,7 +2408,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdImportV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -2357,10 +2432,12 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
+            break;
         }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2368,6 +2445,7 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2382,7 +2460,6 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
     }
     return false;
 }
-
 
 bool NewTxn::CheckConflictCmd(const WalCmdAddColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
@@ -2470,6 +2547,7 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2477,6 +2555,7 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2491,7 +2570,6 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
     }
     return false;
 }
-
 
 bool NewTxn::CheckConflictCmd(const WalCmdDropColumnsV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
@@ -2588,9 +2666,22 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
             }
             break;
         }
+        case TransactionType::kCreateIndex: {
+            CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name) {
+                for (const auto &column_name : txn_store.column_names_) {
+                    if (create_index_txn_store->index_base_->ContainsColumn(column_name)) {
+                        retry_query = false;
+                        conflict = true;
+                    }
+                }
+            }
+            break;
+        }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2598,6 +2689,7 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2613,7 +2705,7 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     Set<SegmentID> segment_ids;
@@ -2672,6 +2764,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
                 }
                 break;
             }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2684,7 +2792,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -2720,6 +2828,7 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2727,6 +2836,7 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2741,7 +2851,6 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
     }
     return false;
 }
-
 
 bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
@@ -2790,7 +2899,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
                     }
                 }
             }
-
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2811,7 +2935,8 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name && *create_index_txn_store->index_base_->index_name_ == index_name) {
+            if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name &&
+                *create_index_txn_store->index_base_->index_name_ == index_name) {
                 conflict = true;
             }
             break;
@@ -2837,9 +2962,22 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
             }
             break;
         }
+        case TransactionType::kDropColumn: {
+            DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
+                for (const auto &column_name : drop_columns_txn_store->column_names_) {
+                    if (txn_store.index_base_->ContainsColumn(column_name)) {
+                        retry_query = false;
+                        conflict = true;
+                    }
+                }
+            }
+            break;
+        }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2847,6 +2985,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2862,7 +3001,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
     return false;
 }
 
-bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = cmd.db_name_;
     const String &table_name = cmd.table_name_;
     if (cmd.dump_cause_ != DumpIndexCause::kOptimizeIndex)
@@ -2887,32 +3026,18 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
                 }
                 break;
             }
-            default: {
-                //
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
             }
-        }
-        if (conflict) {
-            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
-            return true;
-        }
-    }
-    return false;
-}
-
-bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
-    return false;
-}
-
-bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
-        bool conflict = false;
-        WalCommandType command_type = wal_cmd->GetType();
-        switch (command_type) {
-            case WalCommandType::COMPACT_V2: {
-                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
-                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
                     conflict = true;
                 }
                 break;
@@ -2929,7 +3054,81 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, S
     return false;
 }
 
-bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause) {
+bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.table_name_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kDropDB: {
+            DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        bool conflict = false;
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+        if (conflict) {
+            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
     bool conflict = false;
@@ -2944,6 +3143,7 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2951,6 +3151,7 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;

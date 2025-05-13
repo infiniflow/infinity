@@ -192,6 +192,7 @@ export struct DumpMemIndexTxnStore : public BaseTxnStore {
     String index_name_{};
     String index_id_str_{};
     u64 index_id_{};
+    SegmentID segment_id_{};
 
     String ToString() const final;
 };
@@ -206,7 +207,7 @@ export struct AddColumnsTxnStore : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
 
-    Vector<SharedPtr<ColumnDef>> column_defs_{};
+    Vector<ColumnDef *> column_defs_{};
 
     String ToString() const final;
 };
