@@ -230,7 +230,7 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
     {
         PrepareForCompact();
 
-        //  t1            compact     commit (success)
+        //  t1            compact     commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -248,12 +248,12 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
     }
     {
         PrepareForCompact();
 
-        //                  t1                     compact     commit (success)
+        //                  t1                     compact     commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -270,7 +270,7 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
         status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
     }
     {
         PrepareForCompact();
@@ -371,7 +371,7 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
     {
         PrepareForCompact();
 
-        //  t1            compact     commit (success)
+        //  t1            compact     commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop table    commit
@@ -389,14 +389,14 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         DropDB();
     }
     {
         PrepareForCompact();
 
-        //                  t1                     compact     commit (success)
+        //                  t1                     compact     commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop table    commit
@@ -413,7 +413,7 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
         status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         DropDB();
     }

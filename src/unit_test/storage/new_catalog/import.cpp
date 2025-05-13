@@ -731,7 +731,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //                            |----------------------|----------|
     //                           t2                  dropdb      commit (success)
@@ -761,7 +761,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -775,7 +775,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  dropdb      commit (success)
@@ -807,7 +807,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -853,7 +853,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -900,7 +900,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -945,7 +945,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1287,7 +1287,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //                            |----------------------|----------|
     //                           t2                  drop table   commit (success)
@@ -1317,7 +1317,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1337,7 +1337,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      import                                          commit (success)
+    //    t1      import                                          commit (fail)
     //    |----------|---------------------------------------------------|
     //          |----------------------|---------------|
     //         t2                  drop table    commit (success)
@@ -1369,7 +1369,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1421,7 +1421,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1474,7 +1474,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -1525,7 +1525,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);

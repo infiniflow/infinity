@@ -489,7 +489,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      delete                                            commit (success)
+    //    t1      delete                                            commit (fail)
     //    |----------|----------------------------------------------------|
     //                            |----------------------|----------|
     //                           t2                  drop db    commit (success)
@@ -530,7 +530,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -542,7 +542,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                        delete                                            commit (success)
+    //    t1                                        delete                                            commit (fail)
     //    |-------------------------------------------|----------------------------------------------------|
     //         |----------------------|----------|
     //        t2                  drop db    commit (success)
@@ -583,7 +583,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         status = txn4->Delete(*db_name, *table_name, row_ids);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -795,10 +795,10 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      delete                                            commit (success)
+    //    t1      delete                                            commit (fail)
     //    |----------|----------------------------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  drop db    commit (success)
+    //                           t2                  drop table    commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -836,7 +836,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -855,10 +855,10 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                        delete                                            commit (success)
+    //    t1                                        delete                                            commit (fail)
     //    |-------------------------------------------|----------------------------------------------------|
     //         |----------------------|----------|
-    //        t2                  drop db    commit (success)
+    //        t2                  drop table    commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -896,7 +896,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         status = txn4->Delete(*db_name, *table_name, row_ids);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
