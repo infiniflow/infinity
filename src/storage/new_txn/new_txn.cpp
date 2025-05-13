@@ -195,7 +195,7 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     String db_id_str;
     status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
     if (!status.ok()) {
-        return status;
+        return Status(status.code(), MakeUnique<String>(fmt::format("Fail to fetch next database id, {}", status.message())));
     }
 
     // Put the data into local txn store
@@ -665,8 +665,10 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(txn_store->db_id_str_);
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
+    txn_store->table_id_ = std::stoull(txn_store->table_id_str_);
     txn_store->index_base_ = index_base;
 
     auto wal_command =
@@ -742,10 +744,13 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(txn_store->db_id_str_);
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
+    txn_store->table_id_ = std::stoull(txn_store->table_id_str_);
     txn_store->index_name_ = index_name;
     txn_store->index_id_str_ = index_id;
+    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
 
     auto wal_command = MakeShared<WalCmdDropIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_name, index_id);
     wal_command->index_key_ = index_key;
@@ -2007,6 +2012,9 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
         case WalCommandType::DELETE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause);
         }
+        case WalCommandType::DROP_TABLE_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdDropTableV2 &>(cmd), previous_txn, cause);
+        }
         default: {
             return false;
         }
@@ -2059,6 +2067,14 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateTableV2 &cmd, NewTxn *previous_t
                 auto *prev_cmd = static_cast<WalCmdCreateTableV2 *>(wal_cmd.get());
                 const SharedPtr<String> &prev_table_name = prev_cmd->table_def_->table_name();
                 if (prev_cmd->db_name_ == db_name && *prev_table_name == *table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *prev_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                const String &db_name_to_drop = prev_cmd->db_name_;
+                if (db_name_to_drop == db_name) {
                     conflict = true;
                 }
                 break;
@@ -2422,8 +2438,22 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
                         }
                     }
                 }
+                break;
             }
-
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_database_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_database_cmd->db_name_ == db_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -2483,6 +2513,32 @@ bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, S
             case WalCommandType::COMPACT_V2: {
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+        if (conflict) {
+            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, String &cause) {
+    const String &db_name = cmd.db_name_;
+    //    const String &table_name = cmd.table_name_;
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        bool conflict = false;
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_database_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_database_cmd->db_name_ == db_name) {
                     conflict = true;
                 }
                 break;

@@ -233,7 +233,7 @@ u64 SystemCache::AddNewTableSegment(u64 db_id, u64 table_id) {
     return segment_id;
 }
 
-Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const SharedPtr<IndexBase> &index_base) {
+Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name) {
     std::unique_lock lock(cache_mtx_);
     auto db_iter = db_cache_map_.find(db_id);
     if (db_iter == db_cache_map_.end()) {
@@ -247,13 +247,31 @@ Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const 
     }
     TableCache *table_cache = table_iter->second.get();
     u64 index_id = table_cache->next_index_id_;
-    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, *index_base->index_name_);
+    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, index_name);
     table_cache->AddTableIndexCacheNolock(table_index_cache);
     ++table_cache->next_index_id_;
     return {0, Status::OK()};
 }
 
-void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) { std::unique_lock lock(cache_mtx_); }
+void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
+    std::unique_lock lock(cache_mtx_);
+    auto db_iter = db_cache_map_.find(db_id);
+    if (db_iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    DbCache *db_cache = db_iter->second.get();
+
+    auto table_iter = db_cache->table_cache_map_.find(table_id);
+    if (table_iter == db_cache->table_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
+    }
+    TableCache *table_cache = table_iter->second.get();
+    auto index_iter = table_cache->index_cache_map_.find(index_id);
+    if (index_iter == table_cache->index_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Table index cache with id: {} not found", index_id));
+    }
+    table_cache->DropTableIndexCacheNolock(index_id);
+}
 
 Vector<Pair<RowID, u64>> SystemCache::PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);

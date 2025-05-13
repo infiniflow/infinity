@@ -588,6 +588,7 @@ private:
     bool CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn, String &cause);
     bool CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause);
+    bool CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, String &cause);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);

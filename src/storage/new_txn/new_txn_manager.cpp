@@ -385,6 +385,24 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
                 }
                 break;
             }
+            case TransactionType::kCreateIndex: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                if (base_txn_store != nullptr) {
+                    // base_txn_store means the creation with ignore if exists
+                    CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store);
+                    system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                }
+                break;
+            }
+            case TransactionType::kDropIndex: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                // base_txn_store means the drop with ignore
+                if (base_txn_store != nullptr) {
+                    DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store);
+                    system_cache_->DropIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->index_id_);
+                }
+                break;
+            }
             default: {
                 break;
             }

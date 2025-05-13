@@ -155,7 +155,7 @@ public:
 
     u64 AddNewTableSegment(u64 db_id, u64 table_id);
 
-    Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const SharedPtr<IndexBase> &index_base);
+    Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
 
     Vector<Pair<RowID, u64>> PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);
