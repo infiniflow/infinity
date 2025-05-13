@@ -113,6 +113,7 @@ public:
     i64 DenseIndexBuildingWorker();
     i64 SparseIndexBuildingWorker();
     i64 FulltextIndexBuildingWorker();
+    i64 BottomExecutorWorker();
 
     StorageType StorageType();
     String ObjectStorageUrl();
