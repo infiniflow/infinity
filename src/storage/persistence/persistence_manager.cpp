@@ -136,7 +136,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     if (src_size == 0) {
         LOG_WARN(fmt::format("Persist empty local path {}", file_path));
         ObjAddr obj_addr(ObjAddr::KeyEmpty, 0, 0);
-        fs::remove(tmp_file_path, ec); // This cause the issue
+        fs::remove(tmp_file_path, ec); // This may cause the issue
         if (ec) {
             String error_message = fmt::format("Failed to remove {}", tmp_file_path);
             UnrecoverableError(error_message);

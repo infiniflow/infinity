@@ -16,8 +16,6 @@ module;
 
 #include <filesystem>
 #include <ranges>
-#include <string>
-#include <unordered_set>
 
 module meta_tree;
 
@@ -38,6 +36,7 @@ import new_catalog;
 import status;
 import kv_code;
 import catalog_cache;
+import check_statement;
 
 namespace infinity {
 
@@ -881,16 +880,16 @@ nlohmann::json MetaPmObject::ToJson() const {
     return json_res;
 }
 
-bool MetaTree::PathFilter(std::string_view path, EntityTag tag, Optional<String> db_table_str) {
+bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str) {
     switch (tag) {
-        case EntityTag::kSystem: {
+        case CheckStmtType::kSystem: {
             return true;
         }
-        case EntityTag::kTable: {
+        case CheckStmtType::kTable: {
             auto table_str = fmt::format("{}", db_table_str.value());
             return path.find(table_str) != String::npos;
         }
-        case EntityTag::kInvalid: {
+        case CheckStmtType::kInvalid: {
             UnrecoverableError("Invalid entity tag");
         }
         default:
@@ -913,8 +912,6 @@ HashSet<String> MetaTree::GetMetaPathSet() {
 
 HashSet<String> MetaTree::GetDataVfsPathSet() {
     HashSet<String> data_path_set;
-    // const auto *pm = InfinityContext::instance().persistence_manager();
-    // pm->SaveLocalPath();
     const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
     for (auto files = pm->GetAllFiles(); const auto &path : files | std::views::keys) {
         data_path_set.emplace(path);
@@ -933,7 +930,7 @@ HashSet<String> MetaTree::GetDataVfsOffPathSet() {
     return data_path_set;
 }
 
-Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<String> db_table_str) {
+Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str) {
     auto meta_path_set = this->GetMetaPathSet();
     auto data_path_set = is_vfs ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
 

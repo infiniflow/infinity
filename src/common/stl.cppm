@@ -337,6 +337,9 @@ using std::strncmp;
 // using std::literals;
 using std::localtime;
 using std::put_time;
+
+using std::views::keys;
+using std::views::values;
 } // namespace std
 
 namespace infinity {
