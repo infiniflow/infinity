@@ -121,10 +121,22 @@ export struct MetaPmObject final : public MetaObject {
     Map<String, SharedPtr<MetaKey>> path_map_{};
 };
 
+export enum class EntityTag {
+    kInvalid,
+    kSystem,
+    kTable,
+};
+
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
 public:
+    static bool PathFilter(std::string_view path, EntityTag tag, Optional<String> db_table_str);
+    HashSet<String> GetMetaPathSet();
+    static HashSet<String> GetDataVfsPathSet();
+    static HashSet<String> GetDataVfsOffPathSet();
+    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<String> db_table_str);
+
     Vector<MetaTableObject *> ListTables() const;
     SharedPtr<SystemCache> RestoreSystemCache(Storage* storage_ptr) const;
 

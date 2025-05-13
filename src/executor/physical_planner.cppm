@@ -152,6 +152,9 @@ private:
 
     // Explain
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    // Check
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCheck(const SharedPtr<LogicalNode> &logical_operator) const;
 };
 
 } // namespace infinity

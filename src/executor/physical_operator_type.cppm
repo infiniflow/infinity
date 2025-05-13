@@ -111,6 +111,8 @@ export enum class PhysicalOperatorType : i8 {
 
     kSink,
     kSource,
+
+    kCheck,
 };
 
 export String PhysicalOperatorToString(PhysicalOperatorType type);

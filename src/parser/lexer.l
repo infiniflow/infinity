@@ -53,6 +53,7 @@ CASE            { return CASE; }
 CAST            { return CAST; }
 CATALOG         { return CATALOG; }
 CATALOGS        { return CATALOGS; }
+CHECK           { return CHECK; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }

@@ -55,6 +55,7 @@ import logical_fusion;
 import logical_unnest;
 import logical_unnest_aggregate;
 import logical_node_type;
+import logical_check;
 import third_party;
 
 import base_expression;
@@ -81,6 +82,7 @@ import flush_statement;
 import optimize_statement;
 import logger;
 import show_statement;
+import check_statement;
 
 namespace infinity {
 
@@ -236,6 +238,10 @@ Status ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vecto
             break;
         case LogicalNodeType::kPrepare:
             break;
+        case LogicalNodeType::kCheck: {
+            Explain((LogicalCheck *)statement, result, intent_size);
+            break;
+        }
         default: {
             String error_message = "Unexpected logical node type";
             UnrecoverableError(error_message);
@@ -2590,6 +2596,54 @@ Status ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, SharedPtr<V
     while (std::getline(iss, line)) {
         result->emplace_back(MakeShared<String>(std::move(line)));
     }
+    return Status::OK();
+}
+
+Status ExplainLogicalPlan::Explain(const LogicalCheck *check_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    switch (check_node->check_type()) {
+        case CheckStmtType::kInvalid: {
+            String error_message = "Invalid check statement type";
+            UnrecoverableError(error_message);
+            break;
+        }
+        case CheckStmtType::kSystem: {
+            String check_ptr;
+            if (intent_size != 0) {
+                check_ptr = String(intent_size - 2, ' ');
+                check_ptr += "-> CHECK SYSTEM ";
+            } else {
+                check_ptr = "CHECK SYSTEM ";
+            }
+            check_ptr += "(";
+            check_ptr += std::to_string(check_node->node_id());
+            check_ptr += ")";
+            result->emplace_back(MakeShared<String>(check_ptr));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case CheckStmtType::kTable: {
+            String check_ptr;
+            if (intent_size != 0) {
+                check_ptr = String(intent_size - 2, ' ');
+                check_ptr += "-> CHECK TABLE ";
+            } else {
+                check_ptr = "CHECK TABLE ";
+            }
+            check_ptr += "(";
+            check_ptr += std::to_string(check_node->node_id());
+            check_ptr += ")";
+            result->emplace_back(MakeShared<String>(check_ptr));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+    }
+
     return Status::OK();
 }
 

@@ -458,6 +458,13 @@ export struct UnnestAggregateOperatorState : public OperatorState {
     inline explicit UnnestAggregateOperatorState() : OperatorState(PhysicalOperatorType::kUnnestAggregate) {}
 };
 
+//Check
+export struct CheckOperatorState : public OperatorState {
+    inline explicit CheckOperatorState() : OperatorState(PhysicalOperatorType::kCheck) {}
+
+    Vector<UniquePtr<DataBlock>> output_{};
+};
+
 // Source
 export enum class SourceStateType {
     kInvalid,

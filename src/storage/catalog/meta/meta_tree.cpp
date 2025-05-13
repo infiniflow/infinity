@@ -14,12 +14,16 @@
 
 module;
 
+#include <filesystem>
+#include <ranges>
 #include <string>
+#include <unordered_set>
 
 module meta_tree;
 
 import stl;
 import third_party;
+import infinity_context;
 import infinity_exception;
 import internal_types;
 import default_values;
@@ -875,6 +879,82 @@ nlohmann::json MetaPmObject::ToJson() const {
         json_res["paths"].push_back(path_pair.second->ToJson());
     }
     return json_res;
+}
+
+bool MetaTree::PathFilter(std::string_view path, EntityTag tag, Optional<String> db_table_str) {
+    switch (tag) {
+        case EntityTag::kSystem: {
+            return true;
+        }
+        case EntityTag::kTable: {
+            auto table_str = fmt::format("{}", db_table_str.value());
+            return path.find(table_str) != String::npos;
+        }
+        case EntityTag::kInvalid: {
+            UnrecoverableError("Invalid entity tag");
+        }
+        default:
+            return false;
+    }
+    return true;
+}
+
+HashSet<String> MetaTree::GetMetaPathSet() {
+    HashSet<String> meta_path_set;
+    for (auto &pm_obj : pm_object_map_ | std::views::values) {
+        for (auto &path : pm_obj->path_map_ | std::views::keys) {
+            // We don't need to check for duplicate paths since meta_tree has already done that.
+            meta_path_set.emplace(path);
+        }
+    }
+
+    return meta_path_set;
+}
+
+HashSet<String> MetaTree::GetDataVfsPathSet() {
+    HashSet<String> data_path_set;
+    // const auto *pm = InfinityContext::instance().persistence_manager();
+    // pm->SaveLocalPath();
+    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
+    for (auto files = pm->GetAllFiles(); const auto &path : files | std::views::keys) {
+        data_path_set.emplace(path);
+    }
+    return data_path_set;
+}
+
+HashSet<String> MetaTree::GetDataVfsOffPathSet() {
+    HashSet<String> data_path_set;
+    auto data_dir = InfinityContext::instance().config()->DataDir();
+    for (const auto &entry : std::filesystem::recursive_directory_iterator{data_dir}) {
+        if (std::filesystem::is_regular_file(entry)) {
+            data_path_set.emplace(entry.path().string());
+        }
+    }
+    return data_path_set;
+}
+
+Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, EntityTag tag, Optional<String> db_table_str) {
+    auto meta_path_set = this->GetMetaPathSet();
+    auto data_path_set = is_vfs ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
+
+    meta_path_set.merge(data_path_set);
+
+    Pair<Vector<String>, Vector<String>> mismatch_entries_pair;
+    auto &[meta_mismatch_entry, data_mismatch_entry] = mismatch_entries_pair;
+
+    for (auto &path : meta_path_set) {
+        if (PathFilter(path, tag, db_table_str) && !data_path_set.contains(path)) {
+            data_mismatch_entry.emplace_back(path);
+        }
+    }
+
+    for (auto &path : data_path_set) {
+        if (PathFilter(path, tag, db_table_str) && !meta_path_set.contains(path)) {
+            meta_mismatch_entry.emplace_back(path);
+        }
+    }
+
+    return mismatch_entries_pair;
 }
 
 } // namespace infinity
