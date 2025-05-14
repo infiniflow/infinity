@@ -40,6 +40,8 @@ import new_catalog;
 import txn_allocator;
 import txn_allocator_task;
 import storage;
+import catalog_cache;
+import base_txn_store;
 
 namespace infinity {
 
@@ -52,19 +54,19 @@ NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp s
 
     // auto kv_instance = kv_store_->GetInstance();
     // String db_string_id;
-    // Status status = kv_instance->Get(LATEST_DATABASE_ID.data(), db_string_id);
+    // Status status = kv_instance->Get(NEXT_DATABASE_ID.data(), db_string_id);
     // if (!status.ok()) {
-    //     kv_instance->Put(LATEST_DATABASE_ID.data(), "0");
+    //     kv_instance->Put(NEXT_DATABASE_ID.data(), "0");
     // }
     // String table_string_id;
-    // status = kv_instance->Get(LATEST_TABLE_ID.data(), table_string_id);
+    // status = kv_instance->Get(NEXT_TABLE_ID.data(), table_string_id);
     // if (!status.ok()) {
-    //     kv_instance->Put(LATEST_TABLE_ID.data(), "0");
+    //     kv_instance->Put(NEXT_TABLE_ID.data(), "0");
     // }
     // String index_string_id;
-    // status = kv_instance->Get(LATEST_INDEX_ID.data(), index_string_id);
+    // status = kv_instance->Get(NEXT_INDEX_ID.data(), index_string_id);
     // if (!status.ok()) {
-    //     kv_instance->Put(LATEST_INDEX_ID.data(), "0");
+    //     kv_instance->Put(NEXT_INDEX_ID.data(), "0");
     // }
     // status = kv_instance->Commit();
     // if (!status.ok()) {
@@ -203,6 +205,9 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
 bool NewTxnManager::SetTxnCheckpoint(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     std::lock_guard guard(locker_);
+    if(txn->txn_context()->txn_type_ == TransactionType::kNewCheckpoint) {
+        return true;
+    }
 
     if (ckp_begin_ts_ == UNCOMMIT_TS) {
         LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
@@ -333,9 +338,71 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
-        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
-            std::lock_guard guard(locker_);
-            ckp_begin_ts_ = UNCOMMIT_TS;
+        switch (txn->GetTxnType()) {
+            case TransactionType::kNewCheckpoint: {
+                std::lock_guard guard(locker_);
+                ckp_begin_ts_ = UNCOMMIT_TS;
+                break;
+            }
+            case TransactionType::kCreateDB: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                if (base_txn_store != nullptr) {
+                    // base_txn_store means the creation with ignore if exists
+                    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
+                    system_cache_->AddNewDbCache(txn_store->db_name_, txn_store->db_id_);
+                }
+
+                break;
+            }
+            case TransactionType::kDropDB: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                // base_txn_store means the drop with ignore
+                if (base_txn_store != nullptr) {
+                    DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
+                    system_cache_->DropDbCache(drop_db_txn_store->db_id_);
+                }
+
+                break;
+            }
+            case TransactionType::kCreateTable: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                if (base_txn_store != nullptr) {
+                    // base_txn_store means the creation with ignore if exists
+                    CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store);
+                    system_cache_->AddNewTableCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                }
+                break;
+            }
+            case TransactionType::kDropTable: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                // base_txn_store means the drop with ignore
+                if (base_txn_store != nullptr) {
+                    DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
+                    system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
+                }
+                break;
+            }
+            case TransactionType::kCreateIndex: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                if (base_txn_store != nullptr) {
+                    // base_txn_store means the creation with ignore if exists
+                    CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store);
+                    system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                }
+                break;
+            }
+            case TransactionType::kDropIndex: {
+                BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                // base_txn_store means the drop with ignore
+                if (base_txn_store != nullptr) {
+                    DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store);
+                    system_cache_->DropIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->index_id_);
+                }
+                break;
+            }
+            default: {
+                break;
+            }
         }
         this->CleanupTxn(txn, true);
     } else {
@@ -642,6 +709,11 @@ void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
     }
     allocator_map_.erase(commit_ts);
     return;
+}
+
+void NewTxnManager::SetSystemCache() {
+    system_cache_ = storage_->new_catalog()->GetSystemCache();
+    txn_allocator_->SetSystemCache(system_cache_);
 }
 
 } // namespace infinity

@@ -62,6 +62,7 @@ import data_access_state;
 import hnsw_util;
 import bmp_util;
 import defer_op;
+import base_txn_store;
 
 namespace infinity {
 
@@ -150,6 +151,22 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     if (!status.ok()) {
         return status;
     }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
+    DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
+    txn_store->table_name_ = table_name;
+    txn_store->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
+    txn_store->index_name_ = index_name;
+    txn_store->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
+    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
+    txn_store->segment_id_ = segment_index_meta.segment_id();
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
