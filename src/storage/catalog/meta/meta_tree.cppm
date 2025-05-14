@@ -21,6 +21,7 @@ import meta_type;
 import meta_key;
 import third_party;
 import internal_types;
+import check_statement;
 
 namespace infinity {
 
@@ -125,6 +126,12 @@ export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
 public:
+    static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
+    HashSet<String> GetMetaPathSet();
+    static HashSet<String> GetDataVfsPathSet();
+    static HashSet<String> GetDataVfsOffPathSet();
+    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str);
+
     Vector<MetaTableObject *> ListTables() const;
     SharedPtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
 

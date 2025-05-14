@@ -205,6 +205,14 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
+        case PhysicalOperatorType::kCheck: {
+            CheckOperatorState *check_output_state = static_cast<CheckOperatorState *>(task_op_state);
+            for (auto &data_block : check_output_state->output_) {
+                materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+            }
+            check_output_state->output_.clear();
+            break;
+        }
         default: {
             Status status = Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
             RecoverableError(status);

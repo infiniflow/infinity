@@ -53,6 +53,9 @@ String SegmentMetaKey::ToString() const {
 }
 
 String SegmentTagMetaKey::ToString() const {
+    if (tag_name_ == "fast_rough_filter") {
+        return fmt::format("segment_tag: {}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_));
+    }
     return fmt::format("segment_tag: {}:{}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_), value_);
 }
 
@@ -324,14 +327,13 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             SharedPtr<TableColumnMetaKey> table_column_meta_key = MakeShared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
             table_column_meta_key->value_ = value;
             return table_column_meta_key;
-        } else {
-            const String &db_id_str = fields[1];
-            const String &table_id_str = fields[2];
-            const String &tag_name_str = fields[3];
-            SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
-            table_tag_meta_key->value_ = value;
-            return table_tag_meta_key;
         }
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &tag_name_str = fields[3];
+        SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
+        table_tag_meta_key->value_ = value;
+        return table_tag_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "idx") {
@@ -367,11 +369,10 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             auto segment_index_tag_meta_key = MakeShared<SegmentIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, tag_name_str);
             segment_index_tag_meta_key->value_ = value;
             return segment_index_tag_meta_key;
-        } else {
-            auto segment_index_meta_key = MakeShared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
-            segment_index_meta_key->commit_ts_ = std::stoull(value);
-            return segment_index_meta_key;
         }
+        auto segment_index_meta_key = MakeShared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
+        segment_index_meta_key->commit_ts_ = std::stoull(value);
+        return segment_index_meta_key;
     }
 
     if (fields[0] == "idx_chunk") {
@@ -386,27 +387,26 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
                 MakeShared<ChunkIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id, tag_name_str);
             chunk_index_tag_meta_key->value_ = value;
             return chunk_index_tag_meta_key;
-        } else {
-            auto chunk_index_meta_key = MakeShared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
-            chunk_index_meta_key->commit_ts_ = std::stoull(value);
-            return chunk_index_meta_key;
         }
+        auto chunk_index_meta_key = MakeShared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
+        chunk_index_meta_key->commit_ts_ = std::stoull(value);
+        return chunk_index_meta_key;
     }
 
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
             const String &path_key = fields[2];
             SharedPtr<PmPathMetaKey> pm_path_meta_key = MakeShared<PmPathMetaKey>(path_key);
-            pm_path_meta_key->value_ = value;
+            pm_path_meta_key->value_ = value; //
             return pm_path_meta_key;
-        } else if (fields[1] == "object_stat") {
+        }
+        if (fields[1] == "object_stat") {
             const String &object_key = fields[2];
             SharedPtr<PmObjectMetaKey> pm_object_meta_key = MakeShared<PmObjectMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
-        } else {
-            UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
         }
+        UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
     }
 
     const String &tag_name_str = fields[0];

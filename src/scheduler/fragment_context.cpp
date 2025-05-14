@@ -496,6 +496,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kReadCache: {
             return MakeTaskStateTemplate<ReadCacheState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kCheck: {
+            return MakeTaskStateTemplate<CheckOperatorState>(physical_ops[operator_id]);
+        }
         default: {
             String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type()));
             UnrecoverableError(error_message);
@@ -1063,7 +1066,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kCompactFinish:
         case PhysicalOperatorType::kCompactIndexPrepare:
-        case PhysicalOperatorType::kReadCache: {
+        case PhysicalOperatorType::kReadCache:
+        case PhysicalOperatorType::kCheck: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -1174,7 +1178,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kExplain:
-        case PhysicalOperatorType::kShow: {
+        case PhysicalOperatorType::kShow:
+        case PhysicalOperatorType::kCheck: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
