@@ -84,11 +84,6 @@ void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *opera
     NewTxn *new_txn = query_context->GetNewTxn();
     checkpoint_task->new_txn_ = new_txn;
 
-    bool set_success = new_txn->txn_mgr()->SetTxnCheckpoint(new_txn);
-    if (!set_success) {
-        return;
-    }
-
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     bg_processor->Submit(checkpoint_task);
     checkpoint_task->Wait();

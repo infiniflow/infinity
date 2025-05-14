@@ -34,6 +34,16 @@ String DropTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, table_name_, table_id_str_);
 }
 
+String RenameTableTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, db_id: {}, old_table: {}, table_id: {}, new_table_name: {}",
+                       TransactionType2Str(type_),
+                       db_name_,
+                       db_id_str_,
+                       old_table_name_,
+                       table_id_str_,
+                       new_table_name_);
+}
+
 String CreateIndexTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index_id: {}",
                        TransactionType2Str(type_),

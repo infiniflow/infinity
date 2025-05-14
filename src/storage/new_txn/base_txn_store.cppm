@@ -108,8 +108,22 @@ export struct DropTableTxnStore : public BaseTxnStore {
 
     String db_name_{};
     String db_id_str_{};
+    u64 db_id_{};
     String table_name_{};
     String table_id_str_{};
+    u64 table_id_{};
+
+    String ToString() const final;
+};
+
+export struct RenameTableTxnStore : public BaseTxnStore {
+    RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String old_table_name_{};
+    String table_id_str_{};
+    String new_table_name_{};
 
     String ToString() const final;
 };
@@ -119,8 +133,10 @@ export struct CreateIndexTxnStore : public BaseTxnStore {
 
     String db_name_{};
     String db_id_str_{};
+    u64 db_id_{};
     String table_name_{};
     String table_id_str_{};
+    u64 table_id_{};
     SharedPtr<IndexBase> index_base_{};
     u64 index_id_{};
 
@@ -132,10 +148,13 @@ export struct DropIndexTxnStore : public BaseTxnStore {
 
     String db_name_{};
     String db_id_str_{};
+    u64 db_id_{};
     String table_name_{};
     String table_id_str_{};
+    u64 table_id_{};
     String index_name_{};
     String index_id_str_{};
+    u64 index_id_{};
 
     String ToString() const final;
 };

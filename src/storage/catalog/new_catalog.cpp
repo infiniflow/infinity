@@ -81,19 +81,19 @@ NewCatalog::~NewCatalog() = default;
 Status NewCatalog::Init(KVStore *kv_store) {
     auto kv_instance = kv_store->GetInstance();
     String db_string_id;
-    Status status = kv_instance->Get(LATEST_DATABASE_ID.data(), db_string_id);
+    Status status = kv_instance->Get(NEXT_DATABASE_ID.data(), db_string_id);
     if (!status.ok()) {
-        kv_instance->Put(LATEST_DATABASE_ID.data(), "0");
+        kv_instance->Put(NEXT_DATABASE_ID.data(), "0");
     }
     String table_string_id;
-    status = kv_instance->Get(LATEST_TABLE_ID.data(), table_string_id);
+    status = kv_instance->Get(NEXT_TABLE_ID.data(), table_string_id);
     if (!status.ok()) {
-        kv_instance->Put(LATEST_TABLE_ID.data(), "0");
+        kv_instance->Put(NEXT_TABLE_ID.data(), "0");
     }
     String index_string_id;
-    status = kv_instance->Get(LATEST_INDEX_ID.data(), index_string_id);
+    status = kv_instance->Get(NEXT_INDEX_ID.data(), index_string_id);
     if (!status.ok()) {
-        kv_instance->Put(LATEST_INDEX_ID.data(), "0");
+        kv_instance->Put(NEXT_INDEX_ID.data(), "0");
     }
     status = kv_instance->Commit();
     if (!status.ok()) {
@@ -618,7 +618,7 @@ Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_p
     // Read full checkpoint file
     // Status status;
     String value;
-    Status status = kv_store_->Get(LATEST_DATABASE_ID.data(), value);
+    Status status = kv_store_->Get(NEXT_DATABASE_ID.data(), value);
     if (status.ok()) {
         return status;
     }
@@ -691,7 +691,7 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
                 }
 
                 String db_id_str;
-                Status status = IncrLatestID(db_id_str, LATEST_DATABASE_ID);
+                Status status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
                 if (!status.ok()) {
                     return status;
                 }
@@ -739,7 +739,7 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
             }
 
             String table_id_str;
-            Status status = IncrLatestID(table_id_str, LATEST_TABLE_ID);
+            Status status = IncrLatestID(table_id_str, NEXT_TABLE_ID);
             if (!status.ok()) {
                 return status;
             }
@@ -903,7 +903,7 @@ Status NewCatalog::TransformCatalogBlockColumn(BlockMeta &block_meta, const nloh
 
 Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json) {
     String index_id_str;
-    Status status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
+    Status status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1468,7 +1468,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     SharedPtr<MetaTree> meta_tree = MetaTree::MakeMetaTree(meta_keys);
     LOG_INFO(meta_tree->ToJson().dump());
 
-    // system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
+    system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {
     //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
@@ -1484,25 +1484,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     return Status::OK();
 }
 
-SharedPtr<SystemCache> NewCatalog::GetSystemCache() const {
-    std::unique_lock lock(catalog_cache_mtx_);
-    return system_cache_;
-}
-
-u64 NewCatalog::AddNewDbCache() {
-    std::unique_lock lock(catalog_cache_mtx_);
-    u64 db_id = system_cache_->RequestNextDbID();
-    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, 0);
-    system_cache_->AddDbCache(db_cache);
-    return db_id;
-}
-
-SharedPtr<DbCache> NewCatalog::GetDbCache(u64 db_id) const {
-    std::unique_lock lock(catalog_cache_mtx_);
-    return system_cache_->GetDbCache(db_id);
-}
-
-void NewCatalog::DropDbCache(u64 db_id) { system_cache_->DropDbCache(db_id); }
+SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_; }
 
 SharedPtr<TableCache> NewCatalog::GetTableCache(u64 db_id, u64 table_id) const {
     std::unique_lock lock(catalog_cache_mtx_);
@@ -1516,38 +1498,6 @@ SharedPtr<TableCache> NewCatalog::GetTableCache(u64 db_id, u64 table_id) const {
         return nullptr;
     }
     return table_iter->second;
-}
-
-Tuple<SharedPtr<TableCache>, Status> NewCatalog::AddNewTableCache(u64 db_id, u64 table_id) {
-    std::unique_lock lock(catalog_cache_mtx_);
-    auto db_iter = table_cache_map_.find(db_id);
-    if (db_iter == table_cache_map_.end()) {
-        table_cache_map_[db_id] = MakeShared<HashMap<u64, SharedPtr<TableCache>>>();
-        //  return Status::NotFound(fmt::format("Table cache with db id: {} not found", db_id));
-    }
-    SharedPtr<HashMap<u64, SharedPtr<TableCache>>> &db_map = table_cache_map_[db_id];
-    auto table_iter = db_map->find(table_id);
-    if (table_iter != db_map->end()) {
-        return {nullptr, Status::DuplicateEntry(fmt::format("Table cache with id: {} already exists", table_id))};
-    }
-    SharedPtr<TableCache> table_cache = MakeShared<TableCache>(db_id, table_id);
-    db_map->emplace(table_id, table_cache);
-    return {table_cache, Status::OK()};
-}
-
-Status NewCatalog::DropTableCache(u64 db_id, u64 table_id) {
-    std::unique_lock lock(catalog_cache_mtx_);
-    auto db_iter = table_cache_map_.find(db_id);
-    if (db_iter == table_cache_map_.end()) {
-        return Status::NotFound(fmt::format("Table cache with db id: {} not found", db_id));
-    }
-    SharedPtr<HashMap<u64, SharedPtr<TableCache>>> db_map = db_iter->second;
-    auto table_iter = db_map->find(table_id);
-    if (table_iter == db_map->end()) {
-        return Status::NotFound(fmt::format("Table cache with id: {} not found", table_id));
-    }
-    db_map->erase(table_iter);
-    return Status::OK();
 }
 
 } // namespace infinity

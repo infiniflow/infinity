@@ -72,16 +72,17 @@ export enum class TransactionType {
     kAppend,
     kUpdate,
     kImport,
-    kDumpMemIndex,
-    kOptimizeIndex,
-    kCreateIndex,
     kDelete,
     kCompact,
     kCreateDB,
     kCreateTable,
     kDropDB,
     kDropTable,
+    kRenameTable,
+    kCreateIndex,
     kDropIndex,
+    kDumpMemIndex,
+    kOptimizeIndex,
     kAddColumn,
     kDropColumn
 };
@@ -135,6 +136,9 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kCreateTable: {
             return "CreateTable";
+        }
+        case TransactionType::kRenameTable: {
+            return "RenameTable";
         }
         case TransactionType::kDropDB: {
             return "DropDB";

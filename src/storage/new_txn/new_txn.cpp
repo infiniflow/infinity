@@ -167,6 +167,8 @@ void NewTxn::CheckTxn(const String &db_name) {
 
 // Database OPs
 Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
+    this->SetTxnType(TransactionType::kCreateDB);
+
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -183,16 +185,16 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
-        return Status(ErrorCode::kDuplicateDatabaseName, MakeUnique<String>(fmt::format("Database: {} already exists", db_name)));
+        return Status::DuplicateDatabase(db_name);
     }
     if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
 
-    String db_id;
-    status = IncrLatestID(db_id, LATEST_DATABASE_ID);
+    String db_id_str;
+    status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
     if (!status.ok()) {
-        return status;
+        return Status(status.code(), MakeUnique<String>(fmt::format("Fail to fetch next database id, {}", status.message())));
     }
 
     // Put the data into local txn store
@@ -201,17 +203,20 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     }
 
     base_txn_store_ = MakeShared<CreateDBTxnStore>();
-    CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
-    create_db_txn_store->db_name_ = db_name;
-    create_db_txn_store->comment_ptr_ = comment;
+    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->comment_ptr_ = comment;
+    txn_store->db_id_ = std::stoull(db_id_str);
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name, db_id, *comment);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name, db_id_str, *comment);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
 Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kDropDB);
+
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -316,6 +321,7 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
 }
 
 Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kCreateTable);
 
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -346,6 +352,9 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     }
 
     std::tie(table_id_str, status) = db_meta->GetNextTableID();
+    if (!status.ok()) {
+        return status;
+    }
 
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
@@ -358,8 +367,8 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = *table_def->table_name();
+    txn_store->table_id_ = std::stoull(table_id_str);
 
-    SharedPtr<String> local_table_dir = DetermineRandomPath(*table_def->table_name());
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id_str, table_def);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
@@ -367,11 +376,6 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     LOG_TRACE("NewTxn::CreateTable created table entry is inserted.");
     return Status::OK();
 }
-
-// Status NewTxn::RenameTable(TableEntry *old_table_entry, const String &new_table_name) {
-//     UnrecoverableError("Not implemented yet");
-//     return Status::OK();
-// }
 
 Status NewTxn::AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs) {
 
@@ -516,6 +520,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
 }
 
 Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kDropTable);
 
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -553,8 +558,10 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_id_str;
+    txn_store->table_id_ = std::stoull(table_id_str);
 
     auto wal_command = MakeShared<WalCmdDropTableV2>(db_name, db_meta->db_id_str(), table_name, table_id_str);
     wal_command->table_key_ = table_key;
@@ -566,6 +573,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
 }
 
 Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name) {
+    this->SetTxnType(TransactionType::kRenameTable);
 
     this->CheckTxnStatus();
     this->CheckTxn(db_name);
@@ -595,6 +603,19 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         return status;
     }
 
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<RenameTableTxnStore>();
+    RenameTableTxnStore *txn_store = static_cast<RenameTableTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->old_table_name_ = old_table_name;
+    txn_store->table_id_str_ = table_id_str;
+    txn_store->new_table_name_ = new_table_name;
+
     auto wal_command = MakeShared<WalCmdRenameTableV2>(db_name, db_meta->db_id_str(), old_table_name, table_id_str, new_table_name);
     wal_command->old_table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
@@ -619,7 +640,6 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
     table_names = *table_names_ptr;
     return Status::OK();
 }
-
 // Index OPs
 
 Status NewTxn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
@@ -656,7 +676,7 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     // Get latest index id and lock the id
     String index_id_str;
-    status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
+    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
     if (!status.ok()) {
         return status;
     }
@@ -670,8 +690,10 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(txn_store->db_id_str_);
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
+    txn_store->table_id_ = std::stoull(txn_store->table_id_str_);
     txn_store->index_base_ = index_base;
 
     auto wal_command =
@@ -747,10 +769,13 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(txn_store->db_id_str_);
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
+    txn_store->table_id_ = std::stoull(txn_store->table_id_str_);
     txn_store->index_name_ = index_name;
     txn_store->index_id_str_ = index_id;
+    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
 
     auto wal_command = MakeShared<WalCmdDropIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_name, index_id);
     wal_command->index_key_ = index_key;
@@ -1121,6 +1146,10 @@ bool NewTxn::NeedToAllocate() const {
 
 void NewTxn::SetTxnType(TransactionType type) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (txn_context_ptr_->txn_type_ == type) {
+        return;
+    }
+
     switch (txn_context_ptr_->txn_type_) {
         case TransactionType::kNormal: {
             txn_context_ptr_->txn_type_ = type;
@@ -1204,7 +1233,7 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 
 Status NewTxn::Commit() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
-    if ((wal_entry_->cmds_.empty() && txn_store_.ReadOnly() && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
+    if ((wal_entry_->cmds_.empty() && base_txn_store_ == nullptr && txn_store_.ReadOnly() && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
@@ -1253,7 +1282,7 @@ Status NewTxn::Commit() {
                 SharedPtr<TxnAllocatorTask> txn_allocator_task = MakeShared<TxnAllocatorTask>(this);
                 txn_mgr_->SubmitForAllocation(txn_allocator_task);
                 txn_allocator_task->Wait();
-                status = txn_allocator_task->status();
+                status = txn_allocator_task->status_;
                 // LOG_INFO(fmt::format("Finish allocation task: {}, transaction: {}", *this->GetTxnText(), txn_context_ptr_->txn_id_));
                 break;
             }
@@ -1486,7 +1515,7 @@ Status NewTxn::CommitReplayCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd)
     // IncreaseLatestDBID
     SizeT id_num = std::stoull(create_db_cmd->db_id_);
     ++id_num;
-    status = kv_instance_->Put(LATEST_DATABASE_ID.data(), fmt::format("{}", id_num));
+    status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
     return status;
 }
 
@@ -1753,6 +1782,23 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
     }
     return Status::OK();
 }
+//
+// Status NewTxn::CommitCreateDB() {
+//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+//
+//    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
+//    String db_id_str = std::to_string(txn_store->db_id_);
+//    Optional<DBMeeta> db_meta;
+//    Status status = NewCatalog::AddNewDB(kv_instance_.get(), db_id_str, commit_ts, txn_store->db_name_, txn_store->comment_ptr_.get(), db_meta);
+//    if (!status.ok()) {
+//        UnrecoverableError(status.message());
+//    }
+//
+//    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(txn_store->db_name_, db_id_str, *txn_store->comment_ptr_);
+//    wal_entry_->cmds_.push_back(wal_command);
+//    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+//    return Status::OK();
+//}
 
 Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -2038,6 +2084,9 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
         }
         case WalCommandType::DELETE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdDeleteV2 &>(cmd), previous_txn, cause, retry_query);
+        }
+        case WalCommandType::DROP_TABLE_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdDropTableV2 &>(cmd), previous_txn, cause, retry_query);
         }
         default: {
             return false;
@@ -2898,6 +2947,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateIndexV2 &cmd, NewTxn *previous_t
                         }
                     }
                 }
+                break;
             }
             case WalCommandType::DROP_TABLE_V2: {
                 auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
@@ -3034,10 +3084,70 @@ bool NewTxn::CheckConflictCmd(const WalCmdDumpIndexV2 &cmd, NewTxn *previous_txn
                 }
                 break;
             }
+            default: {
+                ;
+            }
+        }
+        if (conflict) {
+            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = cmd.db_name_;
+    const String &table_name = cmd.table_name_;
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        bool conflict = false;
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::COMPACT_V2: {
+                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    conflict = true;
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE_V2: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
+                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
             case WalCommandType::DROP_DATABASE_V2: {
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
                 if (drop_db_cmd->db_name_ == db_name) {
                     retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+        if (conflict) {
+            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = cmd.db_name_;
+    //    const String &table_name = cmd.table_name_;
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        bool conflict = false;
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_database_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_database_cmd->db_name_ == db_name) {
                     conflict = true;
                 }
                 break;
@@ -3082,48 +3192,6 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     if (conflict) {
         cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;
-    }
-    return false;
-}
-
-bool NewTxn::CheckConflictCmd(const WalCmdDeleteV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = cmd.db_name_;
-    const String &table_name = cmd.table_name_;
-    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
-        bool conflict = false;
-        WalCommandType command_type = wal_cmd->GetType();
-        switch (command_type) {
-            case WalCommandType::COMPACT_V2: {
-                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(wal_cmd.get());
-                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
-                    conflict = true;
-                }
-                break;
-            }
-            case WalCommandType::DROP_TABLE_V2: {
-                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(wal_cmd.get());
-                if (drop_table_cmd->db_name_ == db_name && drop_table_cmd->table_name_ == table_name) {
-                    retry_query = false;
-                    conflict = true;
-                }
-                break;
-            }
-            case WalCommandType::DROP_DATABASE_V2: {
-                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
-                if (drop_db_cmd->db_name_ == db_name) {
-                    retry_query = false;
-                    conflict = true;
-                }
-                break;
-            }
-            default: {
-                //
-            }
-        }
-        if (conflict) {
-            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
-            return true;
-        }
     }
     return false;
 }

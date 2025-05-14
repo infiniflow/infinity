@@ -22,8 +22,8 @@ import infinity_context;
 import new_txn;
 import txn_state;
 import extra_ddl_info;
-import logger;
 import third_party;
+import logger;
 
 using namespace infinity;
 
@@ -159,12 +159,13 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
-                            LOG_WARN(fmt::format("{} {} CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                            LOG_WARN(fmt::format("Thread: {}, loop: {}, CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
-                            LOG_INFO(fmt::format("{} {} CreateDatabase CommitTxn success", thread_i, txn_id));
+                            LOG_INFO(fmt::format("Thread: {}, loop: {}, CreateDatabase CommitTxn success", thread_i, txn_id));
                         }
                     } else {
-                        LOG_WARN(fmt::format("{} {} CreateDatabase failed: {}", thread_i, txn_id, status.message()));
+                        LOG_WARN(fmt::format("Thread: {}, loop: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
+                        status = new_txn_mgr->RollBackTxn(txn);
                     }
                 }
                 {
@@ -175,12 +176,13 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
-                            LOG_WARN(fmt::format("{} {} DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
+                            LOG_WARN(fmt::format("Thread: {}, loop: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
-                            LOG_INFO(fmt::format("{} {} DropDatabase CommitTxn success", thread_i, txn_id));
+                            LOG_INFO(fmt::format("Thread: {}, loop: {}, DropDatabase CommitTxn success", thread_i, txn_id));
                         }
                     } else {
-                        LOG_WARN(fmt::format("{} {} DropDatabase failed: {}", thread_i, txn_id, status.message()));
+                        LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
+                        status = new_txn_mgr->RollBackTxn(txn);
                     }
                 }
             }

@@ -594,7 +594,7 @@ Vector<MetaTableObject *> MetaTree::ListTables() const {
 
 SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
     u64 next_db_id{0};
-    auto tag_iter = system_tag_map_.find("latest_database_id");
+    auto tag_iter = system_tag_map_.find(NEXT_DATABASE_ID.data());
     if (tag_iter != system_tag_map_.end()) {
         try {
             next_db_id = std::stoull(tag_iter->second);
@@ -611,7 +611,7 @@ SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const 
     for (const auto &db_pair : db_map_) {
         MetaDBObject *meta_db_object = static_cast<MetaDBObject *>(db_pair.second.get());
         SharedPtr<DbCache> db_cache = meta_db_object->RestoreDbCache(storage_ptr);
-        system_cache->AddDbCache(db_cache);
+        system_cache->AddDbCacheNolock(db_cache);
     }
     return system_cache;
 }
@@ -636,11 +636,11 @@ SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
         String error_message = fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what());
         UnrecoverableError(error_message);
     }
-    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, 0);
+    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, db_key->db_name_, 0);
     for (const auto &table_pair : table_map_) {
         MetaTableObject *meta_table_object = static_cast<MetaTableObject *>(table_pair.second.get());
         SharedPtr<TableCache> table_cache = meta_table_object->RestoreTableCache(storage_ptr);
-        db_cache->AddTableCache(table_cache);
+        db_cache->AddTableCacheNolock(table_cache);
     }
 
     return db_cache;
@@ -758,13 +758,11 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
 
 SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) const {
     auto table_key = static_cast<TableMetaKey *>(meta_key_.get());
-    u64 db_id = 0;
     u64 table_id = 0;
     SegmentID unsealed_segment_id = 0;
     SegmentOffset unsealed_segment_offset = 0;
     SegmentID next_segment_id = 0;
     try {
-        db_id = std::stoull(table_key->db_id_str_);
         table_id = std::stoull(table_key->table_id_str_);
         unsealed_segment_id = this->GetUnsealedSegmentID();
         unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
@@ -776,9 +774,9 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
 
     SharedPtr<TableCache> table_cache = nullptr;
     if (unsealed_segment_id == 0 and unsealed_segment_offset == 0) {
-        table_cache = MakeShared<TableCache>(db_id, table_id);
+        table_cache = MakeShared<TableCache>(table_id, table_key->table_name_);
     } else {
-        table_cache = MakeShared<TableCache>(db_id, table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
+        table_cache = MakeShared<TableCache>(table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
     }
 
     return table_cache;
@@ -849,7 +847,7 @@ SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage 
         String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_index_key->ToString(), e.what());
         UnrecoverableError(error_message);
     }
-    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id);
+    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, table_index_key->index_name_);
     return table_index_cache;
 }
 
