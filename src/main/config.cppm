@@ -125,6 +125,7 @@ public:
     // Persistence
     String PersistenceDir();
     i64 PersistenceObjectSizeLimit();
+    bool UseVFS();
 
     // Buffer
     i64 BufferManagerSize();
@@ -185,7 +186,7 @@ private:
 
 
 private:
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     GlobalOptions global_options_;
     // record running query flag
     Atomic<bool> record_running_query_{false};

@@ -30,6 +30,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
 #include "statement/admin_statement.h"
+#include "statement/check_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -125,6 +126,7 @@ struct SQL_LTYPE {
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
     infinity::AdminStatement* admin_stmt;
+    infinity::CheckStatement* check_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -408,7 +410,7 @@ struct SQL_LTYPE {
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE
-%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY
+%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK
 
 %token NUMBER
 
@@ -431,6 +433,7 @@ struct SQL_LTYPE {
 %type <compact_stmt>      compact_statement
 %type <admin_stmt>        admin_statement
 %type <alter_stmt>        alter_statement
+%type <check_stmt>        check_statement
 
 %type <stmt_array>        statement_list
 
@@ -546,6 +549,7 @@ statement : create_statement { $$ = $1; }
 | compact_statement { $$ = $1; }
 | admin_statement { $$ = $1; }
 | alter_statement { $$ = $1; }
+| check_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -2653,6 +2657,22 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     }
     delete $7;
     free($3->schema_name_ptr_);
+    free($3->table_name_ptr_);
+    delete $3;
+}
+
+check_statement : CHECK SYSTEM {
+    $$ = new infinity::CheckStatement();
+    $$->check_type_ = infinity::CheckStmtType::kSystem;
+}
+| CHECK TABLE table_name {
+    $$ = new infinity::CheckStatement();
+    $$->check_type_ = infinity::CheckStmtType::kTable;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
 }

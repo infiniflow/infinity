@@ -2909,6 +2909,12 @@ i64 Config::PersistenceObjectSizeLimit() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPersistenceObjectSizeLimit);
 }
 
+bool Config::UseVFS() {
+    std::lock_guard guard(mutex_);
+    const auto persistence_dir = global_options_.GetStringValue(GlobalOptionIndex::kPersistenceDir);
+    return !persistence_dir.empty();
+}
+
 // Buffer
 i64 Config::BufferManagerSize() {
     std::lock_guard<std::mutex> guard(mutex_);

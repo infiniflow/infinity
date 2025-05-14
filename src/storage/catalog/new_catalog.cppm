@@ -160,6 +160,7 @@ private:
     Status RefactorPath(const String &path_key, String &fine_path, char delimiter);
     Status TransformData(const String &data_path, KVInstance *kv_instance, nlohmann::json *full_ckp_json, bool is_vfs);
     Map<String, String> dbname_to_idstr_;
+    Map<String, String> indexstr_to_idstr_;
     Set<String> dir_set_;
     static constexpr SizeT db_prefix_len_ = 14;    // XXXXXXXXXX_db_
     static constexpr SizeT table_prefix_len_ = 17; // XXXXXXXXXX_table_
@@ -193,11 +194,12 @@ private:
 
 public:
     SharedPtr<MetaTree> MakeMetaTree() const;
+    Vector<SharedPtr<MetaKey>> MakeMetaKeys() const;
     Status RestoreCatalogCache(Storage *storage_ptr);
 
     SharedPtr<SystemCache> GetSystemCache() const;
 
-    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;             // used by append in allocation
+    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;                                                  // used by append in allocation
 private:
     KVStore *kv_store_{};
 
@@ -290,6 +292,7 @@ private:
 
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
+    // bool is_vfs_{false};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);

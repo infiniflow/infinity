@@ -19,7 +19,7 @@ module;
 #include <string>
 #include <tuple>
 #include <vector>
-
+#include <optional>
 module logical_planner;
 
 import stl;
@@ -61,6 +61,7 @@ import logical_export;
 import logical_import;
 import logical_explain;
 import logical_command;
+import logical_check;
 import explain_logical_plan;
 import explain_ast;
 
@@ -240,6 +241,9 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
                 return Status::InvalidNodeRole("Attempt to write on non-writable node");
             }
             return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
+        }
+        case StatementType::kCheck: {
+            return BuildCheck(static_cast<const CheckStatement *>(statement), bind_context_ptr);
         }
         default: {
             UnrecoverableError("Invalid statement type.");
@@ -1373,7 +1377,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             if (storage_mode == StorageMode::kUnInitialized) {
                 UnrecoverableError("Uninitialized storage mode");
             }
-            
+
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
             this->logical_plan_ = logical_command;
             break;
@@ -1923,6 +1927,50 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     }
 
     this->logical_plan_ = explain_node;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+
+    switch (statement->check_type_) {
+        case CheckStmtType::kSystem: {
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(), CheckStmtType::kSystem, None, None);
+            break;
+        }
+        case CheckStmtType::kTable: {
+
+            Optional<String> table_name = statement->table_name_;
+            if (!table_name.has_value()) {
+                String error_message = "Check statement missing table table_name.";
+                UnrecoverableError(error_message);
+            }
+
+            NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            String table_key;
+
+            if (!statement->schema_name_.has_value()) {
+                auto check_statement = const_cast<CheckStatement *>(statement);
+                check_statement->schema_name_ = query_context_ptr_->schema_name();
+            }
+            Optional<String> schema_name = statement->schema_name_;
+            Status status = new_txn->GetTableMeta(schema_name.value(), table_name.value(), db_meta, table_meta, &table_key);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            this->logical_plan_ = MakeShared<LogicalCheck>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                           CheckStmtType::kTable,
+                                                           statement->schema_name_,
+                                                           statement->table_name_);
+            break;
+        }
+        default: {
+            String error_message = "Unexpected check statement type.";
+            UnrecoverableError(error_message);
+        }
+    }
+
     return Status::OK();
 }
 
