@@ -46,7 +46,6 @@ class IndexBase;
 export struct SegmentIndexPrepareInfo {
     SegmentID segment_id_{};
     ChunkID chunk_id_{};
-    SegmentOffset start_offset_{};
     SizeT row_count_{};
 };
 
@@ -58,6 +57,7 @@ export struct CreateIndexPrepareInfo {
 
 export struct ImportPrepareInfo {
     Vector<SegmentID> segment_ids_;
+    Vector<u64> row_counts_; // assigned by import operation in prepare commit phase. row count of each imported segment.
     Vector<CreateIndexPrepareInfo> indexes_;
 };
 
@@ -104,12 +104,11 @@ public:
 
 export struct SegmentCache {
 public:
-    SegmentCache(SegmentID segment_id, SegmentOffset segment_offset, u64 row_count)
-        : segment_id_(segment_id), segment_offset_(segment_offset), row_count_(row_count) {}
+    SegmentCache(SegmentID segment_id, SegmentOffset segment_offset, u64 row_count) : segment_id_(segment_id), row_count_(row_count) {}
 
     SegmentID segment_id_{};
-    SegmentOffset segment_offset_{};
     u64 row_count_{};
+    bool sealed_{false}; // true if the segment is sealed
 };
 
 export class TableCache {
@@ -139,8 +138,8 @@ public:
     RowID GetCommitUnsealedPosition();
 
     // Import segments
-    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegmentsNolock(u64 segment_count);
-    void CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &import_prepare_info);
+    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id);
+    void CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
 
     // Compact segments
     Tuple<SharedPtr<CompactPrepareInfo>, Status> PrepareCompactSegmentsNolock(const Vector<SegmentID> &segment_ids);
@@ -185,6 +184,8 @@ public:
     // Used by dump index / create index, index_id -> table_index_cache
     Map<u64, SharedPtr<TableIndexCache>> index_cache_map_{}; // index_id -> table_index_cache
     Map<String, u64> index_name_map_{};                      // index_name -> index_id
+
+    Map<TransactionID, SharedPtr<ImportPrepareInfo>> import_prepare_info_map_{}; // txn_id -> import_prepare_info
 };
 
 export struct DbCache {
@@ -228,8 +229,8 @@ public:
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
 
     // Import segments
-    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count);
-    void CommitImportSegments(u64 db_id, u64 table_id, const SharedPtr<ImportPrepareInfo> &import_prepare_info);
+    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id);
+    void CommitImportSegments(u64 db_id, u64 table_id, const SharedPtr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
 
     // Compact segments
     Tuple<SharedPtr<CompactPrepareInfo>, Status> PrepareCompactSegments(u64 db_id, u64 table_id, const Vector<SegmentID> &segment_ids);
