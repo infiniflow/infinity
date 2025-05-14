@@ -53,6 +53,9 @@ String SegmentMetaKey::ToString() const {
 }
 
 String SegmentTagMetaKey::ToString() const {
+    if (tag_name_ == "fast_rough_filter") {
+        return fmt::format("segment_tag: {}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_));
+    }
     return fmt::format("segment_tag: {}:{}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_), value_);
 }
 
