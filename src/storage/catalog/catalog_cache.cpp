@@ -40,7 +40,7 @@ TableCache::TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffse
     }
 }
 
-Vector<Pair<RowID, u64>> TableCache::PrepareAppendRanges(SizeT row_count, TransactionID transaction_id) {
+Vector<Pair<RowID, u64>> TableCache::PrepareAppendRangesNolock(SizeT row_count, TransactionID transaction_id) {
     if (row_count > MAX_BLOCK_CAPACITY) {
         UnrecoverableError(fmt::format("Attempt to prepare row_count: {} > MAX_BLOCK_CAPACITY: {}", row_count, MAX_BLOCK_CAPACITY));
     }
@@ -79,7 +79,7 @@ Vector<Pair<RowID, u64>> TableCache::PrepareAppendRanges(SizeT row_count, Transa
     return ranges;
 }
 
-void TableCache::CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id) {
+void TableCache::CommitAppendRangesNolock(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id) {
     for (const auto &range : ranges) {
         auto [row_offset, row_count, transaction] = prepared_append_ranges_.front();
         if (range.first != row_offset or range.second != row_count or transaction != txn_id) {
@@ -112,24 +112,65 @@ RowID TableCache::GetCommitUnsealedPosition() {
     return RowID(commit_unsealed_segment_id_, commit_unsealed_segment_offset_);
 }
 
-Vector<SegmentID> TableCache::GetNewSegmentsNolock(SizeT segment_count) {
-    Vector<SegmentID> segment_ids;
-    segment_ids.reserve(segment_count);
+// Import segments
+Tuple<SharedPtr<ImportPrepareInfo>, Status> TableCache::PrepareImportSegmentsNolock(u64 segment_count) {
+    SharedPtr<ImportPrepareInfo> import_prepare_info = MakeShared<ImportPrepareInfo>();
+    // Get the prepared segment id and insert into the import prepare info
     for (SizeT i = 0; i < segment_count; ++i) {
-        segment_ids.emplace_back(next_segment_id_);
+        SegmentID segment_id = next_segment_id_;
+        import_prepare_info->segment_ids_.emplace_back(segment_id);
         ++next_segment_id_;
     }
-    return segment_ids;
+
+    Vector<SegmentID> &segments = import_prepare_info->segment_ids_;
+
+    // Create index prepare info
+    for (const auto &index_pair : index_cache_map_) {
+        auto index_cache = index_pair.second;
+        CreateIndexPrepareInfo index_prepare_info;
+        index_prepare_info.index_id_ = index_cache->index_id_;
+        index_prepare_info.index_name_ = index_cache->index_name_;
+        index_prepare_info.segment_index_prepare_infos_.reserve(segment_count);
+        for (const SegmentID segment_id : segments) {
+            SegmentIndexPrepareInfo segment_index_prepare_info;
+            segment_index_prepare_info.segment_id_ = segment_id;
+            segment_index_prepare_info.chunk_id_ = 0; // chunk id should be zero
+            segment_index_prepare_info.start_offset_ = segment_cache_map_[segment_id]->segment_offset_;
+            segment_index_prepare_info.row_count_ = segment_cache_map_[segment_id]->row_count_;
+            index_prepare_info.segment_index_prepare_infos_.emplace_back(segment_index_prepare_info);
+        }
+        import_prepare_info->indexes_.emplace_back(index_prepare_info);
+    }
+
+    return {import_prepare_info, Status::OK()};
+}
+void TableCache::CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &import_prepare_info) { return; }
+
+// Compact segments
+Tuple<SharedPtr<CompactPrepareInfo>, Status> TableCache::PrepareCompactSegmentsNolock(const Vector<SegmentID> &segment_ids) {
+    return {nullptr, Status::OK()};
+}
+void TableCache::CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo> &import_prepare_info) { return; }
+
+// Optimize segments
+Tuple<SharedPtr<OptimizePrepareInfo>, Status> TableCache::PrepareOptimizeSegmentsNolock(const Vector<SegmentID> &segment_ids) {
+    return {nullptr, Status::OK()};
+}
+Tuple<SharedPtr<OptimizePrepareInfo>, Status> TableCache::PrepareOptimizeSegmentsNolock() { return {nullptr, Status::OK()}; }
+void TableCache::CommitOptimizeSegmentsNolock(const SharedPtr<OptimizePrepareInfo> &import_prepare_info) { return; }
+
+Tuple<SharedPtr<ImportPrepareInfo>, Status> TableCache::GetNewSegmentIDsNolock(SizeT segment_count) {
+    //    Vector<SegmentID> segment_ids;
+    //    segment_ids.reserve(segment_count);
+    //    for (SizeT i = 0; i < segment_count; ++i) {
+    //        segment_ids.emplace_back(next_segment_id_);
+    //        ++next_segment_id_;
+    //    }
+    //    return segment_ids;
+    return {nullptr, Status::OK()};
 }
 
-SegmentID TableCache::GetCompactSegment() {
-    // For debug, not to use next_segment_id_++
-    SegmentID segment_id = next_segment_id_;
-    next_segment_id_ += 1;
-    return segment_id;
-}
-
-Pair<RowID, u64> TableCache::PrepareDumpIndexRange(u64 index_id) { return {RowID(), 0}; }
+Pair<RowID, u64> TableCache::PrepareDumpIndexRangeNolock(u64 index_id) { return {RowID(), 0}; }
 
 void TableCache::AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache) {
     auto [iter, insert_success] = index_cache_map_.emplace(table_index_cache->index_id_, table_index_cache);
@@ -195,55 +236,27 @@ void SystemCache::DropDbCache(u64 db_id) {
 
 void SystemCache::AddNewTableCache(u64 db_id, u64 table_id, const String &table_name) {
     std::unique_lock lock(cache_mtx_);
-    auto db_iter = db_cache_map_.find(db_id);
-    if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
-    }
-
-    DbCache *db_cache = db_iter->second.get();
+    DbCache *db_cache = this->GetDbCacheNolock(db_id);
     db_cache->AddNewTableCacheNolock(table_id, table_name);
 }
 
 void SystemCache::DropTableCache(u64 db_id, u64 table_id) {
     std::unique_lock lock(cache_mtx_);
-    auto db_iter = db_cache_map_.find(db_id);
-    if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
-    }
-
-    DbCache *db_cache = db_iter->second.get();
+    DbCache *db_cache = this->GetDbCacheNolock(db_id);
     db_cache->DropTableCacheNolock(table_id);
 }
 
-Vector<SegmentID> SystemCache::AddNewTableSegment(u64 db_id, u64 table_id, u64 segment_count) {
+Tuple<SharedPtr<ImportPrepareInfo>, Status> SystemCache::PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count) {
     std::unique_lock lock(cache_mtx_);
-    auto db_iter = db_cache_map_.find(db_id);
-    if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
-    }
-    DbCache *db_cache = db_iter->second.get();
-
-    auto table_iter = db_cache->table_cache_map_.find(table_id);
-    if (table_iter == db_cache->table_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
-    }
-    TableCache *table_cache = table_iter->second.get();
-    return table_cache->GetNewSegmentsNolock(segment_count);
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
+    return table_cache->PrepareImportSegmentsNolock(segment_count);
 }
+
+void SystemCache::CommitImportSegments(u64 db_id, u64 table_id, const SharedPtr<ImportPrepareInfo> &import_prepare_info) {}
 
 Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name) {
     std::unique_lock lock(cache_mtx_);
-    auto db_iter = db_cache_map_.find(db_id);
-    if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
-    }
-    DbCache *db_cache = db_iter->second.get();
-
-    auto table_iter = db_cache->table_cache_map_.find(table_id);
-    if (table_iter == db_cache->table_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
-    }
-    TableCache *table_cache = table_iter->second.get();
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     u64 index_id = table_cache->next_index_id_;
     SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, index_name);
     table_cache->AddTableIndexCacheNolock(table_index_cache);
@@ -253,17 +266,7 @@ Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const 
 
 void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
     std::unique_lock lock(cache_mtx_);
-    auto db_iter = db_cache_map_.find(db_id);
-    if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
-    }
-    DbCache *db_cache = db_iter->second.get();
-
-    auto table_iter = db_cache->table_cache_map_.find(table_id);
-    if (table_iter == db_cache->table_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
-    }
-    TableCache *table_cache = table_iter->second.get();
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     auto index_iter = table_cache->index_cache_map_.find(index_id);
     if (index_iter == table_cache->index_cache_map_.end()) {
         UnrecoverableError(fmt::format("Table index cache with id: {} not found", index_id));
@@ -273,18 +276,14 @@ void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
 
 Vector<Pair<RowID, u64>> SystemCache::PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);
-    auto db_iter = db_cache_map_.find(db_id);
-    if (db_iter == db_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
-    }
-    DbCache *db_cache = db_iter->second.get();
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
+    return table_cache->PrepareAppendRangesNolock(row_count, txn_id);
+}
 
-    auto table_iter = db_cache->table_cache_map_.find(table_id);
-    if (table_iter == db_cache->table_cache_map_.end()) {
-        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
-    }
-    TableCache *table_cache = table_iter->second.get();
-    return table_cache->PrepareAppendRanges(row_count, txn_id);
+void SystemCache::CommitAppendRanges(u64 db_id, u64 table_id, const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id) {
+    std::unique_lock lock(cache_mtx_);
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
+    table_cache->CommitAppendRangesNolock(ranges, txn_id);
 }
 
 Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
@@ -306,6 +305,26 @@ SharedPtr<DbCache> SystemCache::GetDbCache(u64 db_id) const {
         return nullptr;
     }
     return iter->second;
+}
+
+DbCache *SystemCache::GetDbCacheNolock(u64 db_id) {
+    auto db_iter = db_cache_map_.find(db_id);
+    if (db_iter == db_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Db cache with id: {} not found", db_id));
+    }
+    DbCache *db_cache = db_iter->second.get();
+    return db_cache;
+}
+
+TableCache *SystemCache::GetTableCacheNolock(u64 db_id, u64 table_id) {
+    DbCache *db_cache = this->GetDbCacheNolock(db_id);
+
+    auto table_iter = db_cache->table_cache_map_.find(table_id);
+    if (table_iter == db_cache->table_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
+    }
+    TableCache *table_cache = table_iter->second.get();
+    return table_cache;
 }
 
 nlohmann::json SystemCache::ToJson() const {

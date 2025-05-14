@@ -43,6 +43,41 @@ namespace infinity {
 
 class IndexBase;
 
+export struct SegmentIndexPrepareInfo {
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+    SegmentOffset start_offset_{};
+    SizeT row_count_{};
+};
+
+export struct CreateIndexPrepareInfo {
+    u64 index_id_{};
+    String index_name_{};
+    Vector<SegmentIndexPrepareInfo> segment_index_prepare_infos_;
+};
+
+export struct ImportPrepareInfo {
+    Vector<SegmentID> segment_ids_;
+    Vector<CreateIndexPrepareInfo> indexes_;
+};
+
+export struct CompactPrepareInfo {
+    SegmentID new_segment_id_;
+    Vector<SegmentID> old_segment_ids_;
+    Vector<CreateIndexPrepareInfo> indexes_;
+};
+
+export struct OptimizeSegmentIndexPrepareInfo {
+    SegmentID new_segment_id_;
+    Vector<ChunkID> old_chunk_ids_;
+    ChunkID new_chunk_id_;
+};
+
+export struct OptimizePrepareInfo {
+    u64 index_id_{};
+    Vector<OptimizeSegmentIndexPrepareInfo> segment_index_prepare_infos_;
+};
+
 export struct SegmentIndexCache {
 public:
     explicit SegmentIndexCache(SegmentID segment_id) : segment_id_(segment_id) {}
@@ -67,6 +102,16 @@ public:
     Map<SegmentID, SharedPtr<SegmentIndexCache>> segment_index_cache_map_{}; // segment_id -> segment_index_cache
 };
 
+export struct SegmentCache {
+public:
+    SegmentCache(SegmentID segment_id, SegmentOffset segment_offset, u64 row_count)
+        : segment_id_(segment_id), segment_offset_(segment_offset), row_count_(row_count) {}
+
+    SegmentID segment_id_{};
+    SegmentOffset segment_offset_{};
+    u64 row_count_{};
+};
+
 export class TableCache {
 public:
     // Used when the table is created
@@ -88,13 +133,26 @@ public:
     SegmentID next_segment_id() const { return next_segment_id_; }
     u64 next_index_id() const { return next_index_id_; }
 
-    Vector<Pair<RowID, u64>> PrepareAppendRanges(SizeT row_count, TransactionID txn_id);
-    void CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id);
+    Vector<Pair<RowID, u64>> PrepareAppendRangesNolock(SizeT row_count, TransactionID txn_id);
+    void CommitAppendRangesNolock(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id);
+
     RowID GetCommitUnsealedPosition();
 
-    Vector<SegmentID> GetNewSegmentsNolock(SizeT segment_count);
-    SegmentID GetCompactSegment();
-    Pair<RowID, u64> PrepareDumpIndexRange(u64 index_id); // used by dump mem index and create index
+    // Import segments
+    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegmentsNolock(u64 segment_count);
+    void CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &import_prepare_info);
+
+    // Compact segments
+    Tuple<SharedPtr<CompactPrepareInfo>, Status> PrepareCompactSegmentsNolock(const Vector<SegmentID> &segment_ids);
+    void CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo> &import_prepare_info);
+
+    // Optimize segments
+    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegmentsNolock(const Vector<SegmentID> &segment_ids);
+    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegmentsNolock();
+    void CommitOptimizeSegmentsNolock(const SharedPtr<OptimizePrepareInfo> &import_prepare_info);
+
+    Tuple<SharedPtr<ImportPrepareInfo>, Status> GetNewSegmentIDsNolock(SizeT segment_count);
+    Pair<RowID, u64> PrepareDumpIndexRangeNolock(u64 index_id); // used by dump mem index and create index
 
     void AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache);
     void DropTableIndexCacheNolock(u64 index_id);
@@ -121,6 +179,8 @@ public:
 
     // Used by append
     Deque<Tuple<RowID, u64, TransactionID>> prepared_append_ranges_{};
+
+    Map<SegmentID, SharedPtr<SegmentCache>> segment_cache_map_{}; // segment_id -> segment_cache
 
     // Used by dump index / create index, index_id -> table_index_cache
     Map<u64, SharedPtr<TableIndexCache>> index_cache_map_{}; // index_id -> table_index_cache
@@ -159,14 +219,30 @@ public:
     // Drop table
     void DropTableCache(u64 db_id, u64 table_id);
 
-    // Get new segments
-    Vector<SegmentID> AddNewTableSegment(u64 db_id, u64 table_id, u64 segment_count);
-
     // Create index
     Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
+    Tuple<SharedPtr<CreateIndexPrepareInfo>, Status> PrepareNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
+    void CommitNewIndexCache(u64 db_id, u64 table_id, const SharedPtr<CreateIndexPrepareInfo> &index_prepare_info);
+
+    // Drop index
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
 
+    // Import segments
+    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count);
+    void CommitImportSegments(u64 db_id, u64 table_id, const SharedPtr<ImportPrepareInfo> &import_prepare_info);
+
+    // Compact segments
+    Tuple<SharedPtr<CompactPrepareInfo>, Status> PrepareCompactSegments(u64 db_id, u64 table_id, const Vector<SegmentID> &segment_ids);
+    void CommitCompactSegments(u64 db_id, u64 table_id, const SharedPtr<CompactPrepareInfo> &import_prepare_info);
+
+    // Optimize segments
+    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegments(u64 db_id, u64 table_id, const Vector<SegmentID> &segment_ids);
+    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegments(u64 db_id, u64 table_id);
+    void CommitOptimizeSegments(u64 db_id, u64 table_id, const SharedPtr<OptimizePrepareInfo> &import_prepare_info);
+
+    // Append and update
     Vector<Pair<RowID, u64>> PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);
+    void CommitAppendRanges(u64 db_id, u64 table_id, const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id);
 
     nlohmann::json ToJson() const;
 
@@ -175,6 +251,9 @@ public:
     SharedPtr<DbCache> GetDbCache(u64 db_id) const;
 
 private:
+    DbCache *GetDbCacheNolock(u64 db_id);
+    TableCache *GetTableCacheNolock(u64 db_id, u64 table_id);
+
     mutable std::mutex cache_mtx_{};
     u64 next_db_id_{};
     Map<u64, SharedPtr<DbCache>> db_cache_map_{}; // db_id -> db_cache
