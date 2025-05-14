@@ -334,7 +334,7 @@ public:
     Status Update(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block, const Vector<RowID> &row_ids);
 
 private:
-    Status GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block, Vector<Pair<RowID, u64>> &row_ranges);
+    Tuple<Vector<Pair<RowID, u64>>, Status> GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block);
 
     Status AppendInner(const String &db_name,
                        const String &table_name,

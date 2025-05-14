@@ -410,7 +410,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     }
 
     Vector<Pair<RowID, u64>> row_ranges;
-    status = GetRowRanges(*table_meta, input_block, row_ranges);
+    std::tie(row_ranges, status) = GetRowRanges(*table_meta, input_block);
     if (!status.ok()) {
         return status;
     }
@@ -437,11 +437,12 @@ Status NewTxn::Append(const TableInfo &table_info, const SharedPtr<DataBlock> &i
     return Append(*table_info.db_name_, *table_info.table_name_, input_block);
 }
 
-Status NewTxn::GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block, Vector<Pair<RowID, u64>> &row_ranges) {
+Tuple<Vector<Pair<RowID, u64>>, Status> NewTxn::GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block) {
+    Vector<Pair<RowID, u64>> row_ranges;
     RowID begin_row_id;
     Status status = table_meta.GetNextRowID(begin_row_id);
     if (!status.ok()) {
-        return status;
+        return {row_ranges, status};
     }
     SizeT left_rows = input_block->row_count();
     while (left_rows > 0) {
@@ -454,7 +455,7 @@ Status NewTxn::GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &
         begin_row_id = RowID(segment_id + 1, 0);
     }
 
-    return Status::OK();
+    return {row_ranges, Status::OK()};
 }
 
 Status NewTxn::AppendInner(const String &db_name,
@@ -554,7 +555,7 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
     }
 
     Vector<Pair<RowID, u64>> row_ranges;
-    status = GetRowRanges(*table_meta, input_block, row_ranges);
+    std::tie(row_ranges, status) = GetRowRanges(*table_meta, input_block);
     if (!status.ok()) {
         return status;
     }
