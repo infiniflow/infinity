@@ -93,7 +93,6 @@ struct AppendState;
 struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
-struct BaseTxnStore;
 struct TxnCommitterTask;
 
 struct BaseTxnStore;
@@ -107,6 +106,7 @@ struct CompactTxnStore;
 struct CreateIndexTxnStore;
 struct DumpMemIndexTxnStore;
 struct DeleteTxnStore;
+struct DropTableTxnStore;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -627,6 +627,7 @@ private:
     bool CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
