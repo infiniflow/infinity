@@ -334,11 +334,16 @@ public:
     Status Update(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block, const Vector<RowID> &row_ids);
 
 private:
+    Status GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block, Vector<Pair<RowID, u64>> &row_ranges);
+
     Status AppendInner(const String &db_name,
                        const String &table_name,
                        const String &table_key,
                        TableMeeta &table_meta,
-                       const SharedPtr<DataBlock> &input_block);
+                       const SharedPtr<DataBlock> &input_block,
+                       const Vector<Pair<RowID, u64>> &row_ranges);
+
+    Status DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids);
 
 public:
     // Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);

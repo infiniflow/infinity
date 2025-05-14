@@ -276,4 +276,30 @@ export struct DeleteTxnStore : public BaseTxnStore {
 
     String ToString() const final;
 };
+
+export struct UpdateTxnStore : public BaseTxnStore {
+    UpdateTxnStore() : BaseTxnStore(TransactionType::kUpdate) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+
+    SharedPtr<DataBlock> input_block_{};
+    Vector<String> index_ids_{}; // indexes will be appended
+
+    // For data append
+    Vector<Pair<RowID, u64>> row_ranges_{};
+
+    // For mem index
+    Vector<MemIndexRange> mem_indexes_to_append_{};
+    Vector<MemIndexRange> mem_indexes_to_dump_{};
+
+    Vector<RowID> row_ids_{};
+
+    String ToString() const final;
+};
+
 } // namespace infinity

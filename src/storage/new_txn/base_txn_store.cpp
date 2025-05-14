@@ -127,4 +127,9 @@ String DeleteTxnStore::ToString() const {
                        table_id_,
                        row_ids_.size());
 }
+
+String UpdateTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_name_, table_id_);
+}
+
 } // namespace infinity

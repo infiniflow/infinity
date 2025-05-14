@@ -109,13 +109,7 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_column_vectors);
 
-            Status status = new_txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_data_block);
-            if (!status.ok()) {
-                operator_state->status_ = status;
-                RecoverableError(status);
-                return false;
-            }
-            status = new_txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
+            Status status = new_txn->Update(*table_info_->db_name_, *table_info_->table_name_, output_data_block, row_ids);
             if (!status.ok()) {
                 operator_state->status_ = status;
                 RecoverableError(status);
