@@ -112,7 +112,7 @@ RowID TableCache::GetCommitUnsealedPosition() {
     return RowID(commit_unsealed_segment_id_, commit_unsealed_segment_offset_);
 }
 
-Vector<SegmentID> TableCache::GetImportSegments(SizeT segment_count) {
+Vector<SegmentID> TableCache::GetNewSegmentsNolock(SizeT segment_count) {
     Vector<SegmentID> segment_ids;
     segment_ids.reserve(segment_count);
     for (SizeT i = 0; i < segment_count; ++i) {
@@ -215,7 +215,7 @@ void SystemCache::DropTableCache(u64 db_id, u64 table_id) {
     db_cache->DropTableCacheNolock(table_id);
 }
 
-u64 SystemCache::AddNewTableSegment(u64 db_id, u64 table_id) {
+Vector<SegmentID> SystemCache::AddNewTableSegment(u64 db_id, u64 table_id, u64 segment_count) {
     std::unique_lock lock(cache_mtx_);
     auto db_iter = db_cache_map_.find(db_id);
     if (db_iter == db_cache_map_.end()) {
@@ -228,9 +228,7 @@ u64 SystemCache::AddNewTableSegment(u64 db_id, u64 table_id) {
         UnrecoverableError(fmt::format("Table cache with id: {} not found", table_id));
     }
     TableCache *table_cache = table_iter->second.get();
-    SegmentID segment_id = table_cache->next_segment_id_;
-    ++table_cache->next_segment_id_;
-    return segment_id;
+    return table_cache->GetNewSegmentsNolock(segment_count);
 }
 
 Tuple<u64, Status> SystemCache::AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name) {

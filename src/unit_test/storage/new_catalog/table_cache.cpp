@@ -121,7 +121,7 @@ TEST_P(TestTableCache, test_table_cache) {
         EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
         EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
 
-        Vector<SegmentID> import_segments = table_cache_ptr->GetImportSegments(2);
+        Vector<SegmentID> import_segments = table_cache_ptr->GetNewSegmentsNolock(2);
         Vector<SegmentID> expected_segments;
         expected_segments.emplace_back(2);
         expected_segments.emplace_back(3);

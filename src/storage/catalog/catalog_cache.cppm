@@ -92,7 +92,7 @@ public:
     void CommitAppendRanges(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id);
     RowID GetCommitUnsealedPosition();
 
-    Vector<SegmentID> GetImportSegments(SizeT segment_count);
+    Vector<SegmentID> GetNewSegmentsNolock(SizeT segment_count);
     SegmentID GetCompactSegment();
     Pair<RowID, u64> PrepareDumpIndexRange(u64 index_id); // used by dump mem index and create index
 
@@ -147,14 +147,22 @@ public:
 export class SystemCache {
 public:
     explicit SystemCache(u64 next_db_id) : next_db_id_(next_db_id) {}
+    // Create db
     void AddNewDbCache(const String &db_name, u64 db_id);
+
+    // Drop db
     void DropDbCache(u64 db_id);
 
+    // Create table
     void AddNewTableCache(u64 db_id, u64 table_id, const String &table_name);
+
+    // Drop table
     void DropTableCache(u64 db_id, u64 table_id);
 
-    u64 AddNewTableSegment(u64 db_id, u64 table_id);
+    // Get new segments
+    Vector<SegmentID> AddNewTableSegment(u64 db_id, u64 table_id, u64 segment_count);
 
+    // Create index
     Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
 
