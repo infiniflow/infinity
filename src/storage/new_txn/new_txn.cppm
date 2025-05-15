@@ -93,7 +93,6 @@ struct AppendState;
 struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
-struct BaseTxnStore;
 struct TxnCommitterTask;
 
 struct BaseTxnStore;
@@ -107,6 +106,7 @@ struct CompactTxnStore;
 struct CreateIndexTxnStore;
 struct DumpMemIndexTxnStore;
 struct DeleteTxnStore;
+struct DropTableTxnStore;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -334,11 +334,16 @@ public:
     Status Update(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block, const Vector<RowID> &row_ids);
 
 private:
+    Tuple<Vector<Pair<RowID, u64>>, Status> GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block);
+
     Status AppendInner(const String &db_name,
                        const String &table_name,
                        const String &table_key,
                        TableMeeta &table_meta,
-                       const SharedPtr<DataBlock> &input_block);
+                       const SharedPtr<DataBlock> &input_block,
+                       const Vector<Pair<RowID, u64>> &row_ranges);
+
+    Status DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids);
 
 public:
     // Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
@@ -622,6 +627,7 @@ private:
     bool CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);

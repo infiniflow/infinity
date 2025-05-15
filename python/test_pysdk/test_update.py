@@ -266,6 +266,33 @@ class TestInfinity:
         res = db_obj.drop_table("test_update_table_with_one_block"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_update_table_with_two_blocks(self, suffix):
+        # connect
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_update_table_with_two_blocks"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_table_with_two_blocks"+suffix,
+                                        {"c1": {"type": "int"}, "c2": {"type": "int"}},
+                                        ConflictType.Error)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(6000)]
+        table_obj.insert(values)
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        values = [{"c1": 1, "c2": 2} for _ in range(5000)]
+        table_obj.insert(values)
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # update
+        table_obj.update("c1 = 1", {"c2": 20})
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        res = db_obj.drop_table("test_update_table_with_two_blocks"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_update_table_with_one_segment(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
