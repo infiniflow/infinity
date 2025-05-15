@@ -117,6 +117,8 @@ public:
     void CommitBottom(NewTxn *txn);
 
 private:
+    void UpdateCatalogCache(NewTxn *txn);
+
     void CleanupTxn(NewTxn *txn, bool commit);
 
 public:
@@ -144,6 +146,7 @@ public:
     void SetSystemCache();
 
 private:
+    mutable std::mutex locker1_;
     mutable std::mutex locker_{};
     Storage *storage_{};
     BufferManager *buffer_mgr_{};
@@ -175,6 +178,7 @@ private:
     Atomic<u64> total_rollbacked_txn_count_{0};
 
     SharedPtr<SystemCache> system_cache_{};
+
 private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};

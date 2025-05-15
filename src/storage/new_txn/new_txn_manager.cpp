@@ -205,7 +205,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
 bool NewTxnManager::SetTxnCheckpoint(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     std::lock_guard guard(locker_);
-    if(txn->txn_context()->txn_type_ == TransactionType::kNewCheckpoint) {
+    if (txn->txn_context()->txn_type_ == TransactionType::kNewCheckpoint) {
         return true;
     }
 
@@ -333,77 +333,17 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
+    // std::lock_guard guard(locker1_);
     Status status = txn->Commit();
     if (commit_ts_ptr != nullptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
     if (status.ok()) {
-        switch (txn->GetTxnType()) {
-            case TransactionType::kNewCheckpoint: {
-                std::lock_guard guard(locker_);
-                ckp_begin_ts_ = UNCOMMIT_TS;
-                break;
-            }
-            case TransactionType::kCreateDB: {
-                BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                if (base_txn_store != nullptr) {
-                    // base_txn_store means the creation with ignore if exists
-                    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
-                    system_cache_->AddNewDbCache(txn_store->db_name_, txn_store->db_id_);
-                }
-
-                break;
-            }
-            case TransactionType::kDropDB: {
-                BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                // base_txn_store means the drop with ignore
-                if (base_txn_store != nullptr) {
-                    DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
-                    system_cache_->DropDbCache(drop_db_txn_store->db_id_);
-                }
-
-                break;
-            }
-            case TransactionType::kCreateTable: {
-                BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                if (base_txn_store != nullptr) {
-                    // base_txn_store means the creation with ignore if exists
-                    CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store);
-                    system_cache_->AddNewTableCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
-                }
-                break;
-            }
-            case TransactionType::kDropTable: {
-                BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                // base_txn_store means the drop with ignore
-                if (base_txn_store != nullptr) {
-                    DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
-                    system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
-                }
-                break;
-            }
-            case TransactionType::kCreateIndex: {
-                BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                if (base_txn_store != nullptr) {
-                    // base_txn_store means the creation with ignore if exists
-                    CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store);
-                    system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
-                }
-                break;
-            }
-            case TransactionType::kDropIndex: {
-                BaseTxnStore *base_txn_store = txn->GetTxnStore();
-                // base_txn_store means the drop with ignore
-                if (base_txn_store != nullptr) {
-                    DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store);
-                    system_cache_->DropIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->index_id_);
-                }
-                break;
-            }
-            default: {
-                break;
-            }
+        if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
+            std::lock_guard guard(locker_);
+            ckp_begin_ts_ = UNCOMMIT_TS;
         }
+
         this->CleanupTxn(txn, true);
     } else {
         this->CleanupTxn(txn, false);
@@ -522,7 +462,75 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
         }
         bottom_txns_.erase(iter);
         current_ts_ = it_ts;
+        if (it_txn->GetTxnState() == TxnState::kCommitting) {
+            // TODO: rollback txn shouldn't be here.
+            UpdateCatalogCache(it_txn.get());
+        }
         it_txn->NotifyTopHalf();
+    }
+}
+
+void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
+    switch (txn->GetTxnType()) {
+        case TransactionType::kCreateDB: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                // base_txn_store means the creation with ignore if exists
+                CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
+                system_cache_->AddNewDbCache(txn_store->db_name_, txn_store->db_id_);
+            }
+
+            break;
+        }
+        case TransactionType::kDropDB: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            // base_txn_store means the drop with ignore
+            if (base_txn_store != nullptr) {
+                DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(base_txn_store);
+                system_cache_->DropDbCache(drop_db_txn_store->db_id_);
+            }
+
+            break;
+        }
+        case TransactionType::kCreateTable: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                // base_txn_store means the creation with ignore if exists
+                CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store);
+                system_cache_->AddNewTableCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            // base_txn_store means the drop with ignore
+            if (base_txn_store != nullptr) {
+                DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store);
+                system_cache_->DropTableCache(txn_store->db_id_, txn_store->table_id_);
+            }
+            break;
+        }
+        case TransactionType::kCreateIndex: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                // base_txn_store means the creation with ignore if exists
+                CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store);
+                system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+            }
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            // base_txn_store means the drop with ignore
+            if (base_txn_store != nullptr) {
+                DropIndexTxnStore *txn_store = static_cast<DropIndexTxnStore *>(base_txn_store);
+                system_cache_->DropIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->index_id_);
+            }
+            break;
+        }
+        default: {
+            break;
+        }
     }
 }
 

@@ -179,8 +179,15 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
 
     this->CheckTxnStatus();
 
+    String db_id_str;
+    Status status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+    LOG_TRACE(fmt::format("txn: {}, create db, apply db_id: {}", txn_context_ptr_->txn_id_, db_id_str));
+    if (!status.ok()) {
+        return Status(status.code(), MakeUnique<String>(fmt::format("Fail to fetch next database id, {}", status.message())));
+    }
+
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    status = GetDBMeta(db_name, db_meta);
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -189,12 +196,6 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     }
     if (status.code() != ErrorCode::kDBNotExist) {
         return status;
-    }
-
-    String db_id_str;
-    status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
-    if (!status.ok()) {
-        return Status(status.code(), MakeUnique<String>(fmt::format("Fail to fetch next database id, {}", status.message())));
     }
 
     // Put the data into local txn store
@@ -1997,16 +1998,16 @@ Status NewTxn::CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpo
 }
 
 Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
-    //    String string_id;
-    //    Status status = kv_instance_->Get(id_name.data(), string_id);
-    //    if (!status.ok()) {
-    //        return status;
-    //    }
-    //    SizeT id_num = std::stoull(string_id);
-    //    ++id_num;
-    //    id_str = fmt::format("{}", id_num);
-    //    return kv_instance_->Put(id_name.data(), id_str);
-    return new_catalog_->IncrLatestID(id_str, id_name);
+    String string_id;
+    Status status = kv_instance_->Get(id_name.data(), string_id);
+    if (!status.ok()) {
+        return status;
+    }
+    SizeT id_num = std::stoull(string_id);
+    ++id_num;
+    id_str = fmt::format("{}", id_num);
+    return kv_instance_->Put(id_name.data(), id_str);
+    // return new_catalog_->IncrLatestID(id_str, id_name);
 }
 
 bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &retry_query) {
@@ -2061,6 +2062,9 @@ bool NewTxn::CheckConflictCmd(const WalCmd &cmd, NewTxn *previous_txn, String &c
         case WalCommandType::CREATE_DATABASE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateDatabaseV2 &>(cmd), previous_txn, cause, retry_query);
         }
+        case WalCommandType::DROP_DATABASE_V2: {
+            return CheckConflictCmd(static_cast<const WalCmdDropDatabaseV2 &>(cmd), previous_txn, cause, retry_query);
+        }
         case WalCommandType::CREATE_TABLE_V2: {
             return CheckConflictCmd(static_cast<const WalCmdCreateTableV2 &>(cmd), previous_txn, cause, retry_query);
         }
@@ -2112,6 +2116,33 @@ bool NewTxn::CheckConflictCmd(const WalCmdCreateDatabaseV2 &cmd, NewTxn *previou
                 }
                 break;
             }
+            case WalCommandType::DROP_DATABASE_V2: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
+                if (drop_db_cmd->db_name_ == db_name) {
+                    retry_query = false;
+                    conflict = true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+        if (conflict) {
+            cause = fmt::format("{} vs. {}", wal_cmd->CompactInfo(), cmd.CompactInfo());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = cmd.db_name_;
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        bool conflict = false;
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
             case WalCommandType::DROP_DATABASE_V2: {
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
                 if (drop_db_cmd->db_name_ == db_name) {
