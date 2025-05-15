@@ -173,6 +173,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     txn_store->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
     txn_store->segment_id_ = segment_index_meta.segment_id();
+    txn_store->table_key_ = table_key;
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
@@ -1690,12 +1691,12 @@ Status NewTxn::AddChunkWal(const String &db_name,
                                                   index_name,
                                                   segment_index_meta.table_index_meta().index_id_str(),
                                                   segment_id,
-                                                  std::move(chunk_infos),
-                                                  deprecate_ids);
+                                                  chunk_infos,
+                                                  deprecate_ids,
+                                                  table_key);
     if (dump_index_cause == DumpIndexCause::kDumpMemIndex) {
         dump_cmd->clear_mem_index_ = true;
     }
-    dump_cmd->table_key_ = table_key;
     dump_cmd->dump_cause_ = dump_index_cause;
 
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
@@ -1909,7 +1910,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     }
 
     if (this->IsReplay()) {
-        WalCmdDumpIndexV2 dump_index_cmd(db_name, db_id_str, table_name, table_id_str, index_name, index_id_str, 0);
+        WalCmdDumpIndexV2 dump_index_cmd(db_name, db_id_str, table_name, table_id_str, index_name, index_id_str, 0, table_key);
         dump_index_cmd.dump_cause_ = DumpIndexCause::kReplayCreateIndex;
         for (const WalSegmentIndexInfo &segment_index_info : create_index_cmd->segment_index_infos_) {
             dump_index_cmd.segment_id_ = segment_index_info.segment_id_;

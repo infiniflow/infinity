@@ -326,6 +326,16 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
+    WalSegmentInfo segment_info(*segment_meta, begin_ts);
+    for (SizeT i = 0; i < block_row_cnts.size(); ++i) {
+        segment_info.block_infos_[i].row_count_ = block_row_cnts[i];
+    }
+    segment_info.row_count_ = segment_row_cnt;
+    status = this->AddSegmentVersion(segment_info, *segment_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
     base_txn_store_ = MakeShared<ImportTxnStore>();
     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
     import_txn_store->db_name_ = db_name;
@@ -336,30 +346,11 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
     import_txn_store->input_blocks_ = input_blocks;
     import_txn_store->segment_ids_.emplace_back(segment_meta->segment_id());
-
-    { // Add import wal;
-        auto import_command =
-            MakeShared<WalCmdImportV2>(db_name, db_meta->db_id_str(), table_name, table_meta.table_id_str(), WalSegmentInfo(*segment_meta, begin_ts));
-        if (block_row_cnts.size() != import_command->segment_info_.block_infos_.size()) {
+    import_txn_store->segment_info_ = segment_info;
             //            auto all_key_values = txn_mgr_->kv_store()->GetAllKeyValue();
             //            for (auto &key_value : all_key_values) {
             //                LOG_ERROR(fmt::format("key: {}, value: {}", key_value.first, key_value.second));
             //            }
-            UnrecoverableError("Block row count mismatch");
-        }
-        for (SizeT i = 0; i < block_row_cnts.size(); ++i) {
-            import_command->segment_info_.block_infos_[i].row_count_ = block_row_cnts[i];
-        }
-        import_command->segment_info_.row_count_ = segment_row_cnt;
-
-        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
-        txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
-
-        status = this->AddSegmentVersion(import_command->segment_info_, *segment_meta);
-        if (!status.ok()) {
-            return status;
-        }
-    }
 
     // index
     Vector<String> *index_id_strs_ptr = nullptr;
@@ -735,6 +726,8 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         if (base_txn_store_ != nullptr) {
             return Status::UnexpectedError("txn store is not null");
         }
+        Vector<WalSegmentInfo> segment_infos;
+        segment_infos.emplace_back(*compact_state.new_segment_meta_, begin_ts);
 
         base_txn_store_ = MakeShared<CompactTxnStore>();
         CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
@@ -744,12 +737,11 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         compact_txn_store->table_name_ = table_name;
         compact_txn_store->table_id_str_ = table_meta.table_id_str();
         compact_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-        compact_txn_store->segment_ids_ = segment_ids;
+        compact_txn_store->segment_infos_ = segment_infos;
+        compact_txn_store->deprecated_segment_ids_ = segment_ids;
         compact_txn_store->new_segment_id_ = new_segment_ids[0];
 
         Vector<SegmentID> deprecated_segment_ids = segment_ids;
-        Vector<WalSegmentInfo> segment_infos;
-        segment_infos.emplace_back(*compact_state.new_segment_meta_, begin_ts);
         {
             WalSegmentInfo &segment_info = segment_infos.back();
             segment_info.row_count_ = compact_state.segment_row_cnt_;

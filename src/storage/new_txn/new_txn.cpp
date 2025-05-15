@@ -209,10 +209,6 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     txn_store->db_name_ = db_name;
     txn_store->comment_ptr_ = comment;
     txn_store->db_id_ = std::stoull(db_id_str);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name, db_id_str, *comment);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
@@ -251,10 +247,6 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     String db_id_str = db_meta->db_id_str();
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_id_ = std::stoull(db_id_str);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabaseV2>(db_name, db_meta->db_id_str());
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
@@ -369,12 +361,9 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = *table_def->table_name();
+    txn_store->table_id_str_ = table_id_str;
     txn_store->table_id_ = std::stoull(table_id_str);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id_str, table_def);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->table_def_ = table_def;
     LOG_TRACE("NewTxn::CreateTable created table entry is inserted.");
     return Status::OK();
 }
@@ -422,15 +411,8 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
-    for (auto &column_def : column_defs) {
-        txn_store->column_defs_.emplace_back(column_def.get());
-    }
-
-    // Generate add column cmd
-    auto wal_command = MakeShared<WalCmdAddColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_defs);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+    txn_store->column_defs_ = column_defs;
+    txn_store->table_key_ = table_key;
 
     return Status::OK();
 }
@@ -511,13 +493,8 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
     txn_store->column_names_ = column_names;
-
-    auto wal_command =
-        MakeShared<WalCmdDropColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_names, column_ids);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->column_ids_ = column_ids;
+    txn_store->table_key_ = table_key;
     return Status::OK();
 }
 
@@ -564,12 +541,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->table_id_ = std::stoull(table_id_str);
-
-    auto wal_command = MakeShared<WalCmdDropTableV2>(db_name, db_meta->db_id_str(), table_name, table_id_str);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->table_key_ = table_key;
     LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
     return Status::OK();
 }
@@ -617,12 +589,6 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     txn_store->old_table_name_ = old_table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->new_table_name_ = new_table_name;
-
-    auto wal_command = MakeShared<WalCmdRenameTableV2>(db_name, db_meta->db_id_str(), old_table_name, table_id_str, new_table_name);
-    wal_command->old_table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
     LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
 }
@@ -696,14 +662,9 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
     txn_store->table_id_ = std::stoull(txn_store->table_id_str_);
+    txn_store->index_id_str_ = index_id_str;
     txn_store->index_base_ = index_base;
-
-    auto wal_command =
-        MakeShared<WalCmdCreateIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_id_str, index_base);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->table_key_ = table_key;
     LOG_TRACE("NewTxn::CreateIndex created index entry is inserted.");
     return Status::OK();
 }
@@ -778,11 +739,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     txn_store->index_name_ = index_name;
     txn_store->index_id_str_ = index_id;
     txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
-
-    auto wal_command = MakeShared<WalCmdDropIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_name, index_id);
-    wal_command->index_key_ = index_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+    txn_store->index_key_ = index_key;
 
     LOG_TRACE(fmt::format("NewTxn::DropIndexByName dropped index: {}.{}.{}", db_name, table_name, index_name));
     return Status::OK();
@@ -1040,10 +997,6 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     if (!status.ok()) {
         return status;
     }
-
-    auto checkpoint_cmd = MakeShared<WalCmdCheckpointV2>(option.checkpoint_ts_);
-    wal_entry_->cmds_.push_back(checkpoint_cmd);
-    txn_context_ptr_->AddOperation(MakeShared<String>(checkpoint_cmd->ToString()));
 
     return Status::OK();
 }

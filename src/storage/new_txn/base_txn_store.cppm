@@ -19,12 +19,14 @@ export module base_txn_store;
 import stl;
 import internal_types;
 import txn_state;
+import column_def;
+import wal_entry;
 
 namespace infinity {
 
 struct DataBlock;
 class IndexBase;
-class ColumnDef;
+class TableDef;
 
 export struct MemIndexRange {
     String index_id_{};
@@ -68,6 +70,7 @@ export struct BaseTxnStore {
     TransactionType type_{TransactionType::kInvalid};
 
     virtual String ToString() const = 0;
+    virtual SharedPtr<WalEntry> ToWalEntry() const = 0;
     virtual ~BaseTxnStore() = default;
 };
 
@@ -76,9 +79,11 @@ export struct CreateDBTxnStore : public BaseTxnStore {
 
     String db_name_{};
     u64 db_id_{};
+    String db_id_str_{};
     SharedPtr<String> comment_ptr_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct DropDBTxnStore : public BaseTxnStore {
@@ -89,6 +94,7 @@ export struct DropDBTxnStore : public BaseTxnStore {
     u64 db_id_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct CreateTableTxnStore : public BaseTxnStore {
@@ -98,9 +104,12 @@ export struct CreateTableTxnStore : public BaseTxnStore {
     String db_id_str_{};
     u64 db_id_{};
     String table_name_{};
+    String table_id_str_{};
     u64 table_id_{};
+    SharedPtr<TableDef> table_def_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct DropTableTxnStore : public BaseTxnStore {
@@ -112,8 +121,10 @@ export struct DropTableTxnStore : public BaseTxnStore {
     String table_name_{};
     String table_id_str_{};
     u64 table_id_{};
+    String table_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct RenameTableTxnStore : public BaseTxnStore {
@@ -124,8 +135,10 @@ export struct RenameTableTxnStore : public BaseTxnStore {
     String old_table_name_{};
     String table_id_str_{};
     String new_table_name_{};
+    String old_table_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct CreateIndexTxnStore : public BaseTxnStore {
@@ -138,9 +151,11 @@ export struct CreateIndexTxnStore : public BaseTxnStore {
     String table_id_str_{};
     u64 table_id_{};
     SharedPtr<IndexBase> index_base_{};
-    u64 index_id_{};
+    String index_id_str_{};
+    String table_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct DropIndexTxnStore : public BaseTxnStore {
@@ -155,8 +170,10 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     String index_name_{};
     String index_id_str_{};
     u64 index_id_{};
+    String index_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct OptimizeIndexTxnStore : public BaseTxnStore {
@@ -197,6 +214,7 @@ export struct AppendTxnStore : public BaseTxnStore {
     Vector<MemIndexRange> mem_indexes_to_dump_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
     SizeT RowCount() const;
 };
 
@@ -212,8 +230,10 @@ export struct ImportTxnStore : public BaseTxnStore {
 
     Vector<SharedPtr<DataBlock>> input_blocks_{};
     Vector<SegmentID> segment_ids_{};
+    WalSegmentInfo segment_info_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
     SizeT RowCount() const;
     SizeT SegmentCount() const;
 };
@@ -232,8 +252,10 @@ export struct DumpMemIndexTxnStore : public BaseTxnStore {
     String index_id_str_{};
     u64 index_id_{};
     SegmentID segment_id_{};
+    String table_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct AddColumnsTxnStore : public BaseTxnStore {
@@ -246,9 +268,11 @@ export struct AddColumnsTxnStore : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
 
-    Vector<ColumnDef *> column_defs_{};
+    Vector<SharedPtr<ColumnDef>> column_defs_{};
+    String table_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct DropColumnsTxnStore : public BaseTxnStore {
@@ -263,8 +287,10 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
 
     Vector<String> column_names_{};
     Vector<ColumnID> column_ids_{};
+    String table_key_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct CompactTxnStore : public BaseTxnStore {
@@ -278,9 +304,11 @@ export struct CompactTxnStore : public BaseTxnStore {
     u64 table_id_{};
 
     SegmentID new_segment_id_{};
-    Vector<SegmentID> segment_ids_{};
+    Vector<WalSegmentInfo> segment_infos_{};
+    Vector<SegmentID> deprecated_segment_ids_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct DeleteTxnStore : public BaseTxnStore {
@@ -296,6 +324,7 @@ export struct DeleteTxnStore : public BaseTxnStore {
     Vector<RowID> row_ids_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
 };
 
 export struct UpdateTxnStore : public BaseTxnStore {
@@ -318,9 +347,11 @@ export struct UpdateTxnStore : public BaseTxnStore {
     Vector<MemIndexRange> mem_indexes_to_append_{};
     Vector<MemIndexRange> mem_indexes_to_dump_{};
 
+    // For delete
     Vector<RowID> row_ids_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry() const final;
     SizeT RowCount() const;
 };
 
