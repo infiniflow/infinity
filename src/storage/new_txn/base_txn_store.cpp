@@ -66,7 +66,13 @@ String DropIndexTxnStore::ToString() const {
 }
 
 String AppendTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_name_, table_id_);
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, appended: {}",
+                       TransactionType2Str(type_),
+                       db_name_,
+                       db_id_,
+                       table_name_,
+                       table_id_,
+                       row_ranges_.size());
 }
 
 String ImportTxnStore::ToString() const {
@@ -127,4 +133,16 @@ String DeleteTxnStore::ToString() const {
                        table_id_,
                        row_ids_.size());
 }
+
+String UpdateTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, appended: {}, deleted: {}",
+                       TransactionType2Str(type_),
+                       db_name_,
+                       db_id_,
+                       table_name_,
+                       table_id_,
+                       row_ranges_.size(),
+                       row_ids_.size());
+}
+
 } // namespace infinity

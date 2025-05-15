@@ -312,7 +312,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
-
     base_txn_store_ = MakeShared<ImportTxnStore>();
     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
     import_txn_store->db_name_ = db_name;
@@ -410,94 +409,94 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    return AppendInner(db_name, table_name, table_key, *table_meta, input_block);
+    Vector<Pair<RowID, u64>> row_ranges;
+    std::tie(row_ranges, status) = GetRowRanges(*table_meta, input_block);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<AppendTxnStore>();
+    AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
+    append_txn_store->db_name_ = db_name;
+    append_txn_store->db_id_str_ = table_meta->db_id_str();
+    append_txn_store->db_id_ = std::stoull(table_meta->db_id_str());
+    append_txn_store->table_name_ = table_name;
+    append_txn_store->table_id_str_ = table_meta->table_id_str();
+    append_txn_store->table_id_ = std::stoull(table_meta->table_id_str());
+    append_txn_store->input_block_ = input_block;
+    append_txn_store->row_ranges_ = row_ranges;
+
+    return AppendInner(db_name, table_name, table_key, *table_meta, input_block, row_ranges);
 }
 
 Status NewTxn::Append(const TableInfo &table_info, const SharedPtr<DataBlock> &input_block) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TableMeeta table_meta(table_info.db_id_, table_info.table_id_, *kv_instance_, begin_ts);
-    return AppendInner(*table_info.db_name_, *table_info.table_name_, table_info.table_key_, table_meta, input_block);
+    return Append(*table_info.db_name_, *table_info.table_name_, input_block);
+}
+
+Tuple<Vector<Pair<RowID, u64>>, Status> NewTxn::GetRowRanges(TableMeeta &table_meta, const SharedPtr<DataBlock> &input_block) {
+    Vector<Pair<RowID, u64>> row_ranges;
+    RowID begin_row_id;
+    Status status = table_meta.GetNextRowID(begin_row_id);
+    if (!status.ok()) {
+        return {row_ranges, status};
+    }
+    SizeT left_rows = input_block->row_count();
+    while (left_rows > 0) {
+        SegmentID segment_id = begin_row_id.segment_id_;
+        SizeT segment_row_cnt = begin_row_id.segment_offset_;
+        SizeT segment_room = DEFAULT_SEGMENT_CAPACITY - segment_row_cnt;
+        SizeT copyed_rows = left_rows < segment_room ? left_rows : segment_room;
+        row_ranges.push_back({begin_row_id, copyed_rows});
+        left_rows -= copyed_rows;
+        begin_row_id = RowID(segment_id + 1, 0);
+    }
+
+    return {row_ranges, Status::OK()};
 }
 
 Status NewTxn::AppendInner(const String &db_name,
                            const String &table_name,
                            const String &table_key,
                            TableMeeta &table_meta,
-                           const SharedPtr<DataBlock> &input_block) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    Vector<Pair<RowID, u64>> row_ranges;
+                           const SharedPtr<DataBlock> &input_block,
+                           const Vector<Pair<RowID, u64>> &row_ranges) {
 
-    // Read col definition in new rocksdb transaction
-    KVStore *kv_store = txn_mgr_->kv_store();
-    UniquePtr<KVInstance> kv_instance_validation = kv_store->GetInstance();
-    TableMeeta table_meta_validation(table_meta.db_id_str(), table_meta.table_id_str(), *kv_instance_validation, begin_ts);
-
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
     {
-        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
-        {
-            auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
-            if (!col_def_status.ok()) {
-                return col_def_status;
-            }
-            column_defs = col_defs;
+        auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
+        if (!col_def_status.ok()) {
+            return col_def_status;
         }
-        SizeT column_count = column_defs->size();
+        column_defs = col_defs;
+    }
+    SizeT column_count = column_defs->size();
 
-        if (input_block->column_count() != column_count) {
-            String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
+    if (input_block->column_count() != column_count) {
+        String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
+        LOG_ERROR(err_msg);
+
+        return Status::ColumnCountMismatch(err_msg);
+    }
+
+    Vector<SharedPtr<DataType>> column_types;
+    for (SizeT col_id = 0; col_id < column_count; ++col_id) {
+        column_types.emplace_back((*column_defs)[col_id]->type());
+        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+            String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
             LOG_ERROR(err_msg);
 
-            return Status::ColumnCountMismatch(err_msg);
-        }
-
-        Vector<SharedPtr<DataType>> column_types;
-        for (SizeT col_id = 0; col_id < column_count; ++col_id) {
-            column_types.emplace_back((*column_defs)[col_id]->type());
-            if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
-                String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
-                LOG_ERROR(err_msg);
-
-                return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
-            }
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
         }
     }
 
     auto append_command = MakeShared<WalCmdAppendV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ranges, input_block);
-    RowID begin_row_id;
-    Status status = table_meta.GetNextRowID(begin_row_id);
-    if (!status.ok()) {
-        return status;
-    }
-    SizeT left_rows = append_command->block_->row_count();
-    while (left_rows > 0) {
-        SegmentID segment_id = begin_row_id.segment_id_;
-        SizeT segment_row_cnt = begin_row_id.segment_offset_;
-        SizeT segment_room = DEFAULT_SEGMENT_CAPACITY - segment_row_cnt;
-        SizeT copyed_rows = left_rows < segment_room ? left_rows : segment_room;
-        append_command->row_ranges_.push_back({begin_row_id, copyed_rows});
-        left_rows -= copyed_rows;
-        begin_row_id = RowID(segment_id + 1, 0);
-    }
-
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
-
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-
-    base_txn_store_ = MakeShared<AppendTxnStore>();
-    AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
-    append_txn_store->db_name_ = db_name;
-    append_txn_store->db_id_str_ = table_meta.db_id_str();
-    append_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
-    append_txn_store->table_name_ = table_name;
-    append_txn_store->table_id_str_ = table_meta.table_id_str();
-    append_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-    append_txn_store->input_block_ = input_block;
-    append_txn_store->row_ranges_ = append_command->row_ranges_;
 
     return Status::OK();
 }
@@ -513,27 +512,87 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    /*
     // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<DeleteTxnStore>();
+        DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+        delete_txn_store->db_name_ = db_name;
+        delete_txn_store->db_id_str_ = db_meta->db_id_str();
+        delete_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+        delete_txn_store->table_name_ = table_name;
+        delete_txn_store->table_id_str_ = table_meta_opt->table_id_str();
+        delete_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
+        delete_txn_store->row_ids_ = row_ids;
+    } else {
+        DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+        delete_txn_store->row_ids_.reserve(delete_txn_store->row_ids_.size() + row_ids.size());
+        delete_txn_store->row_ids_.insert(delete_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
     }
 
-    base_txn_store_ = MakeShared<DeleteTxnStore>();
-    DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
-    delete_txn_store->db_name_ = db_name;
-    delete_txn_store->db_id_str_ = db_meta->db_id_str();
-    delete_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
-    delete_txn_store->table_name_ = table_name;
-    delete_txn_store->table_id_str_ = table_meta_opt->table_id_str();
-    delete_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
-    delete_txn_store->row_ids_ = row_ids;
-    */
+    return DeleteInner(db_name, table_name, *table_meta_opt, row_ids);
+}
 
-    auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, db_meta->db_id_str(), table_name, table_meta_opt->table_id_str(), row_ids);
+Status NewTxn::DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids) {
+    auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(delete_command->ToString()));
+
+    return Status::OK();
+}
+
+Status NewTxn::Update(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block, const Vector<RowID> &row_ids) {
+    this->CheckTxn(db_name);
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = this->IncreaseMemIndexReferenceCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    Vector<Pair<RowID, u64>> row_ranges;
+    std::tie(row_ranges, status) = GetRowRanges(*table_meta, input_block);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<UpdateTxnStore>();
+        UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
+        update_txn_store->db_name_ = db_name;
+        update_txn_store->db_id_str_ = db_meta->db_id_str();
+        update_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+        update_txn_store->table_name_ = table_name;
+        update_txn_store->table_id_str_ = table_meta->table_id_str();
+        update_txn_store->table_id_ = std::stoull(table_meta->table_id_str());
+        update_txn_store->input_blocks_.emplace_back(input_block);
+        update_txn_store->row_ranges_ = row_ranges;
+        update_txn_store->row_ids_ = row_ids;
+    } else {
+        UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
+        update_txn_store->input_blocks_.emplace_back(input_block);
+        update_txn_store->row_ranges_.reserve(update_txn_store->row_ranges_.size() + row_ranges.size());
+        update_txn_store->row_ranges_.insert(update_txn_store->row_ranges_.end(), row_ranges.begin(), row_ranges.end());
+        update_txn_store->row_ids_.reserve(update_txn_store->row_ids_.size() + row_ids.size());
+        update_txn_store->row_ids_.insert(update_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
+    }
+
+    status = AppendInner(db_name, table_name, table_key, *table_meta, input_block, row_ranges);
+    if (!status.ok()) {
+        return status;
+    }
+    status = this->DeleteInner(db_name, table_name, *table_meta, row_ids);
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
