@@ -79,11 +79,9 @@ void TxnAllocator::Process() {
                                              txn_store->table_name_,
                                              txn_store->table_id_,
                                              txn_store->input_block_->row_count()));
-                        txn_store->row_ranges_ = system_cache_->PrepareAppendRanges(txn_store->db_id_,
-                                                                                    txn_store->table_id_,
-                                                                                    txn_store->input_block_->row_count(),
-                                                                                    txn->TxnID());
-
+                        SharedPtr<AppendPrepareInfo> append_info =
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, txn_store->input_block_->row_count(), txn->TxnID());
+                        txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
                     case TransactionType::kUpdate: {

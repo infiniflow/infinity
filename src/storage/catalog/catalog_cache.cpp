@@ -29,88 +29,87 @@ import index_base;
 namespace infinity {
 
 TableCache::TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
-    : table_id_(table_id), prepare_unsealed_segment_id_(unsealed_segment_id), prepare_unsealed_segment_offset_(unsealed_segment_offset),
-      commit_unsealed_segment_id_(unsealed_segment_id), commit_unsealed_segment_offset_(unsealed_segment_offset), next_segment_id_(next_segment_id) {
-    if (unsealed_segment_offset == DEFAULT_SEGMENT_CAPACITY) {
-        all_segments_sealed_prepare_ = true;
-        all_segments_sealed_commit_ = true;
-    } else {
-        all_segments_sealed_prepare_ = false;
-        all_segments_sealed_commit_ = false;
-    }
-}
+    : prepare_segment_id_(unsealed_segment_id), prepare_segment_offset_(unsealed_segment_offset), commit_segment_id_(unsealed_segment_id),
+      commit_segment_offset_(unsealed_segment_offset), table_id_(table_id), next_segment_id_(next_segment_id) {}
 
-Vector<Pair<RowID, u64>> TableCache::PrepareAppendRangesNolock(SizeT row_count, TransactionID transaction_id) {
-    if (row_count > MAX_BLOCK_CAPACITY) {
-        UnrecoverableError(fmt::format("Attempt to prepare row_count: {} > MAX_BLOCK_CAPACITY: {}", row_count, MAX_BLOCK_CAPACITY));
+SharedPtr<AppendPrepareInfo> TableCache::PrepareAppendNolock(SizeT row_count, TransactionID txn_id) {
+    if (row_count > MAX_BLOCK_CAPACITY or row_count == 0) {
+        UnrecoverableError(fmt::format("Attempt to append row_count: {}", row_count));
     }
 
-    Vector<Pair<RowID, u64>> ranges;
-    if (all_segments_sealed_prepare_) {
-        prepare_unsealed_segment_id_ = next_segment_id_;
-        prepare_unsealed_segment_offset_ = row_count;
+    SharedPtr<AppendPrepareInfo> append_info = MakeShared<AppendPrepareInfo>();
+    append_info->transaction_id_ = txn_id;
+    if (unsealed_segment_cache_ == nullptr) {
+        unsealed_segment_cache_ = MakeShared<SegmentCache>(next_segment_id_, row_count);
+        unsealed_segment_cache_->sealed_ = false;
+
+        // Update prepare info
+        prepare_segment_id_ = next_segment_id_;
+        prepare_segment_offset_ = row_count;
+
+        append_info->ranges_.emplace_back(RowID(next_segment_id_, 0), row_count);
         ++next_segment_id_;
-        ranges.emplace_back(RowID(prepare_unsealed_segment_id_, 0), row_count);
-        all_segments_sealed_prepare_ = false;
     } else {
-        if (prepare_unsealed_segment_offset_ + row_count < DEFAULT_SEGMENT_CAPACITY) {
-            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), row_count);
-            prepare_unsealed_segment_offset_ += row_count;
-            all_segments_sealed_prepare_ = false;
-        } else if (prepare_unsealed_segment_offset_ + row_count == DEFAULT_SEGMENT_CAPACITY) {
-            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), row_count);
-            prepare_unsealed_segment_offset_ += row_count;
-            all_segments_sealed_prepare_ = true;
+        if (unsealed_segment_cache_->row_count_ + row_count < DEFAULT_SEGMENT_CAPACITY) {
+            // Don't need to add new segment
+            append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), row_count);
+            unsealed_segment_cache_->row_count_ += row_count;
+
+            prepare_segment_offset_ += row_count;
+        } else if (unsealed_segment_cache_->row_count_ + row_count == DEFAULT_SEGMENT_CAPACITY) {
+            // Need to add new segment
+            append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), row_count);
+            unsealed_segment_cache_->row_count_ += row_count;
+            unsealed_segment_cache_->sealed_ = true;
+            sealed_segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+
+            prepare_segment_offset_ += row_count;
         } else {
-            SizeT remaining = DEFAULT_SEGMENT_CAPACITY - prepare_unsealed_segment_offset_;
-            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, prepare_unsealed_segment_offset_), remaining);
-            prepare_unsealed_segment_id_ = next_segment_id_;
+            SizeT first_row_count = DEFAULT_SEGMENT_CAPACITY - unsealed_segment_cache_->row_count_;
+            append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), first_row_count);
+            unsealed_segment_cache_->row_count_ += first_row_count;
+            unsealed_segment_cache_->sealed_ = true;
+            sealed_segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+
+            // Update prepare info
+            SizeT second_row_count = row_count - first_row_count;
+            prepare_segment_id_ = next_segment_id_;
+            prepare_segment_offset_ = second_row_count;
+
+            // create new segment
+            unsealed_segment_cache_ = MakeShared<SegmentCache>(next_segment_id_, second_row_count);
+            unsealed_segment_cache_->sealed_ = false;
+            append_info->ranges_.emplace_back(RowID(next_segment_id_, 0), second_row_count);
             ++next_segment_id_;
-            prepare_unsealed_segment_offset_ = row_count - remaining; // remaining rows must not exceed DEFAULT_SEGMENT_CAPACITY
-            ranges.emplace_back(RowID(prepare_unsealed_segment_id_, 0), prepare_unsealed_segment_offset_);
-            all_segments_sealed_prepare_ = false;
         }
     }
 
-    // append all ranges item to prepared_append_ranges_
+    uncommitted_append_infos_.emplace_back(append_info);
+    return append_info;
+}
+
+void TableCache::CommitAppendNolock(const SharedPtr<AppendPrepareInfo> &append_info, TransactionID txn_id) {
+    SharedPtr<AppendPrepareInfo> saved_append_info = uncommitted_append_infos_.front();
+    if (saved_append_info->transaction_id_ != txn_id) {
+        UnrecoverableError(fmt::format("Attempt to commit append prepare transaction id: {} != {}", saved_append_info->transaction_id_, txn_id));
+    }
+    uncommitted_append_infos_.pop_front();
+    const Vector<Pair<RowID, u64>> &ranges = append_info->ranges_;
     for (const auto &range : ranges) {
-        prepared_append_ranges_.emplace_back(range.first, range.second, transaction_id);
-    }
-    return ranges;
-}
-
-void TableCache::CommitAppendRangesNolock(const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id) {
-    for (const auto &range : ranges) {
-        auto [row_offset, row_count, transaction] = prepared_append_ranges_.front();
-        if (range.first != row_offset or range.second != row_count or transaction != txn_id) {
-            UnrecoverableError(fmt::format("Attempt to commit row range: {}: {}, {} != {}: {}, {}",
-                                           txn_id,
-                                           range.first.ToString(),
-                                           range.second,
-                                           transaction,
-                                           row_offset.ToString(),
-                                           row_count));
-        }
-        prepared_append_ranges_.pop_front();
-        commit_unsealed_segment_id_ = range.first.segment_id_;
-        commit_unsealed_segment_offset_ += range.second;
-        if (commit_unsealed_segment_offset_ == DEFAULT_SEGMENT_CAPACITY) {
-            all_segments_sealed_commit_ = true;
-        } else if (commit_unsealed_segment_offset_ > DEFAULT_SEGMENT_CAPACITY) {
-            commit_unsealed_segment_offset_ -= DEFAULT_SEGMENT_CAPACITY;
-            all_segments_sealed_commit_ = false;
-        } else {
-            all_segments_sealed_commit_ = false;
+        commit_segment_id_ = range.first.segment_id_;
+        commit_segment_offset_ += range.second;
+        if (commit_segment_offset_ > DEFAULT_SEGMENT_CAPACITY) {
+            commit_segment_offset_ -= DEFAULT_SEGMENT_CAPACITY;
         }
     }
+    return;
 }
 
-RowID TableCache::GetCommitUnsealedPosition() {
-    if (all_segments_sealed_commit_) {
-        UnrecoverableError("No unsealed segment");
-    }
-    return RowID(commit_unsealed_segment_id_, commit_unsealed_segment_offset_);
+bool TableCache::AllPrepareAreCommittedNolock() const {
+    return prepare_segment_id_ == commit_segment_id_ && prepare_segment_offset_ == commit_segment_offset_;
 }
+
+RowID TableCache::GetCommitPosition() const { return RowID(commit_segment_id_, commit_segment_offset_); }
 
 // Import segments
 Tuple<SharedPtr<ImportPrepareInfo>, Status> TableCache::PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id) {
@@ -322,16 +321,15 @@ void SystemCache::DropIndexCache(u64 db_id, u64 table_id, u64 index_id) {
     table_cache->DropTableIndexCacheNolock(index_id);
 }
 
-Vector<Pair<RowID, u64>> SystemCache::PrepareAppendRanges(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {
+SharedPtr<AppendPrepareInfo> SystemCache::PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    return table_cache->PrepareAppendRangesNolock(row_count, txn_id);
+    return table_cache->PrepareAppendNolock(row_count, txn_id);
 }
-
-void SystemCache::CommitAppendRanges(u64 db_id, u64 table_id, const Vector<Pair<RowID, u64>> &ranges, TransactionID txn_id) {
+void SystemCache::CommitAppend(u64 db_id, u64 table_id, const SharedPtr<AppendPrepareInfo> &append_info, TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
-    table_cache->CommitAppendRangesNolock(ranges, txn_id);
+    table_cache->CommitAppendNolock(append_info, txn_id);
 }
 
 Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
