@@ -73,27 +73,29 @@ void TxnAllocator::Process() {
                 switch (txn_type) {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
+                        SizeT row_count = txn_store->input_block_->row_count();
                         LOG_INFO(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
                                              txn_store->db_name_,
                                              txn_store->db_id_,
                                              txn_store->table_name_,
                                              txn_store->table_id_,
-                                             txn_store->input_block_->row_count()));
+                                             row_count));
                         SharedPtr<AppendPrepareInfo> append_info =
-                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, txn_store->input_block_->row_count(), txn->TxnID());
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
                         txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
                     case TransactionType::kUpdate: {
                         UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
+                        SizeT row_count = txn_store->RowCount();
                         LOG_INFO(fmt::format("TxnAllocator: Update txn: db: {}, {}, table: {}, {}, data size: {}",
                                              txn_store->db_name_,
                                              txn_store->db_id_,
                                              txn_store->table_name_,
                                              txn_store->table_id_,
-                                             txn_store->RowCount()));
+                                             row_count));
                         SharedPtr<AppendPrepareInfo> append_info =
-                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, txn_store->RowCount(), txn->TxnID());
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
                         txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
