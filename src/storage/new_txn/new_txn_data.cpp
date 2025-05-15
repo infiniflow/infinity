@@ -513,18 +513,21 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<DeleteTxnStore>();
+        DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+        delete_txn_store->db_name_ = db_name;
+        delete_txn_store->db_id_str_ = db_meta->db_id_str();
+        delete_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+        delete_txn_store->table_name_ = table_name;
+        delete_txn_store->table_id_str_ = table_meta_opt->table_id_str();
+        delete_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
+        delete_txn_store->row_ids_ = row_ids;
+    } else {
+        DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+        delete_txn_store->row_ids_.reserve(delete_txn_store->row_ids_.size() + row_ids.size());
+        delete_txn_store->row_ids_.insert(delete_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
     }
-    base_txn_store_ = MakeShared<DeleteTxnStore>();
-    DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
-    delete_txn_store->db_name_ = db_name;
-    delete_txn_store->db_id_str_ = db_meta->db_id_str();
-    delete_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
-    delete_txn_store->table_name_ = table_name;
-    delete_txn_store->table_id_str_ = table_meta_opt->table_id_str();
-    delete_txn_store->table_id_ = std::stoull(table_meta_opt->table_id_str());
-    delete_txn_store->row_ids_ = row_ids;
 
     return DeleteInner(db_name, table_name, *table_meta_opt, row_ids);
 }
@@ -561,20 +564,26 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<UpdateTxnStore>();
+        UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
+        update_txn_store->db_name_ = db_name;
+        update_txn_store->db_id_str_ = db_meta->db_id_str();
+        update_txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+        update_txn_store->table_name_ = table_name;
+        update_txn_store->table_id_str_ = table_meta->table_id_str();
+        update_txn_store->table_id_ = std::stoull(table_meta->table_id_str());
+        update_txn_store->input_blocks_.emplace_back(input_block);
+        update_txn_store->row_ranges_ = row_ranges;
+        update_txn_store->row_ids_ = row_ids;
+    } else {
+        UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
+        update_txn_store->input_blocks_.emplace_back(input_block);
+        update_txn_store->row_ranges_.reserve(update_txn_store->row_ranges_.size() + row_ranges.size());
+        update_txn_store->row_ranges_.insert(update_txn_store->row_ranges_.end(), row_ranges.begin(), row_ranges.end());
+        update_txn_store->row_ids_.reserve(update_txn_store->row_ids_.size() + row_ids.size());
+        update_txn_store->row_ids_.insert(update_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
     }
-    base_txn_store_ = MakeShared<UpdateTxnStore>();
-    UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
-    update_txn_store->db_name_ = db_name;
-    update_txn_store->db_id_str_ = table_meta->db_id_str();
-    update_txn_store->db_id_ = std::stoull(table_meta->db_id_str());
-    update_txn_store->table_name_ = table_name;
-    update_txn_store->table_id_str_ = table_meta->table_id_str();
-    update_txn_store->table_id_ = std::stoull(table_meta->table_id_str());
-    update_txn_store->input_block_ = input_block;
-    update_txn_store->row_ranges_ = row_ranges;
-    update_txn_store->row_ids_ = row_ids;
 
     status = AppendInner(db_name, table_name, table_key, *table_meta, input_block, row_ranges);
     if (!status.ok()) {

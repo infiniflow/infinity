@@ -287,7 +287,7 @@ export struct UpdateTxnStore : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
 
-    SharedPtr<DataBlock> input_block_{};
+    Vector<SharedPtr<DataBlock>> input_blocks_{};
     Vector<String> index_ids_{}; // indexes will be appended
 
     // For data append
