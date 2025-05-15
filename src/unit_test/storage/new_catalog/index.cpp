@@ -943,10 +943,10 @@ TEST_P(TestTxnIndex, create_index_create_index) {
 
     {
         // create index and create index
-        //  t1            create index   commit (success)
+        //  t3            create index   commit (success)
         //  |--------------|---------------|
-        //                         |------------------|------------------|
-        //                        t2                create index      commit (fail)
+        //                         |------------------|
+        //                        t4                create index (fail)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -974,8 +974,6 @@ TEST_P(TestTxnIndex, create_index_create_index) {
 
         // create index idx1
         status = txn4->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_FALSE(status.ok());
 
         // drop index
@@ -1004,8 +1002,8 @@ TEST_P(TestTxnIndex, create_index_create_index) {
         // create index and create index
         //  t1            create index   commit (success)
         //  |--------------|---------------|
-        //         |------------------|------------------|
-        //        t2                create index      commit (fail)
+        //         |------------------|
+        //        t2                create index (fail)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -1030,15 +1028,10 @@ TEST_P(TestTxnIndex, create_index_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = txn4->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
-
-        // create index idx1
-
-        status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
 
         // drop index
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
@@ -1064,10 +1057,10 @@ TEST_P(TestTxnIndex, create_index_create_index) {
 
     {
         // create index and create index
-        //  t1            create index               commit (fail)
-        //  |--------------|--------------------------------|
-        //         |------------------|------------------|
-        //        t2                create index      commit (success)
+        //  t1         create index           commit (success)
+        //  |--------------|-------------------------|
+        //         |------------------|
+        //        t2            create index (fail)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -1092,13 +1085,10 @@ TEST_P(TestTxnIndex, create_index_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = txn4->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // drop index
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
