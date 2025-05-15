@@ -146,7 +146,7 @@ public:
     SegmentOffset commit_segment_offset_{0};
 
     // Import segments
-    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id);
+    SharedPtr<ImportPrepareInfo> PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id);
     void CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
 
     // Compact segments
@@ -232,7 +232,7 @@ public:
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
 
     // Import segments
-    Tuple<SharedPtr<ImportPrepareInfo>, Status> PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id);
+    SharedPtr<ImportPrepareInfo> PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id);
     void CommitImportSegments(u64 db_id, u64 table_id, const SharedPtr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id);
 
     // Compact segments

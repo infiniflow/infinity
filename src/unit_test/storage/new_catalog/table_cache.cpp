@@ -126,7 +126,7 @@ TEST_P(TestTableCache, test_table_cache) {
         EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
         EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
 
-        auto [import_info, status] = table_cache_ptr->PrepareImportSegmentsNolock(2, 2045);
+        auto import_info = table_cache_ptr->PrepareImportSegmentsNolock(2, 2045);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
         EXPECT_EQ(table_cache_ptr->import_prepare_info_map_.size(), 1);
         EXPECT_EQ(import_info->segment_ids_.size(), 2);

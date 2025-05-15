@@ -180,6 +180,7 @@ export struct AppendTxnStore : public BaseTxnStore {
     Vector<MemIndexRange> mem_indexes_to_dump_{};
 
     String ToString() const final;
+    SizeT RowCount() const;
 };
 
 export struct ImportTxnStore : public BaseTxnStore {
@@ -193,9 +194,11 @@ export struct ImportTxnStore : public BaseTxnStore {
     u64 table_id_{};
 
     Vector<SharedPtr<DataBlock>> input_blocks_{};
-    SegmentID segment_id_{};
+    Vector<SegmentID> segment_ids_{};
 
     String ToString() const final;
+    SizeT RowCount() const;
+    SizeT SegmentCount() const;
 };
 
 export struct DumpMemIndexTxnStore : public BaseTxnStore {
@@ -300,6 +303,7 @@ export struct UpdateTxnStore : public BaseTxnStore {
     Vector<RowID> row_ids_{};
 
     String ToString() const final;
+    SizeT RowCount() const;
 };
 
 } // namespace infinity

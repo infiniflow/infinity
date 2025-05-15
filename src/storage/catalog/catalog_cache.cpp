@@ -112,7 +112,7 @@ bool TableCache::AllPrepareAreCommittedNolock() const {
 RowID TableCache::GetCommitPosition() const { return RowID(commit_segment_id_, commit_segment_offset_); }
 
 // Import segments
-Tuple<SharedPtr<ImportPrepareInfo>, Status> TableCache::PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id) {
+SharedPtr<ImportPrepareInfo> TableCache::PrepareImportSegmentsNolock(u64 segment_count, TransactionID txn_id) {
     SharedPtr<ImportPrepareInfo> import_prepare_info = MakeShared<ImportPrepareInfo>();
     // Get the prepared segment id and insert into the import prepare info
     for (SizeT i = 0; i < segment_count; ++i) {
@@ -141,7 +141,7 @@ Tuple<SharedPtr<ImportPrepareInfo>, Status> TableCache::PrepareImportSegmentsNol
     }
 
     import_prepare_info_map_.emplace(txn_id, import_prepare_info);
-    return {import_prepare_info, Status::OK()};
+    return import_prepare_info;
 }
 
 void TableCache::CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &import_prepare_info, TransactionID txn_id) {
@@ -289,7 +289,7 @@ void SystemCache::DropTableCache(u64 db_id, u64 table_id) {
     db_cache->DropTableCacheNolock(table_id);
 }
 
-Tuple<SharedPtr<ImportPrepareInfo>, Status> SystemCache::PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id) {
+SharedPtr<ImportPrepareInfo> SystemCache::PrepareImportSegments(u64 db_id, u64 table_id, u64 segment_count, TransactionID txn_id) {
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     return table_cache->PrepareImportSegmentsNolock(segment_count, txn_id);
