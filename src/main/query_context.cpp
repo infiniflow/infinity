@@ -292,7 +292,8 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         if (new_txn != nullptr) {
             StopProfile();
             StartProfile(QueryPhase::kRollback);
-            if (new_txn->GetTxnState() == TxnState::kRollbacking) {
+            TxnState txn_state = new_txn->GetTxnState();
+            if (txn_state == TxnState::kRollbacking or txn_state == TxnState::kStarted) {
                 this->RollbackTxn();
             }
             StopProfile(QueryPhase::kRollback);

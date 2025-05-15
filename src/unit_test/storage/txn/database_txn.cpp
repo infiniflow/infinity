@@ -180,6 +180,7 @@ TEST_P(DBTxnTest, test2) {
 //           |            |               |                   |                      |           |
 //       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Commit     |
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)            TXN2 Commit
+// The diagram above may be outdated.
 TEST_P(DBTxnTest, test3) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -205,6 +206,7 @@ TEST_P(DBTxnTest, test3) {
 //           |            |               |                   |                      |           |
 //       TXN2 Begin       |      TXN2 Create db1              |                      |      TXN2 Commit
 //                    TXN1 Begin                    TXN1 Create db1(WW-Conflict)  TXN1 Commit
+// The diagram above may be outdated.
 TEST_P(DBTxnTest, test4) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -223,11 +225,7 @@ TEST_P(DBTxnTest, test4) {
 
     // Txn2: Create db1, NOT OK
     status = new_txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(status.ok());
-
-    // Txn2: Commit, OK
-    status = txn_mgr->CommitTxn(new_txn2);
-    EXPECT_TRUE(!status.ok());
+    EXPECT_FALSE(status.ok());
 }
 
 TEST_P(DBTxnTest, test5) {
@@ -299,6 +297,7 @@ TEST_P(DBTxnTest, test6) {
 //           |            |               |                   |                      |           |       |         |
 //       TXN1 Begin       |      TXN1 Create db1              |                  TXN1 Drop db1   |   TXN1 Commit   |
 //                    TXN2 Begin                    TXN2 Create db1(WW-Conflict)         TXN2 Create db1 OK  TXN2 Commit
+// The diagram above may be outdated.
 TEST_P(DBTxnTest, test7) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -315,13 +314,10 @@ TEST_P(DBTxnTest, test7) {
 
     // Txn2: Create db1, OK
     status = new_txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(status.ok());
+    EXPECT_FALSE(status.ok());
 
     // Txn1: Commit, OK
-    txn_mgr->RollBackTxn(new_txn1);
-
-    // Txn2: Commit, OK
-    txn_mgr->CommitTxn(new_txn2);
+    txn_mgr->CommitTxn(new_txn1);
 
     // Txn3: Create, OK
     NewTxn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);

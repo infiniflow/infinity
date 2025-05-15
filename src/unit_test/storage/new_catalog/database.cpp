@@ -47,8 +47,8 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
     {
         //    t1      create      commit (success)
         //    |----------|---------|
-        //       |----------------------|----------|
-        //       t2                  create      commit (fail)
+        //       |----------------------|
+        //       t2                  create(fail)
 
         // start txn1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -62,14 +62,13 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-
-        // Conflict, can't commit
-        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
         // Check if db1 exists
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status.ok());
         EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
@@ -77,14 +76,14 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         // drop db1
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check if db1 exists
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_info2 == nullptr);
         EXPECT_FALSE(db_status1.ok());
@@ -95,8 +94,8 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
     {
         //    t1      create      commit (success)
         //    |----------|---------|
-        //       |----------|----------|
-        //       t2       create      commit (fail)
+        //       |----------|
+        //       t2       create (fail)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         // start txn2
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -104,17 +103,13 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         Status status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
         status = txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        // Conflict, can't commit
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
         // Check if db1 exists
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status.ok());
         EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
@@ -122,14 +117,14 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         // drop db1
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check if db1 exists
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_info2 == nullptr);
         EXPECT_FALSE(db_status1.ok());
@@ -138,10 +133,10 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
     }
 
     {
-        //    t1            create  commit (success)
-        //    |---------------|------|
+        //    t1            create (fail)
+        //    |---------------|
         //       |----------|----------|
-        //       t2       create      commit (fail)
+        //       t2       create      commit (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         // start txn2
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -150,17 +145,13 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // Conflict, can't commit
-        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
         // Check if db1 exists
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status.ok());
         EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
@@ -168,14 +159,14 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         // drop db1
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check if db1 exists
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_info2 == nullptr);
         EXPECT_FALSE(db_status1.ok());
@@ -186,8 +177,8 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
     {
         //          t1      create    commit (success)
         //          |-------|---------|
-        //       |----------------------|----------|
-        //       t2                  create      commit (fail)
+        //       |----------------------|
+        //       t2                  create (fail)
 
         // start txn2
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -201,14 +192,10 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-
-        // Conflict, can't commit
-        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
         // Check if db1 exists
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status.ok());
         EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
@@ -216,14 +203,14 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         // drop db1
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check if db1 exists
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_info2 == nullptr);
         EXPECT_FALSE(db_status1.ok());
@@ -234,9 +221,8 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
     {
         //               t1      create      commit (success)
         //                |----------|---------|
-        //       |----------------------|----------|
-        //       t2                  create      commit (fail)
-
+        //       |----------------------|
+        //       t2                  create (fail)
         // start txn2
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         // start txn1
@@ -246,17 +232,13 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        // Conflict, can't commit
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
         // Check if db1 exists
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status.ok());
         EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
@@ -264,14 +246,14 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         // drop db1
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check if db1 exists
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_info2 == nullptr);
         EXPECT_FALSE(db_status1.ok());
@@ -280,10 +262,10 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
     }
 
     {
-        //               t1               create      commit (success)
-        //                |-----------------|----------|
+        //               t1               create (fail)
+        //                |-----------------|
         //       |----------------------|-----------------|
-        //       t2                  create           commit (fail)
+        //       t2                  create           commit (success)
 
         // start txn2
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -294,17 +276,13 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-
-        // Conflict, can't commit
-        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
         // Check if db1 exists
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status.ok());
         EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
@@ -312,14 +290,14 @@ TEST_P(TestTxnDatabase, createdb_createdb_test) {
         EXPECT_TRUE(status.ok());
 
         // drop db1
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         // Check if db1 exists
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
         auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_info2 == nullptr);
         EXPECT_FALSE(db_status1.ok());
