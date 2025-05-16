@@ -112,16 +112,7 @@ void TxnAllocator::Process() {
                             system_cache_->PrepareImportSegments(txn_store->db_id_, txn_store->table_id_, segment_count, txn->TxnID());
                         break;
                     }
-                    case TransactionType::kDumpMemIndex: {
-                        break;
-                    }
-                    case TransactionType::kOptimizeIndex: {
-                        break;
-                    }
                     case TransactionType::kCompact: {
-                        break;
-                    }
-                    case TransactionType::kCreateIndex: {
                         break;
                     }
                     default: {

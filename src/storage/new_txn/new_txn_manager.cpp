@@ -299,7 +299,6 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
-    // std::lock_guard guard(locker1_);
     Status status = txn->Commit();
     if (commit_ts_ptr != nullptr) {
         *commit_ts_ptr = txn->CommitTS();

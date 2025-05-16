@@ -1126,10 +1126,7 @@ bool NewTxn::GetTxnBottomDone() {
 bool NewTxn::NeedToAllocate() const {
     TransactionType txn_type = GetTxnType();
     switch (txn_type) {
-        case TransactionType::kOptimizeIndex: // for new chunk id
         case TransactionType::kCompact:       // for new segment id
-        case TransactionType::kDumpMemIndex:  // for new chunk id
-        case TransactionType::kCreateIndex:   // for data range to create index
         case TransactionType::kImport:        // for new segment id
         case TransactionType::kAppend:        // for data range to append
         case TransactionType::kUpdate: {      // for data range to append

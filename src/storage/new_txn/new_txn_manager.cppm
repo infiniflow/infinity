@@ -140,7 +140,6 @@ public:
     void SetSystemCache();
 
 private:
-    mutable std::mutex locker1_;
     mutable std::mutex locker_{};
     Storage *storage_{};
     BufferManager *buffer_mgr_{};
