@@ -145,6 +145,8 @@ public:
 
     void SetSystemCache();
 
+    void RemoveMapElementForRollback(TxnTimeStamp commit_ts);
+
 private:
     mutable std::mutex locker1_;
     mutable std::mutex locker_{};
