@@ -190,19 +190,9 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     TableMeeta &table_meta = *table_meta_opt;
 
-    // SegmentID segment_id = 0;
-    // status = table_meta.GetNextSegmentID(segment_id);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-    // status = table_meta.SetNextSegmentID(segment_id + 1);
-    // if (!status.ok()) {
-    //     return status;
-    // }
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<SegmentMeta> segment_meta;
-    // status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
     // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
@@ -228,17 +218,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         }
         u32 row_cnt = input_block->row_count();
 
-        // BlockID block_id = 0;
-        // {
-        //     std::tie(block_id, status) = segment_meta->GetNextBlockID();
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
-        //     status = segment_meta->SetNextBlockID(block_id + 1);
-        //     if (!status.ok()) {
-        //         return status;
-        //     }
-        // }
         Optional<BlockMeta> block_meta;
         // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
         status = NewCatalog::AddNewBlock1(*segment_meta, fake_commit_ts, block_meta);
