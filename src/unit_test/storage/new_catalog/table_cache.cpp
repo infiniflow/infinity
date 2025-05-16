@@ -33,269 +33,133 @@ TEST_P(TestTableCache, test_table_cache) {
     {
         UniquePtr<TableCache> table_cache_ptr = MakeUnique<TableCache>(1, "tbl1");
         EXPECT_EQ(table_cache_ptr->table_id(), 1);
-        EXPECT_TRUE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->uncommitted_append_infos_.size(), 0);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_, nullptr);
+        EXPECT_EQ(table_cache_ptr->sealed_segment_cache_map_.size(), 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 0);
 
-        Vector<Pair<RowID, u64>> ranges = table_cache_ptr->PrepareAppendRanges(8190, 2);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8190);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 0);
+        SharedPtr<AppendPrepareInfo> append_prepare_info = table_cache_ptr->PrepareAppendNolock(8190, 2);
+        EXPECT_NE(table_cache_ptr->unsealed_segment_cache_, nullptr);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8190);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 1);
-        EXPECT_EQ(ranges.size(), 1);
-        EXPECT_EQ(ranges[0].first, RowID(0, 0));
-        EXPECT_EQ(ranges[0].second, 8190);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(append_prepare_info->ranges_.size(), 1);
+        EXPECT_EQ(append_prepare_info->ranges_[0].first, RowID(0, 0));
+        EXPECT_EQ(append_prepare_info->ranges_[0].second, 8190);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8190);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 0);
 
-        ranges = table_cache_ptr->PrepareAppendRanges(2, 4);
-        EXPECT_EQ(ranges.size(), 1);
-        EXPECT_EQ(ranges[0].first, RowID(0, 8190));
-        EXPECT_EQ(ranges[0].second, 2);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8192);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 0);
+        append_prepare_info = table_cache_ptr->PrepareAppendNolock(2, 4);
+        EXPECT_EQ(append_prepare_info->ranges_.size(), 1);
+        EXPECT_EQ(append_prepare_info->ranges_[0].first, RowID(0, 8190));
+        EXPECT_EQ(append_prepare_info->ranges_[0].second, 2);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8192);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 1);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8192);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 0);
 
-        ranges = table_cache_ptr->PrepareAppendRanges(8190, 6);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 16382);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 0);
+        append_prepare_info = table_cache_ptr->PrepareAppendNolock(8190, 6);
+        EXPECT_EQ(append_prepare_info->ranges_.size(), 1);
+        EXPECT_EQ(append_prepare_info->ranges_[0].first, RowID(0, 8192));
+        EXPECT_EQ(append_prepare_info->ranges_[0].second, 8190);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 16382);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 1);
-        EXPECT_EQ(ranges.size(), 1);
-        EXPECT_EQ(ranges[0].first, RowID(0, 8192));
-        EXPECT_EQ(ranges[0].second, 8190);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 16382);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 0);
 
-        ranges = table_cache_ptr->PrepareAppendRanges(8190, 8);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 24572);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 0);
+        append_prepare_info = table_cache_ptr->PrepareAppendNolock(8190, 8);
+        EXPECT_EQ(append_prepare_info->ranges_.size(), 1);
+        EXPECT_EQ(append_prepare_info->ranges_[0].first, RowID(0, 16382));
+        EXPECT_EQ(append_prepare_info->ranges_[0].second, 8190);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 24572);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 1);
-        EXPECT_EQ(ranges.size(), 1);
-        EXPECT_EQ(ranges[0].first, RowID(0, 16382));
-        EXPECT_EQ(ranges[0].second, 8190);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 24572);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 0);
 
-        ranges.clear();
-        ranges.push_back(Pair<RowID, u64>(RowID(0, 0), 8190));
-        table_cache_ptr->CommitAppendRanges(ranges, 2);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 24572);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8190);
+        append_prepare_info = table_cache_ptr->uncommitted_append_infos_.front();
+        table_cache_ptr->CommitAppendNolock(append_prepare_info, append_prepare_info->transaction_id_);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 24572);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 1);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 24572);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
 
-        for (SizeT i = 0; i < 1025; ++i) {
+        for (SizeT i = 0; i < 1022; ++i) {
             TransactionID txn_id = 2 * i + 10;
-            ranges = table_cache_ptr->PrepareAppendRanges(8192, txn_id);
+            table_cache_ptr->PrepareAppendNolock(8192, txn_id);
         }
 
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 32764);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8190);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8188);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 2);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8188);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
 
-        for (SizeT i = 1024; i < 1024 + 1020; ++i) {
+        for (SizeT i = 1022; i < 1022 + 1023; ++i) {
             TransactionID txn_id = 2 * i + 10;
-            ranges = table_cache_ptr->PrepareAppendRanges(8192, txn_id);
+            table_cache_ptr->PrepareAppendNolock(8192, txn_id);
         }
 
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8388604);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8190);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8388604);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 2);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8388604);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8190);
 
-        Vector<SegmentID> import_segments = table_cache_ptr->GetImportSegments(2);
-        Vector<SegmentID> expected_segments;
-        expected_segments.emplace_back(2);
-        expected_segments.emplace_back(3);
-        EXPECT_EQ(import_segments, expected_segments);
+        auto import_info = table_cache_ptr->PrepareImportSegmentsNolock(2, 2045);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
+        EXPECT_EQ(table_cache_ptr->import_prepare_info_map_.size(), 1);
+        EXPECT_EQ(import_info->segment_ids_.size(), 2);
+        EXPECT_EQ(import_info->row_counts_.size(), 0);
+        EXPECT_EQ(import_info->indexes_.size(), 0);
 
-        ranges.clear();
-        ranges.push_back(Pair<RowID, u64>(RowID(0, 8190), 2));
-        table_cache_ptr->CommitAppendRanges(ranges, 4);
-        ranges.clear();
-        ranges.push_back(Pair<RowID, u64>(RowID(0, 8192), 8190));
-        table_cache_ptr->CommitAppendRanges(ranges, 6);
-        ranges.clear();
-        ranges.push_back(Pair<RowID, u64>(RowID(0, 16382), 8190));
-        table_cache_ptr->CommitAppendRanges(ranges, 8);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8388604);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 0);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 24572);
+        append_prepare_info = table_cache_ptr->uncommitted_append_infos_.front();
+        table_cache_ptr->CommitAppendNolock(append_prepare_info, append_prepare_info->transaction_id_);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8388604);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8388604);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 0);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8192);
 
-        SegmentOffset offset = 24572;
-        SegmentID segment_id = 0;
-        for (SizeT i = 0; i < 1025; ++i) {
-            TransactionID txn_id = 2 * i + 10;
-            ranges.clear();
-
-            if (offset + 8192 > 8388608) {
-                u64 len = 8388608 - offset;
-                ranges.push_back(Pair<RowID, u64>(RowID(segment_id, offset), len));
-                ++segment_id;
-                offset = 0;
-                len = 8192 - len;
-                ranges.push_back(Pair<RowID, u64>(RowID(segment_id, offset), len));
-                offset += len;
-            } else {
-                ranges.push_back(Pair<RowID, u64>(RowID(segment_id, offset), 8192));
-                offset += 8192;
-            }
-
-            table_cache_ptr->CommitAppendRanges(ranges, txn_id);
+        while (!table_cache_ptr->uncommitted_append_infos_.empty()) {
+            append_prepare_info = table_cache_ptr->uncommitted_append_infos_.front();
+            table_cache_ptr->CommitAppendNolock(append_prepare_info, append_prepare_info->transaction_id_);
         }
 
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8388604);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 32764);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->unsealed_segment_cache_->row_count_, 8388604);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
+        EXPECT_EQ(table_cache_ptr->prepare_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->prepare_segment_offset_, 8388604);
+        EXPECT_EQ(table_cache_ptr->commit_segment_id_, 1);
+        EXPECT_EQ(table_cache_ptr->commit_segment_offset_, 8388604);
 
-        for (SizeT i = 1024; i < 1024 + 1020; ++i) {
-            TransactionID txn_id = 2 * i + 10;
-            ranges.clear();
-
-            if (offset + 8192 > 8388608) {
-                u64 len = 8388608 - offset;
-                ranges.push_back(Pair<RowID, u64>(RowID(segment_id, offset), len));
-                ++segment_id;
-                offset = 0;
-                len = 8192 - len;
-                ranges.push_back(Pair<RowID, u64>(RowID(segment_id, offset), len));
-                offset += len;
-            } else {
-                ranges.push_back(Pair<RowID, u64>(RowID(segment_id, offset), 8192));
-                offset += 8192;
-            }
-
-            table_cache_ptr->CommitAppendRanges(ranges, txn_id);
-        }
-
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8388604);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8388604);
+        import_info->row_counts_.push_back(8190);
+        import_info->row_counts_.push_back(8190 * 1024);
+        table_cache_ptr->CommitImportSegmentsNolock(import_info, 2045);
         EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
-
-        ranges = table_cache_ptr->PrepareAppendRanges(4, 2 * (1024 + 1020) + 10);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8388608);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8388604);
-        EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
-        EXPECT_TRUE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
-
-        ranges.clear();
-        ranges.push_back(Pair<RowID, u64>(RowID(1, 8388604), 4));
-        table_cache_ptr->CommitAppendRanges(ranges, 2 * (1024 + 1020) + 10);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 8388608);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8388608);
-        EXPECT_EQ(table_cache_ptr->next_segment_id(), 4);
-        EXPECT_TRUE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
-
-        ranges = table_cache_ptr->PrepareAppendRanges(1, 2 * (1024 + 1021) + 10);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 4);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 8388608);
-        EXPECT_EQ(table_cache_ptr->next_segment_id(), 5);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_TRUE(table_cache_ptr->has_commit_unsealed_segment());
-
-        ranges.clear();
-        ranges.push_back(Pair<RowID, u64>(RowID(4, 0), 1));
-        table_cache_ptr->CommitAppendRanges(ranges, 2 * (1024 + 1021) + 10);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_id(), 4);
-        EXPECT_EQ(table_cache_ptr->prepare_unsealed_segment_offset(), 1);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_id(), 4);
-        EXPECT_EQ(table_cache_ptr->commit_unsealed_segment_offset(), 1);
-        EXPECT_EQ(table_cache_ptr->next_segment_id(), 5);
-        EXPECT_FALSE(table_cache_ptr->has_prepared_unsealed_segment());
-        EXPECT_FALSE(table_cache_ptr->has_commit_unsealed_segment());
-
-        RowID commit_unsealed_position = table_cache_ptr->GetCommitUnsealedPosition();
-        EXPECT_EQ(commit_unsealed_position.segment_id_, 4);
-        EXPECT_EQ(commit_unsealed_position.segment_offset_, 1);
-
-        SegmentID compact_segment_id = table_cache_ptr->GetCompactSegment();
-        EXPECT_EQ(compact_segment_id, 5);
-        EXPECT_EQ(table_cache_ptr->next_segment_id(), 6);
+        EXPECT_EQ(table_cache_ptr->import_prepare_info_map_.size(), 0);
     }
-    //    EXPECT_EQ(table_cache_ptr->capacity_position(), RowID(0, 0));
-    //    EXPECT_EQ(table_cache_ptr->data_position(), RowID(0, 0));
-    //
-    //    table_cache_ptr->UpdateCapacityPosition(0, 1);
-    //    EXPECT_EQ(table_cache_ptr->capacity_position(), RowID(0, 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateCapacityPosition(0, 1024u * 8192u - 1); // last offset of segment
-    //    EXPECT_EQ(table_cache_ptr->capacity_position(), RowID(0, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateDataPosition(0, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->data_position(), RowID(0, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateCapacityPosition(1, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->capacity_position(), RowID(1, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateDataPosition(1, 0);
-    //    EXPECT_EQ(table_cache_ptr->data_position(), RowID(1, 0));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateCapacityPosition(2, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->capacity_position(), RowID(2, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateCapacityPosition(3, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->capacity_position(), RowID(3, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{2});
-    //
-    //    table_cache_ptr->UpdateDataPosition(1, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->data_position(), RowID(1, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{2});
-    //
-    //    table_cache_ptr->UpdateDataPosition(2, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->data_position(), RowID(2, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    table_cache_ptr->UpdateDataPosition(3, 1024u * 8192u - 1);
-    //    EXPECT_EQ(table_cache_ptr->data_position(), RowID(3, 1024u * 8192u - 1));
-    //    EXPECT_EQ(table_cache_ptr->GetDiffSegments(), Deque<SegmentID>{});
-    //
-    //    EXPECT_ANY_THROW(table_cache_ptr->UpdateCapacityPosition(2, 1024u * 8192u - 1));
-    //    EXPECT_ANY_THROW(table_cache_ptr->UpdateCapacityPosition(3, 1024u * 8192u - 2));
-    //    EXPECT_ANY_THROW(table_cache_ptr->UpdateDataPosition(2, 1024u * 8192u - 1));
-    //    EXPECT_ANY_THROW(table_cache_ptr->UpdateDataPosition(3, 1024u * 8192u - 2));
 }

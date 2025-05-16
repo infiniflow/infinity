@@ -321,7 +321,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     import_txn_store->table_id_str_ = table_meta.table_id_str();
     import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
     import_txn_store->input_blocks_ = input_blocks;
-    import_txn_store->segment_id_ = segment_meta->segment_id();
+    import_txn_store->segment_ids_.emplace_back(segment_meta->segment_id());
 
     { // Add import wal;
         auto import_command =

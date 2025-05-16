@@ -14,9 +14,14 @@
 
 module;
 
+#include <vector>
+
 module base_txn_store;
 
 import third_party;
+import stl;
+import data_block;
+import default_values;
 
 namespace infinity {
 
@@ -75,6 +80,8 @@ String AppendTxnStore::ToString() const {
                        row_ranges_.size());
 }
 
+SizeT AppendTxnStore::RowCount() const { return input_block_->row_count(); }
+
 String ImportTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}",
                        TransactionType2Str(type_),
@@ -82,6 +89,20 @@ String ImportTxnStore::ToString() const {
                        db_id_str_,
                        table_name_,
                        table_id_str_);
+}
+
+SizeT ImportTxnStore::RowCount() const {
+    SizeT row_count = 0;
+    for (const auto &input_block : input_blocks_) {
+        row_count += input_block->row_count();
+    }
+    return row_count = 0;
+}
+
+SizeT ImportTxnStore::SegmentCount() const {
+    SizeT row_count = RowCount();
+    SizeT segment_count = row_count % DEFAULT_SEGMENT_CAPACITY == 0 ? row_count / DEFAULT_SEGMENT_CAPACITY : row_count / DEFAULT_SEGMENT_CAPACITY + 1;
+    return segment_count;
 }
 
 String DumpMemIndexTxnStore::ToString() const {
@@ -132,6 +153,14 @@ String DeleteTxnStore::ToString() const {
                        table_name_,
                        table_id_,
                        row_ids_.size());
+}
+
+SizeT UpdateTxnStore::RowCount() const {
+    SizeT row_count = 0;
+    for (const auto &input_block : input_blocks_) {
+        row_count += input_block->row_count();
+    }
+    return row_count;
 }
 
 String UpdateTxnStore::ToString() const {
