@@ -1174,7 +1174,7 @@ Status NewTxn::Commit() {
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
         LOG_TRACE(fmt::format("Commit READ txn: {}. begin ts: {}, Command: {}", txn_context_ptr_->txn_id_, BeginTS(), *GetTxnText()));
-        return PostReadTxnCommit();
+        return Status::OK();
     }
 
     StorageMode current_storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -1289,20 +1289,6 @@ Status NewTxn::CommitRecovery() {
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Replay transaction, commit: {}", status.message()));
     }
-    return Status::OK();
-}
-
-Status NewTxn::PostReadTxnCommit() {
-    // Restore the mem index reference count
-    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
-        }
-    }
-
     return Status::OK();
 }
 
@@ -3633,16 +3619,6 @@ void NewTxn::PostCommit() {
         }
     }
 
-    // Restore the mem index reference count
-    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
-        }
-    }
-
     TransactionType txn_type = GetTxnType();
     if (txn_type == TransactionType::kNewCheckpoint) {
         if (!wal_entry_->cmds_.empty()) {
@@ -3812,16 +3788,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         return status;
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
-
-    // Restore the mem index reference count
-    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post rollback phase: {}", status.message()));
-        }
-    }
 
     if (conflicted_txn_ != nullptr) {
         // Wait for dependent transaction finished
@@ -4210,21 +4176,6 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, file_paths);
-}
-
-Status NewTxn::IncreaseMemIndexReferenceCount(const String &table_key) {
-    Status status = new_catalog_->IncreaseTableReferenceCountForMemIndex(table_key);
-    if (status.ok()) {
-        ++mem_index_reference_count_[table_key];
-    }
-    return status;
-}
-
-SizeT NewTxn::GetMemIndexReferenceCount(const String &table_key) {
-    if (mem_index_reference_count_.find(table_key) == mem_index_reference_count_.end()) {
-        return 0;
-    }
-    return mem_index_reference_count_[table_key];
 }
 
 Status NewTxn::Dummy() {

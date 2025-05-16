@@ -178,8 +178,6 @@ public:
 
     Status CommitRecovery();
 
-    Status PostReadTxnCommit();
-
     bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
     bool CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
 
@@ -648,17 +646,11 @@ public:
                                   ChunkID chunk_id,
                                   Vector<String> &file_paths);
 
-    Status IncreaseMemIndexReferenceCount(const String &table_key);
-    SizeT GetMemIndexReferenceCount(const String &table_key);
-
     Status Dummy();
     void SetWalSize(i64 wal_size);
 
     // Get the table id which is used in the txn. Return empty string if no table is used.
     String GetTableIdStr();
-
-private:
-    HashMap<String, SizeT> mem_index_reference_count_{};
 
 private:
     // Reference to external class

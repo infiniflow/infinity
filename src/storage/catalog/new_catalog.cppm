@@ -226,13 +226,9 @@ public:
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
-    Status IncreaseTableReferenceCountForMemIndex(const String &table_key);
-    Status DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count);
     Status SetMemIndexDump(const String &table_key);
     Status UnsetMemIndexDump(const String &table_key);
     bool IsMemIndexDump(const String &table_key);
-    SizeT GetTableReferenceCountForMemIndex(const String &table_key);
-    SizeT GetTableReferenceCountForMemIndex() const;
 
 private:
     mutable std::shared_mutex mem_index_mtx_{};
