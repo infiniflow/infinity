@@ -392,11 +392,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    status = this->IncreaseMemIndexReferenceCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     Vector<Pair<RowID, u64>> row_ranges;
     std::tie(row_ranges, status) = GetRowRanges(*table_meta, input_block);
     if (!status.ok()) {
@@ -536,11 +531,6 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = this->IncreaseMemIndexReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }

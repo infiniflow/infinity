@@ -1187,64 +1187,6 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
     return result;
 }
 
-Status NewCatalog::IncreaseTableReferenceCountForMemIndex(const String &table_key) {
-    std::unique_lock lock(mem_index_mtx_);
-    auto iter = table_lock_for_mem_index_.find(table_key);
-    if (iter == table_lock_for_mem_index_.end()) {
-        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
-    }
-
-    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
-    if (table_lock_for_mem_index->dumping_mem_index_) {
-        return Status::DumpingMemIndex(fmt::format("Table key: {} is dumping mem index", table_key));
-    }
-
-    ++table_lock_for_mem_index->append_count_;
-
-    return Status::OK();
-}
-
-Status NewCatalog::DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count) {
-    std::unique_lock lock(mem_index_mtx_);
-    auto iter = table_lock_for_mem_index_.find(table_key);
-    if (iter == table_lock_for_mem_index_.end()) {
-        return Status::OK();
-    }
-
-    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
-    if (table_lock_for_mem_index->dumping_mem_index_) {
-        UnrecoverableError(fmt::format("Table key: {} is dumping mem index", table_key));
-    }
-
-    SizeT &append_count = table_lock_for_mem_index->append_count_;
-    if (append_count >= count) {
-        append_count -= count;
-    } else {
-        UnrecoverableError(fmt::format("Attempt to reduce reference count {} by {}, of {}", append_count, count, table_key));
-    }
-
-    if (append_count == 0) {
-        table_lock_for_mem_index_.erase(table_key);
-    }
-
-    return Status::OK();
-}
-
-SizeT NewCatalog::GetTableReferenceCountForMemIndex(const String &table_key) {
-    std::unique_lock lock(mem_index_mtx_);
-    auto iter = table_lock_for_mem_index_.find(table_key);
-    if (iter == table_lock_for_mem_index_.end()) {
-        return 0;
-    }
-
-    return iter->second->append_count_;
-}
-
-SizeT NewCatalog::GetTableReferenceCountForMemIndex() const {
-    std::unique_lock lock(mem_index_mtx_);
-    return table_lock_for_mem_index_.size();
-}
-
 Status NewCatalog::SetMemIndexDump(const String &table_key) {
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);
