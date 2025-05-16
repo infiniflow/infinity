@@ -143,10 +143,6 @@ NewTxn::~NewTxn() {
 #endif
 }
 
-NewTxnTableStore *NewTxn::GetNewTxnTableStore(const String &table_name) { return txn_store_.GetNewTxnTableStore(table_name); }
-
-NewTxnTableStore *NewTxn::GetExistNewTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistNewTxnTableStore(table_entry); }
-
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kStarted) {
@@ -1298,7 +1294,6 @@ Status NewTxn::Commit() {
     }
 
     if (status.ok()) {
-        txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
         status = this->PrepareCommit(commit_ts);
     }
 
@@ -1336,7 +1331,6 @@ Status NewTxn::CommitReplay() {
 
     this->SetTxnCommitting(commit_ts);
 
-    txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     Status status = this->PrepareCommitReplay(commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Replay transaction, prepare commit: {}", status.message()));
@@ -3664,12 +3658,6 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-}
-
-void NewTxn::AddWriteTxnNum(TableEntry *table_entry) {
-    const String &table_name = *table_entry->GetTableName();
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-    table_store->AddWriteTxnNum();
 }
 
 Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
