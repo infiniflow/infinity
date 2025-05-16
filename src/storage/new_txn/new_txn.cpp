@@ -1474,6 +1474,9 @@ Status NewTxn::PostReadTxnCommit() {
 
 Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
     // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
+    if (base_txn_store_.get() != nullptr) {
+        wal_entry_ = base_txn_store_->ToWalEntry();
+    }
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
