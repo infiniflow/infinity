@@ -73,23 +73,43 @@ void TxnAllocator::Process() {
                 switch (txn_type) {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
+                        SizeT row_count = txn_store->input_block_->row_count();
                         LOG_INFO(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
                                              txn_store->db_name_,
                                              txn_store->db_id_,
                                              txn_store->table_name_,
                                              txn_store->table_id_,
-                                             txn_store->input_block_->row_count()));
-                        txn_store->row_ranges_ = system_cache_->PrepareAppendRanges(txn_store->db_id_,
-                                                                                    txn_store->table_id_,
-                                                                                    txn_store->input_block_->row_count(),
-                                                                                    txn->TxnID());
-
+                                             row_count));
+                        SharedPtr<AppendPrepareInfo> append_info =
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
+                        txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
                     case TransactionType::kUpdate: {
+                        UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
+                        SizeT row_count = txn_store->RowCount();
+                        LOG_INFO(fmt::format("TxnAllocator: Update txn: db: {}, {}, table: {}, {}, data size: {}",
+                                             txn_store->db_name_,
+                                             txn_store->db_id_,
+                                             txn_store->table_name_,
+                                             txn_store->table_id_,
+                                             row_count));
+                        SharedPtr<AppendPrepareInfo> append_info =
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
+                        txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
                     case TransactionType::kImport: {
+                        ImportTxnStore *txn_store = static_cast<ImportTxnStore *>(base_txn_store);
+                        SizeT segment_count = txn_store->SegmentCount();
+                        LOG_INFO(fmt::format("TxnAllocator: Import txn: db: {}, {}, table: {}, {}, segment count: {}",
+                                             txn_store->db_name_,
+                                             txn_store->db_id_,
+                                             txn_store->table_name_,
+                                             txn_store->table_id_,
+                                             segment_count));
+                        SharedPtr<ImportPrepareInfo> import_info =
+                            system_cache_->PrepareImportSegments(txn_store->db_id_, txn_store->table_id_, segment_count, txn->TxnID());
                         break;
                     }
                     case TransactionType::kDumpMemIndex: {
@@ -101,27 +121,6 @@ void TxnAllocator::Process() {
                     case TransactionType::kCompact: {
                         break;
                     }
-                        //                    case TransactionType::kCreateDB: {
-                        //                        CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store);
-                        //                        std::tie(txn_store->db_id_, txn_allocator_task->status_) =
-                        //                        system_cache_->AddNewDbCache(txn_store->db_name_); if (txn_allocator_task->status_.ok()) {
-                        //                            LOG_DEBUG(fmt::format("CreateDB txn: db: {}, {}", txn_store->db_name_, txn_store->db_id_));
-                        //                        } else {
-                        //                            LOG_DEBUG(txn_allocator_task->status_.message());
-                        //                        }
-                        //
-                        //                        break;
-                        //                    }
-                        //                    case TransactionType::kCreateTable: {
-                        //                        CreateTableTxnStore *txn_store = static_cast<CreateTableTxnStore *>(base_txn_store);
-                        //                        txn_store->table_id_ = system_cache_->AddNewTableCache(txn_store->db_id_);
-                        //                        LOG_INFO(fmt::format("CreateTable txn: db: {}, {}, table: {}, {}",
-                        //                                             txn_store->db_name_,
-                        //                                             txn_store->db_id_,
-                        //                                             txn_store->table_name_,
-                        //                                             txn_store->table_id_));
-                        //                        break;
-                        //                    }
                     case TransactionType::kCreateIndex: {
                         break;
                     }
