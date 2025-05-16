@@ -607,7 +607,7 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     return Status::OK();
 }
 
-Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<AppendRange> &append_ranges) {
+Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Pair<RowID, u64>> &append_ranges) {
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -644,47 +644,27 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
         return Status::OK();
     };
 
-    for (const AppendRange &range : append_ranges) {
-        if (!segment_meta || segment_meta->segment_id() != range.segment_id_) {
-            segment_meta.emplace(range.segment_id_, table_index_meta.table_meta());
-
-            {
-                auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+    for (const Pair<RowID, u64> &range : append_ranges) {
+        SegmentID segment_id = range.first.segment_id_;
+        BlockID block_id = range.first.segment_offset_ >> BLOCK_OFFSET_SHIFT;
+        cur_offset = range.first.segment_offset_ & BLOCK_OFFSET_MASK;
+        cur_row_cnt = range.second;
+        if (!segment_meta || segment_meta->segment_id() != segment_id) {
+            segment_meta.emplace(segment_id, table_index_meta.table_meta());
+            if (!table_index_meta.HasSegmentIndexID(segment_id)) {
+                Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
                 if (!status.ok()) {
                     return status;
                 }
-                auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), range.segment_id_);
-                if (iter == segment_ids_ptr->end()) {
-                    status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, range.segment_id_, segment_index_meta);
-                    if (!status.ok()) {
-                        return status;
-                    }
-                } else {
-                    segment_index_meta.emplace(range.segment_id_, table_index_meta);
-                }
+            } else {
+                segment_index_meta.emplace(segment_id, table_index_meta);
             }
-            block_meta.reset();
         }
-        if (!block_meta || block_meta->block_id() != range.block_id_) {
-            if (block_meta) {
-                append_in_column();
-            }
-            block_meta.emplace(range.block_id_, segment_meta.value());
-            column_meta.emplace(column_idx, *block_meta);
-            cur_offset = range.start_offset_;
-            cur_row_cnt = range.row_count_;
-        } else {
-            if (cur_offset + cur_row_cnt != range.start_offset_) {
-                UnrecoverableError("AppendIndex: append range is not continuous");
-            }
-            cur_row_cnt += range.row_count_;
+        if (!block_meta || block_meta->block_id() != block_id) {
+            block_meta.emplace(block_id, segment_meta.value());
+            column_meta.emplace(column_idx, block_meta.value());
         }
-    }
-    if (cur_row_cnt > 0) {
-        Status status = append_in_column();
-        if (!status.ok()) {
-            return status;
-        }
+        append_in_column();
     }
 
     return Status::OK();
@@ -1705,7 +1685,7 @@ Status NewTxn::AddChunkWal(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges) {
+Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges) {
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
@@ -1769,7 +1749,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
             if (!status.ok()) {
                 return status;
             }
-            append_ranges.emplace_back(segment_id, block_id, block_offset, block_row_cnt - block_offset);
+            append_ranges.emplace_back(RowID(segment_id, (u32(block_id) << BLOCK_OFFSET_SHIFT) + block_offset), block_row_cnt - block_offset);
             block_offset = 0;
         }
     }
@@ -1791,7 +1771,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
         return status;
     }
 
-    Vector<AppendRange> append_ranges;
+    Vector<Pair<RowID, u64>> append_ranges;
     HashSet<SegmentID> index_segment_ids_set(index_segment_ids_ptr->begin(), index_segment_ids_ptr->end());
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);

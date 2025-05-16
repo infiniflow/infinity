@@ -82,7 +82,6 @@ struct MemIndex;
 struct NewTxnCompactState;
 
 struct AppendState;
-struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
 
@@ -181,7 +180,7 @@ public:
     bool CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
     bool CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query);
 
-    Status PrepareCommit(TxnTimeStamp commit_ts);
+    Status PrepareCommit();
 
     void CommitBottom();
 
@@ -329,8 +328,7 @@ private:
                        const String &table_name,
                        const String &table_key,
                        TableMeeta &table_meta,
-                       const SharedPtr<DataBlock> &input_block,
-                       const Vector<Pair<RowID, u64>> &row_ranges);
+                       const SharedPtr<DataBlock> &input_block);
 
     Status DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids);
 
@@ -478,7 +476,7 @@ private:
 
     Status DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids);
 
-    Status AppendIndex(TableIndexMeeta &table_index_meta, const Vector<AppendRange> &append_ranges);
+    Status AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Pair<RowID, u64>> &append_ranges);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
@@ -543,7 +541,7 @@ private:
 
     Status CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option);
 
-    Status CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges);
+    Status CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges);
 
 public:
     Status RecoverMemIndex(TableIndexMeeta &table_index_meta);
@@ -563,8 +561,7 @@ private:
     Status CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
     Status CommitImport(WalCmdImportV2 *import_cmd);
-    Status CommitAppend(WalCmdAppendV2 *append_cmd, KVInstance *kv_instance);
-    Status PostCommitAppend(const WalCmdAppendV2 *append_cmd, KVInstance *kv_instance);
+    Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
     Status RollbackDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
     Status CommitCompact(WalCmdCompactV2 *compact_cmd);

@@ -70,7 +70,7 @@ export struct BaseTxnStore {
     TransactionType type_{TransactionType::kInvalid};
 
     virtual String ToString() const = 0;
-    virtual SharedPtr<WalEntry> ToWalEntry() const = 0;
+    virtual SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const = 0;
     virtual ~BaseTxnStore() = default;
 };
 
@@ -83,7 +83,7 @@ export struct CreateDBTxnStore : public BaseTxnStore {
     SharedPtr<String> comment_ptr_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropDBTxnStore : public BaseTxnStore {
@@ -94,7 +94,7 @@ export struct DropDBTxnStore : public BaseTxnStore {
     u64 db_id_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateTableTxnStore : public BaseTxnStore {
@@ -109,7 +109,7 @@ export struct CreateTableTxnStore : public BaseTxnStore {
     SharedPtr<TableDef> table_def_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropTableTxnStore : public BaseTxnStore {
@@ -124,7 +124,7 @@ export struct DropTableTxnStore : public BaseTxnStore {
     String table_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct RenameTableTxnStore : public BaseTxnStore {
@@ -138,7 +138,7 @@ export struct RenameTableTxnStore : public BaseTxnStore {
     String old_table_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CreateIndexTxnStore : public BaseTxnStore {
@@ -155,7 +155,7 @@ export struct CreateIndexTxnStore : public BaseTxnStore {
     String table_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropIndexTxnStore : public BaseTxnStore {
@@ -173,7 +173,7 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     String index_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct OptimizeIndexTxnStore : public BaseTxnStore {
@@ -214,7 +214,7 @@ export struct AppendTxnStore : public BaseTxnStore {
     Vector<MemIndexRange> mem_indexes_to_dump_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     SizeT RowCount() const;
 };
 
@@ -233,7 +233,7 @@ export struct ImportTxnStore : public BaseTxnStore {
     WalSegmentInfo segment_info_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     SizeT RowCount() const;
     SizeT SegmentCount() const;
 };
@@ -255,7 +255,7 @@ export struct DumpMemIndexTxnStore : public BaseTxnStore {
     String table_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct AddColumnsTxnStore : public BaseTxnStore {
@@ -272,7 +272,7 @@ export struct AddColumnsTxnStore : public BaseTxnStore {
     String table_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DropColumnsTxnStore : public BaseTxnStore {
@@ -290,7 +290,7 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
     String table_key_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct CompactTxnStore : public BaseTxnStore {
@@ -308,7 +308,7 @@ export struct CompactTxnStore : public BaseTxnStore {
     Vector<SegmentID> deprecated_segment_ids_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct DeleteTxnStore : public BaseTxnStore {
@@ -324,7 +324,7 @@ export struct DeleteTxnStore : public BaseTxnStore {
     Vector<RowID> row_ids_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct UpdateTxnStore : public BaseTxnStore {
@@ -351,7 +351,7 @@ export struct UpdateTxnStore : public BaseTxnStore {
     Vector<RowID> row_ids_{};
 
     String ToString() const final;
-    SharedPtr<WalEntry> ToWalEntry() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
     SizeT RowCount() const;
 };
 

@@ -29,8 +29,9 @@ namespace infinity {
 String CreateDBTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id:{}, comment: {}", TransactionType2Str(type_), db_name_, db_id_, *comment_ptr_);
 }
-SharedPtr<WalEntry> CreateDBTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> CreateDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name_, db_id_str_, *comment_ptr_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -38,8 +39,9 @@ SharedPtr<WalEntry> CreateDBTxnStore::ToWalEntry() const {
 
 String DropDBTxnStore::ToString() const { return fmt::format("{}: database: {}, db_id: {}", TransactionType2Str(type_), db_name_, db_id_); }
 
-SharedPtr<WalEntry> DropDBTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> DropDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabaseV2>(db_name_, db_id_str_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -49,8 +51,9 @@ String CreateTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_id_);
 }
 
-SharedPtr<WalEntry> CreateTableTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> CreateTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name_, db_id_str_, table_id_str_, table_def_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -60,8 +63,9 @@ String DropTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, table_name_, table_id_str_);
 }
 
-SharedPtr<WalEntry> DropTableTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> DropTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropTableV2>(db_name_, db_id_str_, table_name_, table_id_str_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -76,8 +80,9 @@ String RenameTableTxnStore::ToString() const {
                        new_table_name_);
 }
 
-SharedPtr<WalEntry> RenameTableTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> RenameTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command =
         MakeShared<WalCmdRenameTableV2>(db_name_, db_id_str_, old_table_name_, table_id_str_, new_table_name_, old_table_key_);
     wal_entry->cmds_.push_back(wal_command);
@@ -94,8 +99,9 @@ String CreateIndexTxnStore::ToString() const {
                        index_id_str_);
 }
 
-SharedPtr<WalEntry> CreateIndexTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> CreateIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command =
         MakeShared<WalCmdCreateIndexV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_id_str_, index_base_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
@@ -113,8 +119,9 @@ String DropIndexTxnStore::ToString() const {
                        index_id_str_);
 }
 
-SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command =
         MakeShared<WalCmdDropIndexV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, index_key_);
     wal_entry->cmds_.push_back(wal_command);
@@ -145,8 +152,9 @@ String AppendTxnStore::ToString() const {
 
 SizeT AppendTxnStore::RowCount() const { return input_block_->row_count(); }
 
-SharedPtr<WalEntry> AppendTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> AppendTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ranges_, input_block_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -156,8 +164,9 @@ String ImportTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_name_, table_id_);
 }
 
-SharedPtr<WalEntry> ImportTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_info_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -188,10 +197,12 @@ String DumpMemIndexTxnStore::ToString() const {
                        index_id_);
 }
 
-SharedPtr<WalEntry> DumpMemIndexTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> DumpMemIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
-    SharedPtr<WalCmd> wal_command =
+    wal_entry->commit_ts_ = commit_ts;
+    SharedPtr<WalCmdDumpIndexV2> wal_command =
         MakeShared<WalCmdDumpIndexV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, segment_id_, table_key_);
+    wal_command->dump_cause_ = DumpIndexCause::kDumpMemIndex;
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -206,8 +217,9 @@ String AddColumnsTxnStore::ToString() const {
                        column_defs_.size());
 }
 
-SharedPtr<WalEntry> AddColumnsTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> AddColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAddColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_defs_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -223,8 +235,9 @@ String DropColumnsTxnStore::ToString() const {
                        column_names_.size());
 }
 
-SharedPtr<WalEntry> DropColumnsTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> DropColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command =
         MakeShared<WalCmdDropColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_names_, column_ids_, table_key_);
     wal_entry->cmds_.push_back(wal_command);
@@ -242,8 +255,9 @@ String CompactTxnStore::ToString() const {
                        fmt::join(segment_ids_, " "));
 }
 
-SharedPtr<WalEntry> CompactTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command =
         MakeShared<WalCmdCompactV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_, deprecated_segment_ids_);
     wal_entry->cmds_.push_back(wal_command);
@@ -268,8 +282,9 @@ SizeT UpdateTxnStore::RowCount() const {
     return row_count;
 }
 
-SharedPtr<WalEntry> DeleteTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> DeleteTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDeleteV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ids_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
@@ -286,8 +301,9 @@ String UpdateTxnStore::ToString() const {
                        row_ids_.size());
 }
 
-SharedPtr<WalEntry> UpdateTxnStore::ToWalEntry() const {
+SharedPtr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command1 = MakeShared<WalCmdDeleteV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ids_);
     wal_entry->cmds_.push_back(wal_command1);
     if (!input_blocks_.empty()) {

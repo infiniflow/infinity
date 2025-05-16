@@ -103,9 +103,11 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    if (file_size < buffer_size_) {
+    if (file_size < buffer_size_ && buffer_size_ != 0) {
         String error_message = fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_);
         UnrecoverableError(error_message);
+    } else {
+        buffer_size_ = file_size;
     }
 
     auto buffer = MakeUnique<char[]>(buffer_size_);
@@ -122,9 +124,11 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
 }
 
 bool VarFileWorker::ReadFromMmapImpl(const void *ptr, SizeT file_size) {
-    if (file_size < buffer_size_) {
+    if (file_size < buffer_size_ && buffer_size_ != 0) {
         String error_message = fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_);
         UnrecoverableError(error_message);
+    } else {
+        buffer_size_ = file_size;
     }
     auto *var_buffer = new VarBuffer(buffer_obj_, static_cast<const char *>(ptr), buffer_size_);
     mmap_data_ = reinterpret_cast<u8 *>(var_buffer);

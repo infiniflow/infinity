@@ -1188,6 +1188,7 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
 }
 
 Status NewCatalog::SetMemIndexDump(const String &table_key) {
+    LOG_INFO(fmt::format("SetMemIndexDump {}", table_key));
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);
     if (iter == table_lock_for_mem_index_.end()) {
@@ -1206,6 +1207,7 @@ Status NewCatalog::SetMemIndexDump(const String &table_key) {
 }
 
 Status NewCatalog::UnsetMemIndexDump(const String &table_key) {
+    LOG_INFO(fmt::format("UnsetMemIndexDump {}", table_key));
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);
     if (iter == table_lock_for_mem_index_.end()) {
