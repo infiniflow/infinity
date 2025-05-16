@@ -52,13 +52,9 @@ public:
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
 
-    bool SetTxnCheckpoint(NewTxn *txn);
-
     NewTxn *GetTxn(TransactionID txn_id) const;
 
     TxnState GetTxnState(TransactionID txn_id) const;
-
-    bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     inline void Lock() { locker_.lock(); }
 
@@ -98,8 +94,6 @@ public:
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
-
-    TxnTimeStamp GetNewTimeStamp();
 
     TxnTimeStamp GetCleanupScanTS1();
 

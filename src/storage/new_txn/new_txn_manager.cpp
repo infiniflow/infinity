@@ -202,26 +202,6 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
     return recovery_txn;
 }
 
-bool NewTxnManager::SetTxnCheckpoint(NewTxn *txn) {
-    TxnTimeStamp begin_ts = txn->BeginTS();
-    std::lock_guard guard(locker_);
-    if (txn->txn_context()->txn_type_ == TransactionType::kNewCheckpoint) {
-        return true;
-    }
-
-    if (ckp_begin_ts_ == UNCOMMIT_TS) {
-        LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
-        ckp_begin_ts_ = begin_ts;
-    } else {
-        LOG_WARN(
-            fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn", ckp_begin_ts_, begin_ts));
-        return false;
-    }
-    txn->txn_context()->txn_type_ = TransactionType::kNewCheckpoint;
-
-    return true;
-}
-
 NewTxn *NewTxnManager::GetTxn(TransactionID txn_id) const {
     std::lock_guard guard(locker_);
     NewTxn *res = txn_map_.at(txn_id).get();
@@ -236,20 +216,6 @@ TxnState NewTxnManager::GetTxnState(TransactionID txn_id) const {
     }
     NewTxn *txn = iter->second.get();
     return txn->GetTxnState();
-}
-
-bool NewTxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    std::lock_guard guard(locker_);
-    auto iter = txn_map_.find(txn_id);
-    if (iter == txn_map_.end()) {
-        return true; // NewTxn is already committed
-    }
-    NewTxn *txn = iter->second.get();
-    auto state = txn->GetTxnState();
-    if (state != TxnState::kCommitting && state != TxnState::kCommitted) {
-        return false;
-    }
-    return txn->CommitTS() < begin_ts;
 }
 
 // Prepare to commit ReadTxn
@@ -422,8 +388,6 @@ void NewTxnManager::SetNewSystemTS(TxnTimeStamp new_system_ts) {
     current_ts_ = new_system_ts;
     prepare_commit_ts_ = new_system_ts;
 }
-
-TxnTimeStamp NewTxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
     std::lock_guard guard(locker_);
