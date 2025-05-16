@@ -1266,10 +1266,12 @@ Status NewTxn::CommitReplay() {
 
     this->SetTxnCommitting(commit_ts);
 
-    Status status = this->PrepareCommitReplay(commit_ts);
+    Status status = this->PrepareCommit(commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Replay transaction, prepare commit: {}", status.message()));
     }
+
+    CommitBottom();
 
     // Try to commit the transaction
     status = kv_instance_->Commit();
@@ -1279,174 +1281,6 @@ Status NewTxn::CommitReplay() {
     PostCommit();
 
     return Status::OK();
-}
-
-Status NewTxn::PrepareCommitReplay(TxnTimeStamp commit_ts) {
-    // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
-    for (auto &command : wal_entry_->cmds_) {
-        WalCommandType command_type = command->GetType();
-        switch (command_type) {
-            case WalCommandType::DUMMY: {
-                break;
-            }
-            case WalCommandType::CREATE_DATABASE_V2: {
-                auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
-                Status status = CommitReplayCreateDB(create_db_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_DATABASE_V2: {
-                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
-                Status status = CommitDropDB(drop_db_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::CREATE_TABLE_V2: {
-                auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
-                Status status = CommitCreateTable(create_table_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_TABLE_V2: {
-                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
-                Status status = CommitDropTable(drop_table_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::RENAME_TABLE_V2: {
-                auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
-                Status status = CommitRenameTable(rename_table_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::ADD_COLUMNS_V2: {
-                auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
-                Status status = CommitAddColumns(add_column_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_COLUMNS_V2: {
-                auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
-                Status status = CommitDropColumns(drop_column_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::CREATE_INDEX_V2: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
-                Status status = CommitCreateIndex(create_index_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_INDEX_V2: {
-                auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
-                Status status = CommitDropIndex(drop_index_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DUMP_INDEX_V2: {
-                // TODO: move follow to post commit
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::APPEND_V2: {
-                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
-                Status status = CommitAppend(append_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = PostCommitAppend(append_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DELETE_V2: {
-                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
-
-                Status status = PrepareCommitDelete(delete_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::IMPORT_V2: {
-                auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
-                Status status = CommitImport(import_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::COMPACT_V2: {
-                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
-                Status status = CommitCompact(compact_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::CHECKPOINT_V2: {
-                auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-                Status status = CommitCheckpoint(checkpoint_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to checkpoint");
-                }
-                break;
-            }
-            case WalCommandType::OPTIMIZE_V2: {
-                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
-                break;
-            }
-            default: {
-                UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
-                break;
-            }
-        }
-    }
-
-    String commit_ts_str = std::to_string(commit_ts);
-    for (const String &meta_key : keys_wait_for_commit_) {
-        kv_instance_->Put(meta_key, commit_ts_str);
-    }
-    return Status::OK();
-}
-
-Status NewTxn::CommitReplayCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
-    Optional<DBMeeta> db_meta;
-    const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
-    Status status = NewCatalog::AddNewDB(kv_instance_.get(), create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
-    if (!status.ok()) {
-        return status;
-    }
-    // IncreaseLatestDBID
-    SizeT id_num = std::stoull(create_db_cmd->db_id_);
-    ++id_num;
-    status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
-    return status;
 }
 
 Status NewTxn::CommitRecovery() {

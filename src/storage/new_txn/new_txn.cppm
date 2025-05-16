@@ -176,8 +176,6 @@ public:
 
     Status CommitReplay();
 
-    Status PrepareCommitReplay(TxnTimeStamp commit_ts);
-
     Status CommitRecovery();
 
     Status PostReadTxnCommit();
@@ -557,8 +555,6 @@ public:
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
 private:
-    Status CommitReplayCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
-
     Status CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
     Status CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
