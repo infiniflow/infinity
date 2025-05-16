@@ -1304,13 +1304,9 @@ Status NewTxn::Commit() {
 
     if (!status.ok()) {
         // If prepare commit or conflict check failed, rollback the transaction
+
+        txn_mgr_->RemoveMapElementForRollback(commit_ts);
         this->SetTxnRollbacking(commit_ts);
-
-        txn_mgr_->SendToWAL(this);
-
-        // Wait until CommitTxnBottom is done.
-        std::unique_lock<std::mutex> lk(commit_lock_);
-        commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
         PostRollback(commit_ts);
         return status;
@@ -1326,6 +1322,7 @@ Status NewTxn::Commit() {
 
     PostCommit();
 
+    // commit_bottom_done_ = false;
     return Status::OK();
 }
 
@@ -3326,15 +3323,15 @@ void NewTxn::CommitBottom() {
     txn_mgr_->CommitBottom(this);
 }
 
-void NewTxn::RollbackBottom() {
-    TransactionID txn_id = this->TxnID();
-    LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
-    TxnState txn_state = this->GetTxnState();
-    if (txn_state != TxnState::kRollbacking) {
-        UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
-    }
-    txn_mgr_->CommitBottom(this);
-}
+// void NewTxn::RollbackBottom() {
+//     TransactionID txn_id = this->TxnID();
+//     LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
+//     TxnState txn_state = this->GetTxnState();
+//     if (txn_state != TxnState::kRollbacking) {
+//         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
+//     }
+//     txn_mgr_->CommitBottom(this);
+// }
 
 void NewTxn::NotifyTopHalf() {
     TxnState txn_state = this->GetTxnState();
