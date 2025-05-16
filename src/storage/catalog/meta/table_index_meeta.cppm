@@ -58,6 +58,8 @@ public:
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
+    bool HasSegmentIndexID(SegmentID segment_id);
+
     Status AddSegmentID(SegmentID segment_id);
 
     Status AddSegmentIndexID1(SegmentID segment_id, NewTxn *new_txn);
