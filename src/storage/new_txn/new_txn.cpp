@@ -659,6 +659,13 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
+    // Get latest index id and lock the id
+    String index_id_str;
+    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
+    if (!status.ok()) {
+        return status;
+    }
+
     String index_key;
     String index_id;
     status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
@@ -668,13 +675,6 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         }
         return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     } else if (status.code() != ErrorCode::kIndexNotExist) {
-        return status;
-    }
-
-    // Get latest index id and lock the id
-    String index_id_str;
-    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
-    if (!status.ok()) {
         return status;
     }
 
