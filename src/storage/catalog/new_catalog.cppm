@@ -198,8 +198,8 @@ public:
     Status RestoreCatalogCache(Storage *storage_ptr);
 
     SharedPtr<SystemCache> GetSystemCache() const;
+    SystemCache* GetSystemCachePtr() const;
 
-    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const;                                                  // used by append in allocation
 private:
     KVStore *kv_store_{};
 
@@ -337,7 +337,11 @@ public:
 
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
 
+    static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id);
+
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
+
+    static Status LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
     static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 

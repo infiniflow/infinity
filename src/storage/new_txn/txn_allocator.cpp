@@ -68,8 +68,8 @@ void TxnAllocator::Process() {
                 running = false;
             } else {
                 NewTxn *txn = txn_allocator_task->txn_ptr();
-                TransactionType txn_type = txn->GetTxnType();
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                TransactionType txn_type = base_txn_store->type_;
                 switch (txn_type) {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
@@ -112,16 +112,7 @@ void TxnAllocator::Process() {
                             system_cache_->PrepareImportSegments(txn_store->db_id_, txn_store->table_id_, segment_count, txn->TxnID());
                         break;
                     }
-                    case TransactionType::kDumpMemIndex: {
-                        break;
-                    }
-                    case TransactionType::kOptimizeIndex: {
-                        break;
-                    }
                     case TransactionType::kCompact: {
-                        break;
-                    }
-                    case TransactionType::kCreateIndex: {
                         break;
                     }
                     default: {

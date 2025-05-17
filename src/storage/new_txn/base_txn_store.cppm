@@ -260,6 +260,7 @@ export struct CompactTxnStore : public BaseTxnStore {
     u64 db_id_{};
     u64 table_id_{};
 
+    SegmentID new_segment_id_{};
     Vector<SegmentID> segment_ids_{};
 
     String ToString() const final;

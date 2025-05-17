@@ -49,6 +49,14 @@ export struct SegmentIndexPrepareInfo {
     SizeT row_count_{};
 };
 
+export struct DumpMemIndexPrepareInfo {
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+    SegmentOffset start_offset_{};
+    SizeT row_count_{};
+    u64 index_id_;
+};
+
 export struct CreateIndexPrepareInfo {
     u64 index_id_{};
     String index_name_{};
@@ -153,13 +161,7 @@ public:
     SharedPtr<CompactPrepareInfo> PrepareCompactSegmentsNolock(const Vector<SegmentID> &segment_ids, TransactionID txn_id);
     void CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
 
-    // Optimize segments
-    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegmentsNolock(const Vector<SegmentID> &segment_ids);
-    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegmentsNolock();
-    void CommitOptimizeSegmentsNolock(const SharedPtr<OptimizePrepareInfo> &import_prepare_info);
-
-    Tuple<SharedPtr<ImportPrepareInfo>, Status> GetNewSegmentIDsNolock(SizeT segment_count);
-    Pair<RowID, u64> PrepareDumpIndexRangeNolock(u64 index_id); // used by dump mem index and create index
+    Vector<SegmentID> ApplySegmentIDsNolock(u64 segment_count);
 
     void AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache);
     void DropTableIndexCacheNolock(u64 index_id);
@@ -224,10 +226,8 @@ public:
     // Drop table
     void DropTableCache(u64 db_id, u64 table_id);
 
-    // Create index
-    Tuple<u64, Status> AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
-    Tuple<SharedPtr<CreateIndexPrepareInfo>, Status> PrepareNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
-    void CommitNewIndexCache(u64 db_id, u64 table_id, const SharedPtr<CreateIndexPrepareInfo> &index_prepare_info);
+    // Create index to cache
+    void AddNewIndexCache(u64 db_id, u64 table_id, const String &index_name);
 
     // Drop index
     void DropIndexCache(u64 db_id, u64 table_id, u64 index_id);
@@ -240,10 +240,7 @@ public:
     SharedPtr<CompactPrepareInfo> PrepareCompactSegments(u64 db_id, u64 table_id, const Vector<SegmentID> &segment_ids, TransactionID txn_id);
     void CommitCompactSegments(u64 db_id, u64 table_id, const SharedPtr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
 
-    // Optimize segments
-    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegments(u64 db_id, u64 table_id, const Vector<SegmentID> &segment_ids);
-    Tuple<SharedPtr<OptimizePrepareInfo>, Status> PrepareOptimizeSegments(u64 db_id, u64 table_id);
-    void CommitOptimizeSegments(u64 db_id, u64 table_id, const SharedPtr<OptimizePrepareInfo> &import_prepare_info);
+    Vector<SegmentID> ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count);
 
     // Append and update
     SharedPtr<AppendPrepareInfo> PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);

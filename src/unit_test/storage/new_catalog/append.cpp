@@ -4759,12 +4759,11 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
 
         SharedPtr<DataBlock> input_block1 = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kAppend);
         Status status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
-
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name, *table_name, {0, 1});
@@ -4797,11 +4796,11 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({0, 1, 2});
+        CheckTable({2, 3});
 
         DropDB();
     }

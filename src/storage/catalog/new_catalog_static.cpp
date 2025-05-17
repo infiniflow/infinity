@@ -704,6 +704,19 @@ Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts
     return Status::OK();
 }
 
+Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
+    Status status = table_meta.AddSegmentWithID(commit_ts, segment_id);
+    if (!status.ok()) {
+        return status;
+    }
+    segment_meta.emplace(segment_id, table_meta);
+    status = segment_meta->InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status;
 
@@ -712,11 +725,29 @@ Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentI
     if (!status.ok()) {
         return status;
     }
-    if (segment_id != segment_info.segment_id_) {
-        UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_info.segment_id_));
-    }
 
     SegmentMeta segment_meta(segment_id, table_meta);
+    status = segment_meta.InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
+    Status status = table_meta.AddSegmentWithID(checkpoint_ts, segment_info.segment_id_);
+    if (!status.ok()) {
+        return status;
+    }
+
+    SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
     status = segment_meta.InitSet();
     if (!status.ok()) {
         return status;

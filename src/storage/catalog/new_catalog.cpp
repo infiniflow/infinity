@@ -1512,18 +1512,6 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
 
 SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_; }
 
-SharedPtr<TableCache> NewCatalog::GetTableCache(u64 db_id, u64 table_id) const {
-    std::unique_lock lock(catalog_cache_mtx_);
-    auto db_iter = table_cache_map_.find(db_id);
-    if (db_iter == table_cache_map_.end()) {
-        return nullptr;
-    }
-    SharedPtr<HashMap<u64, SharedPtr<TableCache>>> db_map = db_iter->second;
-    auto table_iter = db_map->find(table_id);
-    if (table_iter == db_map->end()) {
-        return nullptr;
-    }
-    return table_iter->second;
-}
+SystemCache *NewCatalog::GetSystemCachePtr() const { return system_cache_.get(); }
 
 } // namespace infinity
