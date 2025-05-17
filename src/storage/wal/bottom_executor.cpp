@@ -29,7 +29,7 @@ BottomExecutor::BottomExecutor(SizeT pool_size) {
     for (SizeT i = 0; i < pool_size; ++i) {
         String name = fmt::format("BottomExecutor_{}", i);
         txn_queues_.emplace_back(MakeShared<BlockingQueue<NewTxn *>>(name));
-        SharedPtr<BlockingQueue<NewTxn *>> queue = txn_queues_.back();
+        SharedPtr<BlockingQueue<NewTxn *>> &queue = txn_queues_.back();
         auto executor = [&, queue] {
             Vector<NewTxn *> txns;
             while (running_.load()) {
@@ -37,12 +37,7 @@ BottomExecutor::BottomExecutor(SizeT pool_size) {
                 if (got) {
                     SizeT txns_size = txns.size();
                     for (SizeT i = 0; i < txns_size; ++i) {
-                        TxnState txn_state = txns[i]->GetTxnState();
-                        if (txn_state == TxnState::kCommitting) {
-                            txns[i]->CommitBottom();
-                        } else {
-                            txns[i]->RollbackBottom();
-                        }
+                        txns[i]->CommitBottom();
                     }
                     txns.clear();
                     std::unique_lock<std::mutex> lock(mutex_);

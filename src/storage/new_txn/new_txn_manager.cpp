@@ -333,8 +333,11 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
-    // std::lock_guard guard(locker1_);
-    Status status = txn->Commit();
+    Status status;
+    {
+        // std::lock_guard guard(locker1_);
+        status = txn->Commit();
+    }
     if (commit_ts_ptr != nullptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
@@ -462,10 +465,10 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
         }
         bottom_txns_.erase(iter);
         current_ts_ = it_ts;
-        if (it_txn->GetTxnState() == TxnState::kCommitting) {
-            // TODO: rollback txn shouldn't be here.
-            UpdateCatalogCache(it_txn.get());
-        }
+        // if (it_txn->GetTxnState() == TxnState::kCommitting) {
+        // TODO: rollback txn shouldn't be here.
+        UpdateCatalogCache(it_txn.get());
+        // }
         it_txn->NotifyTopHalf();
     }
 }
@@ -644,8 +647,9 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
-        res.reserve(check_txns_.size());
-        for (SizeT i = 0; i < check_txns_.size(); ++i) {
+        SizeT check_txns_size = check_txns_.size();
+        res.reserve(check_txns_size);
+        for (SizeT i = 0; i < check_txns_size; ++i) {
             SharedPtr<NewTxn> &check_txn = check_txns_[i];
             TxnTimeStamp check_commit_ts = check_txn->CommitTS();
             TxnState check_txn_state = check_txn->GetTxnState();
@@ -722,6 +726,20 @@ void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
 void NewTxnManager::SetSystemCache() {
     system_cache_ = storage_->new_catalog()->GetSystemCache();
     txn_allocator_->SetSystemCache(system_cache_);
+}
+
+void NewTxnManager::RemoveMapElementForRollback(TxnTimeStamp commit_ts) {
+    {
+        std::lock_guard l(locker_);
+        if (!wait_conflict_ck_.erase(commit_ts)) {
+            UnrecoverableError(fmt::format("Key: {} is not exists.", commit_ts));
+        }
+        if (!bottom_txns_.erase(commit_ts)) {
+            UnrecoverableError(fmt::format("Key: {} is not exists.", commit_ts));
+        }
+        // check_txns_.pop_back();
+    }
+    // current_ts_ = commit_ts;
 }
 
 } // namespace infinity

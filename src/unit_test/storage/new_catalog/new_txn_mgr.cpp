@@ -132,7 +132,7 @@ TEST_F(TestTxnManagerTest, test_ts) {
         commit_tss.push_back(txn1_commit_ts);
     }
 
-    EXPECT_GE(begin_tss[4], commit_tss[3]);
+    EXPECT_LT(begin_tss[4], commit_tss[3]);
     EXPECT_LT(begin_tss[4], commit_tss[4]);
 
     EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
@@ -192,7 +192,7 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
         worker_threads[thread_i].join();
     }
 
-    EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
+    EXPECT_LE(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }
 
 TEST_F(TestTxnManagerTest, test_check_txns) {

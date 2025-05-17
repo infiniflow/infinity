@@ -178,7 +178,7 @@ public:
 
     Status PrepareCommit(TxnTimeStamp commit_ts);
 
-    void RollbackBottom();
+    // void RollbackBottom();
 
     void CommitBottom();
 
