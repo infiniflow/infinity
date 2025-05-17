@@ -1124,12 +1124,21 @@ bool NewTxn::GetTxnBottomDone() {
 };
 
 bool NewTxn::NeedToAllocate() const {
-    TransactionType txn_type = GetTxnType();
+    TransactionType txn_type = TransactionType::kInvalid;
+    if(base_txn_store_ != nullptr) {
+        txn_type = base_txn_store_->type_;
+        if (txn_type != GetTxnType()) {
+            LOG_WARN(fmt::format("Transaction type mismatch: {} vs {}", TransactionType2Str(txn_type), TransactionType2Str(GetTxnType())));
+        }
+    } else {
+        txn_type = GetTxnType();
+    }
+
     switch (txn_type) {
-        case TransactionType::kCompact:       // for new segment id
-        case TransactionType::kImport:        // for new segment id
-        case TransactionType::kAppend:        // for data range to append
-        case TransactionType::kUpdate: {      // for data range to append
+        case TransactionType::kCompact:  // for new segment id
+        case TransactionType::kImport:   // for new segment id
+        case TransactionType::kAppend:   // for data range to append
+        case TransactionType::kUpdate: { // for data range to append
             return true;
         }
         default:

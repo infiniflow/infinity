@@ -68,8 +68,8 @@ void TxnAllocator::Process() {
                 running = false;
             } else {
                 NewTxn *txn = txn_allocator_task->txn_ptr();
-                TransactionType txn_type = txn->GetTxnType();
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                TransactionType txn_type = base_txn_store->type_;
                 switch (txn_type) {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);

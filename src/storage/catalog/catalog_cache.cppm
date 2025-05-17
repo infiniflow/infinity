@@ -161,6 +161,8 @@ public:
     SharedPtr<CompactPrepareInfo> PrepareCompactSegmentsNolock(const Vector<SegmentID> &segment_ids, TransactionID txn_id);
     void CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
 
+    Vector<SegmentID> ApplySegmentIDsNolock(u64 segment_count);
+
     void AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache);
     void DropTableIndexCacheNolock(u64 index_id);
 
@@ -237,6 +239,8 @@ public:
     // Compact segments
     SharedPtr<CompactPrepareInfo> PrepareCompactSegments(u64 db_id, u64 table_id, const Vector<SegmentID> &segment_ids, TransactionID txn_id);
     void CommitCompactSegments(u64 db_id, u64 table_id, const SharedPtr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
+
+    Vector<SegmentID> ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count);
 
     // Append and update
     SharedPtr<AppendPrepareInfo> PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);

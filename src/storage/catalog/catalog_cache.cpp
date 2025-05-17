@@ -256,6 +256,18 @@ void TableCache::CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo>
     return;
 }
 
+Vector<SegmentID> TableCache::ApplySegmentIDsNolock(u64 segment_count) {
+    Vector<SegmentID> segment_ids;
+    segment_ids.reserve(segment_count);
+    for (SizeT i = 0; i < segment_count; ++i) {
+        SegmentID segment_id = next_segment_id_;
+        segment_ids.emplace_back(segment_id);
+        ++next_segment_id_;
+    }
+
+    return segment_ids;
+}
+
 void TableCache::AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache) {
     auto [iter, insert_success] = index_cache_map_.emplace(table_index_cache->index_id_, table_index_cache);
     if (!insert_success) {
@@ -372,6 +384,12 @@ void SystemCache::CommitCompactSegments(u64 db_id, u64 table_id, const SharedPtr
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     return table_cache->CommitCompactSegmentsNolock(compact_prepare_info, txn_id);
+}
+
+Vector<SegmentID> SystemCache::ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count) {
+    std::unique_lock lock(cache_mtx_);
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
+    return table_cache->ApplySegmentIDsNolock(segment_count);
 }
 
 SharedPtr<AppendPrepareInfo> SystemCache::PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {
