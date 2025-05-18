@@ -113,7 +113,9 @@ public:
 private:
     void UpdateCatalogCache(NewTxn *txn);
 
-    void CleanupTxn(NewTxn *txn, bool commit);
+    void CleanupTxn(NewTxn *txn);
+
+    void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
     u64 NextSequence() { return ++sequence_; }
@@ -150,7 +152,8 @@ private:
 
     KVStore *kv_store_;
 
-    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
+    //    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
+    Map<TxnTimeStamp, u64> begin_txn_map_{}; // Used for clean up TS and txn conflict check txns
     Deque<SharedPtr<NewTxn>> check_txns_;
     Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts
 

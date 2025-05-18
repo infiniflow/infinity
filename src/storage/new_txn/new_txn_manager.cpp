@@ -162,7 +162,8 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
-    begin_txns_.emplace(begin_ts, new_txn_id);
+    ++begin_txn_map_[begin_ts];
+    //    begin_txns_.emplace(begin_ts, new_txn_id);
 
     return new_txn;
 }
@@ -308,11 +309,8 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
-
-        this->CleanupTxn(txn, true);
-    } else {
-        this->CleanupTxn(txn, false);
     }
+    CleanupTxn(txn);
     return status;
 }
 
@@ -333,7 +331,7 @@ Status NewTxnManager::RollBackTxn(NewTxn *txn) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
-        this->CleanupTxn(txn, false);
+        CleanupTxn(txn);
     }
     return status;
 }
@@ -390,7 +388,8 @@ void NewTxnManager::SetNewSystemTS(TxnTimeStamp new_system_ts) {
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
     std::lock_guard guard(locker_);
-    return begin_txns_.empty() ? current_ts_ + 1 : begin_txns_.begin()->first;
+    //    return begin_txns_.empty() ? current_ts_ + 1 : begin_txns_.begin()->first;
+    return begin_txn_map_.empty() ? current_ts_ + 1 : begin_txn_map_.begin()->first;
 }
 
 void NewTxnManager::CommitBottom(NewTxn *txn) {
@@ -497,7 +496,7 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
     }
 }
 
-void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
+void NewTxnManager::CleanupTxn(NewTxn *txn) {
     bool is_write_transaction = txn->IsWriteTransaction();
     TxnTimeStamp begin_ts = txn->BeginTS();
     TransactionID txn_id = txn->TxnID();
@@ -531,6 +530,8 @@ void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
                 String error_message = fmt::format("NewTxn: {} not found in txn map", txn_id);
                 UnrecoverableError(error_message);
             }
+
+            CleanupTxnBottomNolock(txn_id, begin_ts);
         }
     } else {
         // For read-only NewTxn only remove txn from txn_map
@@ -541,20 +542,30 @@ void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
         //            }
         //            txn_contexts_.push_back(txn_ptr);
         txn_map_.erase(txn_id);
+
+        CleanupTxnBottomNolock(txn_id, begin_ts);
     }
-    {
-        std::lock_guard guard(locker_);
-        SizeT remove_n = begin_txns_.erase({begin_ts, txn_id});
-        if (remove_n == 0) {
-            String error_message = fmt::format("NewTxn: {} not found in begin_txns_", txn_id);
-            UnrecoverableError(error_message);
-        }
+}
 
-        TxnTimeStamp first_begin_ts = begin_txns_.empty() ? UNCOMMIT_TS : begin_txns_.begin()->first;
+void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto begin_txn_iter = begin_txn_map_.find(begin_ts);
+    if (begin_txn_iter == begin_txn_map_.end()) {
+        String error_message = fmt::format("NewTxn: {} with begin ts: {} not found in begin_txn_map_", txn_id, begin_ts);
+        UnrecoverableError(error_message);
+    }
+    --begin_txn_iter->second;
+    if (begin_txn_iter->second == 0) {
+        begin_txn_map_.erase(begin_txn_iter);
+    }
 
-        while (!check_txns_.empty() && check_txns_.front()->CommitTS() < first_begin_ts) {
-            check_txns_.pop_front();
-        }
+    if (begin_txn_map_.empty()) {
+        check_txns_.clear();
+        return;
+    }
+
+    TxnTimeStamp first_begin_ts = begin_txn_map_.begin()->first;
+    while (!check_txns_.empty() && check_txns_.front()->CommitTS() < first_begin_ts) {
+        check_txns_.pop_front();
     }
 }
 
