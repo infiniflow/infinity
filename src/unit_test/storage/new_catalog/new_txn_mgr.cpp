@@ -24,7 +24,6 @@ import txn_state;
 import extra_ddl_info;
 import third_party;
 import logger;
-import profiler;
 
 using namespace infinity;
 
@@ -152,12 +151,10 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
             std::cout << "Thread " << thread_i << " start" << std::endl;
             for (SizeT loop_i = 0; loop_i < loop_num; ++loop_i) {
                 Status status;
-                BaseProfiler profiler1;
                 {
-                    profiler1.Begin();
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
                     TransactionID txn_id = txn->TxnID();
-                    LOG_INFO(fmt::format("        Thread: {}, txn_id: {} CreateDatabase", thread_i, txn_id));
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} CreateDatabase", thread_i, txn_id));
                     status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
@@ -170,14 +167,12 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                         LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    profiler1.End();
-                    LOG_INFO(fmt::format("        Thread: {}, txn_id: {}, time: {}", thread_i, txn_id, profiler1.ElapsedToString()));
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {}", thread_i, txn_id));
                 }
                 {
-                    profiler1.Begin();
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
                     TransactionID txn_id = txn->TxnID();
-                    LOG_INFO(fmt::format("        Thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
                     status = txn->DropDatabase(*db_name, ConflictType::kError);
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
@@ -190,33 +185,8 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                         LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    profiler1.End();
-                    LOG_INFO(fmt::format("        Thread: {}, txn_id: {}, time: {}", thread_i, txn_id, profiler1.ElapsedToString()));
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {}", thread_i, txn_id));
                 }
-                // {
-                //     profiler1.Begin();
-                //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-                //     if (txn == nullptr) {
-                //         continue;
-                //     }
-                //     // TransactionID txn_id = txn->TxnID();
-                //     // LOG_INFO(fmt::format("        Thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
-                //     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-                //     status = txn->Checkpoint(last_checkpoint_ts);
-                //     if (status.ok()) {
-                //         status = new_txn_mgr->CommitTxn(txn);
-                //         if (!status.ok()) {
-                //             // LOG_WARN(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
-                //         } else {
-                //             // LOG_INFO(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn success", thread_i, txn_id));
-                //         }
-                //     } else {
-                //         LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
-                //         status = new_txn_mgr->RollBackTxn(txn);
-                //     }
-                //     profiler1.End();
-                //     // LOG_INFO(fmt::format("        Thread: {}, txn_id: {}, time: {}", thread_i, txn_id, profiler1.ElapsedToString()));
-                // }
             }
         }));
     }

@@ -65,7 +65,6 @@ import meta_info;
 import wal_entry;
 import block_index;
 import bottom_executor;
-import profiler;
 
 module wal_manager;
 
@@ -174,9 +173,7 @@ void WalManager::SubmitTxn(Vector<NewTxn *> &txn_array) {
     if (!running_.load()) {
         return;
     }
-    LOG_INFO(fmt::format("before wal submit txn, cnt: {}", cnt_));
     new_wait_flush_.EnqueueBulk(txn_array);
-    LOG_INFO("after wal submit txn");
 }
 
 TxnTimeStamp WalManager::LastCheckpointTS() const {
@@ -445,13 +442,7 @@ void WalManager::NewFlush() {
     Deque<NewTxn *> txn_batch{};
     ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
-        ++cnt_;
-        LOG_INFO(fmt::format(">>>{}", cnt_));
-        BaseProfiler profiler;
-        profiler.Begin();
         new_wait_flush_.DequeueBulk(txn_batch);
-        profiler.End();
-        LOG_INFO(fmt::format("!!!!!!!!!!! {}, cnt: {}", profiler.ElapsedToString(), cnt_));
         if (txn_batch.empty()) {
             LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;
@@ -464,17 +455,11 @@ void WalManager::NewFlush() {
                 running_ = false;
                 break;
             }
-            LOG_INFO(fmt::format(">>>For test, txn_id: {}, cnt: {}", txn->TxnID(), cnt_));
             TxnState txn_state = txn->GetTxnState();
 
             switch (txn_state) {
                 case TxnState::kCommitting: {
                     break;
-                }
-                case TxnState::kRollbacking: {
-                    // rollback txn
-                    // need calls CommitBottom to update NewTxnManager::current_ts_ to NewTxnManager::prepare_commit_ts_
-                    continue;
                 }
                 default: {
                     String error_message = fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state));
@@ -552,7 +537,6 @@ void WalManager::NewFlush() {
 
         // Commit bottom
         for (const auto &txn : txn_batch) {
-            LOG_INFO(fmt::format(">>>Before submit to bottom executor, txn_id: {}", txn->TxnID()));
             bottom_executor_->Submit(txn);
             // TODO: if txn is checkpoint, swap WAL file
         }

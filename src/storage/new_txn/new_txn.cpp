@@ -81,7 +81,6 @@ import segment_entry;
 import txn_allocator_task;
 import meta_type;
 import base_txn_store;
-import profiler;
 
 namespace infinity {
 
@@ -1126,7 +1125,7 @@ bool NewTxn::GetTxnBottomDone() {
 
 bool NewTxn::NeedToAllocate() const {
     TransactionType txn_type = TransactionType::kInvalid;
-    if(base_txn_store_ != nullptr) {
+    if (base_txn_store_ != nullptr) {
         txn_type = base_txn_store_->type_;
         if (txn_type != GetTxnType()) {
             LOG_WARN(fmt::format("Transaction type mismatch: {} vs {}", TransactionType2Str(txn_type), TransactionType2Str(GetTxnType())));
@@ -1249,20 +1248,12 @@ Status NewTxn::Commit() {
             return Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_storage_mode)));
         }
     }
-    BaseProfiler profiler;
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts;
     if (this->IsReplay()) {
         commit_ts = this->CommitTS(); // Replayed from WAL
     } else {
-        auto type = GetTxnType();
-        if (type == TransactionType::kNewCheckpoint) {
-            commit_ts = txn_mgr_->GetWriteCommitTS(shared_from_this());
-            LOG_INFO(fmt::format("Checkpoint get commits ts, txn_id: {}, commit_ts: {}", TxnID(), commit_ts));
-        } else {
-            commit_ts = txn_mgr_->GetWriteCommitTS(shared_from_this());
-            LOG_INFO(fmt::format("Normal get commits ts, txn_id: {}, commit_ts: {}", TxnID(), commit_ts));
-        }
+        commit_ts = txn_mgr_->GetWriteCommitTS(shared_from_this());
     }
     LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
 
@@ -1309,26 +1300,11 @@ Status NewTxn::Commit() {
         status = this->PrepareCommit(commit_ts);
     }
 
-    // std::lock_guard guard(locker_);
-    // prepare_commit_ts_ += 2;
-    // TxnTimeStamp commit_ts = prepare_commit_ts_;
-    // wait_conflict_ck_.emplace(commit_ts, nullptr);
-    // check_txns_.emplace_back(txn);
-    // bottom_txns_.emplace(commit_ts, txn);
-    // if (txn->NeedToAllocate()) {
-    //     allocator_map_.emplace(commit_ts, nullptr);
-    // }
-    // txn->SetTxnWrite();
-    // return commit_ts;
-
     if (!status.ok()) {
         // If prepare commit or conflict check failed, rollback the transaction
-        // txn_mgr_->RemoveMapElementForRollback(commit_ts, shared_from_this());
         this->SetTxnRollbacking(commit_ts);
-
         txn_mgr_->SendToWAL(shared_from_this());
         PostRollback(commit_ts);
-        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
         return status;
     }
 
@@ -1338,12 +1314,9 @@ Status NewTxn::Commit() {
 
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(commit_lock_);
-    profiler.Begin();
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
-    profiler.End();
     PostCommit();
 
-    // LOG_INFO(fmt::format("%%%%%%%% {}, txn_id: {}", profiler.ElapsedToString(), TxnID()));
     return Status::OK();
 }
 
@@ -1708,14 +1681,10 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
         }
     }
 
-    BaseProfiler profiler;
-    profiler.Begin();
     String commit_ts_str = std::to_string(commit_ts);
     for (const String &meta_key : keys_wait_for_commit_) {
         kv_instance_->Put(meta_key, commit_ts_str);
     }
-    profiler.End();
-    LOG_INFO(fmt::format("vvvvvvvvvvvv{}, txn_id: {}", profiler.ElapsedToString(), TxnID()));
     return Status::OK();
 }
 
@@ -1823,22 +1792,14 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
 //}
 
 Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
-    BaseProfiler profiler;
-    profiler.Begin();
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     Optional<DBMeeta> db_meta;
     const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
-    LOG_INFO(fmt::format("*create db | before | txn_id: {}", TxnID()));
     Status status = NewCatalog::AddNewDB(kv_instance_.get(), create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
-    LOG_INFO(fmt::format("*create db | after | txn_id: {}", TxnID()));
-    profiler.End();
-    LOG_INFO(fmt::format(";;;;;;;;;;;;;{}, txn_id: {}", profiler.ElapsedToString(), TxnID()));
     if (!status.ok()) {
-        LOG_INFO(fmt::format("#create db | fail | txn_id: {}, {}", TxnID(), *status.msg_));
         return status;
     }
-    LOG_INFO(fmt::format("*create db | OK | txn_id: {}", TxnID()));
 
     return Status::OK();
 }
@@ -1852,21 +1813,11 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     }
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
-    LOG_INFO(fmt::format("#drop db | before | txn_id: {}", TxnID()));
-    BaseProfiler profiler;
-    profiler.Begin();
+
     status = kv_instance_->Delete(db_key);
-    LOG_INFO(fmt::format("#drop db | after | txn_id: {}", TxnID()));
-    profiler.End();
-    LOG_INFO(fmt::format("Drop commit {}, txn_id: {}", profiler.ElapsedToString(), TxnID()));
     if (!status.ok()) {
-        LOG_INFO(fmt::format("#drop db | fail | txn_id: {}, {}", TxnID(), *status.msg_));
-        // while (!status.ok()) {
-        //     status = kv_instance_->Delete(db_key);
-        // }
         return status;
     }
-    LOG_INFO(fmt::format("#drop db | OK | txn_id: {}", TxnID()));
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str(), drop_db_cmd->db_name_));
 
@@ -3369,29 +3320,14 @@ void NewTxn::CommitBottom() {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
     // TODO: Append, Update, DumpMemoryIndex
-    LOG_INFO(fmt::format("--- commit bottom, txn_id: {}", TxnID()));
     txn_mgr_->CommitBottom(this);
 }
-
-// void NewTxn::RollbackBottom() {
-//     TransactionID txn_id = this->TxnID();
-//     LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
-//     TxnState txn_state = this->GetTxnState();
-//     if (txn_state != TxnState::kRollbacking) {
-//         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
-//     }
-//     txn_mgr_->CommitBottom(this);
-// }
 
 void NewTxn::NotifyTopHalf() {
     TxnState txn_state = this->GetTxnState();
     if (txn_state == TxnState::kCommitting) {
         // Try to commit rocksdb transaction
-        BaseProfiler profiler;
-        profiler.Begin();
         Status status = kv_instance_->Commit();
-        profiler.End();
-        LOG_INFO(fmt::format("Commit bottom txn_id: {}", TxnID()));
         if (!status.ok()) {
             UnrecoverableError(fmt::format("Commit bottom: {}", status.message()));
         }
@@ -3400,7 +3336,6 @@ void NewTxn::NotifyTopHalf() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_bottom_done_ = true;
     commit_cv_.notify_one();
-    LOG_INFO("Send signal");
     LOG_TRACE(fmt::format("Transaction {} notify top half, commit ts {}.", TxnID(), CommitTS()));
 }
 

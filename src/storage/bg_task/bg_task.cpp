@@ -52,7 +52,6 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     //     return status;
     // }
     return status;
-    // return Status::OK();
 }
 
 ForceCheckpointTask::ForceCheckpointTask(Txn *txn, bool full_checkpoint, TxnTimeStamp cleanup_ts)

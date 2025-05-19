@@ -228,7 +228,6 @@ private:
     mutable std::mutex last_ckp_ts_mutex_{};
     TxnTimeStamp last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
-    Atomic<int> cnt_{0};
 };
 
 } // namespace infinity

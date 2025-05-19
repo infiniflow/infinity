@@ -42,7 +42,6 @@ import txn_allocator_task;
 import storage;
 import catalog_cache;
 import base_txn_store;
-import profiler;
 
 namespace infinity {
 
@@ -276,9 +275,6 @@ void NewTxnManager::SendToWAL(const SharedPtr<NewTxn> &txn) {
         UnrecoverableError(error_message);
     }
 
-    BaseProfiler profiler;
-    profiler.Begin();
-
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     std::lock_guard guard(locker_);
@@ -301,41 +297,14 @@ void NewTxnManager::SendToWAL(const SharedPtr<NewTxn> &txn) {
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
         Vector<NewTxn *> txn_array;
         do {
-            // bottom_txns_.emplace(wait_conflict_ck_.begin()->first, wait_conflict_ck_.begin()->second);
             txn_array.push_back(wait_conflict_ck_.begin()->second);
             wait_conflict_ck_.erase(wait_conflict_ck_.begin());
         } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
         wal_mgr_->SubmitTxn(txn_array);
-        profiler.End();
-        LOG_INFO("===========");
-        for (auto &i : txn_array) {
-            LOG_INFO(
-                fmt::format("={}, txn_id: {}, commit_ts: {}, begin_ts: {}", profiler.ElapsedToString(), i->TxnID(), i->CommitTS(), i->BeginTS()));
-        }
-    } else if (wait_conflict_ck_.empty()) {
-        profiler.End();
-        LOG_INFO(fmt::format("+++++1+++++{}, txn_id: {}", profiler.ElapsedToString(), txn->TxnID()));
-    } else {
-        profiler.End();
-        for (auto &[key, value] : wait_conflict_ck_) {
-            if (value != nullptr) {
-                LOG_INFO(
-                    fmt::format("+{}, txn_id: {}, commit_ts: {}, begin_ts: {}", profiler.ElapsedToString(), value->TxnID(), key, value->BeginTS()));
-            } else {
-                LOG_INFO(fmt::format("+{}, txn_id: null, commit_ts: {}", profiler.ElapsedToString(), key));
-            }
-        }
-        LOG_INFO(fmt::format("+++++2+++++{}, txn_id: {}, commit_ts: {}, begin_ts: {}",
-                             profiler.ElapsedToString(),
-                             txn->TxnID(),
-                             commit_ts,
-                             txn->BeginTS()));
     }
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
-    BaseProfiler profiler;
-    profiler.Begin();
     Status status;
     {
         // std::lock_guard guard(locker1_);
@@ -344,8 +313,6 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
     if (commit_ts_ptr != nullptr) {
         *commit_ts_ptr = txn->CommitTS();
     }
-    profiler.End();
-    LOG_INFO(fmt::format("@@@@@@@@@@{}, txn_id: {}", profiler.ElapsedToString(), txn->TxnID()));
     if (status.ok()) {
         if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
             std::lock_guard guard(locker_);

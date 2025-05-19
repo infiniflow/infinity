@@ -178,8 +178,6 @@ public:
 
     Status PrepareCommit(TxnTimeStamp commit_ts);
 
-    // void RollbackBottom();
-
     void CommitBottom();
 
     void NotifyTopHalf();
