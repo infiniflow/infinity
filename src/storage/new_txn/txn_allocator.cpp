@@ -68,8 +68,8 @@ void TxnAllocator::Process() {
                 running = false;
             } else {
                 NewTxn *txn = txn_allocator_task->txn_ptr();
-                TransactionType txn_type = txn->GetTxnType();
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                TransactionType txn_type = base_txn_store->type_;
                 switch (txn_type) {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
@@ -97,31 +97,6 @@ void TxnAllocator::Process() {
                         SharedPtr<AppendPrepareInfo> append_info =
                             system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
                         txn_store->row_ranges_ = append_info->ranges_;
-                        break;
-                    }
-                    case TransactionType::kImport: {
-                        ImportTxnStore *txn_store = static_cast<ImportTxnStore *>(base_txn_store);
-                        SizeT segment_count = txn_store->SegmentCount();
-                        LOG_INFO(fmt::format("TxnAllocator: Import txn: db: {}, {}, table: {}, {}, segment count: {}",
-                                             txn_store->db_name_,
-                                             txn_store->db_id_,
-                                             txn_store->table_name_,
-                                             txn_store->table_id_,
-                                             segment_count));
-                        SharedPtr<ImportPrepareInfo> import_info =
-                            system_cache_->PrepareImportSegments(txn_store->db_id_, txn_store->table_id_, segment_count, txn->TxnID());
-                        break;
-                    }
-                    case TransactionType::kDumpMemIndex: {
-                        break;
-                    }
-                    case TransactionType::kOptimizeIndex: {
-                        break;
-                    }
-                    case TransactionType::kCompact: {
-                        break;
-                    }
-                    case TransactionType::kCreateIndex: {
                         break;
                     }
                     default: {

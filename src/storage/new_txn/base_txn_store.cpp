@@ -96,7 +96,7 @@ SizeT ImportTxnStore::RowCount() const {
     for (const auto &input_block : input_blocks_) {
         row_count += input_block->row_count();
     }
-    return row_count = 0;
+    return row_count;
 }
 
 SizeT ImportTxnStore::SegmentCount() const {

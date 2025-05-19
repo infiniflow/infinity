@@ -14,49 +14,41 @@
 
 module;
 
-#include <chrono>
-#include <iostream>
-
 import stl;
 import third_party;
 import crc;
 import blocking_queue;
 import new_txn;
 import txn_state;
-import logger;
 
 module bottom_executor;
 
 namespace infinity {
-using namespace std::literals;
+
 BottomExecutor::BottomExecutor(SizeT pool_size) {
     for (SizeT i = 0; i < pool_size; ++i) {
         String name = fmt::format("BottomExecutor_{}", i);
-        txn_queue_ = MakeShared<BlockingQueue<NewTxn *>>(name);
-        SharedPtr<BlockingQueue<NewTxn *>> &queue = txn_queue_;
+        txn_queues_.emplace_back(MakeShared<BlockingQueue<NewTxn *>>(name));
+        SharedPtr<BlockingQueue<NewTxn *>> queue = txn_queues_.back();
         auto executor = [&, queue] {
             Vector<NewTxn *> txns;
             while (running_.load()) {
-                {
-                    std::unique_lock lock(executor_mutex_);
-                    cond_.wait(lock, [] { return 1; });
-                }
-                bool got = queue->TryDequeueBulk(txns);
+                bool got = queue->TryDequeueBulkWait(txns, 10);
                 if (got) {
                     SizeT txns_size = txns.size();
                     for (SizeT i = 0; i < txns_size; ++i) {
-                        txns[i]->CommitBottom();
+                        TxnState txn_state = txns[i]->GetTxnState();
+                        if (txn_state == TxnState::kCommitting) {
+                            txns[i]->CommitBottom();
+                        }
                     }
                     txns.clear();
-                    // std::unique_lock<std::mutex> lock(mutex_);
+                    std::unique_lock<std::mutex> lock(mutex_);
                     cnt_ -= txns_size;
                     if (cnt_ == 0) {
                         cv_.notify_one();
                     }
                 }
-                // else {
-                //     LOG_INFO(">>>Got empty bulk");
-                // }
             }
         };
         auto thr = Thread(executor);
@@ -74,16 +66,12 @@ BottomExecutor::~BottomExecutor() {
 }
 
 void BottomExecutor::Submit(NewTxn *txn) {
-    // String table_id_str = txn->GetTableIdStr();
-    // u32 checksum = CRC32IEEE::makeCRC((const unsigned char *)table_id_str.data(), table_id_str.size());
-    // SizeT idx = checksum % txn_queues_.size();
-    // auto now = std::chrono::system_clock::now();
-    // const std::time_t t_c = std::chrono::system_clock::to_time_t(now - 24h);
-    LOG_INFO(fmt::format("--- submit to bottom, txn_id: {}", txn->TxnID()));
-    txn_queue_->Enqueue(txn);
-    cond_.notify_one();
-    // std::unique_lock<std::mutex> lock(mutex_);
-    ++cnt_;
+    String table_id_str = txn->GetTableIdStr();
+    u32 checksum = CRC32IEEE::makeCRC((const unsigned char *)table_id_str.data(), table_id_str.size());
+    SizeT idx = checksum % txn_queues_.size();
+    txn_queues_[idx]->Enqueue(txn);
+    std::unique_lock<std::mutex> lock(mutex_);
+    cnt_++;
 }
 
 void BottomExecutor::Wait() {

@@ -52,13 +52,9 @@ public:
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
 
-    bool SetTxnCheckpoint(NewTxn *txn);
-
     NewTxn *GetTxn(TransactionID txn_id) const;
 
     TxnState GetTxnState(TransactionID txn_id) const;
-
-    bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     inline void Lock() { locker_.lock(); }
 
@@ -99,8 +95,6 @@ public:
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
 
-    TxnTimeStamp GetNewTimeStamp();
-
     TxnTimeStamp GetCleanupScanTS1();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
@@ -119,7 +113,9 @@ public:
 private:
     void UpdateCatalogCache(NewTxn *txn);
 
-    void CleanupTxn(NewTxn *txn, bool commit);
+    void CleanupTxn(NewTxn *txn);
+
+    void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
     u64 NextSequence() { return ++sequence_; }
@@ -148,7 +144,6 @@ public:
     void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, const SharedPtr<NewTxn>& txn_ptr);
 
 private:
-    mutable std::mutex locker1_;
     mutable std::mutex locker_{};
     Storage *storage_{};
     BufferManager *buffer_mgr_{};
@@ -159,6 +154,8 @@ private:
 
     KVStore *kv_store_;
 
+    //    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
+    Map<TxnTimeStamp, u64> begin_txn_map_{}; // Used for clean up TS and txn conflict check txns
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
     Set<SharedPtr<NewTxn>> check_txns_;
     Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts

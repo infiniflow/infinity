@@ -3461,8 +3461,8 @@ TEST_P(TestTxnImport, test_import_append_table) {
 
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // Scan and check
@@ -3473,7 +3473,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3719,7 +3719,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
     //    t1      import                          commit (success)
     //    |----------|--------------------------------|
     //                            |----------------------|---------------|
-    //                           t2                  import (fail)    rollback (success)
+    //                           t2                  import          commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3746,8 +3746,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
 
         Vector<SharedPtr<DataBlock>> input_blocks2 = {make_input_block(), make_input_block()};
         status = txn6->Import(*db_name, *table_name, input_blocks2);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Scan and check
@@ -3758,7 +3758,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3773,7 +3773,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
     //    t1      import                               commit (success)
     //    |----------|-----------------------------------------|
     //                            |----------------------|----------|
-    //                           t2              import (fail)     rollback (success)
+    //                           t2                  import       commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3796,12 +3796,12 @@ TEST_P(TestTxnImport, test_import_import_table) {
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
         Vector<SharedPtr<DataBlock>> input_blocks2 = {make_input_block(), make_input_block()};
         status = txn6->Import(*db_name, *table_name, input_blocks2);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn6);
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         // Scan and check
@@ -3815,7 +3815,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3830,7 +3830,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
     //    t1      import                                               commit (success)
     //    |----------|--------------------------------------------------------|
     //                            |----------------------|---------------|
-    //                           t2                  import (fail)   rollback
+    //                           t2                  import           commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3853,8 +3853,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent import"), TransactionType::kNormal);
         Vector<SharedPtr<DataBlock>> input_blocks2 = {make_input_block(), make_input_block()};
         status = txn6->Import(*db_name, *table_name, input_blocks2);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
@@ -3868,7 +3868,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3883,7 +3883,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
     //    t1      import                                          commit (success)
     //    |----------|---------------------------------------------------|
     //          |----------------------|---------------|
-    //         t2                  import(fail)    commit
+    //         t2                  import           commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3908,8 +3908,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
 
         Vector<SharedPtr<DataBlock>> input_blocks2 = {make_input_block(), make_input_block()};
         status = txn6->Import(*db_name, *table_name, input_blocks2);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
@@ -3923,7 +3923,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3935,10 +3935,10 @@ TEST_P(TestTxnImport, test_import_import_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                t1      import                                          commit (fail)
+    //                t1      import                                          commit(success)
     //                |----------|---------------------------------------------------|
     //          |----------------------|--------------|
-    //         t2                  import (fail)   rollback
+    //         t2                  import         commit(success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3963,8 +3963,8 @@ TEST_P(TestTxnImport, test_import_import_table) {
 
         Vector<SharedPtr<DataBlock>> input_blocks2 = {make_input_block(), make_input_block()};
         status = txn6->Import(*db_name, *table_name, input_blocks2);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
@@ -3978,7 +3978,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -5804,11 +5804,11 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         //        new_txn_mgr->PrintAllKeyValue();
 
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({0, 1, 2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -5816,7 +5816,7 @@ TEST_P(TestTxnImport, test_import_and_compact) {
     //    t1      import                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  compact (fail)          rollback (success)
+    //                    t2                  compact                  commit(success)
     {
         PrepareForCompact();
 
@@ -5830,15 +5830,15 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn2);
+        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({0, 1, 2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -5846,7 +5846,7 @@ TEST_P(TestTxnImport, test_import_and_compact) {
     //    t1      import                                   commit (success)
     //    |----------|-----------------------------------------------|
     //                    |-------------|-----------------------|
-    //                    t2        compact (fail)    rollback (success)
+    //                    t2        compact              commit (success)
     {
         PrepareForCompact();
 
@@ -5860,14 +5860,14 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({0, 1, 2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -5890,15 +5890,15 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
                                                       make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -5923,12 +5923,12 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
                                                       make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -5954,11 +5954,11 @@ TEST_P(TestTxnImport, test_import_and_compact) {
         Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
                                                       make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }

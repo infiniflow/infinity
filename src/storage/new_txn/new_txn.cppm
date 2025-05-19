@@ -405,11 +405,6 @@ public:
 
     NewTxnManager *txn_mgr() const { return txn_mgr_; }
 
-    // Create txn store if not exists
-    NewTxnTableStore *GetNewTxnTableStore(const String &table_name);
-
-    NewTxnTableStore *GetExistNewTxnTableStore(TableEntry *table_entry) const;
-
     WalEntry *GetWALEntry() const;
 
     const SharedPtr<String> GetTxnText() const { return txn_text_; }
@@ -417,8 +412,6 @@ public:
     const String &db_name() const { return db_name_; }
 
     void SetDBName(const String &db_name) { db_name_ = db_name; }
-
-    void AddWriteTxnNum(TableEntry *table_entry);
 
     // Some transaction need to pass the txn access right check in txn commit phase;
     void SetReaderAllowed(bool allowed) { allowed_in_reader_ = allowed; }

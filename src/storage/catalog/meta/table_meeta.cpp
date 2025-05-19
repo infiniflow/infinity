@@ -217,6 +217,12 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
     return {segment_id, Status::OK()};
 }
 
+Status TableMeeta::AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id) {
+    String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    return kv_instance_.Put(segment_id_key, commit_ts_str);
+}
+
 Status TableMeeta::CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts) {
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
