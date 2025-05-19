@@ -212,6 +212,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     } catch (const std::exception &e) {
         return Status::UnexpectedError(fmt::format("Database: {} or db is dropped: {}, cause: ", db_name, table_name, e.what()));
     }
+    LOG_TRACE(fmt::format("Import: apply segment id: {}", segment_ids[0]));
     status = NewCatalog::AddNewSegmentWithID(table_meta, fake_commit_ts, segment_meta, segment_ids[0]);
     if (!status.ok()) {
         return status;
@@ -687,7 +688,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     } catch (const std::exception &e) {
         return Status::UnexpectedError(fmt::format("Database: {} or db is dropped: {}, cause: ", db_name, table_name, e.what()));
     }
-
+    LOG_TRACE(fmt::format("Compact: apply segment id: {}", segment_ids[0]));
     NewTxnCompactState compact_state;
     status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state, new_segment_ids[0]);
     if (!status.ok()) {

@@ -100,16 +100,6 @@ void TxnAllocator::Process() {
                         break;
                     }
                     case TransactionType::kImport: {
-                        ImportTxnStore *txn_store = static_cast<ImportTxnStore *>(base_txn_store);
-                        SizeT segment_count = txn_store->SegmentCount();
-                        LOG_INFO(fmt::format("TxnAllocator: Import txn: db: {}, {}, table: {}, {}, segment count: {}",
-                                             txn_store->db_name_,
-                                             txn_store->db_id_,
-                                             txn_store->table_name_,
-                                             txn_store->table_id_,
-                                             segment_count));
-                        SharedPtr<ImportPrepareInfo> import_info =
-                            system_cache_->PrepareImportSegments(txn_store->db_id_, txn_store->table_id_, segment_count, txn->TxnID());
                         break;
                     }
                     case TransactionType::kCompact: {
