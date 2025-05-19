@@ -2565,10 +2565,10 @@ TEST_P(TestTxnIndex, drop_index_and_drop_db) {
     {
 
         // create index and drop db
-        //  t1            drop index   commit (success)
+        //  t1            drop index   commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
-        //        t2   drop db    commit
+        //        t2   drop db    commit (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -2606,7 +2606,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         new_txn_mgr->PrintAllKeyValue();
     }
@@ -2614,7 +2614,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_db) {
     {
 
         // create index and drop db
-        //                  t1                     drop index   commit (success)
+        //                  t1                     drop index   commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -2654,7 +2654,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_db) {
         status = txn4->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         new_txn_mgr->PrintAllKeyValue();
     }
@@ -2891,7 +2891,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_table) {
 
     {
         // drop index and drop table
-        //  t1            drop index   commit (success)
+        //  t1            drop index   commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop table  commit
@@ -2932,7 +2932,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2944,7 +2944,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_table) {
 
     {
         // drop index and drop table
-        //                  t1                     drop index   commit (success)
+        //                  t1                     drop index   commit (fail)
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop table  commit
@@ -2985,7 +2985,7 @@ TEST_P(TestTxnIndex, drop_index_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);

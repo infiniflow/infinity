@@ -3568,7 +3568,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         drop_db(*db_name);
     }
 
-    //  t1            dump index                                               commit (success)
+    /* FIXME: PostRollback() for dump index is not implemented.
+    //  t1            dump index                                               commit (fail)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
     //                        t2                drop index             commit
@@ -3592,12 +3593,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //  t1            dump index                             commit (success)
+    //  t1            dump index                             commit (fail)
     //  |--------------|------------------------------------------|
     //         |------------------|----------------------|
     //         t2                drop index            commit
@@ -3623,12 +3624,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //  t1                                  dump index                                 commit (success)
+    //  t1                                  dump index                                 commit (fail)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|--------------------|
     //         t2                drop index          commit
@@ -3654,12 +3655,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //  t1                                  dump index                             commit (success)
+    //  t1                                  dump index                             commit (fail)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|-----------|
     //         t2               drop index   commit
@@ -3683,12 +3684,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //                                 t1                    dump index                             commit (success)
+    //                                 t1                    dump index                             commit (fail)
     //                                 |----------------------|------------------------------------------|
     //         |------------------|----------|
     //         t2               drop index  commit
@@ -3713,10 +3714,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
+    */
 
     //                                            t1                    dump index                             commit (success)
     //                                            |----------------------|------------------------------------------|

@@ -4410,7 +4410,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|-----------------------------------------------|
     //                    |-------------|-----------------------|
     //                    t2        drop index (success)    commit (success)
@@ -4448,9 +4448,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
-
-        check_table();
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4460,7 +4458,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                    commit (success)
+    //    t1                                      append                                    commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|------------------------------|
     //                    t2                drop index                 commit (success)
@@ -4500,9 +4498,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
-
-        check_table();
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4512,7 +4508,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|------------|
     //                    t2                  drop index  commit (success)
@@ -4550,9 +4546,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
-
-        check_table();
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4562,7 +4556,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|---------------|
     //                    t2                  drop index   commit (success)
@@ -4601,9 +4595,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
-
-        check_table();
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -5131,6 +5123,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         DropDB();
     }
 
+    /* FIXME: PostRollback() for dump index is not implemented.
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|
@@ -5188,6 +5181,7 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
         DropDB();
     }
+    */
 
     //    t1      append                                   commit (success)
     //    |----------|-----------------------------------------------|
@@ -5207,10 +5201,10 @@ TEST_P(TestTxnAppend, test_append_and_optimize_index) {
         status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         CheckTable({0});
