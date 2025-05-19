@@ -1135,8 +1135,6 @@ bool NewTxn::NeedToAllocate() const {
     }
 
     switch (txn_type) {
-        case TransactionType::kCompact:  // for new segment id
-        case TransactionType::kImport:   // for new segment id
         case TransactionType::kAppend:   // for data range to append
         case TransactionType::kUpdate: { // for data range to append
             return true;

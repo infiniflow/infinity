@@ -99,12 +99,6 @@ void TxnAllocator::Process() {
                         txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
-                    case TransactionType::kImport: {
-                        break;
-                    }
-                    case TransactionType::kCompact: {
-                        break;
-                    }
                     default: {
                         UnrecoverableError(fmt::format("Transaction type {} is not supported", TransactionType2Str(txn_type)));
                     }

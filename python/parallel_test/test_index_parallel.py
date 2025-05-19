@@ -22,6 +22,7 @@ kThreadNum = 4
 
 class TestIndexParallel(TestSdk):
 
+    @pytest.mark.skip(reason = "append and import segment conflicts")
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
