@@ -356,11 +356,13 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         optimize_index_txn_store->index_names_.emplace_back(index_name);
         optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
         optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
     } else {
         OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
         optimize_index_txn_store->index_names_.emplace_back(index_name);
         optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
         optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
     }
 
     txn_store_.AddMetaKeyForBufferObject(MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
@@ -564,6 +566,8 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
     optimize_index_txn_store->index_names_.emplace_back(index_name);
     optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta_opt->index_id_str());
     optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta_opt->index_id_str()));
+    optimize_index_txn_store->segment_ids_.reserve(optimize_index_txn_store->segment_ids_.size() + segment_ids_ptr->size());
+    optimize_index_txn_store->segment_ids_.insert(optimize_index_txn_store->segment_ids_.end(), segment_ids_ptr->begin(), segment_ids_ptr->end());
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimizeV2>(db_name,
                                                                  db_meta->db_id_str(),

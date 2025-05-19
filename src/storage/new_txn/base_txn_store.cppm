@@ -171,6 +171,7 @@ export struct OptimizeIndexTxnStore : public BaseTxnStore {
     Vector<String> index_names_{};
     Vector<String> index_ids_str_{};
     Vector<u64> index_ids_{};
+    Vector<SegmentID> segment_ids_{};
 
     String ToString() const final;
 };

@@ -71,14 +71,15 @@ String DropIndexTxnStore::ToString() const {
 }
 
 String OptimizeIndexTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}",
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}, segment_id: {}",
                        TransactionType2Str(type_),
                        db_name_,
                        db_id_str_,
                        table_name_,
                        table_id_str_,
                        fmt::join(index_names_, " "),
-                       fmt::join(index_ids_str_, " "));
+                       fmt::join(index_ids_str_, " "),
+                       fmt::join(segment_ids_, " "));
 }
 
 String AppendTxnStore::ToString() const {
@@ -148,12 +149,14 @@ String DropColumnsTxnStore::ToString() const {
 }
 
 String CompactTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}",
+
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, segment_id: {}",
                        TransactionType2Str(type_),
                        db_name_,
                        db_id_str_,
                        table_name_,
-                       table_id_str_);
+                       table_id_str_,
+                       fmt::join(segment_ids_, " "));
 }
 
 String DeleteTxnStore::ToString() const {
