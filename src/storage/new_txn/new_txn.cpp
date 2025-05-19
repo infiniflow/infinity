@@ -1593,9 +1593,6 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
                 auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
                 Status status = CommitAddColumns(add_column_cmd);
                 if (!status.ok()) {
-                    if (status.code_ == ErrorCode::kRocksDBError) {
-                        return Status::TxnConflict(txn_context_ptr_->txn_id_, "NewTxn conflict reason: Add column.");
-                    }
                     return status;
                 }
                 break;
@@ -2019,6 +2016,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kCreateDB: {
             return CheckConflictTxnStore(static_cast<const CreateDBTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kDropDB: {
+            return CheckConflictTxnStore(static_cast<const DropDBTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kCreateTable: {
             return CheckConflictTxnStore(static_cast<const CreateTableTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
@@ -2034,8 +2034,14 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kCreateIndex: {
             return CheckConflictTxnStore(static_cast<const CreateIndexTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kDropIndex: {
+            return CheckConflictTxnStore(static_cast<const DropIndexTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kDumpMemIndex: {
             return CheckConflictTxnStore(static_cast<const DumpMemIndexTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
+        case TransactionType::kOptimizeIndex: {
+            return CheckConflictTxnStore(static_cast<const OptimizeIndexTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
         case TransactionType::kDelete: {
             return CheckConflictTxnStore(static_cast<const DeleteTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
@@ -2049,6 +2055,13 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kDropTable: {
             return CheckConflictTxnStore(static_cast<const DropTableTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kRenameTable: {
+            return CheckConflictTxnStore(static_cast<const RenameTableTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
+        case TransactionType::kUpdate: {
+            return CheckConflictTxnStore(static_cast<const UpdateTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
+        case TransactionType::kCheckpoint:
         default: {
             return false;
         }
@@ -2168,10 +2181,26 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
         case TransactionType::kCreateDB: {
             CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (create_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
         }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
@@ -2247,16 +2276,18 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
     const String &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kCreateDB: {
-            CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_db_txn_store->db_name_ == db_name) {
+        case TransactionType::kCreateTable: {
+            CreateTableTxnStore *create_table_txn_store = static_cast<CreateTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_txn_store->db_name_ == db_name && create_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
         }
-        case TransactionType::kCreateTable: {
-            CreateTableTxnStore *create_table_txn_store = static_cast<CreateTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (create_table_txn_store->db_name_ == db_name && create_table_txn_store->table_name_ == table_name) {
+        case TransactionType::kRenameTable: {
+            RenameTableTxnStore *rename_table_txn_store = static_cast<RenameTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (rename_table_txn_store->db_name_ == db_name && rename_table_txn_store->new_table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2264,14 +2295,6 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
-                retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kDropTable: {
-            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
                 retry_query = false;
                 conflict = true;
             }
@@ -2376,6 +2399,13 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
     }
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
+            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kCreateIndex: {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
             if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name) {
@@ -2383,9 +2413,17 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
             }
             break;
         }
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kAddColumn: {
             AddColumnsTxnStore *add_columns_txn_store = static_cast<AddColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (add_columns_txn_store->db_name_ == db_name && add_columns_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2393,6 +2431,7 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropColumn: {
             DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2501,9 +2540,17 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
             }
             break;
         }
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kAddColumn: {
             AddColumnsTxnStore *add_columns_txn_store = static_cast<AddColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (add_columns_txn_store->db_name_ == db_name && add_columns_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2511,6 +2558,7 @@ bool NewTxn::CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropColumn: {
             DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -2621,6 +2669,20 @@ bool NewTxn::CheckConflictTxnStore(const AddColumnsTxnStore &txn_store, NewTxn *
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
             if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kAddColumn: {
+            AddColumnsTxnStore *add_columns_txn_store = static_cast<AddColumnsTxnStore *>(previous_txn->base_txn_store_.get());
+            if (add_columns_txn_store->db_name_ == db_name && add_columns_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
             break;
@@ -2747,6 +2809,13 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
             }
             break;
         }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kCreateIndex: {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
             if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name) {
@@ -2756,6 +2825,18 @@ bool NewTxn::CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn 
                         conflict = true;
                     }
                 }
+            }
+            break;
+        }
+        case TransactionType::kDropColumn: {
+            DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name &&
+                std::find_first_of(txn_store.column_names_.begin(),
+                                   txn_store.column_names_.end(),
+                                   drop_columns_txn_store->column_names_.begin(),
+                                   drop_columns_txn_store->column_names_.end()) != txn_store.column_names_.end()) {
+                retry_query = false;
+                conflict = true;
             }
             break;
         }
@@ -2878,9 +2959,24 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
     const String &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
+            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kCreateIndex: {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
             if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
             break;
@@ -2899,9 +2995,31 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
             }
             break;
         }
+        case TransactionType::kAppend: {
+            AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(previous_txn->base_txn_store_.get());
+            if (append_txn_store->db_name_ == db_name && append_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kDelete: {
             DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(previous_txn->base_txn_store_.get());
             if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kOptimizeIndex: {
+            OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (optimize_index_txn_store->db_name_ == db_name && optimize_index_txn_store->table_name_ == table_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -3019,6 +3137,7 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
             if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name &&
                 *create_index_txn_store->index_base_->index_name_ == index_name) {
+                retry_query = false;
                 conflict = true;
             }
             break;
@@ -3044,6 +3163,13 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
             }
             break;
         }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kDropColumn: {
             DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
@@ -3053,6 +3179,48 @@ bool NewTxn::CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn 
                         conflict = true;
                     }
                 }
+            }
+            break;
+        }
+        case TransactionType::kDropDB: {
+            DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.table_name_;
+    const String &index_name = txn_store.index_name_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name &&
+                drop_index_txn_store->index_name_ == index_name) {
+                retry_query = false;
+                conflict = true;
             }
             break;
         }
@@ -3198,11 +3366,109 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropTableV2 &cmd, NewTxn *previous_txn
 
 bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.table_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.table_name_;
+    const Vector<String> &index_names = txn_store.index_names_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kOptimizeIndex: {
+            OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (optimize_index_txn_store->db_name_ == db_name && optimize_index_txn_store->table_name_ == table_name &&
+                std::find_first_of(index_names.begin(),
+                                   index_names.end(),
+                                   optimize_index_txn_store->index_names_.begin(),
+                                   optimize_index_txn_store->index_names_.end()) != index_names.end()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kAppend: {
+            AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(previous_txn->base_txn_store_.get());
+            if (append_txn_store->db_name_ == db_name && append_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kImport: {
+            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
+            if (import_txn_store->db_name_ == db_name && import_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
+            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name &&
+                std::find(index_names.begin(), index_names.end(), drop_index_txn_store->index_name_) != index_names.end()) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropDB: {
+            DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
                 retry_query = false;
                 conflict = true;
             }
@@ -3222,8 +3488,27 @@ bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *p
 bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
+    const String &index_name = txn_store.index_name_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_mem_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (dump_mem_index_txn_store->db_name_ == db_name && dump_mem_index_txn_store->table_name_ == table_name &&
+                dump_mem_index_txn_store->index_name_ == index_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name &&
+                drop_index_txn_store->index_name_ == index_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
@@ -3263,6 +3548,29 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
             }
             break;
         }
+        case TransactionType::kDelete: {
+            DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(previous_txn->base_txn_store_.get());
+            if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name &&
+                std::find_first_of(txn_store.row_ids_.begin(),
+                                   txn_store.row_ids_.end(),
+                                   delete_txn_store->row_ids_.begin(),
+                                   delete_txn_store->row_ids_.end()) != txn_store.row_ids_.end()) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name &&
+                std::find_first_of(txn_store.row_ids_.begin(),
+                                   txn_store.row_ids_.end(),
+                                   update_txn_store->row_ids_.begin(),
+                                   update_txn_store->row_ids_.end()) != txn_store.row_ids_.end()) {
+
+                conflict = true;
+            }
+            break;
+        }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
@@ -3283,6 +3591,151 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
         }
     }
 
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.old_table_name_;
+    const String &new_table_name = txn_store.new_table_name_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateTable: {
+            CreateTableTxnStore *create_table_txn_store = static_cast<CreateTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_txn_store->db_name_ == db_name && create_table_txn_store->table_name_ == new_table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kRenameTable: {
+            RenameTableTxnStore *rename_table_txn_store = static_cast<RenameTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (rename_table_txn_store->db_name_ == db_name && rename_table_txn_store->old_table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropDB: {
+            DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.table_name_;
+    Set<SegmentID> segment_ids;
+    for (const auto &row_range : txn_store.row_ranges_) {
+        RowID row_id = row_range.first;
+        segment_ids.insert(row_id.segment_id_);
+    }
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
+            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kCreateIndex: {
+            CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kAddColumn: {
+            AddColumnsTxnStore *add_columns_txn_store = static_cast<AddColumnsTxnStore *>(previous_txn->base_txn_store_.get());
+            if (add_columns_txn_store->db_name_ == db_name && add_columns_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropColumn: {
+            DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
+            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name &&
+                segment_ids.contains(dump_index_txn_store->segment_id_)) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDelete: {
+            DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(previous_txn->base_txn_store_.get());
+            if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name &&
+                std::find_first_of(txn_store.row_ids_.begin(),
+                                   txn_store.row_ids_.end(),
+                                   delete_txn_store->row_ids_.begin(),
+                                   delete_txn_store->row_ids_.end()) != txn_store.row_ids_.end()) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kUpdate: {
+            UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropDB: {
+            DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropTable: {
+            DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
     if (conflict) {
         cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
         return true;

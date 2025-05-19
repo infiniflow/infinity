@@ -70,6 +70,17 @@ String DropIndexTxnStore::ToString() const {
                        index_id_str_);
 }
 
+String OptimizeIndexTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}",
+                       TransactionType2Str(type_),
+                       db_name_,
+                       db_id_str_,
+                       table_name_,
+                       table_id_str_,
+                       fmt::join(index_names_, " "),
+                       fmt::join(index_ids_str_, " "));
+}
+
 String AppendTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, appended: {}",
                        TransactionType2Str(type_),

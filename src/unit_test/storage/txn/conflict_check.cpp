@@ -67,7 +67,7 @@ protected:
 
     void ExpectConflict(NewTxn *txn) {
         Status status = txn_mgr_->CommitTxn(txn);
-        EXPECT_EQ(status.code(), ErrorCode::kTxnWWConflict);
+        EXPECT_EQ(status.code(), ErrorCode::kTxnConflict);
     };
 
     void InitTable(const String &db_name, const String &table_name, SharedPtr<TableDef> table_def, SizeT row_cnt) {

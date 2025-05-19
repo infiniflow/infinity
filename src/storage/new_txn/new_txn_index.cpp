@@ -345,6 +345,24 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
+        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+        optimize_index_txn_store->db_name_ = db_name;
+        optimize_index_txn_store->db_id_str_ = table_meta.db_id_str();
+        optimize_index_txn_store->table_name_ = table_name;
+        optimize_index_txn_store->table_id_str_ = table_meta.table_id_str();
+        optimize_index_txn_store->index_names_.emplace_back(index_name);
+        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+    } else {
+        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+        optimize_index_txn_store->index_names_.emplace_back(index_name);
+        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+    }
+
     txn_store_.AddMetaKeyForBufferObject(MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
                                                                        chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
                                                                        chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
@@ -532,6 +550,20 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
             return status;
         }
     }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
+    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    optimize_index_txn_store->db_name_ = db_name;
+    optimize_index_txn_store->db_id_str_ = db_meta->db_id_str();
+    optimize_index_txn_store->table_name_ = table_name;
+    optimize_index_txn_store->table_id_str_ = table_meta_opt->table_id_str();
+    optimize_index_txn_store->index_names_.emplace_back(index_name);
+    optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta_opt->index_id_str());
+    optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta_opt->index_id_str()));
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimizeV2>(db_name,
                                                                  db_meta->db_id_str(),

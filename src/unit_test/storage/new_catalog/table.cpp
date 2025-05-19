@@ -2265,7 +2265,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
     }
 
     // with drop table 1
