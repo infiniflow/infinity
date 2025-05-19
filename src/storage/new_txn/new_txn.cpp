@@ -143,10 +143,6 @@ NewTxn::~NewTxn() {
 #endif
 }
 
-NewTxnTableStore *NewTxn::GetNewTxnTableStore(const String &table_name) { return txn_store_.GetNewTxnTableStore(table_name); }
-
-NewTxnTableStore *NewTxn::GetExistNewTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistNewTxnTableStore(table_entry); }
-
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
     if (txn_state != TxnState::kStarted) {
@@ -1128,15 +1124,19 @@ bool NewTxn::GetTxnBottomDone() {
 };
 
 bool NewTxn::NeedToAllocate() const {
-    TransactionType txn_type = GetTxnType();
+    TransactionType txn_type = TransactionType::kInvalid;
+    if(base_txn_store_ != nullptr) {
+        txn_type = base_txn_store_->type_;
+        if (txn_type != GetTxnType()) {
+            LOG_WARN(fmt::format("Transaction type mismatch: {} vs {}", TransactionType2Str(txn_type), TransactionType2Str(GetTxnType())));
+        }
+    } else {
+        txn_type = GetTxnType();
+    }
+
     switch (txn_type) {
-        case TransactionType::kOptimizeIndex: // for new chunk id
-        case TransactionType::kCompact:       // for new segment id
-        case TransactionType::kDumpMemIndex:  // for new chunk id
-        case TransactionType::kCreateIndex:   // for data range to create index
-        case TransactionType::kImport:        // for new segment id
-        case TransactionType::kAppend:        // for data range to append
-        case TransactionType::kUpdate: {      // for data range to append
+        case TransactionType::kAppend:   // for data range to append
+        case TransactionType::kUpdate: { // for data range to append
             return true;
         }
         default:
@@ -1298,7 +1298,6 @@ Status NewTxn::Commit() {
     }
 
     if (status.ok()) {
-        txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
         status = this->PrepareCommit(commit_ts);
     }
 
@@ -1336,7 +1335,6 @@ Status NewTxn::CommitReplay() {
 
     this->SetTxnCommitting(commit_ts);
 
-    txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     Status status = this->PrepareCommitReplay(commit_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Replay transaction, prepare commit: {}", status.message()));
@@ -3664,12 +3662,6 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-}
-
-void NewTxn::AddWriteTxnNum(TableEntry *table_entry) {
-    const String &table_name = *table_entry->GetTableName();
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-    table_store->AddWriteTxnNum();
 }
 
 Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {

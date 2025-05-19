@@ -98,6 +98,7 @@ public:
     // Status AddSegmentID(SegmentID segment_id);
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
+    Status AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id);
 
     Status CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts);
 
@@ -110,7 +111,7 @@ public:
 
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name, SizeT *column_idx = nullptr);
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnID(const SizeT& column_idx);
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnID(const SizeT &column_idx);
 
     Status GetTableInfo(TableInfo &table_info);
 

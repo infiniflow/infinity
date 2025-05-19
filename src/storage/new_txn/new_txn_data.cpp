@@ -56,14 +56,16 @@ import constant_expr;
 import expression_state;
 import expression_evaluator;
 import base_txn_store;
+import catalog_cache;
 
 namespace infinity {
 
 struct NewTxnCompactState {
     NewTxnCompactState() = default;
 
-    static Status Make(TableMeeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state) {
-        Status status = NewCatalog::AddNewSegment1(table_meta, commit_ts, state.new_segment_meta_);
+    static Status Make(TableMeeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state, SegmentID segment_id) {
+        // Status status = NewCatalog::AddNewSegment1(table_meta, commit_ts, state.new_segment_meta_);
+        Status status = NewCatalog::AddNewSegmentWithID(table_meta, commit_ts, state.new_segment_meta_, segment_id);
         if (!status.ok()) {
             return status;
         }
@@ -200,7 +202,18 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     Optional<SegmentMeta> segment_meta;
     // status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
-    status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
+    // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
+    u64 db_id = std::stoull(table_meta.db_id_str());
+    u64 table_id = std::stoull(table_meta.table_id_str());
+    SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
+    Vector<SegmentID> segment_ids;
+    try {
+        segment_ids = system_cache->ApplySegmentIDs(db_id, table_id, 1);
+    } catch (const std::exception &e) {
+        return Status::UnexpectedError(fmt::format("Database: {} or db is dropped: {}, cause: ", db_name, table_name, e.what()));
+    }
+    LOG_TRACE(fmt::format("Import: apply segment id: {}", segment_ids[0]));
+    status = NewCatalog::AddNewSegmentWithID(table_meta, fake_commit_ts, segment_meta, segment_ids[0]);
     if (!status.ok()) {
         return status;
     }
@@ -385,7 +398,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
 
     const WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
-    status = NewCatalog::LoadFlushedSegment1(table_meta, segment_info, fake_commit_ts);
+    status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -666,8 +679,18 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     // Fake commit timestamp, in prepare commit phase, it will be replaced by real commit timestamp
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
+    SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
+    u64 db_id = std::stoull(table_meta.db_id_str());
+    u64 table_id = std::stoull(table_meta.table_id_str());
+    Vector<SegmentID> new_segment_ids;
+    try {
+        new_segment_ids = system_cache->ApplySegmentIDs(db_id, table_id, 1);
+    } catch (const std::exception &e) {
+        return Status::UnexpectedError(fmt::format("Database: {} or db is dropped: {}, cause: ", db_name, table_name, e.what()));
+    }
+    LOG_TRACE(fmt::format("Compact: apply segment id: {}", segment_ids[0]));
     NewTxnCompactState compact_state;
-    status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state);
+    status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state, new_segment_ids[0]);
     if (!status.ok()) {
         return status;
     }
@@ -713,6 +736,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         compact_txn_store->table_id_str_ = table_meta.table_id_str();
         compact_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
         compact_txn_store->segment_ids_ = segment_ids;
+        compact_txn_store->new_segment_id_ = new_segment_ids[0];
 
         Vector<SegmentID> deprecated_segment_ids = segment_ids;
         Vector<WalSegmentInfo> segment_infos;
@@ -801,7 +825,7 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     TableMeeta &table_meta = *table_meta_opt;
 
     for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
-        status = NewCatalog::LoadFlushedSegment1(table_meta, segment_info, fake_commit_ts);
+        status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
         if (!status.ok()) {
             return status;
         }

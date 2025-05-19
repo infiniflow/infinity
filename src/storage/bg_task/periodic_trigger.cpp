@@ -97,7 +97,7 @@ void NewCleanupPeriodicTrigger::Trigger() {
 }
 
 void CheckpointPeriodicTrigger::Trigger() {
-    LOG_INFO(fmt::format("Trigger {} periodic checkpoint, after {} seconds", is_full_checkpoint_ ? "FULL" : "DELTA", duration_.load()));
+    LOG_INFO(fmt::format("Trigger periodic checkpoint, after {} seconds", duration_.load()));
 
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
