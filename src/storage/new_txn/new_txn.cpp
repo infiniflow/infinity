@@ -2399,13 +2399,6 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
     }
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
-        case TransactionType::kCompact: {
-            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
-            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name) {
-                conflict = true;
-            }
-            break;
-        }
         case TransactionType::kCreateIndex: {
             CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(previous_txn->base_txn_store_.get());
             if (create_index_txn_store->db_name_ == db_name && create_index_txn_store->table_name_ == table_name) {
@@ -2992,13 +2985,6 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
         case TransactionType::kDropColumn: {
             DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kAppend: {
-            AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(previous_txn->base_txn_store_.get());
-            if (append_txn_store->db_name_ == db_name && append_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
             break;
