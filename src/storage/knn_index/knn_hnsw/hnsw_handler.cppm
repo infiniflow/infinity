@@ -211,7 +211,8 @@ public:
     }
 
     HnswHandler(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true)
-        : hnsw_(InitAbstractIndex(index_base, column_def, own_mem)) {
+            : hnsw_(InitAbstractIndex(index_base, column_def, own_mem)) {
+        if (!own_mem) return;
         const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
         const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
 
@@ -264,7 +265,8 @@ public:
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                     using IndexT = std::decay_t<decltype(*arg)>;
-                    res = arg->template KnnSearch<WithLock>(reinterpret_cast<typename IndexT::QueryVecType>(q), k, option);
+                    using QueryVecType = typename IndexT::QueryVecType;
+                    res = arg->template KnnSearch<WithLock>(reinterpret_cast<QueryVecType>(q), k, option);
                 }
             },
             hnsw_);
@@ -561,18 +563,29 @@ public:
             },
             hnsw_);
     }
-    template <typename Iterator>
-    Pair<VertexType, VertexType> StoreData(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        return std::visit(
+    template <typename LabelT>
+    Pair<VertexType, VertexType> StoreData(const auto* data, SizeT dim, SizeT vec_num,
+                                            const HnswInsertConfig &option = kDefaultHnswInsertConfig) {
+        Pair<VertexType, VertexType> res{};
+        std::visit(
             [&](auto &&index) {
                 using T = std::decay_t<decltype(index)>;
                 if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                    return Pair<VertexType, VertexType>{};
+                    UnrecoverableError("Invalid index type.");
                 } else {
-                    return index->StoreData(std::move(iter));
+                    using IndexT = std::decay_t<decltype(*index)>;
+                    if constexpr (IndexT::kOwnMem) {
+                        using DataType = typename IndexT::DataType;
+                        using QueryVecType = typename IndexT::QueryVecType;
+                        auto iter = DenseVectorIter<DataType, LabelT>(reinterpret_cast<QueryVecType>(data), dim, vec_num);
+                        res = index->StoreData(std::move(iter), option);
+                    } else {
+                        UnrecoverableError("Invalid index type.");
+                    }
                 }
             },
             hnsw_);
+        return res;
     }
     template<typename LabelT>
     LabelT GetLabel(VertexType vertex_i) const {
@@ -637,24 +650,6 @@ public:
             },
             hnsw_);
     }
-    // void Load(LocalFileHandle &file_handle) const {
-    //     std::visit(
-    //         [&](auto &&index) {
-    //             using T = std::decay_t<decltype(index)>;
-    //             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-    //                 UnrecoverableError("Invalid index type.");
-    //             } else {
-    //                 using IndexT = std::decay_t<decltype(*index)>;
-    //                 if constexpr (IndexT::kOwnMem) {
-    //                     index = IndexT::Load(file_handle).release();
-    //                 } else {
-    //                     UnrecoverableError("Invalid index type.");
-    //                 }
-    //             }
-    //         },
-    //         hnsw_);
-    //
-    // }
     void LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
         std::visit(
             [&](auto &&index) {
@@ -672,47 +667,57 @@ public:
             },
             hnsw_);
     }
-    // void LoadFromPtr(const char *ptr, SizeT size) const {
-    //     std::visit(
-    //         [&](auto &&index) {
-    //             using T = std::decay_t<decltype(index)>;
-    //             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-    //                 UnrecoverableError("Invalid index type.");
-    //             } else {
-    //                 using IndexT = std::decay_t<decltype(*index)>;
-    //                 if constexpr (IndexT::kOwnMem) {
-    //                     UnrecoverableError("Invalid index type.");
-    //                 } else {
-    //                     index = IndexT::LoadFromPtr(ptr, size).release();
-    //                 }
-    //             }
-    //         },
-    //         hnsw_);
-    // }
-    // void Build(VertexType vertex_i) {
-    //     std::visit(
-    //         [&](auto &&index) {
-    //             using T = std::decay_t<decltype(index)>;
-    //             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-    //                 UnrecoverableError("Invalid index type.");
-    //             } else {
-    //                 index->Build(vertex_i);
-    //             }
-    //         },
-    //         hnsw_);
-    // }
-    // void Optimize() {
-    //     std::visit(
-    //         [&](auto &&index) {
-    //             using T = std::decay_t<decltype(index)>;
-    //             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-    //                 UnrecoverableError("Invalid index type.");
-    //             } else {
-    //                 index->Optimize();
-    //             }
-    //         },
-    //         hnsw_);
-    // }
+    void LoadFromPtr(const char *ptr, SizeT size) {
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                    UnrecoverableError("Invalid index type.");
+                } else {
+                    using IndexT = std::decay_t<decltype(*index)>;
+                    if constexpr (IndexT::kOwnMem) {
+                        UnrecoverableError("Invalid index type.");
+                    } else {
+                        index = IndexT::LoadFromPtr(ptr, size).release();
+                    }
+                }
+            },
+            hnsw_);
+    }
+    void Build(VertexType vertex_i) {
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                    UnrecoverableError("Invalid index type.");
+                } else {
+                    using IndexT = std::decay_t<decltype(*index)>;
+                    if constexpr (IndexT::kOwnMem) {
+                        index->Build(vertex_i);
+                    } else {
+                        UnrecoverableError("Invalid index type.");
+                    }
+                }
+            },
+            hnsw_);
+    }
+    void Optimize() {
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                    UnrecoverableError("Invalid index type.");
+                } else {
+                    using IndexT = std::decay_t<decltype(*index)>;
+                    if constexpr (IndexT::kOwnMem) {
+                        index->Optimize();
+                    } else {
+                        UnrecoverableError("Invalid index type.");
+                    }
+                }
+            },
+            hnsw_);
+    }
     void CompressToLVQ() {
         std::visit(
             [&](auto &&index) {
@@ -737,36 +742,6 @@ public:
             },
             hnsw_);
     }
-    // void Optimize(bool compress_to_lvq, bool lvq_avg) {
-    //     std::visit(
-    //         [&](auto &&index) {
-    //             using T = std::decay_t<decltype(index)>;
-    //             if constexpr (std::is_same_v<T, std::nullptr_t>) {
-    //                 UnrecoverableError("Invalid index type.");
-    //             } else {
-    //                 using IndexT = typename std::remove_pointer_t<T>;
-    //                 if constexpr (IndexT::kOwnMem) {
-    //                     using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-    //                     if (compress_to_lvq) {
-    //                         if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-    //                             UnrecoverableError("Invalid index type.");
-    //                         } else {
-    //                             auto *p = std::move(*index).CompressToLVQ().release();
-    //                             delete index;
-    //                             hnsw_ = p;
-    //                         }
-    //                     }
-    //                     if (lvq_avg) {
-    //                         index->Optimize();
-    //                     }
-    //                 } else {
-    //                     UnrecoverableError("Invalid index type.");
-    //                 }
-    //             }
-    //         },
-    //         hnsw_);
-    // }
-
 private:
     AbstractHnsw hnsw_ = nullptr;
 };
@@ -852,7 +827,7 @@ public:
 //         SizeT mem_usage = hnsw_handler_->InsertVecs(segment_entry, buffer_mgr, column_id, begin_ts, check_ts, kBuildBucketSize, config);
 //         this->IncreaseMemoryUsageBase(mem_usage);
 //     }
-//
+
      template <typename Iter>
      void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig, bool trace = true) {
          SizeT mem_usage = hnsw_handler_->InsertVecs(std::move(iter), kBuildBucketSize, config);

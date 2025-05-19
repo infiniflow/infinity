@@ -66,6 +66,14 @@ public:
         build_type = HnswBuildType::kPlain;
 
         filepath = save_dir_ + "/test_hnsw.bin";
+
+        std::mt19937 rng;
+        rng.seed(0);
+        std::uniform_real_distribution<float> distrib_real;
+        data = MakeUnique<float[]>(dim * element_size);
+        for (SizeT i = 0; i < dim * element_size; ++i) {
+            data[i] = distrib_real(rng);
+        }
     }
 
     UniquePtr<IndexHnsw> MakeIndexHnsw(bool compress = false) {
@@ -81,112 +89,7 @@ public:
         return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
     }
 
-protected:
-    SizeT dim;
-    SizeT M;
-    SizeT ef_construction;
-    SizeT chunk_size;
-    SizeT max_chunk_n;
-    SizeT element_size;
-    SizeT kBuildBucketSize;
-
-    SharedPtr<String> index_name;
-    String filename;
-    Vector<String> column_names;
-    MetricType metric_type;
-    HnswEncodeType encode_type;
-    HnswBuildType build_type;
-
-    String filepath;
-    const std::string save_dir_ = GetFullTmpDir();
-};
-
-TEST_F(HnswHandlerTest, test_memory) {
-    /// generate random dataset
-    std::mt19937 rng;
-    rng.seed(0);
-    std::uniform_real_distribution<float> distrib_real;
-
-    auto data = MakeUnique<float[]>(dim * element_size);
-    for (SizeT i = 0; i < dim * element_size; ++i) {
-        data[i] = distrib_real(rng);
-    }
-
-    auto test_search = [&](HnswHandler *hnsw_handler) {
-        hnsw_handler->Check();
-        KnnSearchOption search_option{.ef_ = 10};
-        SizeT correct = 0;
-        for (SizeT i = 0; i < element_size; ++i) {
-            const auto *query = data.get() + i * dim;
-            auto [result_n, d_ptr, v_ptr] = hnsw_handler->SearchIndex<float, LabelT>(query, 1, search_option);
-            Vector<Pair<float, LabelT>> result(result_n);
-            for (SizeT i = 0; i < result_n; ++i) {
-                result[i] = {d_ptr[i], hnsw_handler->GetLabel<LabelT>(v_ptr[i])};
-            }
-            std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-            if (result.empty()) {
-                continue;
-            }
-            if (result[0].second == (LabelT)i) {
-                ++correct;
-            }
-        }
-        float correct_rate = float(correct) / element_size;
-        std::printf("correct rage: %f\n", correct_rate);
-        EXPECT_GE(correct_rate, 0.95);
-    };
-
-    auto index_hnsw = MakeIndexHnsw();
-    auto column_def = MakeColumnDef();
-
-    {
-        /// get HnswHandler
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
-        auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-        hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
-
-        /// test interface
-        hnsw_handler->GetType();
-        auto [mem_usage, vec_num] = hnsw_handler->GetInfo();
-        printf("hnsw_handler::GetInfo() -> %lu, %lu\n", mem_usage, vec_num);
-        printf("hnsw_handler::GetSizeInBytes() -> %lu\n", hnsw_handler->GetSizeInBytes());
-        test_search(hnsw_handler.get());
-
-        /// test save
-        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        hnsw_handler->SaveToPtr(*file_handle);
-    }
-
-    /// test load
-    {
-        SizeT file_size = VirtualStore::GetFileSize(filepath);
-        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-
-        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
-
-        hnsw_handler->LoadFromPtr(*file_handle, file_size);
-
-        test_search(hnsw_handler.get());
-    }
-}
-
-TEST_F(HnswHandlerTest, test_compress) {
-    std::mt19937 rng;
-    rng.seed(0);
-    std::uniform_real_distribution<float> distrib_real;
-
-    auto data = MakeUnique<float[]>(dim * element_size);
-    for (SizeT i = 0; i < dim * element_size; ++i) {
-        data[i] = distrib_real(rng);
-    }
-
-    auto test_search = [&](auto &hnsw_handler) {
+    void SearchHnswHandler(HnswHandler* hnsw_handler) {
         hnsw_handler->Check();
 
         KnnSearchOption search_option{.ef_ = 10};
@@ -210,20 +113,80 @@ TEST_F(HnswHandlerTest, test_compress) {
         float correct_rate = float(correct) / element_size;
         std::printf("correct rage: %f\n", correct_rate);
         EXPECT_GE(correct_rate, 0.95);
-    };
+    }
 
+protected:
+    SizeT dim;
+    SizeT M;
+    SizeT ef_construction;
+    SizeT chunk_size;
+    SizeT max_chunk_n;
+    SizeT element_size;
+    SizeT kBuildBucketSize;
+
+    SharedPtr<String> index_name;
+    String filename;
+    Vector<String> column_names;
+    MetricType metric_type;
+    HnswEncodeType encode_type;
+    HnswBuildType build_type;
+
+    UniquePtr<float[]> data = nullptr;
+    String filepath;
+    const std::string save_dir_ = GetFullTmpDir();
+};
+
+TEST_F(HnswHandlerTest, test_memory) {
+    auto index_hnsw = MakeIndexHnsw();
+    auto column_def = MakeColumnDef();
+
+    {
+        /// get HnswHandler
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+        hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+
+        /// test interface
+        hnsw_handler->GetType();
+        auto [mem_usage, vec_num] = hnsw_handler->GetInfo();
+        printf("hnsw_handler::GetInfo() -> %lu, %lu\n", mem_usage, vec_num);
+        printf("hnsw_handler::GetSizeInBytes() -> %lu\n", hnsw_handler->GetSizeInBytes());
+        SearchHnswHandler(hnsw_handler.get());
+
+        /// test save
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        hnsw_handler->SaveToPtr(*file_handle);
+    }
+
+    /// test load
+    {
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        SizeT file_size = VirtualStore::GetFileSize(filepath);
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        hnsw_handler->LoadFromPtr(*file_handle, file_size);
+
+        SearchHnswHandler(hnsw_handler.get());
+    }
+}
+
+TEST_F(HnswHandlerTest, test_compress) {
+    /// build in memory
     {
         auto index_hnsw = MakeIndexHnsw();
         auto column_def = MakeColumnDef();
-
-        /// get HnswHandler
         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
         hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
 
         hnsw_handler->CompressToLVQ();
 
-        test_search(hnsw_handler);
+        SearchHnswHandler(hnsw_handler.get());
 
         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
         if (!status.ok()) {
@@ -236,8 +199,37 @@ TEST_F(HnswHandlerTest, test_compress) {
     {
         auto index_hnsw = MakeIndexHnsw(true);
         auto column_def = MakeColumnDef();
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        SizeT file_size = VirtualStore::GetFileSize(filepath);
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        hnsw_handler->LoadFromPtr(*file_handle, file_size);
 
+        SearchHnswHandler(hnsw_handler.get());
+    }
+}
+
+TEST_F(HnswHandlerTest, test_load) {
+    auto index_hnsw = MakeIndexHnsw();
+    auto column_def = MakeColumnDef();
+    /// save index file
+    {
         /// get HnswHandler
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+        auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+        hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+
+        /// save
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        hnsw_handler->SaveToPtr(*file_handle);
+    }
+    /// load by file_handle
+    {
         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
 
         SizeT file_size = VirtualStore::GetFileSize(filepath);
@@ -245,9 +237,140 @@ TEST_F(HnswHandlerTest, test_compress) {
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-
         hnsw_handler->LoadFromPtr(*file_handle, file_size);
 
-        test_search(hnsw_handler);
+        SearchHnswHandler(hnsw_handler.get());
     }
+    /// load by mmap
+    {
+        auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get(), false);
+        SizeT file_size = VirtualStore::GetFileSize(filepath);
+#define USE_MMAP
+#ifdef USE_MMAP
+        unsigned char *data_ptr = nullptr;
+        int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
+        if (ret < 0) {
+            UnrecoverableError("mmap failed");
+        }
+        const char *ptr = reinterpret_cast<const char *>(data_ptr);
+#else
+        auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        auto buffer = MakeUnique<char[]>(file_size);
+        file_handle->Read(buffer.get(), file_size);
+        const char *ptr = buffer.get();
+#endif
+        hnsw_handler->LoadFromPtr(ptr, file_size);
+
+        SearchHnswHandler(hnsw_handler.get());
+
+#ifdef USE_MMAP
+        VirtualStore::MunmapFile(filepath);
+#endif
+    }
+}
+
+TEST_F(HnswHandlerTest, test_parallel) {
+    auto index_hnsw = MakeIndexHnsw();
+    auto column_def = MakeColumnDef();
+    auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
+
+    std::atomic<int> total = 0;
+    std::atomic<int> res = 0;
+    std::atomic<bool> stop = false;
+    std::atomic<bool> starve = false;
+    std::shared_mutex opt_mtx;
+
+    auto SharedOptLck = [&]() {
+        if (starve.load()) {
+            starve.wait(true);
+        }
+        return std::shared_lock(opt_mtx);
+    };
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+    auto UniqueOptLck = [&]() {
+        bool old = false;
+        bool success = starve.compare_exchange_strong(old, true);
+        assert(success);
+        auto ret = std::unique_lock(opt_mtx);
+        starve.store(false);
+        starve.notify_all();
+        return ret;
+    };
+#pragma clang diagnostic pop
+
+    auto write_thread = std::thread([&] {
+        i32 start_i = 0, end_i = 0;
+        {
+            auto w_lck = UniqueOptLck();
+            HnswInsertConfig config;
+            config.optimize_ = true;
+            std::tie(start_i, end_i) = hnsw_handler->StoreData<LabelT>(data.get(), dim, element_size / 2);
+        }
+        {
+            auto write_thread2 = std::thread([&] {
+                SizeT insert_n = element_size - element_size / 2;
+                for (SizeT i = element_size / 2; i < element_size; ++i) {
+                    DenseVectorIter<float, LabelT> iter(data.get(), dim, 1 /*insert_n*/);
+                    hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+                    if ((i + 1) % (insert_n / 4) == 0) {
+                        auto w_lck = UniqueOptLck();
+                        hnsw_handler->Optimize();
+                    }
+                }
+            });
+
+            std::atomic<i32> idx = start_i;
+            std::vector<std::thread> worker_threads;
+            for (int i = 0; i < 4; ++i) {
+                worker_threads.emplace_back([&] {
+                    while (true) {
+                        i32 i = idx.fetch_add(1);
+                        if (i >= end_i) {
+                            break;
+                        }
+                        auto r_lck = SharedOptLck();
+                        hnsw_handler->Build(i);
+                    }
+                });
+            }
+            for (int i = 0; i < 4; ++i) {
+                worker_threads[i].join();
+            }
+            write_thread2.join();
+        }
+        stop.store(true);
+    });
+    std::vector<std::thread> read_threads;
+    for (int j = 0; j < 4; ++j) {
+        read_threads.emplace_back([&] {
+            while (stop.load() == false) {
+                for (SizeT i = 0; i < element_size; ++i) {
+                    const float *query = data.get() + i * dim;
+                    auto r_lck = SharedOptLck();
+                    auto [result_n, d_ptr, v_ptr] = hnsw_handler->template SearchIndex<float, LabelT>(query, 1);
+                    Vector<Pair<float, LabelT>> result(result_n);
+                    for (SizeT k = 0; k < result_n; ++k) {
+                        result[k] = {d_ptr[k], hnsw_handler->template GetLabel<LabelT>(v_ptr[k])};
+                    }
+                    std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+                    if (!result.empty()) {
+                        ++res;
+                    }
+                    ++total;
+                }
+            }
+        });
+    }
+    write_thread.join();
+    for (auto &t : read_threads) {
+        t.join();
+    }
+    float correct_rate = float(res) / total;
+    std::printf("correct rage: %f\n", correct_rate);
+    EXPECT_GE(correct_rate, 0.95);
 }
