@@ -147,7 +147,6 @@ TEST_F(HnswHandlerTest, test_memory) {
         hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
 
         /// test interface
-        hnsw_handler->GetType();
         auto [mem_usage, vec_num] = hnsw_handler->GetInfo();
         printf("hnsw_handler::GetInfo() -> %lu, %lu\n", mem_usage, vec_num);
         printf("hnsw_handler::GetSizeInBytes() -> %lu\n", hnsw_handler->GetSizeInBytes());
