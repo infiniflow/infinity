@@ -76,7 +76,7 @@ public:
 
     bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
 
-    void SendToWAL(NewTxn *txn);
+    void SendToWAL(const SharedPtr<NewTxn> &txn);
 
     //[[nodiscard]]
     Status CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr = nullptr);
@@ -145,7 +145,7 @@ public:
 
     void SetSystemCache();
 
-    void RemoveMapElementForRollback(TxnTimeStamp commit_ts);
+    void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, const SharedPtr<NewTxn>& txn_ptr);
 
 private:
     mutable std::mutex locker1_;
@@ -160,7 +160,7 @@ private:
     KVStore *kv_store_;
 
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
-    Deque<SharedPtr<NewTxn>> check_txns_;
+    Set<SharedPtr<NewTxn>> check_txns_;
     Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts

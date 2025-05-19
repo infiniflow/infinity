@@ -203,6 +203,8 @@ private:
 
     // WalManager state
     Atomic<bool> running_{};
+    // std::mutex running_mutex_;
+    // bool running2_;
     Thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members
@@ -226,6 +228,7 @@ private:
     mutable std::mutex last_ckp_ts_mutex_{};
     TxnTimeStamp last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
+    Atomic<int> cnt_{0};
 };
 
 } // namespace infinity

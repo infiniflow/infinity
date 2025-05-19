@@ -37,10 +37,12 @@ private:
 
 private:
     Atomic<bool> running_{true};
-    Vector<SharedPtr<BlockingQueue<NewTxn *>>> txn_queues_{};
+    SharedPtr<BlockingQueue<NewTxn *>> txn_queue_{};
     Vector<Thread> executors_{};
+    std::mutex executor_mutex_{};
+    std::condition_variable cond_;
 
-    SizeT cnt_{0};
+    Atomic<SizeT> cnt_{0};
     std::mutex mutex_{};
     std::condition_variable cv_{};
 };

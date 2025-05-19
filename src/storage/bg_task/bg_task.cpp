@@ -42,16 +42,17 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     Status status = new_txn->Checkpoint(last_checkpoint_ts);
     if (status.ok()) {
-        status = new_txn_mgr->CommitTxn(new_txn);
+        status = new_txn_mgr->CommitTxn(new_txn); //
     }
-    //    if (!status.ok()) {
-    //        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
-    //        if (!rollback_status.ok()) {
-    //            RecoverableError(rollback_status);
-    //        }
-    //        return status;
-    //    }
+    // if (!status.ok()) {
+    //     Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+    //     if (!rollback_status.ok()) {
+    //         RecoverableError(rollback_status);
+    //     }
+    //     return status;
+    // }
     return status;
+    // return Status::OK();
 }
 
 ForceCheckpointTask::ForceCheckpointTask(Txn *txn, bool full_checkpoint, TxnTimeStamp cleanup_ts)

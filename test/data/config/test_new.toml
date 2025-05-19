@@ -20,6 +20,7 @@ temp_dir                 = "/var/infinity/tmp"
 
 [wal]
 wal_dir                  = "/var/infinity/wal"
+full_checkpoint_interval = "5s"
 
 [resource]
 resource_dir             = "/var/infinity/resource"
