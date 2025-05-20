@@ -798,7 +798,7 @@ export struct WalCmdOptimizeV2 final : public WalCmd {
     Vector<UniquePtr<InitParameter>> params_{};
 };
 
-enum class DumpIndexCause { kImport, kCompact, kCreateIndex, kOptimizeIndex, kReplayCreateIndex, kDumpMemIndex, kInvalid };
+export enum class DumpIndexCause { kImport, kCompact, kCreateIndex, kOptimizeIndex, kReplayCreateIndex, kDumpMemIndex, kInvalid };
 
 export struct WalCmdDumpIndex final : public WalCmd {
     WalCmdDumpIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id)
