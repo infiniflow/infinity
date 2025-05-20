@@ -2708,7 +2708,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
 bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
-    const Vector<SegmentID> &segment_ids = txn_store.segment_ids_;
+    const Vector<SegmentID> &segment_ids = txn_store.deprecated_segment_ids_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCompact: {
@@ -3183,8 +3183,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name &&
                 std::find_first_of(segment_ids.begin(),
                                    segment_ids.end(),
-                                   compact_txn_store->segment_ids_.begin(),
-                                   compact_txn_store->segment_ids_.end()) != segment_ids.end()) {
+                                   compact_txn_store->deprecated_segment_ids_.begin(),
+                                   compact_txn_store->deprecated_segment_ids_.end()) != segment_ids.end()) {
                 conflict = true;
             }
             break;

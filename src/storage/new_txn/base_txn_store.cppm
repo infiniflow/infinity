@@ -191,6 +191,7 @@ export struct OptimizeIndexTxnStore : public BaseTxnStore {
     Vector<SegmentID> segment_ids_{};
 
     String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct AppendTxnStore : public BaseTxnStore {

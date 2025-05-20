@@ -140,6 +140,12 @@ String OptimizeIndexTxnStore::ToString() const {
                        fmt::join(segment_ids_, " "));
 }
 
+SharedPtr<WalEntry> OptimizeIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    return wal_entry;
+}
+
 String AppendTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, appended: {}",
                        TransactionType2Str(type_),
@@ -246,13 +252,14 @@ SharedPtr<WalEntry> DropColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
 
 String CompactTxnStore::ToString() const {
 
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, segment_id: {}",
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, new_segment_id: {}, deprecated_segment_ids: {}",
                        TransactionType2Str(type_),
                        db_name_,
                        db_id_str_,
                        table_name_,
                        table_id_str_,
-                       fmt::join(segment_ids_, " "));
+                       new_segment_id_,
+                       fmt::join(deprecated_segment_ids_, " "));
 }
 
 SharedPtr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
