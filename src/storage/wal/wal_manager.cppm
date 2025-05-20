@@ -203,8 +203,6 @@ private:
 
     // WalManager state
     Atomic<bool> running_{};
-    // std::mutex running_mutex_;
-    // bool running2_;
     Thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members

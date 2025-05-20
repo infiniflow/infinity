@@ -1303,14 +1303,14 @@ Status NewTxn::Commit() {
     if (!status.ok()) {
         // If prepare commit or conflict check failed, rollback the transaction
         this->SetTxnRollbacking(commit_ts);
-        txn_mgr_->SendToWAL(shared_from_this());
+        txn_mgr_->SendToWAL(this);
         PostRollback(commit_ts);
         return status;
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
-    txn_mgr_->SendToWAL(shared_from_this());
+    txn_mgr_->SendToWAL(this);
 
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(commit_lock_);
@@ -2147,13 +2147,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdDropDatabaseV2 &cmd, NewTxn *previous_
         bool conflict = false;
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
-            // case WalCommandType::CREATE_DATABASE_V2: {
-            //     auto *prev_cmd = static_cast<WalCmdCreateDatabaseV2 *>(wal_cmd.get());
-            //     if (prev_cmd->db_name_ == db_name) {
-            //         conflict = true;
-            //     }
-            //     break;
-            // }
             case WalCommandType::DROP_DATABASE_V2: {
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(wal_cmd.get());
                 if (drop_db_cmd->db_name_ == db_name) {

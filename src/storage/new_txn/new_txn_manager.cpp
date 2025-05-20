@@ -233,7 +233,7 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     prepare_commit_ts_ += 2;
     TxnTimeStamp commit_ts = prepare_commit_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    check_txns_.emplace_back(txn);
+    check_txns_.emplace(commit_ts, txn);
     bottom_txns_.emplace(commit_ts, txn);
     if (txn->NeedToAllocate()) {
         allocator_map_.emplace(commit_ts, nullptr);
@@ -264,7 +264,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
     return false;
 }
 
-void NewTxnManager::SendToWAL(const SharedPtr<NewTxn> &txn) {
+void NewTxnManager::SendToWAL(NewTxn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "NewTxnManager is not running, cannot put wal entry";
@@ -292,7 +292,7 @@ void NewTxnManager::SendToWAL(const SharedPtr<NewTxn> &txn) {
     if (txn->GetTxnState() == TxnState::kRollbacking) {
         this->RemoveMapElementForRollbackNoLock(txn->CommitTS(), txn);
     } else {
-        wait_conflict_ck_.at(commit_ts) = txn.get();
+        wait_conflict_ck_.at(commit_ts) = txn;
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
         Vector<NewTxn *> txn_array;
@@ -568,7 +568,7 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
     }
 
     TxnTimeStamp first_begin_ts = begin_txn_map_.begin()->first;
-    while (!check_txns_.empty() && (*check_txns_.begin())->CommitTS() < first_begin_ts) {
+    while (!check_txns_.empty() && check_txns_.begin()->first < first_begin_ts) {
         check_txns_.erase(check_txns_.begin());
     }
 }
@@ -623,18 +623,17 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
     {
         std::lock_guard guard(locker_);
         res.reserve(check_txns_.size());
-        for (SizeT i = 0; i < check_txns_.size(); ++i) {
-            SharedPtr<NewTxn> &check_txn = check_txns_[i];
-            TxnTimeStamp check_commit_ts = check_txn->CommitTS();
-            TxnState check_txn_state = check_txn->GetTxnState();
-            bool is_rollback = (check_txn_state == TxnState::kRollbacking) || (check_txn_state == TxnState::kRollbacked);
+        for (auto &check_txn : check_txns_) {
+            auto& [check_commit_ts, txn] = check_txn;
+            TxnState check_txn_state = txn->GetTxnState();
+            bool is_rollback = check_txn_state == TxnState::kRollbacked;
             if (check_commit_ts < begin_ts || is_rollback) {
                 continue;
             }
             if (check_commit_ts >= commit_ts) {
                 break;
             }
-            res.push_back(check_txn);
+            res.push_back(txn);
         }
     }
     return res;
@@ -702,14 +701,14 @@ void NewTxnManager::SetSystemCache() {
     txn_allocator_->SetSystemCache(system_cache_);
 }
 
-void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, const SharedPtr<NewTxn> &txn_ptr) {
+void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr) {
     if (!wait_conflict_ck_.erase(commit_ts)) {
         UnrecoverableError(fmt::format("Key: {} is not exists.", commit_ts));
     }
     if (!bottom_txns_.erase(commit_ts)) {
         UnrecoverableError(fmt::format("Key: {} is not exists.", commit_ts));
     }
-    // check_txns_.erase(txn_ptr);
+    check_txns_.erase(commit_ts);
 
     if (txn_ptr->NeedToAllocate()) {
         allocator_map_.erase(commit_ts);
