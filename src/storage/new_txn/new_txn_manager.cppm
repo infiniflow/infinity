@@ -49,7 +49,7 @@ public:
 
     SharedPtr<NewTxn> BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type);
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
-    UniquePtr<NewTxn> BeginReplayTxn(const SharedPr<WalEntry> &replay_entries);
+    UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
 
     NewTxn *GetTxn(TransactionID txn_id) const;
