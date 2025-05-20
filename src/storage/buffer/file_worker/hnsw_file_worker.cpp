@@ -32,7 +32,11 @@ import logical_type;
 import embedding_info;
 import create_index_info;
 import internal_types;
+#ifdef INDEX_HANDLER
 import hnsw_handler;
+#else
+import abstract_hnsw;
+#endif
 import virtual_store;
 import persistence_manager;
 import local_file_handle;
@@ -78,7 +82,11 @@ void HnswFileWorker::AllocateInMemory() {
         String error_message = "Data is already allocated.";
         UnrecoverableError(error_message);
     }
+#ifdef INDEX_HANDLER
     data_ = static_cast<void *>(new HnswHandlerPtr());
+#else
+    data_ = static_cast<void *>(new AbstractHnsw());
+#endif
 }
 
 void HnswFileWorker::FreeInMemory() {
@@ -86,9 +94,24 @@ void HnswFileWorker::FreeInMemory() {
         String error_message = "FreeInMemory: Data is not allocated.";
         UnrecoverableError(error_message);
     }
+#ifdef INDEX_HANDLER
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     delete *hnsw_handler;
     delete hnsw_handler;
+#else
+    auto *p = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                if (index != nullptr) {
+                    delete index;
+                }
+            }
+        },
+        *p);
+    delete p;
+#endif
     data_ = nullptr;
 }
 
@@ -97,8 +120,27 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
         String error_message = "WriteToFileImpl: Data is not allocated.";
         UnrecoverableError(error_message);
     }
+#ifdef INDEX_HANDLER
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     (*hnsw_handler)->SaveToPtr(*file_handle_);
+#else
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    index->SaveToPtr(*file_handle_);
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        *hnsw_index);
+#endif
     prepare_success = true;
     return true;
 }
@@ -107,21 +149,66 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
+#ifdef INDEX_HANDLER
     data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
     if (!from_spill) {
         file_size = file_handle_->FileSize();
     }
     (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
+#else
+    data_ = static_cast<void *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    if (from_spill) {
+                        index = IndexT::Load(*file_handle_).release();
+                    } else {
+                        index = IndexT::LoadFromPtr(*file_handle_, file_size).release();
+                    }
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        *hnsw_index);
+#endif
 }
 
 bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Mmap data is already allocated.");
     }
+#ifdef INDEX_HANDLER
     mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
     (*hnsw_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
+#else
+    mmap_data_ = reinterpret_cast<u8 *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get(), false)));
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(mmap_data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (!IndexT::kOwnMem) {
+                    const auto *p = static_cast<const char *>(ptr);
+                    index = IndexT::LoadFromPtr(p, size).release();
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        *hnsw_index);
+#endif
     return true;
 }
 
@@ -129,9 +216,22 @@ void HnswFileWorker::FreeFromMmapImpl() {
     if (mmap_data_ == nullptr) {
         UnrecoverableError("Mmap data is not allocated.");
     }
+#ifdef INDEX_HANDLER
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
     delete *hnsw_handler;
     delete hnsw_handler;
+#else
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(mmap_data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                delete index;
+            }
+        },
+        *hnsw_index);
+    delete hnsw_index;
+#endif
     mmap_data_ = nullptr;
 }
 

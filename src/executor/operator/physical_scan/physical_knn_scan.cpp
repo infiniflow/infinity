@@ -59,7 +59,11 @@ import create_index_info;
 import knn_expr;
 import block_entry;
 import segment_entry;
+#ifdef INDEX_HANDLER
 import hnsw_handler;
+#else
+import abstract_hnsw;
+#endif
 import physical_match_tensor_scan;
 import hnsw_alg;
 import ivf_index_data_in_mem;
@@ -687,7 +691,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     if constexpr (!(IsAnyOf<ColumnDataType, u8, i8, f32> && std::is_same_v<ColumnDataType, QueryDataType>)) {
                         UnrecoverableError("Invalid data type");
                     } else {
+#ifdef INDEX_HANDLER
                         auto hnsw_search = [&](const HnswHandlerPtr hnsw_handler, bool with_lock) {
+#else
+                        auto hnsw_search = [&](auto *hnsw_index, bool with_lock) {
+#endif
                             bool rerank = false;
                             KnnSearchOption search_option;
                             search_option.column_logical_type_ = t;
@@ -708,6 +716,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 SizeT result_n1 = 0;
                                 UniquePtr<DistanceDataType[]> d_ptr = nullptr;
                                 UniquePtr<SegmentOffset[]> l_ptr = nullptr;
+#ifdef INDEX_HANDLER
                                 if (use_bitmask) {
                                     BitmaskFilter<SegmentOffset> filter(bitmask);
                                     if (with_lock) {
@@ -736,6 +745,37 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                                     (query, knn_scan_shared_data->topk_, filter, search_option);
                                     }
                                 }
+#else
+                                if (use_bitmask) {
+                                    BitmaskFilter<SegmentOffset> filter(bitmask);
+                                    if (with_lock) {
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_index->template KnnSearch<BitmaskFilter<SegmentOffset>, true>(query,
+                                                                                                               knn_scan_shared_data->topk_,
+                                                                                                               filter,
+                                                                                                               search_option);
+                                    } else {
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_index->template KnnSearch<BitmaskFilter<SegmentOffset>, false>(query,
+                                                                                                                knn_scan_shared_data->topk_,
+                                                                                                                filter,
+                                                                                                                search_option);
+                                    }
+                                } else {
+                                    SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
+                                    if (!with_lock) {
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, search_option);
+                                    } else {
+                                        AppendFilter filter(max_segment_offset);
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_index->template KnnSearch<AppendFilter, true>(query,
+                                                                                               knn_scan_shared_data->topk_,
+                                                                                               filter,
+                                                                                               search_option);
+                                    }
+                                }
+#endif
 
                                 if (result_n < 0) {
                                     result_n = result_n1;
@@ -818,7 +858,23 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 }
                             }
                         };
-
+#ifdef INDEX_HANDLER
+#else
+                        auto abstract_hnsw_search = [&](const AbstractHnsw &abstract_hnsw, bool with_lock) {
+                            std::visit(
+                                [&](auto &&arg) {
+                                    using T = std::decay_t<decltype(arg)>;
+                                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                                        UnrecoverableError("Invalid index type");
+                                    } else if constexpr (!std::is_same_v<ColumnDataType, typename std::remove_pointer_t<T>::DataType>) {
+                                        UnrecoverableError("Invalid data type");
+                                    } else {
+                                        hnsw_search(arg, with_lock);
+                                    }
+                                },
+                                abstract_hnsw);
+                        };
+#endif
                         auto [chunk_ids_ptr, mem_index] = get_chunks();
                         for (ChunkID chunk_id : *chunk_ids_ptr) {
                             ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
@@ -828,12 +884,22 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 UnrecoverableError(status.message());
                             }
                             BufferHandle index_handle = index_buffer->Load();
+#ifdef INDEX_HANDLER
                             const HnswHandlerPtr *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_handle.GetData());
                             hnsw_search(*hnsw_handler, false);
+#else
+                            const auto *abstract_hnsw = reinterpret_cast<const AbstractHnsw *>(index_handle.GetData());
+                            abstract_hnsw_search(*abstract_hnsw, false);
+#endif
                         }
                         if (mem_index && mem_index->memory_hnsw_index_) {
+#ifdef INDEX_HANDLER
                             const HnswHandlerPtr hnsw_handler = mem_index->memory_hnsw_index_->get();
                             hnsw_search(hnsw_handler, true);
+#else
+                            const AbstractHnsw &abstract_hnsw = mem_index->memory_hnsw_index_->get();
+                            abstract_hnsw_search(abstract_hnsw, true);
+#endif
                         }
                     }
                     break;
