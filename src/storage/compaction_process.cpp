@@ -120,6 +120,7 @@ void CompactionProcessor::DoCompact() {
 }
 
 void CompactionProcessor::NewDoCompact() {
+    LOG_TRACE("Background task triggered compaction");
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     Vector<Pair<String, String>> db_table_names;
     {
@@ -152,10 +153,12 @@ void CompactionProcessor::NewDoCompact() {
         DeferFn defer_fn([&] {
             if (status.ok()) {
                 status = new_txn_mgr->CommitTxn(new_txn);
+            } else {
+                LOG_ERROR(fmt::format("Compaction failed: {}", status.message()));
             }
             if (!status.ok()) {
-                status = new_txn_mgr->RollBackTxn(new_txn);
-                if (!status.ok()) {
+                Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+                if (!rollback_status.ok()) {
                     UnrecoverableError(status.message());
                 }
             }
@@ -175,6 +178,10 @@ void CompactionProcessor::NewDoCompact() {
                 UnrecoverableError(status.message());
             }
             segment_ids = *segment_ids_ptr;
+            //            LOG_TRACE(fmt::format("Collect segment ids: {}, txn_id: {}, begin_ts: {}", segment_ids.size(), new_txn->TxnID(),
+            //            new_txn->BeginTS())); for (const SegmentID segment_id : segment_ids) {
+            //                LOG_TRACE(fmt::format("Collect compact segment id: {}", segment_id));
+            //            }
             SegmentID unsealed_id = 0;
             status = table_meta->GetUnsealedSegmentID(unsealed_id);
             if (!status.ok()) {
@@ -206,26 +213,30 @@ void CompactionProcessor::NewDoCompact() {
     }
 }
 
-void CompactionProcessor::NewManualCompact(NewTxn *new_txn, const String &db_name, const String &table_name) {
+Status CompactionProcessor::NewManualCompact(const String &db_name, const String &table_name) {
+    //    LOG_TRACE(fmt::format("Compact command triggered compaction: {}.{}", db_name, table_name));
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        return status;
     }
     Vector<SegmentID> segment_ids;
     {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         if (!status.ok()) {
-            UnrecoverableError(status.message());
+            return status;
         }
         segment_ids = *segment_ids_ptr;
         SegmentID unsealed_id = 0;
         status = table_meta->GetUnsealedSegmentID(unsealed_id);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
-                UnrecoverableError(status.message());
+                return status;
             }
         } else {
             segment_ids.erase(std::remove(segment_ids.begin(), segment_ids.end(), unsealed_id), segment_ids.end());
@@ -233,8 +244,10 @@ void CompactionProcessor::NewManualCompact(NewTxn *new_txn, const String &db_nam
     }
     status = new_txn->Compact(db_name, table_name, segment_ids);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        return status;
     }
+    status = new_txn_mgr->CommitTxn(new_txn);
+    return status;
 }
 
 TxnTimeStamp
@@ -328,7 +341,7 @@ void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
         const String &table_name = dump_task->mem_index_->table_name_;
         const String &index_name = dump_task->mem_index_->index_name_;
         SegmentID segment_id = dump_task->mem_index_->segment_id_;
-        
+
         Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
         if (status.ok()) {
             status = new_txn_mgr->CommitTxn(new_txn);
@@ -401,6 +414,7 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNewCompact: {
+                    // Triggered by compact command
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
                         UnrecoverableError("Uninitialized storage mode");
@@ -410,13 +424,14 @@ void CompactionProcessor::Process() {
 
                         auto *compact_task = static_cast<NewCompactTask *>(bg_task.get());
 
-                        NewManualCompact(compact_task->new_txn_, compact_task->db_name_, compact_task->table_name_);
+                        compact_task->result_status_ = NewManualCompact(compact_task->db_name_, compact_task->table_name_);
 
                         LOG_DEBUG("Do compact end.");
                     }
                     break;
                 }
                 case BGTaskType::kNotifyCompact: {
+                    // Triggered by periodic thread
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
                         UnrecoverableError("Uninitialized storage mode");

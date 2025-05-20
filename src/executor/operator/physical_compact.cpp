@@ -103,6 +103,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     compaction_processor->Submit(compact_task);
     compact_task->Wait();
 
+    compact_operator_state->status_ = compact_task->result_status_;
     compact_operator_state->SetComplete();
     return true;
 }
