@@ -14,6 +14,7 @@
 
 module;
 
+#include <ranges>
 #include <vector>
 
 module base_txn_store;
@@ -129,20 +130,40 @@ SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
 }
 
 String OptimizeIndexTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}, segment_id: {}",
-                       TransactionType2Str(type_),
-                       db_name_,
-                       db_id_str_,
-                       table_name_,
-                       table_id_str_,
-                       fmt::join(index_names_, " "),
-                       fmt::join(index_ids_str_, " "),
-                       fmt::join(segment_ids_, " "));
+    return fmt::format(
+        "{}: database: {}, db_id: {}, table: {}, table_id: {}, table_key: {}, indexes: {}, index_ids: {}, segment_ids: {}, "
+        "deprecate_ids_in_segments_: {}",
+        TransactionType2Str(type_),
+        db_name_,
+        db_id_str_,
+        table_name_,
+        table_id_str_,
+        table_key_,
+        fmt::join(index_names_, " "),
+        fmt::join(index_ids_str_, " "),
+        fmt::join(segment_ids_, " "),
+        fmt::join(deprecate_ids_in_segments_ | std::views::transform([](const auto &row) { return fmt::format("({})", fmt::join(row, " ")); }),
+                  ", "));
 }
 
 SharedPtr<WalEntry> OptimizeIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
+    SharedPtr<WalCmdDumpIndexV2> dump_command;
+    for (SizeT i = 0; i < index_names_.size(); ++i) {
+        dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
+                                                     db_id_str_,
+                                                     table_name_,
+                                                     table_id_str_,
+                                                     index_names_[i],
+                                                     index_ids_str_[i],
+                                                     segment_ids_[i],
+                                                     chunk_infos_in_segments_[i],
+                                                     deprecate_ids_in_segments_[i],
+                                                     table_key_);
+        dump_command->dump_cause_ = DumpIndexCause::kOptimizeIndex;
+        wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
+    }
     return wal_entry;
 }
 
