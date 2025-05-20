@@ -86,6 +86,8 @@ export struct BGTask {
         cv_.notify_one();
     }
 
+    Status result_status_{};
+
     virtual String ToString() const = 0;
 };
 

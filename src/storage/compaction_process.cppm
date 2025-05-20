@@ -21,6 +21,7 @@ import txn;
 import bg_task;
 import blocking_queue;
 import base_statement;
+import status;
 
 namespace infinity {
 
@@ -67,7 +68,7 @@ public:
 
     void NewDoCompact();
 
-    void NewManualCompact(NewTxn *new_txn, const String &db_name, const String &table_name);
+    Status NewManualCompact(const String &db_name, const String &table_name);
 
     u64 RunningTaskCount() const { return task_count_; }
 

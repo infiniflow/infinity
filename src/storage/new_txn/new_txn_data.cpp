@@ -340,6 +340,10 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         auto import_command =
             MakeShared<WalCmdImportV2>(db_name, db_meta->db_id_str(), table_name, table_meta.table_id_str(), WalSegmentInfo(*segment_meta, begin_ts));
         if (block_row_cnts.size() != import_command->segment_info_.block_infos_.size()) {
+            //            auto all_key_values = txn_mgr_->kv_store()->GetAllKeyValue();
+            //            for (auto &key_value : all_key_values) {
+            //                LOG_ERROR(fmt::format("key: {}, value: {}", key_value.first, key_value.second));
+            //            }
             UnrecoverableError("Block row count mismatch");
         }
         for (SizeT i = 0; i < block_row_cnts.size(); ++i) {
@@ -653,6 +657,7 @@ Status NewTxn::PrintVersion(const String &db_name, const String &table_name, con
 
 Status NewTxn::Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
 
+    //    LOG_INFO(fmt::format("Start to compact segment ids: {}", segment_ids.size()));
     this->SetTxnType(TransactionType::kCompact);
 
     this->CheckTxn(db_name);
@@ -688,13 +693,14 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     } catch (const std::exception &e) {
         return Status::UnexpectedError(fmt::format("Database: {} or db is dropped: {}, cause: ", db_name, table_name, e.what()));
     }
-    LOG_TRACE(fmt::format("Compact: apply segment id: {}", segment_ids[0]));
+    LOG_TRACE(fmt::format("Compact: apply segment id: {}", new_segment_ids[0]));
     NewTxnCompactState compact_state;
     status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state, new_segment_ids[0]);
     if (!status.ok()) {
         return status;
     }
 
+    LOG_TRACE(fmt::format("To compact segments {}", segment_ids.size()));
     for (SegmentID segment_id : segment_ids) {
         SegmentMeta segment_meta(segment_id, table_meta);
 
@@ -711,12 +717,14 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
                 return status;
             }
         }
+        //        LOG_TRACE(fmt::format("Compact blocks of segment id: {}", segment_id));
     }
     status = compact_state.Finalize();
     if (!status.ok()) {
         return status;
     }
 
+    //    LOG_TRACE(fmt::format("To remove segment: {}", segment_ids.size()));
     status = table_meta.RemoveSegmentIDs1(segment_ids);
     if (!status.ok()) {
         return status;
@@ -776,6 +784,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         return status;
     }
 
+    //    LOG_TRACE(fmt::format("To populate index: {}", index_id_strs_ptr->size()));
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_name_ptr)[i];
