@@ -72,7 +72,7 @@ KVInstance::~KVInstance() {
 }
 
 Status KVInstance::Put(const String &key, const String &value) {
-    //    LOG_INFO(fmt::format("Put key: {}, value: {}", key, value));
+    //    LOG_TRACE(fmt::format("To put key: {}, value: {}", key, value));
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
         String msg = fmt::format("rocksdb::Transaction::Put key: {}, value: {}", key, value);
@@ -83,6 +83,7 @@ Status KVInstance::Put(const String &key, const String &value) {
 }
 
 Status KVInstance::Delete(const String &key) {
+    //    LOG_TRACE(fmt::format("To delete key: {}", key));
     rocksdb::Status s = transaction_->Delete(key);
     if (!s.ok()) {
         String msg = fmt::format("rocksdb::Transaction::Delete key: {}", key);
