@@ -14,7 +14,6 @@
 
 module;
 
-#include "parser/type/serialize.h"
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1125,7 +1124,7 @@ bool NewTxn::GetTxnBottomDone() {
 
 bool NewTxn::NeedToAllocate() const {
     TransactionType txn_type = TransactionType::kInvalid;
-    if(base_txn_store_ != nullptr) {
+    if (base_txn_store_ != nullptr) {
         txn_type = base_txn_store_->type_;
         if (txn_type != GetTxnType()) {
             LOG_WARN(fmt::format("Transaction type mismatch: {} vs {}", TransactionType2Str(txn_type), TransactionType2Str(GetTxnType())));
@@ -1823,7 +1822,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str(), drop_db_cmd->db_name_));
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str(), drop_db_cmd->db_name_), kv_instance_.get());
 
     return Status::OK();
 }
@@ -1864,7 +1863,7 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableMetaKey>(db_id_str, table_id_str, drop_table_cmd->table_name_));
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableMetaKey>(db_id_str, table_id_str, drop_table_cmd->table_name_), kv_instance_.get());
 
     return Status::OK();
 }
@@ -4119,7 +4118,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<UniquePtr<MetaKey>> metas;
-    new_catalog->GetCleanedMeta(ts, metas);
+    new_catalog->GetCleanedMeta(ts, metas, kv_instance);
 
     for (auto &meta : metas) {
         switch (meta->type_) {

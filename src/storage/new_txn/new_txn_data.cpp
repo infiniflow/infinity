@@ -1339,7 +1339,8 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
                                                                   block_meta.segment_meta().table_meta().table_id_str(),
                                                                   block_meta.segment_meta().segment_id(),
                                                                   block_meta.block_id(),
-                                                                  column_def));
+                                                                  column_def),
+                                        kv_instance_.get());
         }
         return Status::OK();
     };
@@ -1761,7 +1762,7 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
     const Vector<SegmentID> &deprecated_ids = compact_cmd->deprecated_segment_ids_;
 
     for (SegmentID segment_id : deprecated_ids) {
-        new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+        new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id), kv_instance_.get());
     }
     {
         Vector<String> *index_id_strs_ptr = nullptr;
@@ -1779,7 +1780,9 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
             for (SegmentID segment_id : *segment_ids_ptr) {
                 auto iter = std::find(deprecated_ids.begin(), deprecated_ids.end(), segment_id);
                 if (iter != deprecated_ids.end()) {
-                    new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                    new_catalog->AddCleanedMeta(commit_ts,
+                                                MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id),
+                                                kv_instance_.get());
                 }
             }
             status = table_index_meta.RemoveSegmentIndexIDs(*segment_ids_ptr);

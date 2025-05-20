@@ -206,6 +206,22 @@ public:
     static String PMObjectKey(const String &key);
 
     static String PMObjectStatKey(const String &key);
+
+    static String DropDBKey(const String &meta_str);
+
+    static String DropTableKey(const String &meta_str);
+
+    static String DropSegmentKey(const String &meta_str);
+
+    static String DropBlockKey(const String &meta_str);
+
+    static String DropBlockColumnKey(const String &meta_str);
+
+    static String DropTableIndexKey(const String &meta_str);
+
+    static String DropSegmentIndexKey(const String &meta_str);
+
+    static String DropChunkIndexKey(const String &meta_str);
 };
 
 } // namespace infinity

@@ -303,4 +303,20 @@ String KeyEncode::PMObjectKey(const String &key) { return fmt::format("pm|object
 
 String KeyEncode::PMObjectStatKey(const String &key) { return fmt::format("pm|object_stat|{}", key); }
 
+String KeyEncode::DropDBKey(const String &meta_str) { return fmt::format("drop|db|{}", meta_str); }
+
+String KeyEncode::DropTableKey(const String &meta_str) { return fmt::format("drop|tbl|{}", meta_str); }
+
+String KeyEncode::DropSegmentKey(const String &meta_str) { return fmt::format("drop|seg|{}", meta_str); }
+
+String KeyEncode::DropBlockKey(const String &meta_str) { return fmt::format("drop|blk|{}", meta_str); }
+
+String KeyEncode::DropBlockColumnKey(const String &meta_str) { return fmt::format("drop|blk_col|{}", meta_str); }
+
+String KeyEncode::DropTableIndexKey(const String &meta_str) { return fmt::format("drop|idx|{}", meta_str); }
+
+String KeyEncode::DropSegmentIndexKey(const String &meta_str) { return fmt::format("drop|idx_seg|{}", meta_str); }
+
+String KeyEncode::DropChunkIndexKey(const String &meta_str) { return fmt::format("drop|idx_chunk|{}", meta_str); }
+
 } // namespace infinity
