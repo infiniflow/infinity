@@ -159,6 +159,23 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     String ToString() const final;
 };
 
+export struct OptimizeIndexTxnStore : public BaseTxnStore {
+    OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    Vector<String> index_names_{};
+    Vector<String> index_ids_str_{};
+    Vector<u64> index_ids_{};
+    Vector<SegmentID> segment_ids_{};
+
+    String ToString() const final;
+};
+
 export struct AppendTxnStore : public BaseTxnStore {
     AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
 
