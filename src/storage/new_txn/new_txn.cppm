@@ -97,6 +97,7 @@ struct TxnCommitterTask;
 
 struct BaseTxnStore;
 struct CreateDBTxnStore;
+struct DropDBTxnStore;
 struct CreateTableTxnStore;
 struct AppendTxnStore;
 struct ImportTxnStore;
@@ -104,9 +105,13 @@ struct AddColumnsTxnStore;
 struct DropColumnsTxnStore;
 struct CompactTxnStore;
 struct CreateIndexTxnStore;
+struct DropIndexTxnStore;
+struct OptimizeIndexTxnStore;
 struct DumpMemIndexTxnStore;
 struct DeleteTxnStore;
 struct DropTableTxnStore;
+struct RenameTableTxnStore;
+struct UpdateTxnStore;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -610,6 +615,7 @@ private:
 
     bool CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const ImportTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
@@ -617,9 +623,13 @@ private:
     bool CheckConflictTxnStore(const DropColumnsTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const DropIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
