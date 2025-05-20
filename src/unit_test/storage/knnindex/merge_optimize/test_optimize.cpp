@@ -58,7 +58,7 @@ import catalog_meta;
 import mem_index;
 import status;
 import new_txn;
-import abstract_hnsw;
+import hnsw_handler;
 import buffer_obj;
 
 using namespace infinity;

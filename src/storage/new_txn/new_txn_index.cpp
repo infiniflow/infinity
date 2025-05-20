@@ -51,7 +51,7 @@ import memory_indexer;
 import index_full_text;
 import column_index_reader;
 import column_index_merger;
-import abstract_hnsw;
+import hnsw_handler;
 import index_hnsw;
 import abstract_bmp;
 import index_bmp;
@@ -1412,36 +1412,6 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             if (!params) {
                 break;
             }
-
-            auto optimize_index = [&](AbstractHnsw *abstract_hnsw) {
-                std::visit(
-                    [&](auto &&index) {
-                        using T = std::decay_t<decltype(index)>;
-                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                            UnrecoverableError("Invalid index type.");
-                        } else {
-                            using IndexT = typename std::remove_pointer_t<T>;
-                            if constexpr (IndexT::kOwnMem) {
-                                using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-                                if (params->compress_to_lvq) {
-                                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                                        UnrecoverableError("Invalid index type.");
-                                    } else {
-                                        auto *p = std::move(*index).CompressToLVQ().release();
-                                        delete index;
-                                        *abstract_hnsw = p;
-                                    }
-                                }
-                                if (params->lvq_avg) {
-                                    index->Optimize();
-                                }
-                            } else {
-                                UnrecoverableError("Invalid index type.");
-                            }
-                        }
-                    },
-                    *abstract_hnsw);
-            };
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
@@ -1450,11 +1420,22 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     return status;
                 }
                 BufferHandle buffer_handle = index_buffer->Load();
-                auto *abstract_hnsw = static_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
-                optimize_index(abstract_hnsw);
+                HnswHandlerPtr hnsw_handler = *static_cast<HnswHandlerPtr *>(buffer_handle.GetDataMut());
+                if (params->compress_to_lvq) {
+                    hnsw_handler->CompressToLVQ();
+                }
+                if (params->lvq_avg) {
+                    hnsw_handler->Optimize();
+                }
             }
             if (mem_index && mem_index->memory_hnsw_index_) {
-                optimize_index(mem_index->memory_hnsw_index_->get_ptr());
+                HnswHandlerPtr hnsw_handler = mem_index->memory_hnsw_index_->get();
+                if (params->compress_to_lvq) {
+                    hnsw_handler->CompressToLVQ();
+                }
+                if (params->lvq_avg) {
+                    hnsw_handler->Optimize();
+                }
             }
             break;
         }

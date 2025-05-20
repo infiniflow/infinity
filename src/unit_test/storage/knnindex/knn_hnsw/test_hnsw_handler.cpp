@@ -56,7 +56,6 @@ public:
         chunk_size = 128;
         max_chunk_n = 16;
         element_size = max_chunk_n * chunk_size;
-        kBuildBucketSize = 1024;
 
         index_name = MakeShared<String>("index_name");
         filename = "filename";
@@ -122,7 +121,6 @@ protected:
     SizeT chunk_size;
     SizeT max_chunk_n;
     SizeT element_size;
-    SizeT kBuildBucketSize;
 
     SharedPtr<String> index_name;
     String filename;
@@ -144,7 +142,7 @@ TEST_F(HnswHandlerTest, test_memory) {
         /// get HnswHandler
         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-        hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+        hnsw_handler->InsertVecs(std::move(iter));
 
         /// test interface
         auto [mem_usage, vec_num] = hnsw_handler->GetInfo();
@@ -181,7 +179,7 @@ TEST_F(HnswHandlerTest, test_compress) {
         auto column_def = MakeColumnDef();
         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-        hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+        hnsw_handler->InsertVecs(std::move(iter));
 
         hnsw_handler->CompressToLVQ();
 
@@ -218,7 +216,7 @@ TEST_F(HnswHandlerTest, test_load) {
         /// get HnswHandler
         auto hnsw_handler = HnswHandler::Make(index_hnsw.get(), column_def.get());
         auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-        hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+        hnsw_handler->InsertVecs(std::move(iter));
 
         /// save
         auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
@@ -315,7 +313,7 @@ TEST_F(HnswHandlerTest, test_parallel) {
                 SizeT insert_n = element_size - element_size / 2;
                 for (SizeT i = element_size / 2; i < element_size; ++i) {
                     DenseVectorIter<float, LabelT> iter(data.get(), dim, 1 /*insert_n*/);
-                    hnsw_handler->InsertVecs(std::move(iter), kBuildBucketSize);
+                    hnsw_handler->InsertVecs(std::move(iter));
                     if ((i + 1) % (insert_n / 4) == 0) {
                         auto w_lck = UniqueOptLck();
                         hnsw_handler->Optimize();

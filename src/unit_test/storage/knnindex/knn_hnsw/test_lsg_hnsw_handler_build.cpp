@@ -160,7 +160,7 @@ TEST_F(LSGHnswHandlerBuildTest, test1) {
     KnnSearchOption search_option{.ef_ = SizeT(topk) * 10};
     for (SizeT i = 0; i < element_size; ++i) {
         const float *query = data.get() + i * dim;
-        HnswHandler *hnsw_handler = hnsw_index.get()->get_ptr();
+        HnswHandlerPtr hnsw_handler = hnsw_index->get();
         auto [result_n, d_ptr, v_ptr] = hnsw_handler->SearchIndex<float, LabelT>(query, topk, search_option);
         Vector<Pair<f32, LabelT>> res(result_n);
         for (SizeT i = 0; i < result_n; ++i) {

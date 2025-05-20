@@ -22,7 +22,7 @@ import secondary_index_in_mem;
 import ivf_index_data_in_mem;
 import emvb_index_in_mem;
 import memory_indexer;
-import abstract_hnsw;
+import hnsw_handler;
 import abstract_bmp;
 
 namespace infinity {

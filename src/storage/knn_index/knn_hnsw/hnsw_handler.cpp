@@ -170,6 +170,175 @@ UniquePtr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, const Colu
     return MakeUnique<HnswHandler>(index_base, column_def, own_mem);
 }
 
+SizeT HnswHandler::InsertVecs(SizeT block_offset,
+                                BlockColumnEntry *block_column_entry,
+                                BufferManager *buffer_manager,
+                                SizeT row_offset,
+                                SizeT row_count,
+                                const HnswInsertConfig &config,
+                                SizeT kBuildBucketSize) {
+    SizeT mem_usage{};
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using DataType = typename IndexT::DataType;
+
+                    switch (const auto &column_data_type = block_column_entry->column_type(); column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            MemIndexInserterIter<DataType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            break;
+                        }
+                        case LogicalType::kMultiVector: {
+                            MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset,
+                                                                                block_column_entry,
+                                                                                buffer_manager,
+                                                                                row_offset,
+                                                                                row_count);
+                            HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
+                    }
+                } else {
+                    UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+                }
+            }
+        },
+        hnsw_);
+    return mem_usage;
+}
+
+SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
+                                const ColumnVector &col,
+                                BlockOffset offset,
+                                BlockOffset row_count,
+                                const HnswInsertConfig &config,
+                                SizeT kBuildBucketSize) {
+    SizeT mem_usage{};
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using DataType = typename IndexT::DataType;
+                    switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            // MemIndexInserterIter<DataType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                            HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            break;
+                        }
+                        case LogicalType::kMultiVector: {
+                            MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                            // MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset,
+                            //                                                     block_column_entry,
+                            //                                                     buffer_manager,
+                            //                                                     row_offset,
+                            //                                                     row_count);
+                            HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
+                    }
+                } else {
+                    UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+                }
+            }
+        },
+        hnsw_);
+   return mem_usage;
+}
+
+SizeT HnswHandler::InsertVecs(const SegmentEntry *segment_entry,
+                                BufferManager *buffer_mgr,
+                                SizeT column_id,
+                                TxnTimeStamp begin_ts,
+                                bool check_ts,
+                                const HnswInsertConfig &config,
+                                SizeT kBuildBucketSize) {
+        SizeT mem_usage{};
+        std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (!IndexT::kOwnMem) {
+                    UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+                } else {
+                    using DataType = typename IndexT::DataType;
+
+                    switch (const auto &column_data_type = segment_entry->GetTableEntry()->GetColumnDefByID(column_id)->type();
+                            column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            if (check_ts) {
+                                OneColumnIterator<DataType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                                HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            } else {
+                                OneColumnIterator<DataType, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                                HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            }
+                            break;
+                        }
+                        case LogicalType::kMultiVector: {
+                            const auto ele_size = column_data_type->type_info()->Size();
+                            if (check_ts) {
+                                OneColumnIterator<MultiVectorRef<DataType>> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
+                                HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            } else {
+                                OneColumnIterator<MultiVectorRef<DataType>, false> iter(segment_entry, buffer_mgr, column_id, begin_ts,
+                                ele_size); HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                            }
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
+                    }
+                }
+            }
+        },
+        hnsw_);
+    return mem_usage;
+}
+
+SizeT HnswHandler::InsertVecs(int row_count,
+                                const SegmentEntry *segment_entry,
+                                BufferManager *buffer_mgr,
+                                SizeT column_id,
+                                TxnTimeStamp begin_ts,
+                                const HnswInsertConfig &config,
+                                SizeT kBuildBucketSize) {
+    SizeT mem_usage{};
+    std::visit(
+        [&](auto &index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using DataType = typename IndexT::DataType;
+                    CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_id, begin_ts, row_count);
+                    HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        hnsw_);
+    return mem_usage;
+}
+
 SizeT HnswHandler::MemUsage() const {
     return std::visit(
         [&](auto &&index) {
@@ -214,9 +383,7 @@ SizeT HnswHandler::GetSizeInBytes() const {
         hnsw_);
 }
 
-Pair<SizeT, SizeT> HnswHandler::GetInfo() const {
-    return {MemUsage(), GetRowCount()};
-}
+Pair<SizeT, SizeT> HnswHandler::GetInfo() const { return {MemUsage(), GetRowCount()}; }
 
 void HnswHandler::Check() const {
     std::visit(
@@ -365,7 +532,8 @@ void HnswHandler::CompressToLVQ() {
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
-    if (hnsw_handler_ != nullptr) {
+    SizeT mem_usage = hnsw_handler_->MemUsage();
+    if (own_memory_ && hnsw_handler_ != nullptr) {
         delete hnsw_handler_;
     }
     if (trace_) {
@@ -375,9 +543,22 @@ HnswIndexInMem::~HnswIndexInMem() {
         }
         auto *memindex_tracer = storage->memindex_tracer();
         if (memindex_tracer != nullptr) {
-            memindex_tracer->DecreaseMemUsed(0);
+            memindex_tracer->DecreaseMemUsed(mem_usage);
         }
     }
+}
+
+UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
+                                                 const IndexBase *index_base,
+                                                 const ColumnDef *column_def,
+                                                 SegmentIndexEntry *segment_index_entry,
+                                                 bool trace) {
+    auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, segment_index_entry, trace);
+    if (trace) {
+        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+    }
+    return memidx;
 }
 
 UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace) {
@@ -405,12 +586,82 @@ MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
     return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
 }
 
-void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) {
-    hnsw_handler_->SetLSGParam(alpha, std::move(avg));
+void HnswIndexInMem::InsertVecs(SizeT block_offset,
+                 BlockColumnEntry *block_column_entry,
+                 BufferManager *buffer_manager,
+                 SizeT row_offset,
+                 SizeT row_count,
+                 const HnswInsertConfig &config) {
+    SizeT mem_usage = hnsw_handler_->InsertVecs(block_offset, block_column_entry, buffer_manager, row_offset, row_count, config, kBuildBucketSize);
+    this->IncreaseMemoryUsageBase(mem_usage);
 }
 
-TableIndexEntry *HnswIndexInMem::table_index_entry() const {
-    return segment_index_entry_->table_index_entry();
+void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
+                const ColumnVector &col,
+                BlockOffset offset,
+                BlockOffset row_count,
+                const HnswInsertConfig &config) {
+    SizeT mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
+    this->IncreaseMemoryUsageBase(mem_usage);
+}
+
+void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
+                BufferManager *buffer_mgr,
+                SizeT column_id,
+                TxnTimeStamp begin_ts,
+                bool check_ts,
+                const HnswInsertConfig &config) {
+    SizeT mem_usage = hnsw_handler_->InsertVecs(segment_entry, buffer_mgr, column_id, begin_ts, check_ts, config, kBuildBucketSize);
+    this->IncreaseMemoryUsageBase(mem_usage);
+}
+
+SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size_ptr) {
+    SizeT row_count = hnsw_handler_->GetRowCount();
+    SizeT index_size = hnsw_handler_->GetSizeInBytes();
+    SizeT dump_size = hnsw_handler_->MemUsage();
+    trace_ = false;
+    auto new_chunk_indey_entry = segment_index_entry->CreateHnswIndexChunkIndexEntry(begin_row_id_, row_count, buffer_mgr, index_size);
+    if (dump_size_ptr != nullptr) {
+        *dump_size_ptr = dump_size;
+    }
+
+    BufferHandle handle = new_chunk_indey_entry->GetIndex();
+    auto *data_ptr = static_cast<HnswHandlerPtr *>(handle.GetDataMut());
+    *data_ptr = hnsw_handler_;
+    own_memory_ = false;
+    chunk_handle_ = std::move(handle);
+    return new_chunk_indey_entry;
+}
+
+void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
+    trace_ = false;
+    if (dump_size_ptr != nullptr) {
+        SizeT dump_size = hnsw_handler_->MemUsage();
+        *dump_size_ptr = dump_size;
+    }
+
+    BufferHandle handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<HnswHandlerPtr *>(handle.GetDataMut());
+    *data_ptr = hnsw_handler_;
+    own_memory_ = false;
+    chunk_handle_ = std::move(handle);
+}
+
+void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) { hnsw_handler_->SetLSGParam(alpha, std::move(avg)); }
+
+TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
+
+SizeT HnswIndexInMem::GetRowCount() const {
+    return hnsw_handler_->GetRowCount();
+}
+
+SizeT HnswIndexInMem::GetSizeInBytes() const {
+    return hnsw_handler_->GetSizeInBytes();
+}
+
+void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
+    segment_index_entry_ = segment_index_entry;
+    begin_row_id_ = RowID(segment_index_entry->segment_id(), 0);
 }
 
 } // namespace infinity
