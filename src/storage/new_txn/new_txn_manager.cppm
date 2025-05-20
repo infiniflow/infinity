@@ -49,7 +49,7 @@ public:
 
     SharedPtr<NewTxn> BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type);
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
-    UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
+    UniquePtr<NewTxn> BeginReplayTxn(const SharedPr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
 
     NewTxn *GetTxn(TransactionID txn_id) const;
@@ -157,7 +157,7 @@ private:
     //    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
     Map<TxnTimeStamp, u64> begin_txn_map_{}; // Used for clean up TS and txn conflict check txns
     Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
-    Set<SharedPtr<NewTxn>> check_txns_;
+    Deque<SharedPtr<NewTxn>> check_txns_;
     Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
