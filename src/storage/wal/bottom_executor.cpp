@@ -40,8 +40,6 @@ BottomExecutor::BottomExecutor(SizeT pool_size) {
                         TxnState txn_state = txns[i]->GetTxnState();
                         if (txn_state == TxnState::kCommitting) {
                             txns[i]->CommitBottom();
-                        } else {
-                            txns[i]->RollbackBottom();
                         }
                     }
                     txns.clear();

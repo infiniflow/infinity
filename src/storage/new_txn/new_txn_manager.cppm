@@ -141,6 +141,8 @@ public:
 
     void SetSystemCache();
 
+    void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr);
+
 private:
     mutable std::mutex locker_{};
     Storage *storage_{};
@@ -152,9 +154,8 @@ private:
 
     KVStore *kv_store_;
 
-    //    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
     Map<TxnTimeStamp, u64> begin_txn_map_{}; // Used for clean up TS and txn conflict check txns
-    Deque<SharedPtr<NewTxn>> check_txns_;
+    Map<TxnTimeStamp, SharedPtr<NewTxn>> check_txns_;
     Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_; // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
