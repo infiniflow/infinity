@@ -53,7 +53,11 @@ import index_defines;
 import column_inverter;
 import block_entry;
 import chunk_index_entry;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+#else
 import abstract_hnsw;
+#endif
 import abstract_bmp;
 import block_column_iter;
 import txn_store;
@@ -783,6 +787,8 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
             if (!params) {
                 break;
             }
+#ifdef INDEX_HANDLER
+#else
             auto optimize_index = [&](AbstractHnsw *abstract_hnsw) {
                 std::visit(
                     [&](auto &&index) {
@@ -812,18 +818,39 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
                     },
                     *abstract_hnsw);
             };
+#endif
 
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
                 BufferHandle buffer_handle = chunk_index_entry->GetBufferObj()->Load();
+#ifdef INDEX_HANDLER
+                HnswHandlerPtr hnsw_handler = *reinterpret_cast<HnswHandlerPtr *>(buffer_handle.GetDataMut());
+                if (params->compress_to_lvq) {
+                    hnsw_handler->CompressToLVQ();
+                }
+                if (params->lvq_avg) {
+                    hnsw_handler->Optimize();
+                }
+#else
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
+#endif
                 chunk_index_entry->SaveIndexFile();
 
                 set_fileworker_index_def(chunk_index_entry.get());
             }
             if (memory_index_entry.get() != nullptr) {
+#ifdef INDEX_HANDLER
+                HnswHandlerPtr hnsw_handler = memory_index_entry->get();
+                if (params->compress_to_lvq) {
+                    hnsw_handler->CompressToLVQ();
+                }
+                if (params->lvq_avg) {
+                    hnsw_handler->Optimize();
+                }
+#else
                 optimize_index(memory_index_entry->get_ptr());
+#endif
                 dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;
@@ -959,8 +986,13 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                 memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, true /*check_ts*/, buffer_mgr, true);
             } else {
                 memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base, column_def.get(), this);
+#ifdef INDEX_HANDLER
+                HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
+                HnswInsertConfig insert_config;
+                insert_config.optimize_ = true;
+                hnsw_handler->InsertVecs(row_count, segment_entry, buffer_mgr, column_def->id(), begin_ts, insert_config);
+#else
                 const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
-
                 std::visit(
                     [&](auto &index) {
                         using T = std::decay_t<decltype(index)>;
@@ -984,6 +1016,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         }
                     },
                     abstract_hnsw);
+#endif
             }
             merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
             break;

@@ -20,7 +20,11 @@ module;
 module hnsw_lsg_builder;
 
 import stl;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+#else
 import abstract_hnsw;
+#endif
 import segment_entry;
 import column_def;
 import index_hnsw;
