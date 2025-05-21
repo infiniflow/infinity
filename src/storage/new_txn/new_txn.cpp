@@ -1815,7 +1815,10 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
         return status;
     }
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str(), drop_db_cmd->db_name_), kv_instance_.get());
+
+    auto ts_str = std::to_string(commit_ts);
+    auto meta_str = fmt::format("{}/{}", db_meta->db_id_str(), drop_db_cmd->db_name_);
+    kv_instance_->Put(KeyEncode::DropDBKey(meta_str), ts_str);
 
     return Status::OK();
 }
@@ -1856,7 +1859,10 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableMetaKey>(db_id_str, table_id_str, drop_table_cmd->table_name_), kv_instance_.get());
+
+    auto ts_str = std::to_string(commit_ts);
+    auto meta_str = fmt::format("{}/{}/{}", db_id_str, table_id_str, drop_table_cmd->table_name_);
+    kv_instance_->Put(KeyEncode::DropTableKey(meta_str), ts_str);
 
     return Status::OK();
 }
