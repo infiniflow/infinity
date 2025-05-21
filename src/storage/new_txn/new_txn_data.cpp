@@ -275,13 +275,13 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
                 return status;
             }
             col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorTipe::kReadWrite);
-            if (VarBufferManager *var_buffer_mgr = col->buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-                SizeT chunk_size = var_buffer_mgr->TotalSize();
-                Status status = column_meta.SetChunkOffset(chunk_size);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
+            // if (VarBufferManager *var_buffer_mgr = col->buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+            //     SizeT chunk_size = var_buffer_mgr->TotalSize();
+            //     Status status = column_meta.SetChunkOffset(chunk_size);
+            //     if (!status.ok()) {
+            //         return status;
+            //     }
+            // }
 
             buffer_obj->Save();
             if (outline_buffer_obj) {
