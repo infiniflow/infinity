@@ -233,7 +233,7 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     prepare_commit_ts_ += 2;
     TxnTimeStamp commit_ts = prepare_commit_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    check_txns_.emplace(commit_ts, txn);
+    check_txn_map_.emplace(commit_ts, txn);
     bottom_txns_.emplace(commit_ts, txn);
     if (txn->NeedToAllocate()) {
         allocator_map_.emplace(commit_ts, nullptr);
@@ -255,7 +255,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
-    LOG_DEBUG(fmt::format("txn {} CheckConflict1 check_txns {}", txn->TxnID(), check_txns.size()));
+    LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
             return true;
@@ -405,7 +405,7 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
     std::lock_guard guard(locker_);
     auto iter = bottom_txns_.find(commit_ts);
     if (iter == bottom_txns_.end()) {
-        String error_message = fmt::format("NewTxn: {} not found in check_txns_", txn_id);
+        String error_message = fmt::format("NewTxn: {} not found in bottom txn", txn_id);
         UnrecoverableError(error_message);
     }
     if (iter->second == nullptr) {
@@ -563,13 +563,17 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
     }
 
     if (begin_txn_map_.empty()) {
-        check_txns_.clear();
+        check_txn_map_.clear();
         return;
     }
 
     TxnTimeStamp first_begin_ts = begin_txn_map_.begin()->first;
-    while (!check_txns_.empty() && check_txns_.begin()->first < first_begin_ts) {
-        check_txns_.erase(check_txns_.begin());
+    while (!check_txn_map_.empty() && check_txn_map_.begin()->first < first_begin_ts) {
+        LOG_TRACE(fmt::format("Pop check txn, id: {}, with commit_ts: {} < begin_ts: {}",
+                              check_txn_map_.begin()->second->TxnID(),
+                              check_txn_map_.begin()->first,
+                              first_begin_ts));
+        check_txn_map_.erase(check_txn_map_.begin());
     }
 }
 
@@ -622,18 +626,19 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, Txn
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
-        res.reserve(check_txns_.size());
-        for (auto &check_txn : check_txns_) {
-            auto& [check_commit_ts, txn] = check_txn;
-            TxnState check_txn_state = txn->GetTxnState();
-            bool is_rollback = check_txn_state == TxnState::kRollbacked;
+        res.reserve(check_txn_map_.size());
+        for (const auto &check_txn_pair : check_txn_map_) {
+            const SharedPtr<NewTxn> &check_txn = check_txn_pair.second;
+            TxnTimeStamp check_commit_ts = check_txn->CommitTS();
+            TxnState check_txn_state = check_txn->GetTxnState();
+            bool is_rollback = (check_txn_state == TxnState::kRollbacking) || (check_txn_state == TxnState::kRollbacked);
             if (check_commit_ts < begin_ts || is_rollback) {
                 continue;
             }
             if (check_commit_ts >= commit_ts) {
                 break;
             }
-            res.push_back(txn);
+            res.push_back(check_txn);
         }
     }
     return res;
@@ -708,7 +713,7 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
     if (!bottom_txns_.erase(commit_ts)) {
         UnrecoverableError(fmt::format("Key: {} is not exists.", commit_ts));
     }
-    check_txns_.erase(commit_ts);
+    check_txn_map_.erase(commit_ts);
 
     if (txn_ptr->NeedToAllocate()) {
         allocator_map_.erase(commit_ts);
