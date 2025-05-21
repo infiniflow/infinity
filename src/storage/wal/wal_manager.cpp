@@ -483,7 +483,7 @@ void WalManager::NewFlush() {
             }
 
             for (const SharedPtr<WalCmd> &cmd : entry->cmds_) {
-                LOG_TRACE(fmt::format("WAL CMD: {}", cmd->ToString()));
+                LOG_TRACE(fmt::format("TXN: {}, WAL CMD: {}", entry->txn_id_, cmd->ToString()));
             }
 
             i32 exp_size = entry->GetSizeInBytes();

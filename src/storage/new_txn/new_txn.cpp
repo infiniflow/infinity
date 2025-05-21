@@ -3745,7 +3745,7 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
 }
 
 bool NewTxn::CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
-    // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
+    LOG_TRACE(fmt::format("CheckConflictTxnStores::Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     bool conflict = this->CheckConflictTxnStore(check_txn.get(), conflict_reason, retry_query);
     if (conflict) {
         conflicted_txn_ = check_txn;
@@ -4069,7 +4069,7 @@ Status NewTxn::Rollback() {
 
     Status status = PostRollback(abort_ts);
 
-    LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));
+    LOG_TRACE(fmt::format("NewTxn: {} is rolled back.", txn_context_ptr_->txn_id_));
 
     return status;
 }
