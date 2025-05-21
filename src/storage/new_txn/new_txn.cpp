@@ -4201,9 +4201,6 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     }
 
     buffer_mgr->RemoveClean();
-    // std::for_each(metas.begin(), metas.end(), [&](const auto &meta) {
-    //     meta->Clean(kv_instance_);
-    // });
     return Status::OK();
 }
 
