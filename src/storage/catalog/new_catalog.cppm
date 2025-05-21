@@ -198,7 +198,7 @@ public:
     Status RestoreCatalogCache(Storage *storage_ptr);
 
     SharedPtr<SystemCache> GetSystemCache() const;
-    SystemCache* GetSystemCachePtr() const;
+    SystemCache *GetSystemCachePtr() const;
 
 private:
     KVStore *kv_store_{};
@@ -287,9 +287,6 @@ public:
     Status IncrLatestID(String &id_str, std::string_view id_name);
 
 private:
-    // std::mutex cleaned_meta_mtx_{};
-    // MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
-
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
     // bool is_vfs_{false};
