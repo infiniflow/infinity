@@ -594,6 +594,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     txn_store->old_table_name_ = old_table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->new_table_name_ = new_table_name;
+    txn_store->old_table_key_ = table_key;
     LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
 }
@@ -2149,11 +2150,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
 bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
-    Set<SegmentID> segment_ids;
-    for (const auto &row_range : txn_store.row_ranges_) {
-        RowID row_id = row_range.first;
-        segment_ids.insert(row_id.segment_id_);
-    }
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
@@ -2182,14 +2178,6 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
             DropColumnsTxnStore *drop_columns_txn_store = static_cast<DropColumnsTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_columns_txn_store->db_name_ == db_name && drop_columns_txn_store->table_name_ == table_name) {
                 retry_query = false;
-                conflict = true;
-            }
-            break;
-        }
-        case TransactionType::kDumpMemIndex: {
-            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name &&
-                segment_ids.contains(dump_index_txn_store->segment_id_)) {
                 conflict = true;
             }
             break;

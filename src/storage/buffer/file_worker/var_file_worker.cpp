@@ -103,7 +103,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    if (file_size < buffer_size_ && buffer_size_ != 0) {
+    if (file_size < buffer_size_) {
         String error_message = fmt::format("File: {} size {} is smaller than buffer size {}.", GetFilePath(), file_size, buffer_size_);
         UnrecoverableError(error_message);
     } else {
@@ -124,7 +124,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
 }
 
 bool VarFileWorker::ReadFromMmapImpl(const void *ptr, SizeT file_size) {
-    if (file_size < buffer_size_ && buffer_size_ != 0) {
+    if (file_size < buffer_size_) {
         String error_message = fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_);
         UnrecoverableError(error_message);
     } else {

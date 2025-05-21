@@ -4743,6 +4743,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
     };
 
+
     auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
@@ -4769,7 +4770,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         {
             auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({}));
+            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4860,7 +4861,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                         |------------------|----------|
-    //                        t2                append     commit (fail)
+    //                        t2                append     commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4881,7 +4882,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
@@ -4891,7 +4892,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     //  t1            dump index                 commit (success)
     //  |--------------|------------------------------|
     //                         |------------------|------------------|
-    //                        t2           append (false)         rollback (true)
+    //                        t2           append                commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4906,12 +4907,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, make_block());
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -4922,7 +4923,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     //  t1            dump index                                               commit (success)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
-    //                        t2                 append(fail)         rollback
+    //                        t2                 append             commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4937,8 +4938,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, make_block());
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4952,7 +4953,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     //  t1            dump index                             commit (success)
     //  |--------------|------------------------------------------|
     //         |------------------|----------------------|
-    //         t2                append(fail)           rollback
+    //         t2                append               commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4969,8 +4970,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, make_block());
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -4981,7 +4982,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         drop_db(*db_name);
     }
 
-    //  t1                                  dump index (fail)                           rollback (success)
+    //  t1                                  dump index                            commit (success)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|--------------------|
     //         t2                append        commit
@@ -5000,15 +5001,15 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
     }
