@@ -2812,7 +2812,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
         status = txn3->Append(*db_name, *table_name, input_block1);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());

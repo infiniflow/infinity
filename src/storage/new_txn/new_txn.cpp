@@ -3655,77 +3655,102 @@ void NewTxn::CancelCommitBottom() {
 }
 
 Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
-        WalCommandType command_type = wal_cmd->GetType();
-        switch (command_type) {
-            case WalCommandType::ADD_COLUMNS_V2: {
-                //                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::DROP_COLUMNS_V2: {
-                //                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::DROP_TABLE_V2: {
-                //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::RENAME_TABLE_V2: {
-                //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::CREATE_INDEX_V2: {
-                break;
-            }
-            case WalCommandType::DROP_INDEX_V2: {
-                //                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::APPEND_V2: {
-                //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::DELETE_V2: {
-                auto *cmd = static_cast<WalCmdDeleteV2 *>(wal_cmd.get());
-                Status status = RollbackDelete(cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to rollback delete operation");
-                }
-                break;
-            }
-            case WalCommandType::IMPORT_V2: {
-                ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+    TransactionType txn_type = TransactionType::kInvalid;
+    if (base_txn_store_ != nullptr) {
+        txn_type = base_txn_store_->type_;
+    }
+    switch (txn_type) {
+        case TransactionType::kCreateDB: {
+            break;
+        }
+        case TransactionType::kDropDB: {
+            break;
+        }
+        case TransactionType::kCreateTable: {
+            break;
+        }
+        case TransactionType::kAppend: {
+            break;
+        }
+        case TransactionType::kImport: {
+            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
-                SizeT data_block_count = import_txn_store->input_blocks_in_imports_[0].size();
-                for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
-                    import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
-                }
-                break;
+            SizeT data_block_count = import_txn_store->input_blocks_in_imports_[0].size();
+            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+                import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
             }
-            case WalCommandType::DUMP_INDEX_V2: {
-                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
-                    if (!mem_index_status.ok()) {
-                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
-                    }
-                }
+
+            if (import_txn_store->index_names_.size() > 0) {
                 // Restore memory index here
-                // TODO: Not implemented.
                 UnrecoverableError("Not implemented");
-                break;
             }
-            case WalCommandType::COMPACT_V2: {
-                //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                break;
+            break;
+        }
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+            if (compact_txn_store->index_names_.size() > 0) {
+                // Restore memory index here
+                UnrecoverableError("Not implemented");
             }
-            case WalCommandType::CHECKPOINT_V2: {
-                UnrecoverableError("Unexpected case: rollback checkpoint");
-                break;
+            break;
+        }
+        case TransactionType::kCreateIndex: {
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            break;
+        }
+        case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+
+            Status mem_index_status = new_catalog_->UnsetMemIndexDump(dump_index_txn_store->table_key_);
+            if (!mem_index_status.ok()) {
+                UnrecoverableError(
+                    fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_txn_store->table_name_, mem_index_status.message()));
             }
-            default: {
-                break;
+
+            // Restore memory index here
+            // TODO: Not implemented.
+            UnrecoverableError("Not implemented");
+            break;
+        }
+        case TransactionType::kOptimizeIndex: {
+            OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+
+            if (optimize_index_txn_store->index_names_.size() > 0) {
+                // Restore memory index here
+                UnrecoverableError("Not implemented");
             }
+            break;
+        }
+        case TransactionType::kDelete: {
+            DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+            Status status = RollbackDelete(delete_txn_store, kv_instance_.get());
+            if (!status.ok()) {
+                UnrecoverableError("Fail to rollback delete operation");
+            }
+            break;
+        }
+        case TransactionType::kAddColumn: {
+            break;
+        }
+        case TransactionType::kDropColumn: {
+            break;
+        }
+        case TransactionType::kDropTable: {
+            break;
+        }
+        case TransactionType::kRenameTable: {
+            break;
+        }
+        case TransactionType::kUpdate: {
+            break;
+        }
+        case TransactionType::kCheckpoint: {
+            UnrecoverableError("Unexpected case: rollback checkpoint");
+            break;
+        }
+        default: {
         }
     }
 
