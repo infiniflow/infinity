@@ -27,7 +27,11 @@ import hnsw_common;
 import logical_type;
 import index_base;
 import internal_types;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+#else
 import abstract_hnsw;
+#endif
 import infinity_exception;
 import hnsw_alg;
 
@@ -154,7 +158,8 @@ TEST_F(LSGBuildTest, test1) {
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
     UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
-
+#ifdef INDEX_HANDLER
+#else
     auto search_index =
         [](HnswIndexInMem *hnsw_index, const float *query, i32 topk, const KnnSearchOption &search_option) -> Vector<Pair<f32, LabelT>> {
         return std::visit(
@@ -174,13 +179,24 @@ TEST_F(LSGBuildTest, test1) {
             },
             hnsw_index->get());
     };
+#endif
 
     u32 correct_count = 0;
     i32 topk = 1;
     KnnSearchOption search_option{.ef_ = SizeT(topk) * 10};
     for (SizeT i = 0; i < element_size; ++i) {
         const float *query = data.get() + i * dim;
+#ifdef INDEX_HANDLER
+        HnswHandlerPtr hnsw_handler = hnsw_index->get();
+        auto [result_n, d_ptr, v_ptr] = hnsw_handler->SearchIndex<float, LabelT>(query, topk, search_option);
+        Vector<Pair<f32, LabelT>> res(result_n);
+        for (SizeT i = 0; i < result_n; ++i) {
+            res[i] = {d_ptr[i], hnsw_handler->GetLabel<LabelT>(v_ptr[i])};
+        }
+        std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+#else
         Vector<Pair<f32, LabelT>> res = search_index(hnsw_index.get(), query, topk, search_option);
+#endif
         if (res.empty()) {
             continue;
         }

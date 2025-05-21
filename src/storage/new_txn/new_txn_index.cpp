@@ -50,7 +50,11 @@ import memory_indexer;
 import index_full_text;
 import column_index_reader;
 import column_index_merger;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+#else
 import abstract_hnsw;
+#endif
 import index_hnsw;
 import abstract_bmp;
 import index_bmp;
@@ -1413,7 +1417,8 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             if (!params) {
                 break;
             }
-
+#ifdef INDEX_HANDLER
+#else
             auto optimize_index = [&](AbstractHnsw *abstract_hnsw) {
                 std::visit(
                     [&](auto &&index) {
@@ -1443,6 +1448,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     },
                     *abstract_hnsw);
             };
+#endif
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
@@ -1451,11 +1457,31 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     return status;
                 }
                 BufferHandle buffer_handle = index_buffer->Load();
+#ifdef INDEX_HANDLER
+                HnswHandlerPtr hnsw_handler = *static_cast<HnswHandlerPtr *>(buffer_handle.GetDataMut());
+                if (params->compress_to_lvq) {
+                    hnsw_handler->CompressToLVQ();
+                }
+                if (params->lvq_avg) {
+                    hnsw_handler->Optimize();
+                }
+#else
                 auto *abstract_hnsw = static_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
+#endif
             }
             if (mem_index && mem_index->memory_hnsw_index_) {
+#ifdef INDEX_HANDLER
+                HnswHandlerPtr hnsw_handler = mem_index->memory_hnsw_index_->get();
+                if (params->compress_to_lvq) {
+                    hnsw_handler->CompressToLVQ();
+                }
+                if (params->lvq_avg) {
+                    hnsw_handler->Optimize();
+                }
+#else
                 optimize_index(mem_index->memory_hnsw_index_->get_ptr());
+#endif
             }
             break;
         }
