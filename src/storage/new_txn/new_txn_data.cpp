@@ -1336,13 +1336,12 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
             SharedPtr<ColumnDef> column_def = *iter;
 
             auto ts_str = std::to_string(commit_ts);
-            auto meta_str = fmt::format("{}/{}/{}/{}/{}",
-                                        block_meta.segment_meta().table_meta().db_id_str(),
-                                        block_meta.segment_meta().table_meta().table_id_str(),
-                                        block_meta.segment_meta().segment_id(),
-                                        block_meta.block_id(),
-                                        column_def->ToJson().dump());
-            kv_instance_->Put(KeyEncode::DropBlockColumnKey(meta_str), ts_str);
+            kv_instance_->Put(KeyEncode::DropBlockColumnKey(block_meta.segment_meta().table_meta().db_id_str(),
+                                                            block_meta.segment_meta().table_meta().table_id_str(),
+                                                            block_meta.segment_meta().segment_id(),
+                                                            block_meta.block_id(),
+                                                            column_def),
+                              ts_str);
         }
         return Status::OK();
     };
@@ -1764,8 +1763,7 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
 
     for (SegmentID segment_id : deprecated_ids) {
         auto ts_str = std::to_string(commit_ts);
-        auto meta_str = fmt::format("{}/{}/{}", db_id_str, table_id_str, segment_id);
-        kv_instance_->Put(KeyEncode::DropSegmentKey(meta_str), ts_str);
+        kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
     }
     {
         Vector<String> *index_id_strs_ptr = nullptr;
@@ -1784,8 +1782,7 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
                 auto iter = std::find(deprecated_ids.begin(), deprecated_ids.end(), segment_id);
                 if (iter != deprecated_ids.end()) {
                     auto ts_str = std::to_string(commit_ts);
-                    auto meta_str = fmt::format("{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id);
-                    kv_instance_->Put(KeyEncode::DropSegmentIndexKey(meta_str), ts_str);
+                    kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
                 }
             }
             status = table_index_meta.RemoveSegmentIndexIDs(*segment_ids_ptr);

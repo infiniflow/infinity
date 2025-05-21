@@ -1957,8 +1957,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     auto ts_str = std::to_string(commit_ts);
-    auto meta_str = fmt::format("{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_);
-    kv_instance_->Put(KeyEncode::DropTableIndexKey(meta_str), ts_str);
+    kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_), ts_str);
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);
@@ -2018,8 +2017,7 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
     for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
 
         auto ts_str = std::to_string(commit_ts);
-        auto meta_str = fmt::format("{}/{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id, deprecate_id);
-        kv_instance->Put(KeyEncode::DropChunkIndexKey(meta_str), ts_str);
+        kv_instance->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
     return Status::OK();
 }
