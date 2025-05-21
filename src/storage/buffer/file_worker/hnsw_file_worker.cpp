@@ -152,10 +152,11 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
 #ifdef INDEX_HANDLER
     data_ = static_cast<void *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get()).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(data_);
-    if (!from_spill) {
-        file_size = file_handle_->FileSize();
+    if (from_spill) {
+        (*hnsw_handler)->Load(*file_handle_);
+    } else {
+        (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
     }
-    (*hnsw_handler)->LoadFromPtr(*file_handle_, file_size);
 #else
     data_ = static_cast<void *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
     auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(data_);

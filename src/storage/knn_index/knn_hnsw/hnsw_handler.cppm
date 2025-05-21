@@ -275,6 +275,7 @@ public:
     // hnsw_ data operator
     void SetLSGParam(float alpha, UniquePtr<float[]> avg);
     void SaveToPtr(LocalFileHandle &file_handle) const;
+    void Load(LocalFileHandle &file_handle);
     void LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size);
     void LoadFromPtr(const char *ptr, SizeT size);
     void Build(VertexType vertex_i);

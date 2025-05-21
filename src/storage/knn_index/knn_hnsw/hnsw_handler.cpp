@@ -434,6 +434,24 @@ void HnswHandler::SaveToPtr(LocalFileHandle &file_handle) const {
         hnsw_);
 }
 
+void HnswHandler::Load(LocalFileHandle &file_handle) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    index = IndexT::Load(file_handle).release();
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        hnsw_);
+}
+
 void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
     std::visit(
         [&](auto &&index) {
