@@ -1430,7 +1430,7 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
                                                          std::move(meta_infos[1]),
                                                          std::stoull(meta_infos[2]),
                                                          std::stoull(meta_infos[3]),
-                                                         ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4]))))); // infos[4]
+                                                         ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4])))));
         } else if (type_str == "idx") {
             metas.emplace_back(MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]),
                                                              std::move(meta_infos[1]),
@@ -1471,7 +1471,6 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
 
     for (const auto &drop_key : drop_keys) {
         auto keys = infinity::Partition(drop_key, '|');
-        // cassert(keys.size() == 3);
         GetCleanedMetaImpl(keys);
 
         // delete from kv_instance
