@@ -87,6 +87,8 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
 
+    LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
+
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&M_, sizeof(M_));
         file_handle.Append(&ef_construction_, sizeof(ef_construction_));
@@ -289,8 +291,6 @@ protected:
             SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
         }
     }
-
-    LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
     template <bool WithLock, FilterConcept<LabelType> Filter, LogicalType ColumnLogicalType>
     auto SearchLayerHelper(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
