@@ -455,17 +455,11 @@ void WalManager::NewFlush() {
                 running_ = false;
                 break;
             }
-
             TxnState txn_state = txn->GetTxnState();
 
             switch (txn_state) {
                 case TxnState::kCommitting: {
                     break;
-                }
-                case TxnState::kRollbacking: {
-                    // rollback txn
-                    // need calls CommitBottom to update NewTxnManager::current_ts_ to NewTxnManager::prepare_commit_ts_
-                    continue;
                 }
                 default: {
                     String error_message = fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state));
@@ -481,14 +475,15 @@ void WalManager::NewFlush() {
             }
 
             if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
-                LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file",
+                LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, txn_id: {}, swap to new wal file",
                                      txn->BeginTS(),
-                                     txn->CommitTS()));
+                                     txn->CommitTS(),
+                                     txn->TxnID()));
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
             for (const SharedPtr<WalCmd> &cmd : entry->cmds_) {
-                LOG_TRACE(fmt::format("WAL CMD: {}", cmd->ToString()));
+                LOG_TRACE(fmt::format("TXN: {}, WAL CMD: {}", entry->txn_id_, cmd->ToString()));
             }
 
             i32 exp_size = entry->GetSizeInBytes();

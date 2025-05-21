@@ -1247,7 +1247,6 @@ Status NewTxn::Commit() {
             return Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_storage_mode)));
         }
     }
-
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts;
     if (this->IsReplay()) {
@@ -1303,13 +1302,7 @@ Status NewTxn::Commit() {
     if (!status.ok()) {
         // If prepare commit or conflict check failed, rollback the transaction
         this->SetTxnRollbacking(commit_ts);
-
         txn_mgr_->SendToWAL(this);
-
-        // Wait until CommitTxnBottom is done.
-        std::unique_lock<std::mutex> lk(commit_lock_);
-        commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
-
         PostRollback(commit_ts);
         return status;
     }
@@ -1321,7 +1314,6 @@ Status NewTxn::Commit() {
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
-
     PostCommit();
 
     return Status::OK();
@@ -1808,6 +1800,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     return Status::OK();
 }
 Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
+
     String db_key;
     Optional<DBMeeta> db_meta;
     Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, &db_key);
@@ -1816,11 +1809,11 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     }
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
+
     status = kv_instance_->Delete(db_key);
     if (!status.ok()) {
         return status;
     }
-
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_meta->db_id_str(), drop_db_cmd->db_name_), kv_instance_.get());
 
@@ -3751,7 +3744,7 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
 }
 
 bool NewTxn::CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflict_reason, bool &retry_query) {
-    // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
+    LOG_TRACE(fmt::format("CheckConflictTxnStores::Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     bool conflict = this->CheckConflictTxnStore(check_txn.get(), conflict_reason, retry_query);
     if (conflict) {
         conflicted_txn_ = check_txn;
@@ -3768,17 +3761,6 @@ void NewTxn::CommitBottom() {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
     // TODO: Append, Update, DumpMemoryIndex
-
-    txn_mgr_->CommitBottom(this);
-}
-
-void NewTxn::RollbackBottom() {
-    TransactionID txn_id = this->TxnID();
-    LOG_TRACE(fmt::format("Transaction rollback bottom: {} start.", txn_id));
-    TxnState txn_state = this->GetTxnState();
-    if (txn_state != TxnState::kRollbacking) {
-        UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
-    }
     txn_mgr_->CommitBottom(this);
 }
 
@@ -4086,7 +4068,7 @@ Status NewTxn::Rollback() {
 
     Status status = PostRollback(abort_ts);
 
-    LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));
+    LOG_TRACE(fmt::format("NewTxn: {} is rolled back.", txn_context_ptr_->txn_id_));
 
     return status;
 }
