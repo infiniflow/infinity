@@ -14,14 +14,12 @@
 
 module;
 
-#include "json.hpp"
-
-#include <cassert>
 #include <filesystem>
 #include <string>
 module new_catalog;
 
 import stl;
+import third_party;
 import new_txn;
 import status;
 import extra_ddl_info;
