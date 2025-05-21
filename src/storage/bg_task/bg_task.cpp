@@ -44,13 +44,6 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
     if (status.ok()) {
         status = new_txn_mgr->CommitTxn(new_txn);
     }
-    //    if (!status.ok()) {
-    //        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
-    //        if (!rollback_status.ok()) {
-    //            RecoverableError(rollback_status);
-    //        }
-    //        return status;
-    //    }
     return status;
 }
 

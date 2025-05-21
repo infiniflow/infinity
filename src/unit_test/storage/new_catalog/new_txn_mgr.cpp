@@ -132,7 +132,7 @@ TEST_F(TestTxnManagerTest, test_ts) {
         commit_tss.push_back(txn1_commit_ts);
     }
 
-    EXPECT_GE(begin_tss[4], commit_tss[3]);
+    EXPECT_LT(begin_tss[4], commit_tss[3]);
     EXPECT_LT(begin_tss[4], commit_tss[4]);
 
     EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
@@ -167,6 +167,7 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                         LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {}", thread_i, txn_id));
                 }
                 {
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
@@ -184,6 +185,7 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                         LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {}", thread_i, txn_id));
                 }
             }
         }));
@@ -192,7 +194,7 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
         worker_threads[thread_i].join();
     }
 
-    EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
+    EXPECT_LE(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }
 
 TEST_F(TestTxnManagerTest, test_check_txns) {
