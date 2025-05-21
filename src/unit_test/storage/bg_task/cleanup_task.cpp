@@ -384,6 +384,8 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         status = txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
     }
+    LOG_INFO(fmt::format("*After commit create index"));
+    txn_mgr->PrintAllKeyValue();
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         Status status = txn->Compact(*db_name, *table_name, {0, 1, 2, 3, 4});

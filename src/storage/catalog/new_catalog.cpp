@@ -1477,8 +1477,8 @@ void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta, KVInst
             auto meta_str = fmt::format("{}/{}/{}/{}",
                                         segment_index_meta->db_id_str_,
                                         segment_index_meta->table_id_str_,
-                                        segment_index_meta->segment_id_,
-                                        segment_index_meta->commit_ts_);
+                                        segment_index_meta->index_id_str_,
+                                        segment_index_meta->segment_id_);
             kv_instance->Put(KeyEncode::DropSegmentIndexKey(meta_str), ts_str);
             break;
         }
@@ -1495,7 +1495,7 @@ void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta, KVInst
             break;
         }
         default: {
-            UnrecoverableError("Invalid meta type to clean.");
+            // UnrecoverableError("Invalid meta type to clean.");
         }
     }
 
@@ -1546,7 +1546,7 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
                                                              std::stoull(meta_infos[3]),
                                                              std::stoull(meta_infos[4])));
         }
-        UnrecoverableError("Unknown meta key type.");
+        // UnrecoverableError("Unknown meta key type.");
     };
 
     constexpr std::string drop_prefix = "drop";
@@ -1567,6 +1567,13 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         // delete from kv_instance
         iter->Next();
     }
+    std::sort(metas.begin(), metas.end(), [](const auto &lhs, const auto &rhs) {
+        auto l_type = lhs->type_, r_type = rhs->type_;
+        if (l_type == MetaType::kSegment && r_type == MetaType::kSegmentIndex) {
+            return true;
+        }
+        return false;
+    });
 
     // auto iter = cleaned_meta_.lower_bound(ts);
     // for (auto it = cleaned_meta_.begin(); it != iter; ++it) {
