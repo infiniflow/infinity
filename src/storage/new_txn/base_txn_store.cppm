@@ -231,10 +231,17 @@ export struct ImportTxnStore : public BaseTxnStore {
     String table_id_str_{};
     u64 db_id_{};
     u64 table_id_{};
+    String table_key_{};
 
-    Vector<SharedPtr<DataBlock>> input_blocks_{};
+    Vector<Vector<SharedPtr<DataBlock>>> input_blocks_in_imports_{};
+    Vector<WalSegmentInfo> segment_infos_{};
+
+    Vector<String> index_names_{};
+    Vector<String> index_ids_str_{};
+    Vector<u64> index_ids_{};
     Vector<SegmentID> segment_ids_{};
-    WalSegmentInfo segment_info_{};
+    Vector<Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    Vector<Vector<ChunkID>> deprecate_ids_in_segments_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -306,10 +313,18 @@ export struct CompactTxnStore : public BaseTxnStore {
     String table_id_str_{};
     u64 db_id_{};
     u64 table_id_{};
+    String table_key_{};
 
     SegmentID new_segment_id_{};
     Vector<WalSegmentInfo> segment_infos_{};
     Vector<SegmentID> deprecated_segment_ids_{};
+
+    Vector<String> index_names_{};
+    Vector<String> index_ids_str_{};
+    Vector<u64> index_ids_{};
+    Vector<SegmentID> segment_ids_{};
+    Vector<Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    Vector<Vector<ChunkID>> deprecate_ids_in_segments_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

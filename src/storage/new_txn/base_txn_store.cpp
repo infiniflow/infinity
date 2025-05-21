@@ -194,14 +194,32 @@ String ImportTxnStore::ToString() const {
 SharedPtr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_info_);
-    wal_entry->cmds_.push_back(wal_command);
+    for (SizeT i = 0; i < segment_infos_.size(); ++i) {
+        SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_[i]);
+        wal_entry->cmds_.push_back(wal_command);
+    }
+
+    SharedPtr<WalCmdDumpIndexV2> dump_command;
+    for (SizeT i = 0; i < index_names_.size(); ++i) {
+        dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
+                                                     db_id_str_,
+                                                     table_name_,
+                                                     table_id_str_,
+                                                     index_names_[i],
+                                                     index_ids_str_[i],
+                                                     segment_ids_[i],
+                                                     chunk_infos_in_segments_[i],
+                                                     deprecate_ids_in_segments_[i],
+                                                     table_key_);
+        dump_command->dump_cause_ = DumpIndexCause::kImport;
+        wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
+    }
     return wal_entry;
 }
 
 SizeT ImportTxnStore::RowCount() const {
     SizeT row_count = 0;
-    for (const auto &input_block : input_blocks_) {
+    for (const auto &input_block : input_blocks_in_imports_[0]) {
         row_count += input_block->row_count();
     }
     return row_count;
@@ -230,6 +248,7 @@ SharedPtr<WalEntry> DumpMemIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     SharedPtr<WalCmdDumpIndexV2> wal_command =
         MakeShared<WalCmdDumpIndexV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, segment_id_, table_key_);
     wal_command->dump_cause_ = DumpIndexCause::kDumpMemIndex;
+    wal_command->clear_mem_index_ = true;
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -289,6 +308,22 @@ SharedPtr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalCmd> wal_command =
         MakeShared<WalCmdCompactV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_, deprecated_segment_ids_);
     wal_entry->cmds_.push_back(wal_command);
+
+    SharedPtr<WalCmdDumpIndexV2> dump_command;
+    for (SizeT i = 0; i < index_names_.size(); ++i) {
+        dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
+                                                     db_id_str_,
+                                                     table_name_,
+                                                     table_id_str_,
+                                                     index_names_[i],
+                                                     index_ids_str_[i],
+                                                     segment_ids_[i],
+                                                     chunk_infos_in_segments_[i],
+                                                     deprecate_ids_in_segments_[i],
+                                                     table_key_);
+        dump_command->dump_cause_ = DumpIndexCause::kCompact;
+        wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
+    }
     return wal_entry;
 }
 

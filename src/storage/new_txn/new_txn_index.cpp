@@ -905,6 +905,34 @@ Status NewTxn::PopulateIndex(const String &db_name,
     }
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, *segment_index_meta);
+    Vector<WalChunkIndexInfo> chunk_infos;
+    chunk_infos.emplace_back(chunk_index_meta);
+
+    // Put the index into local txn store
+    switch (dump_index_cause) {
+        case DumpIndexCause::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+            compact_txn_store->index_names_.emplace_back(index_name);
+            compact_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+            compact_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+            compact_txn_store->segment_ids_.emplace_back(segment_meta.segment_id());
+            compact_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
+            compact_txn_store->deprecate_ids_in_segments_.emplace_back(old_chunk_ids);
+            break;
+        }
+        case DumpIndexCause::kImport: {
+            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+            import_txn_store->index_names_.emplace_back(index_name);
+            import_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+            import_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+            import_txn_store->segment_ids_.emplace_back(segment_meta.segment_id());
+            import_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
+            import_txn_store->deprecate_ids_in_segments_.emplace_back(old_chunk_ids);
+        }
+        default: {
+        }
+    }
+
     if (create_index_cmd_ptr) {
         WalCmdCreateIndexV2 &create_index_cmd = *create_index_cmd_ptr;
         Vector<WalChunkIndexInfo> chunk_infos;

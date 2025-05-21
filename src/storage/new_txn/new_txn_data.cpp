@@ -301,10 +301,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     //     return status;
     // }
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
     WalSegmentInfo segment_info(*segment_meta, begin_ts);
     for (SizeT i = 0; i < block_row_cnts.size(); ++i) {
         segment_info.block_infos_[i].row_count_ = block_row_cnts[i];
@@ -315,21 +311,22 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    base_txn_store_ = MakeShared<ImportTxnStore>();
-    ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-    import_txn_store->db_name_ = db_name;
-    import_txn_store->db_id_str_ = table_meta.db_id_str();
-    import_txn_store->db_id_ = std::stoull(table_meta.db_id_str());
-    import_txn_store->table_name_ = table_name;
-    import_txn_store->table_id_str_ = table_meta.table_id_str();
-    import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-    import_txn_store->input_blocks_ = input_blocks;
-    import_txn_store->segment_ids_.emplace_back(segment_meta->segment_id());
-    import_txn_store->segment_info_ = segment_info;
-            //            auto all_key_values = txn_mgr_->kv_store()->GetAllKeyValue();
-            //            for (auto &key_value : all_key_values) {
-            //                LOG_ERROR(fmt::format("key: {}, value: {}", key_value.first, key_value.second));
-            //            }
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<ImportTxnStore>();
+        ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        import_txn_store->db_name_ = db_name;
+        import_txn_store->db_id_str_ = table_meta.db_id_str();
+        import_txn_store->table_name_ = table_name;
+        import_txn_store->table_id_str_ = table_meta.table_id_str();
+        import_txn_store->table_key_ = table_key;
+        import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
+        import_txn_store->input_blocks_in_imports_.emplace_back(input_blocks);
+        import_txn_store->segment_infos_.emplace_back(segment_info);
+    } else {
+        ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        import_txn_store->segment_infos_.emplace_back(segment_info);
+    }
 
     // index
     Vector<String> *index_id_strs_ptr = nullptr;
