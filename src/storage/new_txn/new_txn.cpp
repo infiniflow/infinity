@@ -4129,6 +4129,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}", db_meta_key->db_id_str_, db_meta_key->db_name_);
+                kv_instance->Delete(KeyEncode::DropDBKey(meta_str));
                 break;
             }
             case MetaType::kTable: {
@@ -4138,6 +4140,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}", table_meta_key->db_id_str_, table_meta_key->table_id_str_, table_meta_key->table_name_);
+                kv_instance->Delete(KeyEncode::DropTableKey(meta_str));
                 break;
             }
             case MetaType::kSegment: {
@@ -4148,6 +4152,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}", segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, segment_meta_key->segment_id_);
+                kv_instance->Delete(KeyEncode::DropSegmentKey(meta_str));
                 break;
             }
             case MetaType::kBlock: {
@@ -4159,6 +4165,12 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}/{}",
+                                            block_meta_key->db_id_str_,
+                                            block_meta_key->table_id_str_,
+                                            block_meta_key->segment_id_,
+                                            block_meta_key->block_id_);
+                kv_instance->Delete(KeyEncode::DropBlockKey(meta_str));
                 break;
             }
             case MetaType::kBlockColumn: {
@@ -4171,6 +4183,13 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}/{}/{}",
+                                            column_meta_key->db_id_str_,
+                                            column_meta_key->table_id_str_,
+                                            column_meta_key->segment_id_,
+                                            column_meta_key->block_id_,
+                                            column_meta_key->column_def_->ToJson().dump());
+                kv_instance->Delete(KeyEncode::DropBlockColumnKey(meta_str));
                 break;
             }
             case MetaType::kTableIndex: {
@@ -4181,6 +4200,12 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}/{}",
+                                            table_index_meta_key->db_id_str_,
+                                            table_index_meta_key->table_id_str_,
+                                            table_index_meta_key->index_id_str_,
+                                            table_index_meta_key->index_name_);
+                kv_instance->Delete(KeyEncode::DropTableIndexKey(meta_str));
                 break;
             }
             case MetaType::kSegmentIndex: {
@@ -4192,6 +4217,12 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}/{}",
+                                            segment_index_meta_key->db_id_str_,
+                                            segment_index_meta_key->table_id_str_,
+                                            segment_index_meta_key->index_id_str_,
+                                            segment_index_meta_key->segment_id_);
+                kv_instance->Delete(KeyEncode::DropSegmentIndexKey(meta_str));
                 break;
             }
             case MetaType::kChunkIndex: {
@@ -4204,6 +4235,13 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 if (!status.ok()) {
                     return status;
                 }
+                auto meta_str = fmt::format("{}/{}/{}/{}/{}",
+                                            chunk_index_meta_key->db_id_str_,
+                                            chunk_index_meta_key->table_id_str_,
+                                            chunk_index_meta_key->index_id_str_,
+                                            chunk_index_meta_key->segment_id_,
+                                            chunk_index_meta_key->chunk_id_);
+                kv_instance->Delete(KeyEncode::DropChunkIndexKey(meta_str));
                 break;
             }
             default: {
@@ -4213,7 +4251,9 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     }
 
     buffer_mgr->RemoveClean();
-
+    // std::for_each(metas.begin(), metas.end(), [&](const auto &meta) {
+    //     meta->Clean(kv_instance_);
+    // });
     return Status::OK();
 }
 

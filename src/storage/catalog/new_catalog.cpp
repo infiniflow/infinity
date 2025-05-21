@@ -1415,38 +1415,30 @@ Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key)
 
 void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta, KVInstance *kv_instance) {
     auto ts_str = std::to_string(ts);
-    switch (meta->type_) {
+    auto type = meta->type_;
+    switch (type) {
         case MetaType::kDB: {
             auto *db_meta = static_cast<DBMetaKey *>(meta.get());
-            auto meta_str = fmt::format("{}/{}/{}", db_meta->db_id_str_, db_meta->db_name_, db_meta->commit_ts_);
+            auto meta_str = fmt::format("{}/{}", db_meta->db_id_str_, db_meta->db_name_);
             kv_instance->Put(KeyEncode::DropDBKey(meta_str), ts_str);
             break;
         }
         case MetaType::kTable: {
             auto *table_meta = static_cast<TableMetaKey *>(meta.get());
-            auto meta_str =
-                fmt::format("{}/{}/{}/{}", table_meta->db_id_str_, table_meta->table_id_str_, table_meta->table_name_, table_meta->commit_ts_);
+            auto meta_str = fmt::format("{}/{}/{}", table_meta->db_id_str_, table_meta->table_id_str_, table_meta->table_name_);
             kv_instance->Put(KeyEncode::DropTableKey(meta_str), ts_str);
             break;
         }
         case MetaType::kSegment: {
             auto *segment_meta = static_cast<SegmentMetaKey *>(meta.get());
-            auto meta_str = fmt::format("{}/{}/{}/{}",
-                                        segment_meta->db_id_str_,
-                                        segment_meta->table_id_str_,
-                                        segment_meta->segment_id_,
-                                        segment_meta->commit_ts_);
+            auto meta_str = fmt::format("{}/{}/{}", segment_meta->db_id_str_, segment_meta->table_id_str_, segment_meta->segment_id_);
             kv_instance->Put(KeyEncode::DropSegmentKey(meta_str), ts_str);
             break;
         }
         case MetaType::kBlock: {
             auto *block_meta = static_cast<BlockMetaKey *>(meta.get());
-            auto meta_str = fmt::format("{}/{}/{}/{}/{}",
-                                        block_meta->db_id_str_,
-                                        block_meta->table_id_str_,
-                                        block_meta->segment_id_,
-                                        block_meta->block_id_,
-                                        block_meta->commit_ts_);
+            auto meta_str =
+                fmt::format("{}/{}/{}/{}", block_meta->db_id_str_, block_meta->table_id_str_, block_meta->segment_id_, block_meta->block_id_);
             kv_instance->Put(KeyEncode::DropBlockKey(meta_str), ts_str);
             break;
         }
@@ -1463,12 +1455,11 @@ void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta, KVInst
         }
         case MetaType::kTableIndex: {
             auto *table_index_meta = static_cast<TableIndexMetaKey *>(meta.get());
-            auto meta_str = fmt::format("{}/{}/{}/{}/{}",
+            auto meta_str = fmt::format("{}/{}/{}/{}",
                                         table_index_meta->db_id_str_,
                                         table_index_meta->table_id_str_,
                                         table_index_meta->index_id_str_,
-                                        table_index_meta->index_name_,
-                                        table_index_meta->commit_ts_);
+                                        table_index_meta->index_name_);
             kv_instance->Put(KeyEncode::DropTableIndexKey(meta_str), ts_str);
             break;
         }
@@ -1484,13 +1475,12 @@ void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta, KVInst
         }
         case MetaType::kChunkIndex: {
             auto *chunk_index_meta = static_cast<ChunkIndexMetaKey *>(meta.get());
-            auto meta_str = fmt::format("{}/{}/{}/{}/{}/{}",
+            auto meta_str = fmt::format("{}/{}/{}/{}/{}",
                                         chunk_index_meta->db_id_str_,
                                         chunk_index_meta->table_id_str_,
                                         chunk_index_meta->index_id_str_,
                                         chunk_index_meta->segment_id_,
-                                        chunk_index_meta->chunk_id_,
-                                        chunk_index_meta->commit_ts_);
+                                        chunk_index_meta->chunk_id_);
             kv_instance->Put(KeyEncode::DropChunkIndexKey(meta_str), ts_str);
             break;
         }
@@ -1509,37 +1499,30 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         auto meta_infos = infinity::Partition(meta_str, '/');
         if (type_str == "db") {
             metas.emplace_back(MakeUnique<DBMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1])));
-        }
-        if (type_str == "tbl") {
+        } else if (type_str == "tbl") {
             metas.emplace_back(MakeUnique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2])));
-        }
-        if (type_str == "seg") {
+        } else if (type_str == "seg") {
             metas.emplace_back(MakeUnique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
-        }
-        if (type_str == "blk") {
+        } else if (type_str == "blk") {
             metas.emplace_back(
                 MakeUnique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
-        }
-        if (type_str == "blk_col") {
+        } else if (type_str == "blk_col") {
             metas.emplace_back(MakeUnique<ColumnMetaKey>(std::move(meta_infos[0]),
                                                          std::move(meta_infos[1]),
                                                          std::stoull(meta_infos[2]),
                                                          std::stoull(meta_infos[3]),
                                                          ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4]))))); // infos[4]
-        }
-        if (type_str == "idx") {
+        } else if (type_str == "idx") {
             metas.emplace_back(MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]),
                                                              std::move(meta_infos[1]),
                                                              std::move(meta_infos[2]),
                                                              std::move(meta_infos[3])));
-        }
-        if (type_str == "idx_seg") {
+        } else if (type_str == "idx_seg") {
             metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
                                                                std::move(meta_infos[1]),
                                                                std::move(meta_infos[2]),
                                                                std::stoull(meta_infos[3])));
-        }
-        if (type_str == "idx_chunk") {
+        } else if (type_str == "idx_chunk") {
             metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
                                                              std::move(meta_infos[1]),
                                                              std::move(meta_infos[2]),

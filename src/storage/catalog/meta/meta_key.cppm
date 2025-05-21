@@ -20,6 +20,8 @@ import stl;
 import meta_type;
 import third_party;
 import default_values;
+// import status;
+// import kv_store;
 
 namespace infinity {
 
@@ -29,6 +31,7 @@ export struct MetaKey {
     explicit MetaKey(MetaType type) : type_(type) {}
     virtual ~MetaKey() = default;
 
+    // virtual Status Clean(KVInstance *kv_instance) = 0;
     virtual String ToString() const = 0;
     virtual nlohmann::json ToJson() const = 0;
 };
