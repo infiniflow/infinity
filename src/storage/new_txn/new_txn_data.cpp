@@ -1547,10 +1547,10 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance 
     return Status::OK();
 }
 
-Status NewTxn::RollbackDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance) {
+Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    const String &db_id_str = delete_cmd->db_id_;
-    const String &table_id_str = delete_cmd->table_id_;
+    const String &db_id_str = delete_txn_store->db_id_str_;
+    const String &table_id_str = delete_txn_store->table_id_str_;
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
 

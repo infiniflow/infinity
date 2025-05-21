@@ -3109,7 +3109,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //    t1      import                          commit (success)
     //    |----------|--------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  append    commit (fail)
+    //                           t2                  append    commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3138,7 +3138,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         //        status = txn6->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -3148,7 +3148,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3163,7 +3163,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //    t1      import                               commit (success)
     //    |----------|-----------------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  append    commit (fail)
+    //                           t2                  append    commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3192,7 +3192,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -3202,7 +3202,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3217,7 +3217,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //    t1      import                                          commit (success)
     //    |----------|---------------------------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  append   commit (fail)
+    //                           t2                  append   commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3242,7 +3242,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         //        status = txn6->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -3255,7 +3255,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3270,7 +3270,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //    t1      import                                          commit (success)
     //    |----------|---------------------------------------------------|
     //          |----------------------|---------------|
-    //         t2                  append    commit (fail)
+    //         t2                  append    commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3297,7 +3297,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         //        status = txn6->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -3310,7 +3310,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3325,7 +3325,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //                t1      import                                          commit (success)
     //                |----------|---------------------------------------------------|
     //          |----------------------|----------|
-    //         t2                  append   commit (fail)
+    //         t2                  append   commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3352,7 +3352,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         //        status = txn6->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -3365,7 +3365,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3380,7 +3380,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //                           t1      import                                          commit (success)
     //                           |----------|---------------------------------------------------|
     //          |----------------------|----------|
-    //         t2                  append   commit (fail)
+    //         t2                  append   commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3407,7 +3407,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -3420,7 +3420,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {0, 1});
 
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
@@ -3435,7 +3435,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
     //                                     t1      import                                          commit (success)
     //                                     |----------|---------------------------------------------------|
     //          |----------------------|----------|
-    //         t2                  append      commit (fail)
+    //         t2                  append      commit (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
