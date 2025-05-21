@@ -55,10 +55,11 @@ import block_entry;
 import chunk_index_entry;
 #ifdef INDEX_HANDLER
 import hnsw_handler;
+import bmp_handler;
 #else
+import abstract_bmp;
 import abstract_hnsw;
 #endif
-import abstract_bmp;
 import block_column_iter;
 import txn_store;
 import secondary_index_in_mem;
@@ -747,6 +748,8 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
             const auto &options = ret.value();
             const auto [chunk_index_entries, memory_index_entry] = this->GetBMPIndexSnapshot();
 
+#ifdef INDEX_HANDLER
+#else
             auto optimize_index = [&](const AbstractBMP &index) {
                 std::visit(
                     [&](auto &&index) {
@@ -764,16 +767,27 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
                     },
                     index);
             };
+#endif
             for (auto &chunk_index_entry : chunk_index_entries) {
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+#ifdef INDEX_HANDLER
+                BMPHandlerPtr bmp_handler = *static_cast<BMPHandlerPtr *>(buffer_handle.GetDataMut());
+                bmp_handler->Optimize(options);
+#else
                 auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
                 optimize_index(*abstract_bmp);
+#endif
                 chunk_index_entry->SaveIndexFile();
 
                 set_fileworker_index_def(chunk_index_entry.get());
             }
             if (memory_index_entry.get() != nullptr) {
+#ifdef INDEX_HANDLER
+                BMPHandlerPtr bmp_handler = memory_index_entry->get();
+                bmp_handler->Optimize(options);
+#else
                 optimize_index(memory_index_entry->get());
+#endif
 
                 dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
@@ -1023,6 +1037,10 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
         case IndexType::kBMP: {
             auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get(), this);
+#ifdef INDEX_HANDLER
+            BMPHandlerPtr bmp_handler = memory_bmp_index->get();
+            bmp_handler->AddDocs(row_count, segment_entry, buffer_mgr, column_def->id(), begin_ts);
+#else
             AbstractBMP abstract_bmp = memory_bmp_index->get();
 
             std::visit(
@@ -1047,6 +1065,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     }
                 },
                 abstract_bmp);
+#endif
             merged_chunk_index_entry = memory_bmp_index->Dump(this, buffer_mgr);
             break;
         }
