@@ -101,7 +101,7 @@ public:
 
     SegmentID segment_id_{};
     ChunkID next_chunk_id_{};
-    Map<ChunkID, Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
+    //    Map<ChunkID, Pair<RowID, u64>> chunk_row_ranges_{}; // For current segment
 };
 
 export struct TableIndexCache {
@@ -162,6 +162,7 @@ public:
     void CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
 
     Vector<SegmentID> ApplySegmentIDsNolock(u64 segment_count);
+    ChunkID ApplyChunkIDNolock(u64 index_id, SegmentID segment_id);
 
     void AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache);
     void DropTableIndexCacheNolock(u64 index_id);
@@ -241,6 +242,7 @@ public:
     void CommitCompactSegments(u64 db_id, u64 table_id, const SharedPtr<CompactPrepareInfo> &compact_prepare_info, TransactionID txn_id);
 
     Vector<SegmentID> ApplySegmentIDs(u64 db_id, u64 table_id, u64 segment_count);
+    ChunkID ApplyChunkID(u64 db_id, u64 table_id, u64 index_id, SegmentID segment_id);
 
     // Append and update
     SharedPtr<AppendPrepareInfo> PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);

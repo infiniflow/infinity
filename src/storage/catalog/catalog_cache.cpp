@@ -101,6 +101,32 @@ void TableCache::CommitAppendNolock(const SharedPtr<AppendPrepareInfo> &append_i
         if (commit_segment_offset_ > DEFAULT_SEGMENT_CAPACITY) {
             commit_segment_offset_ -= DEFAULT_SEGMENT_CAPACITY;
         }
+
+        auto segment_iter = segment_cache_map_.find(commit_segment_id_);
+        if (segment_iter == segment_cache_map_.end()) {
+            SharedPtr<SegmentCache> segment_cache = MakeShared<SegmentCache>(commit_segment_id_, range.second);
+            segment_cache->sealed_ = false;
+            segment_cache_map_.emplace(commit_segment_id_, segment_cache);
+
+            for (const auto &index_pair : index_cache_map_) {
+                auto index_cache = index_pair.second;
+
+                auto segment_index_cache = MakeShared<SegmentIndexCache>(commit_segment_id_);
+                segment_index_cache->next_chunk_id_ = 0;
+                index_cache->segment_index_cache_map_.emplace(commit_segment_id_, segment_index_cache);
+            }
+        } else {
+            SegmentCache *segment_cache = segment_iter->second.get();
+            segment_cache->row_count_ += range.second;
+            if (segment_cache->row_count_ > DEFAULT_SEGMENT_CAPACITY) {
+                UnrecoverableError(
+                    fmt::format("Segment id: {} row count: {} exceed default capacity", commit_segment_id_, segment_cache->row_count_));
+            } else if (segment_cache->row_count_ == DEFAULT_SEGMENT_CAPACITY) {
+                segment_cache->sealed_ = true;
+            } else {
+                ;
+            }
+        }
     }
     return;
 }
@@ -181,8 +207,9 @@ void TableCache::CommitImportSegmentsNolock(const SharedPtr<ImportPrepareInfo> &
             }
             auto segment_index_cache = MakeShared<SegmentIndexCache>(segment_id);
             segment_index_cache->next_chunk_id_ = segment_index_prepare_info.chunk_id_ + 1;
-            Pair<RowID, u64> range = {RowID(segment_id, 0), segment_index_prepare_info.row_count_};
-            segment_index_cache->chunk_row_ranges_.emplace(segment_index_prepare_info.chunk_id_, range);
+            index_cache->segment_index_cache_map_.emplace(segment_id, segment_index_cache);
+            //            Pair<RowID, u64> range = {RowID(segment_id, 0), segment_index_prepare_info.row_count_};
+            //            segment_index_cache->chunk_row_ranges_.emplace(segment_index_prepare_info.chunk_id_, range);
         }
     }
     return;
@@ -248,8 +275,9 @@ void TableCache::CommitCompactSegmentsNolock(const SharedPtr<CompactPrepareInfo>
             }
             auto segment_index_cache = MakeShared<SegmentIndexCache>(segment_id);
             segment_index_cache->next_chunk_id_ = segment_index_prepare_info.chunk_id_ + 1;
-            Pair<RowID, u64> range = {RowID(segment_id, 0), segment_index_prepare_info.row_count_};
-            segment_index_cache->chunk_row_ranges_.emplace(segment_index_prepare_info.chunk_id_, range);
+            index_cache->segment_index_cache_map_.emplace(segment_id, segment_index_cache);
+            //            Pair<RowID, u64> range = {RowID(segment_id, 0), segment_index_prepare_info.row_count_};
+            //            segment_index_cache->chunk_row_ranges_.emplace(segment_index_prepare_info.chunk_id_, range);
         }
     }
 
@@ -266,6 +294,20 @@ Vector<SegmentID> TableCache::ApplySegmentIDsNolock(u64 segment_count) {
     }
 
     return segment_ids;
+}
+
+ChunkID TableCache::ApplyChunkIDNolock(u64 index_id, SegmentID segment_id) {
+    auto index_iter = index_cache_map_.find(index_id);
+    if (index_iter == index_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Index id: {} not found in index cache map", index_id));
+    }
+    TableIndexCache *index_cache = index_iter->second.get();
+    auto segment_index_iter = index_cache->segment_index_cache_map_.find(segment_id);
+    if (segment_index_iter == index_cache->segment_index_cache_map_.end()) {
+        UnrecoverableError(fmt::format("Segment id: {} not found in segment index cache map", segment_id));
+    }
+    SegmentIndexCache *segment_index_cache = segment_index_iter->second.get();
+    return segment_index_cache->next_chunk_id_++;
 }
 
 void TableCache::AddTableIndexCacheNolock(const SharedPtr<TableIndexCache> &table_index_cache) {
@@ -390,6 +432,12 @@ Vector<SegmentID> SystemCache::ApplySegmentIDs(u64 db_id, u64 table_id, u64 segm
     std::unique_lock lock(cache_mtx_);
     TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
     return table_cache->ApplySegmentIDsNolock(segment_count);
+}
+
+ChunkID SystemCache::ApplyChunkID(u64 db_id, u64 table_id, u64 index_id, SegmentID segment_id) {
+    std::unique_lock lock(cache_mtx_);
+    TableCache *table_cache = this->GetTableCacheNolock(db_id, table_id);
+    return table_cache->ApplyChunkIDNolock(index_id, segment_id);
 }
 
 SharedPtr<AppendPrepareInfo> SystemCache::PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id) {

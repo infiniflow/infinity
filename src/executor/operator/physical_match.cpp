@@ -110,6 +110,8 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
                 auto new_iter = MakeUnique<ScoreThresholdIterator>(std::move(iter), score_threshold);
                 iter = std::move(new_iter);
             }
+        } else {
+            LOG_WARN("physical_match: iter is nullptr");
         }
         return iter;
     };
