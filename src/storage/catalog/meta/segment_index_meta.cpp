@@ -77,7 +77,7 @@ Tuple<ChunkID, Status> SegmentIndexMeta::GetNextChunkID1() {
 }
 
 Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs1() {
-    if (!chunk_ids_.has_value()) {
+    if (!chunk_ids_) {
         auto status = LoadChunkIDs1();
         if (!status.ok()) {
             return {nullptr, status};

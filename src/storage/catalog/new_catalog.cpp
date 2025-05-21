@@ -1488,8 +1488,6 @@ void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta, KVInst
             // UnrecoverableError("Invalid meta type to clean.");
         }
     }
-
-    // cleaned_meta_.emplace(ts, std::move(meta));
 }
 
 void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
@@ -1550,19 +1548,13 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         // delete from kv_instance
         iter->Next();
     }
-    std::sort(metas.begin(), metas.end(), [](const auto &lhs, const auto &rhs) {
-        auto l_type = lhs->type_, r_type = rhs->type_;
-        if (l_type == MetaType::kSegment && r_type == MetaType::kSegmentIndex) {
-            return true;
-        }
-        return false;
-    });
-
-    // auto iter = cleaned_meta_.lower_bound(ts);
-    // for (auto it = cleaned_meta_.begin(); it != iter; ++it) {
-    //     metas.push_back(std::move(it->second));
-    // }
-    // cleaned_meta_.erase(cleaned_meta_.begin(), iter);
+    // std::sort(metas.begin(), metas.end(), [](const auto &lhs, const auto &rhs) {
+    //     auto l_type = lhs->type_, r_type = rhs->type_;
+    //     if (l_type == MetaType::kSegment && r_type == MetaType::kSegmentIndex) {
+    //         return true;
+    //     }
+    //     return false;
+    // });
 }
 
 Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {

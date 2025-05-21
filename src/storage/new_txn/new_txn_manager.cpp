@@ -14,8 +14,6 @@
 
 module;
 
-#include "expression_parser.h"
-
 #include <functional>
 #include <memory>
 
@@ -601,9 +599,6 @@ Status NewTxnManager::Cleanup(TxnTimeStamp last_cleanup_ts, TxnTimeStamp *cur_cl
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
     Status status;
-
-    LOG_INFO(fmt::format("*Clean, last: {}, clean_ts: {}", last_cleanup_ts, cleanup_ts));
-    this->PrintAllKeyValue();
 
     status = NewTxn::Cleanup(cleanup_ts, kv_instance.get());
     if (!status.ok()) {
