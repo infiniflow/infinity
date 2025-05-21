@@ -21,7 +21,6 @@ module new_txn;
 
 import new_txn_manager;
 import kv_store;
-import new_catalog;
 import chunk_index_meta;
 import segment_index_meta;
 import table_index_meeta;
@@ -67,6 +66,7 @@ import hnsw_util;
 import bmp_util;
 import defer_op;
 import base_txn_store;
+import kv_code;
 
 namespace infinity {
 
@@ -369,11 +369,12 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
     }
 
-    txn_store_.AddMetaKeyForBufferObject(MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
-                                                                       chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
-                                                                       chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
-                                                                       chunk_index_meta->segment_index_meta().segment_id(),
-                                                                       chunk_index_meta->chunk_id()));
+    txn_store_.AddMetaKeyForBufferObject(
+        MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
+                                      chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
+                                      chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
+                                      chunk_index_meta->segment_index_meta().segment_id(),
+                                      chunk_index_meta->chunk_id()));
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -1954,7 +1955,9 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_));
+
+    auto ts_str = std::to_string(commit_ts);
+    kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_), ts_str);
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);
@@ -2011,9 +2014,10 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
         table_index_meta.UpdateFulltextSegmentTS(commit_ts);
     }
 
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
-        new_catalog->AddCleanedMeta(commit_ts, MakeUnique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id));
+
+        auto ts_str = std::to_string(commit_ts);
+        kv_instance->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
     return Status::OK();
 }

@@ -608,8 +608,6 @@ Status NewTxnManager::Cleanup(TxnTimeStamp last_cleanup_ts, TxnTimeStamp *cur_cl
 
     Status status;
 
-    // this->PrintAllKeyValue();
-
     status = NewTxn::Cleanup(cleanup_ts, kv_instance.get());
     if (!status.ok()) {
         return status;

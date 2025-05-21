@@ -17,6 +17,7 @@ module;
 export module kv_code;
 
 import stl;
+import column_def;
 
 namespace infinity {
 
@@ -206,6 +207,27 @@ public:
     static String PMObjectKey(const String &key);
 
     static String PMObjectStatKey(const String &key);
+
+    static String DropDBKey(const String &db_id_str, const String &db_name);
+
+    static String DropTableKey(const String &db_id_str, const String &table_id_str, const String &table_name);
+
+    static String DropSegmentKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id);
+
+    static String DropBlockKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id);
+
+    static String DropBlockColumnKey(const String &db_id_str,
+                                     const String &table_id_str,
+                                     SegmentID segment_id,
+                                     BlockID block_id,
+                                     const SharedPtr<ColumnDef> &column_def);
+
+    static String DropTableIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, const String &index_name);
+
+    static String DropSegmentIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id);
+
+    static String
+    DropChunkIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id, ChunkID chunk_id);
 };
 
 } // namespace infinity

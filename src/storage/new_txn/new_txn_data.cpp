@@ -57,6 +57,7 @@ import expression_state;
 import expression_evaluator;
 import base_txn_store;
 import catalog_cache;
+import kv_code;
 
 namespace infinity {
 
@@ -1325,7 +1326,6 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     auto drop_columns_in_block = [&](BlockMeta &block_meta) {
         TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         for (ColumnID column_id : column_ids) {
             auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const SharedPtr<ColumnDef> &column_def) {
                 return ColumnID(column_def->id()) == column_id;
@@ -1334,12 +1334,14 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
                 UnrecoverableError(fmt::format("Column {} not found in table meta", column_id));
             }
             SharedPtr<ColumnDef> column_def = *iter;
-            new_catalog->AddCleanedMeta(commit_ts,
-                                        MakeUnique<ColumnMetaKey>(block_meta.segment_meta().table_meta().db_id_str(),
-                                                                  block_meta.segment_meta().table_meta().table_id_str(),
-                                                                  block_meta.segment_meta().segment_id(),
-                                                                  block_meta.block_id(),
-                                                                  column_def));
+
+            auto ts_str = std::to_string(commit_ts);
+            kv_instance_->Put(KeyEncode::DropBlockColumnKey(block_meta.segment_meta().table_meta().db_id_str(),
+                                                            block_meta.segment_meta().table_meta().table_id_str(),
+                                                            block_meta.segment_meta().segment_id(),
+                                                            block_meta.block_id(),
+                                                            column_def),
+                              ts_str);
         }
         return Status::OK();
     };
@@ -1757,11 +1759,11 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     const Vector<SegmentID> &deprecated_ids = compact_cmd->deprecated_segment_ids_;
 
     for (SegmentID segment_id : deprecated_ids) {
-        new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+        auto ts_str = std::to_string(commit_ts);
+        kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
     }
     {
         Vector<String> *index_id_strs_ptr = nullptr;
@@ -1779,7 +1781,8 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
             for (SegmentID segment_id : *segment_ids_ptr) {
                 auto iter = std::find(deprecated_ids.begin(), deprecated_ids.end(), segment_id);
                 if (iter != deprecated_ids.end()) {
-                    new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                    auto ts_str = std::to_string(commit_ts);
+                    kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
                 }
             }
             status = table_index_meta.RemoveSegmentIndexIDs(*segment_ids_ptr);

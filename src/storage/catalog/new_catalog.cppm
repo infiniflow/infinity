@@ -198,7 +198,7 @@ public:
     Status RestoreCatalogCache(Storage *storage_ptr);
 
     SharedPtr<SystemCache> GetSystemCache() const;
-    SystemCache* GetSystemCachePtr() const;
+    SystemCache *GetSystemCachePtr() const;
 
 private:
     KVStore *kv_store_{};
@@ -265,9 +265,7 @@ private:
     HashMap<String, SharedPtr<SegmentUpdateTS>> segment_update_ts_map_{};
 
 public:
-    void AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta);
-
-    void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas);
+    void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
 
     // Profile related methods
     void SetProfile(bool flag) { enable_profile_ = flag; }
@@ -287,9 +285,6 @@ public:
     Status IncrLatestID(String &id_str, std::string_view id_name);
 
 private:
-    std::mutex cleaned_meta_mtx_{};
-    MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
-
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
     // bool is_vfs_{false};

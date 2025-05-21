@@ -19,6 +19,7 @@ module;
 module new_catalog;
 
 import stl;
+import third_party;
 import new_txn;
 import status;
 import extra_ddl_info;
@@ -1410,20 +1411,74 @@ Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key)
     return Status::OK();
 }
 
-void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta) {
-    std::unique_lock lock(cleaned_meta_mtx_);
+void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
+    auto GetCleanedMetaImpl = [&](const Vector<String> &keys) {
+        const String &type_str = keys[1];
+        const String &meta_str = keys[2];
+        auto meta_infos = infinity::Partition(meta_str, '/');
+        if (type_str == "db") {
+            metas.emplace_back(MakeUnique<DBMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1])));
+        } else if (type_str == "tbl") {
+            metas.emplace_back(MakeUnique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2])));
+        } else if (type_str == "seg") {
+            metas.emplace_back(MakeUnique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
+        } else if (type_str == "blk") {
+            metas.emplace_back(
+                MakeUnique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
+        } else if (type_str == "blk_col") {
+            metas.emplace_back(MakeUnique<ColumnMetaKey>(std::move(meta_infos[0]),
+                                                         std::move(meta_infos[1]),
+                                                         std::stoull(meta_infos[2]),
+                                                         std::stoull(meta_infos[3]),
+                                                         ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4])))));
+        } else if (type_str == "idx") {
+            metas.emplace_back(MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]),
+                                                             std::move(meta_infos[1]),
+                                                             std::move(meta_infos[2]),
+                                                             std::move(meta_infos[3])));
+        } else if (type_str == "idx_seg") {
+            metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
+                                                               std::move(meta_infos[1]),
+                                                               std::move(meta_infos[2]),
+                                                               std::stoull(meta_infos[3])));
+        } else if (type_str == "idx_chunk") {
+            metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
+                                                             std::move(meta_infos[1]),
+                                                             std::move(meta_infos[2]),
+                                                             std::stoull(meta_infos[3]),
+                                                             std::stoull(meta_infos[4])));
+        } else {
+            UnrecoverableError("Unknown meta key type.");
+        }
+    };
 
-    cleaned_meta_.emplace(ts, std::move(meta));
-}
+    constexpr std::string drop_prefix = "drop";
+    auto iter = kv_instance->GetIterator();
+    iter->Seek(drop_prefix);
+    String drop_key, drop_ts_str;
+    TxnTimeStamp drop_ts;
+    Vector<String> drop_keys;
 
-void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas) {
-    std::unique_lock lock(cleaned_meta_mtx_);
-
-    auto iter = cleaned_meta_.lower_bound(ts);
-    for (auto it = cleaned_meta_.begin(); it != iter; ++it) {
-        metas.push_back(std::move(it->second));
+    while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
+        drop_key = iter->Key().ToString();
+        drop_ts_str = iter->Value().ToString();
+        drop_ts = std::stoull(drop_ts_str); // It might not be an integer
+        if (drop_ts <= ts) {
+            drop_keys.emplace_back(drop_key);
+        }
+        iter->Next();
     }
-    cleaned_meta_.erase(cleaned_meta_.begin(), iter);
+
+    for (const auto &drop_key : drop_keys) {
+        auto keys = infinity::Partition(drop_key, '|');
+        GetCleanedMetaImpl(keys);
+
+        // delete from kv_instance
+        Status status = kv_instance->Delete(drop_key);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Remove clean meta failed. {}", *status.msg_));
+        }
+    }
 }
 
 Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
