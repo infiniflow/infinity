@@ -1526,8 +1526,9 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
                                                              std::move(meta_infos[2]),
                                                              std::stoull(meta_infos[3]),
                                                              std::stoull(meta_infos[4])));
+        } else {
+            UnrecoverableError("Unknown meta key type.");
         }
-        // UnrecoverableError("Unknown meta key type.");
     };
 
     constexpr std::string drop_prefix = "drop";
@@ -1535,26 +1536,29 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
     iter->Seek(drop_prefix);
     String drop_key, drop_ts_str;
     TxnTimeStamp drop_ts;
+    Vector<String> drop_keys;
 
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
         drop_key = iter->Key().ToString();
-        auto keys = infinity::Partition(drop_key, '|');
-        // cassert(keys.size() == 3);
-        drop_ts_str = iter->Value().ToString(); // It might not be an integer
-        drop_ts = std::stoull(drop_ts_str);
+        drop_ts_str = iter->Value().ToString();
+        drop_ts = std::stoull(drop_ts_str); // It might not be an integer
         if (drop_ts <= ts) {
-            GetCleanedMetaImpl(keys);
+            drop_keys.emplace_back(drop_key);
         }
-        // delete from kv_instance
         iter->Next();
     }
-    // std::sort(metas.begin(), metas.end(), [](const auto &lhs, const auto &rhs) {
-    //     auto l_type = lhs->type_, r_type = rhs->type_;
-    //     if (l_type == MetaType::kSegment && r_type == MetaType::kSegmentIndex) {
-    //         return true;
-    //     }
-    //     return false;
-    // });
+
+    for (const auto &drop_key : drop_keys) {
+        auto keys = infinity::Partition(drop_key, '|');
+        // cassert(keys.size() == 3);
+        GetCleanedMetaImpl(keys);
+
+        // delete from kv_instance
+        Status status = kv_instance->Delete(drop_key);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Remove clean meta failed. {}", *status.msg_));
+        }
+    }
 }
 
 Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
