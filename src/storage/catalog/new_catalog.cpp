@@ -1432,18 +1432,20 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
             SharedPtr<String> block_dir_ptr =
                 MakeShared<String>(fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", meta_infos[0], meta_infos[1], meta_infos[2], meta_infos[3]));
             BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            {
-                auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                         MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                         block_dir_ptr,
-                                                                         BlockVersion::FileName(),
-                                                                         DEFAULT_BLOCK_CAPACITY,
-                                                                         buffer_mgr->persistence_manager());
-                auto version_buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
-                // if (!version_buffer) {
-                //     return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
-                // }
-                version_buffer->AddObjRc();
+            if (buffer_mgr->GetBufferObject(*block_dir_ptr)) {
+                {
+                    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                             block_dir_ptr,
+                                                                             BlockVersion::FileName(),
+                                                                             DEFAULT_BLOCK_CAPACITY,
+                                                                             buffer_mgr->persistence_manager());
+                    auto version_buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
+                    // if (!version_buffer) {
+                    //     return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
+                    // }
+                    version_buffer->AddObjRc();
+                }
             }
 
             metas.emplace_back(
@@ -1464,40 +1466,42 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
             SharedPtr<String> block_dir_ptr =
                 MakeShared<String>(fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", meta_infos[0], meta_infos[1], meta_infos[2], meta_infos[3]));
             BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            {
-                auto filename = MakeShared<String>(fmt::format("{}.col", column_id));
-                SizeT total_data_size = 0;
-                if (col_def->type()->type() == LogicalType::kBoolean) {
-                    total_data_size = (DEFAULT_BLOCK_CAPACITY + 7) / 8;
-                } else {
-                    total_data_size = DEFAULT_BLOCK_CAPACITY * col_def->type()->Size();
+            if (buffer_mgr->GetBufferObject(*block_dir_ptr)) {
+                {
+                    auto filename = MakeShared<String>(fmt::format("{}.col", column_id));
+                    SizeT total_data_size = 0;
+                    if (col_def->type()->type() == LogicalType::kBoolean) {
+                        total_data_size = (DEFAULT_BLOCK_CAPACITY + 7) / 8;
+                    } else {
+                        total_data_size = DEFAULT_BLOCK_CAPACITY * col_def->type()->Size();
+                    }
+                    auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                  block_dir_ptr,
+                                                                  filename,
+                                                                  total_data_size,
+                                                                  buffer_mgr->persistence_manager());
+                    auto column_buffer = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+                    // if (!column_buffer) {
+                    //     return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
+                    // }
+                    column_buffer->AddObjRc();
                 }
-                auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                              block_dir_ptr,
-                                                              filename,
-                                                              total_data_size,
-                                                              buffer_mgr->persistence_manager());
-                auto column_buffer = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-                // if (!column_buffer) {
-                //     return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
-                // }
-                column_buffer->AddObjRc();
-            }
-            VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-            if (buffer_type == VectorBufferType::kVarBuffer) {
-                auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_id));
-                auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                     block_dir_ptr,
-                                                                     filename,
-                                                                     0, /*buffer_size*/
-                                                                     buffer_mgr->persistence_manager());
-                auto outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
-                // if (!outline_buffer) {
-                //     return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
-                // }
-                outline_buffer->AddObjRc();
+                VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+                if (buffer_type == VectorBufferType::kVarBuffer) {
+                    auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_id));
+                    auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                         MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                         block_dir_ptr,
+                                                                         filename,
+                                                                         0, /*buffer_size*/
+                                                                         buffer_mgr->persistence_manager());
+                    auto outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
+                    // if (!outline_buffer) {
+                    //     return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
+                    // }
+                    outline_buffer->AddObjRc();
+                }
             }
 
             metas.emplace_back(MakeUnique<ColumnMetaKey>(std::move(meta_infos[0]),
