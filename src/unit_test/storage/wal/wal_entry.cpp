@@ -200,6 +200,8 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 }
 
 TEST_F(WalEntryTest, ReadWrite) {
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(nullptr);
     infinity::InfinityContext::instance().InitPhase2();
@@ -296,6 +298,8 @@ TEST_F(WalEntryTest, ReadWrite) {
 }
 
 TEST_F(WalEntryTest, ReadWriteV2) {
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
     infinity::InfinityContext::instance().InitPhase1(config_path);
