@@ -100,6 +100,8 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(WalReplayTest, wal_replay_database) {
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -218,6 +220,8 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         }
     }
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -308,6 +312,8 @@ TEST_P(WalReplayTest, wal_replay_tables) {
 TEST_P(WalReplayTest, wal_replay_append) {
     SizeT row_count = 2;
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -514,6 +520,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
 
 TEST_P(WalReplayTest, wal_replay_import) {
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -721,6 +729,8 @@ TEST_F(WalReplayTest, wal_replay_compact) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     u64 test_segment_n = 2;
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -838,6 +848,8 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 
 TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -903,6 +915,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     ////////////////////////////////
     //    system(tree_cmd.c_str());
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -931,6 +945,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
 
 TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

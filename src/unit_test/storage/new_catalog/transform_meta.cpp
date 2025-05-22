@@ -57,6 +57,8 @@ public:
     void TearDown() override {}
 
     void Init() {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         std::string config_path_str = GetParam();
         config_path_ = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {

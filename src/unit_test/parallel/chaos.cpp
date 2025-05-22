@@ -354,13 +354,9 @@ TEST_P(ParallelTest, ChaosTest) {
     auto db_name = "default_db";
     auto table_name = "chaos_test";
 
-    String data_path = GetHomeDir();
-
     String fulltext_file_path = String(test_data_path()) + "/csv/enwiki_99.csv";
-
     auto data = DataPreprocessing(fulltext_file_path);
 
-    Infinity::LocalInit(data_path);
     CreateTableOptions create_tb_options;
     create_tb_options.conflict_type_ = ConflictType::kError;
     std::vector<ColumnDef *> column_defs;
@@ -440,6 +436,4 @@ TEST_P(ParallelTest, ChaosTest) {
         }
         infinity->LocalDisconnect();
     }
-
-    Infinity::LocalUnInit();
 }

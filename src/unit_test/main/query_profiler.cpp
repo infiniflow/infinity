@@ -24,6 +24,8 @@ import infinity_exception;
 using namespace infinity;
 class QueryProfilerTest : public BaseTest {
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

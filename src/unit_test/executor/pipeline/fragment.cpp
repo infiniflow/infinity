@@ -28,6 +28,8 @@ import sql_runner;
 using namespace infinity;
 class FragmentTest : public BaseTest {
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         BaseTest::SetUp();
         BaseTest::RemoveDbDirs();
 #ifdef INFINITY_DEBUG
