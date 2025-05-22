@@ -75,7 +75,7 @@ Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
             // the key is committed before the txn or the key isn't committed
             segment_ids.push_back(segment_id);
         } else {
-            LOG_DEBUG(fmt::format("Invalid segment id key: {}", iter->Key().ToString()));
+            LOG_DEBUG(fmt::format("Key: {} isn't segment id", iter->Key().ToString()));
         }
         iter->Next();
     }

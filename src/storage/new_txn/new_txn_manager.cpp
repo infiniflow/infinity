@@ -148,9 +148,9 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     }
 
     if (txn_text == nullptr) {
-        LOG_DEBUG(fmt::format("NewTxn: {} is Begin. begin ts: {}, No command text", new_txn_id, begin_ts));
+        LOG_DEBUG(fmt::format("Begin new txn: {}, begin ts: {}, No command text", new_txn_id, begin_ts));
     } else {
-        LOG_DEBUG(fmt::format("NewTxn: {} is Begin. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+        LOG_DEBUG(fmt::format("Begin new txn: {}. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
     }
 
     // Create txn instance

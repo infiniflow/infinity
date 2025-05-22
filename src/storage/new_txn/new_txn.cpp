@@ -1238,6 +1238,7 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
+        LOG_TRACE(fmt::format("Commit READ txn: {}. begin ts: {}, Command: {}", txn_context_ptr_->txn_id_, BeginTS(), *GetTxnText()));
         return PostReadTxnCommit();
     }
 
@@ -1254,7 +1255,11 @@ Status NewTxn::Commit() {
     } else {
         commit_ts = txn_mgr_->GetWriteCommitTS(shared_from_this());
     }
-    LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
+    LOG_TRACE(fmt::format("Committing WRITE txn: {}, begin_ts:{} committing ts: {}, Command: {}",
+                          txn_context_ptr_->txn_id_,
+                          BeginTS(),
+                          commit_ts,
+                          *GetTxnText()));
 
     this->SetTxnCommitting(commit_ts);
 
