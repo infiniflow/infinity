@@ -4220,7 +4220,7 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
 }
 
 Status NewTxn::Dummy() {
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDummy>());
+    base_txn_store_ = MakeShared<DummyTxnStore>();
     return Status::OK();
 }
 
