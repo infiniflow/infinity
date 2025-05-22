@@ -155,9 +155,14 @@ public:
 
     void AddDocs(int row_count, const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts);
 
-    template <typename DataType, typename DistFunc, typename Filter = NoneType>
-    Pair<Vector<BMPDocID>, Vector<DataType>> SearchIndex(const auto &query, i32 topn, const BmpSearchOptions &options, const Filter &filter) const {
-        Pair<Vector<BMPDocID>, Vector<DataType>> res{};
+    template <typename ResultType, typename DistFunc, typename Filter = NoneType, typename MergeHeap = NoneType>
+    void SearchIndex(const auto &query,
+                     i32 topn,
+                     const BmpSearchOptions &options,
+                     const Filter &filter,
+                     SizeT query_id,
+                     SegmentID segment_id,
+                     MergeHeap *merge_heap) const {
         std::visit(
             [&](auto &&index) {
                 using T = std::decay_t<decltype(index)>;
@@ -165,18 +170,21 @@ public:
                     UnrecoverableError("Invalid index type.");
                 } else {
                     using IndexT = std::decay_t<decltype(*index)>;
-                    using DataT = typename IndexT::DataT;
-                    using IdxT = typename IndexT::IdxT;
-                    if constexpr (std::is_same_v<DataT, DataType> && std::is_same_v<DataT, typename DistFunc::DataT> &&
-                                  std::is_same_v<IdxT, typename DistFunc::IndexT>) {
-                        res = index->SearchKnn(query, topn, options, filter);
+                    if constexpr (std::is_same_v<typename IndexT::DataT, typename DistFunc::DataT> &&
+                                  std::is_same_v<typename IndexT::IdxT, typename DistFunc::IndexT>) {
+                        auto [doc_ids, scores] = index->SearchKnn(query, topn, options, filter);
+                        SizeT res_n = doc_ids.size();
+                        for (SizeT i = 0; i < res_n; ++i) {
+                            RowID row_id(segment_id, doc_ids[i]);
+                            ResultType d = scores[i];
+                            merge_heap->Search(query_id, &d, &row_id, 1);
+                        }
                     } else {
                         UnrecoverableError("Invalid index type.");
                     }
                 }
             },
             bmp_);
-        return res;
     }
 
     SizeT MemUsage() const;

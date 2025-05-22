@@ -546,13 +546,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             auto query = get_ele(query_vector, query_id);
             BmpSearchOptions options = BMPUtil::ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
             options.use_lock_ = with_lock;
-            auto [doc_ids, scores] = bmp_handler->template SearchIndex<SegmentOffset, DistFunc>(query, topn, options, filter);
-            SizeT res_n = doc_ids.size();
-            for (SizeT i = 0; i < res_n; ++i) {
-                RowID row_id(segment_id, doc_ids[i]);
-                ResultType d = scores[i];
-                merge_heap->Search(query_id, &d, &row_id, 1);
-            }
+            bmp_handler->template SearchIndex<ResultType, DistFunc>(query, topn, options, filter, query_id, segment_id, merge_heap);
         };
 #else
         auto bmp_search = [&](AbstractBMP index, SizeT query_id, bool with_lock, const auto &filter) {
