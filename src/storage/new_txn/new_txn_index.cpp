@@ -52,11 +52,12 @@ import column_index_reader;
 import column_index_merger;
 #ifdef INDEX_HANDLER
 import hnsw_handler;
+import bmp_handler;
 #else
 import abstract_hnsw;
+import abstract_bmp;
 #endif
 import index_hnsw;
-import abstract_bmp;
 import index_bmp;
 import emvb_index_in_mem;
 import emvb_index;
@@ -1378,6 +1379,8 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
             }
             const auto &options = ret.value();
 
+#ifdef INDEX_HANDLER
+#else
             auto optimize_index = [&](const AbstractBMP &index) {
                 std::visit(
                     [&](auto &&index) {
@@ -1395,6 +1398,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     },
                     index);
             };
+#endif
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
                 BufferObj *index_buffer = nullptr;
@@ -1403,11 +1407,21 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                     return status;
                 }
                 BufferHandle buffer_handle = index_buffer->Load();
+#ifdef INDEX_HANDLER
+                BMPHandlerPtr bmp_handler = *static_cast<BMPHandlerPtr *>(buffer_handle.GetDataMut());
+                bmp_handler->Optimize(options);
+#else
                 auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
                 optimize_index(*abstract_bmp);
+#endif
             }
             if (mem_index && mem_index->memory_bmp_index_) {
+#ifdef INDEX_HANDLER
+                BMPHandlerPtr bmp_handler = mem_index->memory_bmp_index_->get();
+                bmp_handler->Optimize(options);
+#else
                 optimize_index(mem_index->memory_bmp_index_->get());
+#endif
             }
 
             break;
