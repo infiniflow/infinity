@@ -1101,7 +1101,8 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     return system_start_ts;
 }
 
-Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries) {
+Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_storage_mode,
+                                                                              Vector<SharedPtr<WalEntry>> &replay_entries) {
     Vector<String> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
@@ -1122,12 +1123,13 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
     }
     if (wal_list.empty()) {
         LOG_INFO(fmt::format("No checkpoint found, terminate replaying WAL"));
-        return {0, 0};
+        return {0, 0, 0};
     }
 
     LOG_INFO("Start Wal Replay");
     // log the wal files.
 
+    TransactionID max_transaction_id = 0;
     TxnTimeStamp max_checkpoint_ts = 0; // the max commit ts that has been checkpointed
     replay_entries.clear();
     TxnTimeStamp last_commit_ts = 0; // last wal commit ts
@@ -1148,6 +1150,7 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 last_commit_ts = wal_entry->commit_ts_;
+                max_transaction_id = wal_entry->txn_id_;
                 break;
             }
             replay_entries.push_back(wal_entry);
@@ -1184,7 +1187,7 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
                 break;
             }
             case StorageMode::kReadable: {
-                return {0, 0};
+                return {0, 0, 0};
             }
             default: {
                 String error_message = "Unreachable branch";
@@ -1195,14 +1198,15 @@ Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
     std::reverse(replay_entries.begin(), replay_entries.end());
 
-    return {last_commit_ts, max_checkpoint_ts};
+    return {max_transaction_id, last_commit_ts, max_checkpoint_ts};
 }
 
-void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries) {
+Tuple<TransactionID, TxnTimeStamp> WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries) {
     // phase 3: replay the entries
 
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
-    // TransactionID last_txn_id = 0;
+    TransactionID last_txn_id = 0;
+    TxnTimeStamp last_commit_ts = 0;
 
     NewTxnManager *txn_mgr = storage_->new_txn_manager();
 
@@ -1213,8 +1217,8 @@ void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entr
         //                                        max_checkpoint_ts);
         //     UnrecoverableError(error_message);
         // }
-        // last_commit_ts = replay_entries[replay_count]->commit_ts_;
-        // last_txn_id = replay_entries[replay_count]->txn_id_;
+        last_commit_ts = replay_entries[replay_count]->commit_ts_;
+        last_txn_id = replay_entries[replay_count]->txn_id_;
 
         const SharedPtr<WalEntry> &replay_entry = replay_entries[replay_count];
         LOG_DEBUG(replay_entry->ToString());
@@ -1234,12 +1238,13 @@ void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entr
         txn_mgr->CommitReplayTxn(replay_txn.get());
     }
 
-    // LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
+    LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
     // storage_->catalog()->next_txn_id_ = last_txn_id;
     // UpdateCommitState(last_commit_ts, 0);
 
     // TxnTimeStamp system_start_ts = last_commit_ts + 1;
     // LOG_INFO(fmt::format("System start ts: {}", system_start_ts));
+    return {last_txn_id, last_commit_ts};
 }
 
 Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::GetCatalogFiles() const {

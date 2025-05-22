@@ -266,7 +266,7 @@ Status Storage::AdminToWriter() {
 
     Vector<SharedPtr<WalEntry>> replay_entries;
     LOG_INFO("Read WAL files");
-    auto [system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
+    auto [max_txn_id, system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
     // Init database, need to create default_db
     LOG_INFO(fmt::format("Init a new catalog"));
     catalog_ = Catalog::NewCatalog();
@@ -281,9 +281,22 @@ Status Storage::AdminToWriter() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    // Replay wal
     if (config_ptr_->ReplayWal()) {
-        wal_mgr_->ReplayWalEntries(replay_entries);
+        auto [wal_max_txn_id, wal_system_start_ts] = wal_mgr_->ReplayWalEntries(replay_entries);
+        if (wal_max_txn_id < max_txn_id) {
+            UnrecoverableError("Wal max txn id is less than max txn id");
+        }
+        if (wal_system_start_ts < system_start_ts) {
+            UnrecoverableError("Wal system start ts is less than system start ts");
+        }
+        max_txn_id = wal_max_txn_id;
+        system_start_ts = wal_system_start_ts;
     }
+
+    // Set correct txn_id and timestamp
+    new_txn_mgr_->SetCurrentTransactionID(max_txn_id);
+    new_txn_mgr_->SetNewSystemTS(system_start_ts);
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
