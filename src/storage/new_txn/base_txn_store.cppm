@@ -74,6 +74,14 @@ export struct BaseTxnStore {
     virtual ~BaseTxnStore() = default;
 };
 
+// DummyTxnStore is only used in test
+export struct DummyTxnStore : public BaseTxnStore {
+    DummyTxnStore() : BaseTxnStore(TransactionType::kNormal) {}
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 export struct CreateDBTxnStore : public BaseTxnStore {
     CreateDBTxnStore() : BaseTxnStore(TransactionType::kCreateDB) {}
 

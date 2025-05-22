@@ -27,6 +27,16 @@ import default_values;
 
 namespace infinity {
 
+String DummyTxnStore::ToString() const { return fmt::format("{}: dummy", TransactionType2Str(type_)); }
+
+SharedPtr<WalEntry> DummyTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDummy>();
+    wal_entry->cmds_.push_back(wal_command);
+    return wal_entry;
+}
+
 String CreateDBTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id:{}, comment: {}", TransactionType2Str(type_), db_name_, db_id_, *comment_ptr_);
 }
