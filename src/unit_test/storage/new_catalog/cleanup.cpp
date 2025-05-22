@@ -692,8 +692,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
         EXPECT_TRUE(status.ok());
     }
 
-
-
     UnInit();
 
     Init();
@@ -726,7 +724,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
 // }
 
 // ChunkIndexMeta for Index
-
 
 // ColumnMeta for Data and Var(outline)
 // SharedPtr<ColumnDef> col_def;

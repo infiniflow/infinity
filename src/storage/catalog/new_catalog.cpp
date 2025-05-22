@@ -1432,7 +1432,7 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
             SharedPtr<String> block_dir_ptr =
                 MakeShared<String>(fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", meta_infos[0], meta_infos[1], meta_infos[2], meta_infos[3]));
             BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            if (buffer_mgr->GetBufferObject(*block_dir_ptr)) {
+            if (!buffer_mgr->GetBufferObject(fmt::format("/var/infinity/data/{}", *block_dir_ptr))) {
                 {
                     auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -1466,7 +1466,10 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
             SharedPtr<String> block_dir_ptr =
                 MakeShared<String>(fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", meta_infos[0], meta_infos[1], meta_infos[2], meta_infos[3]));
             BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            if (buffer_mgr->GetBufferObject(*block_dir_ptr)) {
+
+            SharedPtr<String> full_path_ptr =
+    MakeShared<String>(fmt::format("{}/{}.col", *block_dir_ptr, column_id));
+            if (!buffer_mgr->GetBufferObject(fmt::format("/var/infinity/data/{}", *full_path_ptr))) {
                 {
                     auto filename = MakeShared<String>(fmt::format("{}.col", column_id));
                     SizeT total_data_size = 0;
