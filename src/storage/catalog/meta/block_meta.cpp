@@ -129,7 +129,8 @@ Status BlockMeta::RestoreSet() {
                                                              BlockVersion::FileName(),
                                                              this->block_capacity(),
                                                              buffer_mgr->persistence_manager());
-    if (!buffer_mgr->GetBufferObject(version_file_worker->GetFilePath())) {
+    auto *buffer_obj = buffer_mgr->GetBufferObject(version_file_worker->GetFilePath());
+    if (buffer_obj == nullptr) {
         version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
         if (!version_buffer_) {
             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));

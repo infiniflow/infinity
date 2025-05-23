@@ -74,20 +74,6 @@ import segment_index_entry;
 import chunk_index_entry;
 import table_index_meta;
 import meta_type;
-import version_file_worker;
-import block_version;
-import data_file_worker;
-import var_file_worker;
-import vector_buffer;
-import logical_type;
-import chunk_index_entry;
-import secondary_index_file_worker;
-import raw_file_worker;
-import ivf_index_file_worker;
-import hnsw_file_worker;
-import bmp_index_file_worker;
-import emvb_index_file_worker;
-import index_defines;
 
 namespace infinity {
 
@@ -1160,8 +1146,8 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
         delete_success = mem_index_map_.erase(mem_index_key) > 0;
     }
     if (!delete_success) {
+        LOG_INFO(fmt::format("MemIndex key: {} not found", mem_index_key));
         return Status::OK();
-        // return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
     }
     return Status::OK();
 }

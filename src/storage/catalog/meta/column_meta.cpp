@@ -184,7 +184,8 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
                                                       filename,
                                                       total_data_size,
                                                       buffer_mgr->persistence_manager());
-        if (!buffer_mgr->GetBufferObject(file_worker->GetFilePath())) {
+        auto *buffer_obj = buffer_mgr->GetBufferObject(file_worker->GetFilePath());
+        if (buffer_obj == nullptr) {
             column_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             if (!column_buffer_) {
                 return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
@@ -208,7 +209,8 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
                                                              filename,
                                                              chunk_offset,
                                                              buffer_mgr->persistence_manager());
-        if (!buffer_mgr->GetBufferObject(outline_file_worker->GetFilePath())) {
+        auto *buffer_obj = buffer_mgr->GetBufferObject(outline_file_worker->GetFilePath());
+        if (buffer_obj == nullptr) {
             outline_buffer_ = buffer_mgr->GetBufferObject(std::move(outline_file_worker));
             if (!outline_buffer_) {
                 return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
