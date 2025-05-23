@@ -1447,6 +1447,10 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             if (segment_meta->segment_id() != segment_id) {
                 UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_meta->segment_id()));
             }
+            table_meta.SetUnsealedSegmentID(segment_id);
+            if (!status.ok()) {
+                return status;
+            }
         } else {
             segment_meta.emplace(segment_id, table_meta);
         }
@@ -1471,6 +1475,12 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         } else {
             block_meta.emplace(block_id, segment_meta.value());
         }
+        SizeT block_row_cnt;
+        std::tie(block_row_cnt, status) = block_meta->GetRowCnt1();
+        if (!status.ok()) {
+            return status;
+        }
+        LOG_DEBUG(fmt::format("CommitBottomAppend block {}, existing row cnt {}, new row cnt {}", block_id, block_row_cnt, range.second));
 
         status = this->AppendInBlock(*block_meta, block_offset, range.second, append_cmd->block_.get(), copied_row_cnt);
         if (!status.ok()) {
