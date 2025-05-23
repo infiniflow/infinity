@@ -113,14 +113,6 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
 }
 
 Status BlockMeta::RestoreSet() {
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    {
-        String block_lock_key = GetBlockTag("lock");
-        Status status = new_catalog->AddBlockLock(std::move(block_lock_key), 0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     SharedPtr<String> block_dir_ptr = this->GetBlockDir();
     auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
@@ -141,13 +133,6 @@ Status BlockMeta::RestoreSet() {
 }
 
 Status BlockMeta::UninitSet(UsageFlag usage_flag) {
-    // {
-    //     String block_row_cnt_key = GetBlockTag("row_cnt");
-    //     Status status = kv_instance_.Delete(block_row_cnt_key);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     if (usage_flag == UsageFlag::kOther) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {

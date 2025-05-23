@@ -527,7 +527,6 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
 }
 
 Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
-    // table_meta.RestoreSet();
     KVInstance &kv_instance = table_meta.kv_instance();
     String table_prefix = KeyEncode::CatalogTablePrefix(table_meta.db_id_str(), table_name);
     auto iter = kv_instance.GetIterator();
@@ -1022,8 +1021,6 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 }
 
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag) {
-    // segment_index_meta.RestoreSet();
-
     auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
