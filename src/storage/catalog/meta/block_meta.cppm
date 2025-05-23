@@ -52,6 +52,8 @@ public:
 
     Status LoadSet(TxnTimeStamp checkpoint_ts);
 
+    Status RestoreSet();
+
     Status UninitSet(UsageFlag usage_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();

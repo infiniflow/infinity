@@ -1107,7 +1107,7 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
         delete_success = block_lock_map_.erase(block_key) > 0;
     }
     if (!delete_success) {
-        return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
+        LOG_WARN(fmt::format("Block key: {} not found", block_key));
     }
     return Status::OK();
 }
@@ -1146,7 +1146,7 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
         delete_success = mem_index_map_.erase(mem_index_key) > 0;
     }
     if (!delete_success) {
-        return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
+        LOG_WARN(fmt::format("MemIndex key: {} not found", mem_index_key));
     }
     return Status::OK();
 }
