@@ -1010,6 +1010,14 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return status;
     }
 
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<CheckpointTxnStore>();
+    CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
+    txn_store->max_commit_ts_ = option.checkpoint_ts_;
+
     return Status::OK();
 }
 
@@ -1819,7 +1827,7 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kUpdate: {
             return CheckConflictTxnStore(static_cast<const UpdateTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
-        case TransactionType::kCheckpoint:
+        case TransactionType::kNewCheckpoint:
         default: {
             return false;
         }
@@ -3746,7 +3754,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kUpdate: {
             break;
         }
-        case TransactionType::kCheckpoint: {
+        case TransactionType::kNewCheckpoint: {
             UnrecoverableError("Unexpected case: rollback checkpoint");
             break;
         }
@@ -3991,6 +3999,14 @@ bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == Transactio
 Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
     WalCommandType command_type = command->GetType();
     switch (command_type) {
+        case WalCommandType::CREATE_DATABASE_V2: {
+            auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
+
+            // IncreaseLatestDBID
+            SizeT id_num = std::stoull(create_db_cmd->db_id_);
+            Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
+            break;
+        }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 

@@ -396,4 +396,15 @@ SharedPtr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
+String CheckpointTxnStore::ToString() const { return fmt::format("{}: max_commit_ts_: {}", TransactionType2Str(type_), max_commit_ts_); }
+
+SharedPtr<WalEntry> CheckpointTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts_);
+    wal_entry->cmds_.push_back(wal_command);
+
+    return wal_entry;
+}
+
 } // namespace infinity
