@@ -382,4 +382,13 @@ export struct UpdateTxnStore : public BaseTxnStore {
     SizeT RowCount() const;
 };
 
+export struct CheckpointTxnStore : public BaseTxnStore {
+    CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
+
+    i64 max_commit_ts_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 } // namespace infinity
