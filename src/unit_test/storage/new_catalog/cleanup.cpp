@@ -772,7 +772,7 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
     }
 
     create_index(index_def1);
-    // create_index(index_def2);
+    create_index(index_def2);
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
