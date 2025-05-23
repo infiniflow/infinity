@@ -112,6 +112,34 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     return Status::OK();
 }
 
+Status BlockMeta::RestoreSet(TxnTimeStamp checkpoint_ts) {
+    checkpoint_ts = begin_ts_;
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    {
+        String block_lock_key = GetBlockTag("lock");
+        Status status = new_catalog->AddBlockLock(std::move(block_lock_key), checkpoint_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             BlockVersion::FileName(),
+                                                             this->block_capacity(),
+                                                             buffer_mgr->persistence_manager());
+    if (!buffer_mgr->GetBufferObject(version_file_worker->GetFilePath())) {
+        version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+        if (!version_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
+        }
+        version_buffer_->AddObjRc();
+    }
+    return Status::OK();
+}
+
 Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     // {
     //     String block_row_cnt_key = GetBlockTag("row_cnt");

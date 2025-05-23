@@ -1437,30 +1437,9 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         } else if (type_str == "seg") {
             metas.emplace_back(MakeUnique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
         } else if (type_str == "blk") {
-            SegmentID segment_id = std::stoull(meta_infos[2]);
-            BlockID block_id = std::stoull(meta_infos[3]);
-
-            TableMeeta table_meta{meta_infos[0], meta_infos[1], *kv_instance, 0};
-            SegmentMeta segment_meta{segment_id, table_meta};
-            BlockMeta block_meta{block_id, segment_meta};
-            block_meta.LoadSet();
-
             metas.emplace_back(
                 MakeUnique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
         } else if (type_str == "blk_col") {
-            SegmentID segment_id = std::stoull(meta_infos[2]);
-            BlockID block_id = std::stoull(meta_infos[3]);
-
-            SharedPtr<ColumnDef> col_def = ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4])));
-            ColumnID column_id = col_def->id();
-
-            TableMeeta table_meta{meta_infos[0], meta_infos[1], *kv_instance, 0};
-            SegmentMeta segment_meta{segment_id, table_meta};
-            BlockMeta block_meta{block_id, segment_meta};
-            ColumnMeta column_meta{column_id, block_meta};
-
-            column_meta.LoadSet();
-
             metas.emplace_back(MakeUnique<ColumnMetaKey>(std::move(meta_infos[0]),
                                                          std::move(meta_infos[1]),
                                                          std::stoull(meta_infos[2]),
@@ -1477,16 +1456,6 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
                                                                std::move(meta_infos[2]),
                                                                std::stoull(meta_infos[3])));
         } else if (type_str == "idx_chunk") {
-            SegmentID segment_id = std::stoull(meta_infos[3]);
-            ChunkID chunk_id = std::stoull(meta_infos[4]);
-
-            TableMeeta table_meta{meta_infos[0], meta_infos[1], *kv_instance, 0};
-            TableIndexMeeta table_index_meta{meta_infos[2], table_meta};
-            SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
-            ChunkIndexMeta chunk_index_meta{chunk_id, segment_index_meta};
-
-            chunk_index_meta.LoadSet();
-
             metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(std::move(meta_infos[0]),
                                                              std::move(meta_infos[1]),
                                                              std::move(meta_infos[2]),
