@@ -112,12 +112,11 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     return Status::OK();
 }
 
-Status BlockMeta::RestoreSet(TxnTimeStamp checkpoint_ts) {
-    checkpoint_ts = begin_ts_;
+Status BlockMeta::RestoreSet() {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         String block_lock_key = GetBlockTag("lock");
-        Status status = new_catalog->AddBlockLock(std::move(block_lock_key), checkpoint_ts);
+        Status status = new_catalog->AddBlockLock(std::move(block_lock_key), 0);
         if (!status.ok()) {
             return status;
         }

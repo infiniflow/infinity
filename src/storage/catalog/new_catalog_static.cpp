@@ -920,7 +920,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
 }
 
 Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
-    block_meta.RestoreSet(0);
+    block_meta.RestoreSet();
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
 

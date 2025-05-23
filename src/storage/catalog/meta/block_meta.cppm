@@ -52,7 +52,7 @@ public:
 
     Status LoadSet(TxnTimeStamp checkpoint_ts);
 
-    Status RestoreSet(TxnTimeStamp checkpoint_ts);
+    Status RestoreSet();
 
     Status UninitSet(UsageFlag usage_flag);
 
