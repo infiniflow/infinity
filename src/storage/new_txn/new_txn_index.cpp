@@ -172,6 +172,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     txn_store->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
     txn_store->segment_id_ = segment_index_meta.segment_id();
+    txn_store->table_key_ = table_key;
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
@@ -350,26 +351,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
-        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->db_name_ = db_name;
-        optimize_index_txn_store->db_id_str_ = table_meta.db_id_str();
-        optimize_index_txn_store->table_name_ = table_name;
-        optimize_index_txn_store->table_id_str_ = table_meta.table_id_str();
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-    } else {
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-    }
-
     txn_store_.AddMetaKeyForBufferObject(
         MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
@@ -474,10 +455,49 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    status = this->AddChunkWal(db_name, table_name, index_name, table_key, *chunk_index_meta, deprecate_ids, DumpIndexCause::kOptimizeIndex);
-    if (!status.ok()) {
-        return status;
+    Vector<WalChunkIndexInfo> chunk_infos;
+    chunk_infos.emplace_back(*chunk_index_meta);
+
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
+        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+        optimize_index_txn_store->db_name_ = db_name;
+        optimize_index_txn_store->db_id_str_ = table_meta.db_id_str();
+        optimize_index_txn_store->table_name_ = table_name;
+        optimize_index_txn_store->table_id_str_ = table_meta.table_id_str();
+        optimize_index_txn_store->table_key_ = table_key;
+        optimize_index_txn_store->index_names_.emplace_back(index_name);
+        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
+        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
+        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
+    } else {
+        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+        optimize_index_txn_store->index_names_.emplace_back(index_name);
+        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
+        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
+        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
     }
+
+    auto dump_cmd = MakeShared<WalCmdDumpIndexV2>(db_name,
+                                                  segment_index_meta.table_index_meta().table_meta().db_id_str(),
+                                                  table_name,
+                                                  segment_index_meta.table_index_meta().table_meta().table_id_str(),
+                                                  index_name,
+                                                  segment_index_meta.table_index_meta().index_id_str(),
+                                                  segment_id,
+                                                  chunk_infos,
+                                                  deprecate_ids,
+                                                  table_key);
+
+    dump_cmd->dump_cause_ = DumpIndexCause::kOptimizeIndex;
+
+    wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
+    txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
     return Status::OK();
 }
 
@@ -559,22 +579,6 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
         }
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-    base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-    optimize_index_txn_store->db_name_ = db_name;
-    optimize_index_txn_store->db_id_str_ = db_meta->db_id_str();
-    optimize_index_txn_store->table_name_ = table_name;
-    optimize_index_txn_store->table_id_str_ = table_meta_opt->table_id_str();
-    optimize_index_txn_store->index_names_.emplace_back(index_name);
-    optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta_opt->index_id_str());
-    optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta_opt->index_id_str()));
-    optimize_index_txn_store->segment_ids_.reserve(optimize_index_txn_store->segment_ids_.size() + segment_ids_ptr->size());
-    optimize_index_txn_store->segment_ids_.insert(optimize_index_txn_store->segment_ids_.end(), segment_ids_ptr->begin(), segment_ids_ptr->end());
-
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimizeV2>(db_name,
                                                                  db_meta->db_id_str(),
                                                                  table_name,
@@ -605,7 +609,7 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     return Status::OK();
 }
 
-Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<AppendRange> &append_ranges) {
+Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Pair<RowID, u64>> &append_ranges) {
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -642,47 +646,27 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
         return Status::OK();
     };
 
-    for (const AppendRange &range : append_ranges) {
-        if (!segment_meta || segment_meta->segment_id() != range.segment_id_) {
-            segment_meta.emplace(range.segment_id_, table_index_meta.table_meta());
-
-            {
-                auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
+    for (const Pair<RowID, u64> &range : append_ranges) {
+        SegmentID segment_id = range.first.segment_id_;
+        BlockID block_id = range.first.segment_offset_ >> BLOCK_OFFSET_SHIFT;
+        cur_offset = range.first.segment_offset_ & BLOCK_OFFSET_MASK;
+        cur_row_cnt = range.second;
+        if (!segment_meta || segment_meta->segment_id() != segment_id) {
+            segment_meta.emplace(segment_id, table_index_meta.table_meta());
+            if (!table_index_meta.HasSegmentIndexID(segment_id)) {
+                Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
                 if (!status.ok()) {
                     return status;
                 }
-                auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), range.segment_id_);
-                if (iter == segment_ids_ptr->end()) {
-                    status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, range.segment_id_, segment_index_meta);
-                    if (!status.ok()) {
-                        return status;
-                    }
-                } else {
-                    segment_index_meta.emplace(range.segment_id_, table_index_meta);
-                }
+            } else {
+                segment_index_meta.emplace(segment_id, table_index_meta);
             }
-            block_meta.reset();
         }
-        if (!block_meta || block_meta->block_id() != range.block_id_) {
-            if (block_meta) {
-                append_in_column();
-            }
-            block_meta.emplace(range.block_id_, segment_meta.value());
-            column_meta.emplace(column_idx, *block_meta);
-            cur_offset = range.start_offset_;
-            cur_row_cnt = range.row_count_;
-        } else {
-            if (cur_offset + cur_row_cnt != range.start_offset_) {
-                UnrecoverableError("AppendIndex: append range is not continuous");
-            }
-            cur_row_cnt += range.row_count_;
+        if (!block_meta || block_meta->block_id() != block_id) {
+            block_meta.emplace(block_id, segment_meta.value());
+            column_meta.emplace(column_idx, block_meta.value());
         }
-    }
-    if (cur_row_cnt > 0) {
-        Status status = append_in_column();
-        if (!status.ok()) {
-            return status;
-        }
+        append_in_column();
     }
 
     return Status::OK();
@@ -920,6 +904,34 @@ Status NewTxn::PopulateIndex(const String &db_name,
     }
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, *segment_index_meta);
+    Vector<WalChunkIndexInfo> chunk_infos;
+    chunk_infos.emplace_back(chunk_index_meta);
+
+    // Put the index into local txn store
+    switch (dump_index_cause) {
+        case DumpIndexCause::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+            compact_txn_store->index_names_.emplace_back(index_name);
+            compact_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+            compact_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+            compact_txn_store->segment_ids_.emplace_back(segment_meta.segment_id());
+            compact_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
+            compact_txn_store->deprecate_ids_in_segments_.emplace_back(old_chunk_ids);
+            break;
+        }
+        case DumpIndexCause::kImport: {
+            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+            import_txn_store->index_names_.emplace_back(index_name);
+            import_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
+            import_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
+            import_txn_store->segment_ids_.emplace_back(segment_meta.segment_id());
+            import_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
+            import_txn_store->deprecate_ids_in_segments_.emplace_back(old_chunk_ids);
+        }
+        default: {
+        }
+    }
+
     if (create_index_cmd_ptr) {
         WalCmdCreateIndexV2 &create_index_cmd = *create_index_cmd_ptr;
         Vector<WalChunkIndexInfo> chunk_infos;
@@ -1689,12 +1701,12 @@ Status NewTxn::AddChunkWal(const String &db_name,
                                                   index_name,
                                                   segment_index_meta.table_index_meta().index_id_str(),
                                                   segment_id,
-                                                  std::move(chunk_infos),
-                                                  deprecate_ids);
+                                                  chunk_infos,
+                                                  deprecate_ids,
+                                                  table_key);
     if (dump_index_cause == DumpIndexCause::kDumpMemIndex) {
         dump_cmd->clear_mem_index_ = true;
     }
-    dump_cmd->table_key_ = table_key;
     dump_cmd->dump_cause_ = dump_index_cause;
 
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
@@ -1703,7 +1715,7 @@ Status NewTxn::AddChunkWal(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges) {
+Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges) {
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
@@ -1767,7 +1779,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
             if (!status.ok()) {
                 return status;
             }
-            append_ranges.emplace_back(segment_id, block_id, block_offset, block_row_cnt - block_offset);
+            append_ranges.emplace_back(RowID(segment_id, (u32(block_id) << BLOCK_OFFSET_SHIFT) + block_offset), block_row_cnt - block_offset);
             block_offset = 0;
         }
     }
@@ -1789,7 +1801,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
         return status;
     }
 
-    Vector<AppendRange> append_ranges;
+    Vector<Pair<RowID, u64>> append_ranges;
     HashSet<SegmentID> index_segment_ids_set(index_segment_ids_ptr->begin(), index_segment_ids_ptr->end());
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
@@ -1908,7 +1920,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     }
 
     if (this->IsReplay()) {
-        WalCmdDumpIndexV2 dump_index_cmd(db_name, db_id_str, table_name, table_id_str, index_name, index_id_str, 0);
+        WalCmdDumpIndexV2 dump_index_cmd(db_name, db_id_str, table_name, table_id_str, index_name, index_id_str, 0, table_key);
         dump_index_cmd.dump_cause_ = DumpIndexCause::kReplayCreateIndex;
         for (const WalSegmentIndexInfo &segment_index_info : create_index_cmd->segment_index_infos_) {
             dump_index_cmd.segment_id_ = segment_index_info.segment_id_;

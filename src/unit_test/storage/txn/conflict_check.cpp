@@ -40,8 +40,9 @@ class ConflictCheckTest : public BaseTest {
 
 protected:
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         RemoveDbDirs();
-
         auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_bgtask.toml");
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
@@ -50,7 +51,10 @@ protected:
         txn_mgr_ = storage_->new_txn_manager();
     }
 
-    void TearDown() override { infinity::InfinityContext::instance().UnInit(); }
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
+    }
 
     NewTxn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
         auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"), TransactionType::kNormal);

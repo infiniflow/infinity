@@ -50,11 +50,12 @@ Status ColumnMeta::SetChunkOffset(SizeT chunk_offset) {
 }
 
 Status ColumnMeta::InitSet() {
-    Status status = SetChunkOffset(0);
-    if (!status.ok()) {
-        return status;
-    }
+    // Status status = SetChunkOffset(0);
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
+    Status status;
     SharedPtr<ColumnDef> col_def;
     {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
@@ -145,10 +146,10 @@ Status ColumnMeta::LoadSet() {
         auto filename = MakeShared<String>(fmt::format("col_{}_out_0", col_def->id()));
 
         SizeT chunk_offset = 0;
-        status = this->GetChunkOffset(chunk_offset);
-        if (!status.ok()) {
-            return status;
-        }
+        // status = this->GetChunkOffset(chunk_offset);
+        // if (!status.ok()) {
+        //     return status;
+        // }
 
         auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),

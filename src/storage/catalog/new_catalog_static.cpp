@@ -843,6 +843,34 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     return Status::OK();
 }
 
+Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id) {
+    Status status = segment_meta.AddBlockWithID(commit_ts, block_id);
+    if (!status.ok()) {
+        return status;
+    }
+    block_meta.emplace(block_id, segment_meta);
+    status = block_meta->InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    {
+        TableMeeta &table_meta = segment_meta.table_meta();
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, *block_meta);
+        status = column_meta.InitSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
     Status status;
 
@@ -897,23 +925,25 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
             return status;
         }
     }
-    for (const auto &column_def : *column_defs_ptr) {
-        const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
-        ColumnMeta column_meta(column_def->id(), block_meta);
-        status = column_meta.SetChunkOffset(chunk_offset);
-        if (!status.ok()) {
-            return status;
-        }
+     for (const auto &column_def : *column_defs_ptr) {
+     //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
+         ColumnMeta column_meta(column_def->id(), block_meta);
+     //    status = column_meta.SetChunkOffset(chunk_offset);
+     //    if (!status.ok()) {
+     //        return status;
+     //    }
 
-        status = column_meta.LoadSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    // status = block_meta.SetRowCnt(block_info.row_count_);
-    // if (!status.ok()) {
-    //     return status;
-    // }
+         status = column_meta.LoadSet();
+         if (!status.ok()) {
+             return status;
+         }
+     }
+     /*
+     status = block_meta.SetRowCnt(block_info.row_count_);
+     if (!status.ok()) {
+         return status;
+     }
+     */
 
     return Status::OK();
 }

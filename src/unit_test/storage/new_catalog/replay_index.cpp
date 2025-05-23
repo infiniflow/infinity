@@ -390,7 +390,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
+            ASSERT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
@@ -652,7 +652,7 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
+            ASSERT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }

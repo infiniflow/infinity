@@ -41,7 +41,8 @@ class InfinityTableTest : public BaseTest {};
 
 TEST_F(InfinityTableTest, test1) {
     using namespace infinity;
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    Infinity::LocalUnInit();
     String path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);

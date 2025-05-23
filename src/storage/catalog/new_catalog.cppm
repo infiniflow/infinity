@@ -224,13 +224,9 @@ public:
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
-    Status IncreaseTableReferenceCountForMemIndex(const String &table_key);
-    Status DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count);
     Status SetMemIndexDump(const String &table_key);
     Status UnsetMemIndexDump(const String &table_key);
     bool IsMemIndexDump(const String &table_key);
-    SizeT GetTableReferenceCountForMemIndex(const String &table_key);
-    SizeT GetTableReferenceCountForMemIndex() const;
 
 private:
     mutable std::shared_mutex mem_index_mtx_{};
@@ -343,6 +339,8 @@ public:
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
+
+    static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
 
     static Status AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 

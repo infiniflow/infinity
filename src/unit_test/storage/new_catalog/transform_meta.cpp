@@ -46,6 +46,8 @@ using namespace infinity;
 class TransformMeta : public BaseTestWithParam<String> {
 public:
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         CleanupDbDirs();
         String config_path_str = GetParam();
         config_path_ = nullptr;
@@ -54,17 +56,20 @@ public:
         }
     }
 
-    void TearDown() override {}
-
-    void Init() {
-        std::string config_path_str = GetParam();
-        config_path_ = nullptr;
-        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
-            config_path_ = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
-        }
-        infinity::InfinityContext::instance().InitPhase1(config_path_);
-        infinity::InfinityContext::instance().InitPhase2();
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
     }
+
+void Init() {
+    std::string config_path_str = GetParam();
+    config_path_ = nullptr;
+    if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+        config_path_ = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
+    }
+    infinity::InfinityContext::instance().InitPhase1(config_path_);
+    infinity::InfinityContext::instance().InitPhase2();
+}
 
     void UnInit() { infinity::InfinityContext::instance().UnInit(); }
 
