@@ -727,8 +727,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
 
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "my_file_name", {column_def1->name()});
-    auto index_name2 = std::make_shared<String>("index2");
-    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "my_file_name", {column_def2->name()}, {});
 
     auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
