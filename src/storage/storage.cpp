@@ -284,11 +284,14 @@ Status Storage::AdminToWriter() {
     // Replay wal
     if (config_ptr_->ReplayWal() && !replay_entries.empty()) {
         auto [wal_max_txn_id, wal_system_start_ts] = wal_mgr_->ReplayWalEntries(replay_entries);
+        if (wal_max_txn_id < max_txn_id) {
+            LOG_WARN(fmt::format("Wal max txn id: {} is less than checkpoint txn id: {}", wal_max_txn_id, max_txn_id));
+        }
         if (wal_system_start_ts < system_start_ts) {
-            UnrecoverableError("Wal system start ts is less than system start ts");
+            LOG_WARN(fmt::format("Wal max commit ts: {} is less than checkpoint txn commit ts: {}", wal_system_start_ts, system_start_ts));
         }
         max_txn_id = std::max(max_txn_id, wal_max_txn_id);
-        system_start_ts = wal_system_start_ts;
+        system_start_ts = std::max(system_start_ts, wal_system_start_ts);
     }
 
     // Set correct txn_id and timestamp

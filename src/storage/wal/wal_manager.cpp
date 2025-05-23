@@ -1144,7 +1144,7 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
                 String error_message = "Found unexpected bad wal entry";
                 UnrecoverableError(error_message);
             }
-            // LOG_TRACE(wal_entry->ToString());
+            LOG_TRACE(wal_entry->ToString());
 
             WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
@@ -1172,6 +1172,8 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
             // LOG_TRACE(wal_entry->ToString());
 
             if (wal_entry->commit_ts_ > max_checkpoint_ts) {
+                LOG_TRACE(fmt::format("Found WAL entry, commit ts: {} > max checkpoint ts: {}", wal_entry->commit_ts_, max_checkpoint_ts));
+                LOG_TRACE(wal_entry->ToString());
                 replay_entries.push_back(wal_entry);
             } else {
                 break;
@@ -1195,7 +1197,7 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
             }
         }
     }
-    LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
+    LOG_INFO(fmt::format("Checkpoint found, replay the catalog, wal entry size: {}", replay_entries.size()));
     std::reverse(replay_entries.begin(), replay_entries.end());
 
     return {max_transaction_id, last_commit_ts, max_checkpoint_ts};
