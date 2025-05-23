@@ -167,14 +167,6 @@ Status ColumnMeta::LoadSet() {
 
 Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
     Status status;
-    if (!column_def) {
-        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        column_def = (*column_defs_ptr)[column_idx_].get();
-    }
 
     auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
