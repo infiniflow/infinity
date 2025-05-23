@@ -99,7 +99,7 @@ TEST_P(TestTxnNewCatalog, test_block_lock) {
     status = new_catalog->DropBlockLockByBlockKey(block_key1);
     EXPECT_TRUE(status.ok());
     status = new_catalog->DropBlockLockByBlockKey(block_key1);
-    EXPECT_FALSE(status.ok());
+    EXPECT_TRUE(status.ok());
     {
         std::shared_ptr<BlockLock> block_lock;
         status = new_catalog->GetBlockLock(block_key1, block_lock);

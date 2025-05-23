@@ -71,7 +71,7 @@ import constant_expr;
 using namespace infinity;
 
 class TestTxnCleanup : public BaseTestParamStr {
-protected:
+public:
     void SetUp() override {
         BaseTestParamStr::SetUp();
 
@@ -87,6 +87,22 @@ protected:
 
         new_txn_mgr_ = nullptr;
         BaseTestParamStr::TearDown();
+    }
+
+    void Init() {
+        auto config_path = std::make_shared<std::string>(std::filesystem::absolute(GetParam()));
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
+
+        new_txn_mgr_ = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
+    }
+
+    void UnInit() {
+        new_txn_mgr_->PrintAllKeyValue();
+        new_txn_mgr_ = nullptr;
+
+        infinity::InfinityContext::instance().UnInit();
     }
 
     void CheckFilePaths() {
@@ -621,15 +637,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
     }
 
     {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
 
         Status status = txn->GetColumnFilePaths(*db_name, *table_name, column_def2->name_, file_paths_);
@@ -660,6 +667,146 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+
+    new_txn_mgr_->PrintAllKeyValue();
+
+    {
+        Status status = new_txn_mgr_->Cleanup();
+        EXPECT_TRUE(status.ok());
+    }
+    this->CheckFilePaths();
+}
+
+TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
+    using namespace infinity;
+
+    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "my_file_name", {column_def1->name()});
+
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&] {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v) {
+            for (u32 i = 0; i < block_row_cnt; ++i) {
+                col.AppendValue(v);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
+    for (SizeT i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn->Append(*db_name, *table_name, make_input_block());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    create_index(index_def1);
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        Status status = txn->GetColumnFilePaths(*db_name, *table_name, column_def2->name_, file_paths_);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names = {column_def2->name_};
+        status = txn->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    UnInit();
+
+    Init();
+
+    {
+        Status status = new_txn_mgr_->Cleanup();
+        EXPECT_TRUE(status.ok());
+    }
+    this->CheckFilePaths();
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+
+        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    UnInit();
+
+    Init();
+
+    new_txn_mgr_->PrintAllKeyValue();
+
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());

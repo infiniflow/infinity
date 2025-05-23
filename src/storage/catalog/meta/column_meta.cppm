@@ -55,6 +55,8 @@ public:
 
     Status LoadSet();
 
+    Status RestoreSet(const ColumnDef *column_def);
+
     Status UninitSet(const ColumnDef *column_def, UsageFlag usage_flag);
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);

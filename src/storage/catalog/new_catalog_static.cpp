@@ -919,6 +919,7 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
 }
 
 Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
+    block_meta.RestoreSet();
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
 
@@ -974,6 +975,7 @@ Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT co
 }
 
 Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag) {
+    column_meta.RestoreSet(column_def);
     Status status;
 
     status = column_meta.UninitSet(column_def, usage_flag);
@@ -1019,7 +1021,6 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 }
 
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag) {
-
     auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
@@ -1192,6 +1193,7 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
 }
 
 Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag) {
+    chunk_index_meta.RestoreSet();
     Status status;
 
     status = chunk_index_meta.UninitSet(usage_flag);
