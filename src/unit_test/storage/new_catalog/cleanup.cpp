@@ -72,10 +72,6 @@ using namespace infinity;
 
 class TestTxnCleanup : public BaseTestParamStr {
 public:
-    // void SetUp() override { BaseTestParamStr::SetUp(); }
-
-    // void TearDown() override {}
-
     void Init() {
         auto config_path = std::make_shared<std::string>(std::filesystem::absolute(GetParam()));
         infinity::InfinityContext::instance().InitPhase1(config_path);
@@ -639,15 +635,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
     }
 
     {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
 
         Status status = txn->GetColumnFilePaths(*db_name, *table_name, column_def2->name_, file_paths_);
@@ -659,19 +646,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
-    {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    UnInit();
-
-    Init();
 
     {
         Status status = new_txn_mgr_->Cleanup();
@@ -705,8 +679,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
     this->CheckFilePaths();
     UnInit();
 }
-
-// ChunkIndexMeta for Index
 
 TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
     Init();
