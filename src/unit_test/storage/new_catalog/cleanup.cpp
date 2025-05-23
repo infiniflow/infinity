@@ -72,6 +72,23 @@ using namespace infinity;
 
 class TestTxnCleanup : public BaseTestParamStr {
 public:
+    void SetUp() override {
+        BaseTestParamStr::SetUp();
+
+        new_txn_mgr_ = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        wal_manager_ = infinity::InfinityContext::instance().storage()->wal_manager();
+    }
+
+    void TearDown() override {
+        new_txn_mgr_->PrintAllKeyValue();
+
+        SizeT kv_num = new_txn_mgr_->KeyValueNum();
+        EXPECT_EQ(kv_num, 5);
+
+        new_txn_mgr_ = nullptr;
+        BaseTestParamStr::TearDown();
+    }
+
     void Init() {
         auto config_path = std::make_shared<std::string>(std::filesystem::absolute(GetParam()));
         infinity::InfinityContext::instance().InitPhase1(config_path);
@@ -83,10 +100,6 @@ public:
 
     void UnInit() {
         new_txn_mgr_->PrintAllKeyValue();
-
-        // SizeT kv_num = new_txn_mgr_->KeyValueNum();
-        // EXPECT_EQ(kv_num, 5);
-
         new_txn_mgr_ = nullptr;
 
         infinity::InfinityContext::instance().UnInit();
@@ -116,7 +129,6 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestTxnCleanup, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, test_cleanup_db) {
-    Init();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -184,11 +196,9 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
     }
 
     this->CheckFilePaths();
-    UnInit();
 }
 
 TEST_P(TestTxnCleanup, test_cleanup_table) {
-    Init();
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -258,11 +268,9 @@ TEST_P(TestTxnCleanup, test_cleanup_table) {
     }
 
     this->CheckFilePaths();
-    UnInit();
 }
 
 TEST_P(TestTxnCleanup, test_cleanup_index) {
-    Init();
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -366,11 +374,9 @@ TEST_P(TestTxnCleanup, test_cleanup_index) {
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
-    UnInit();
 }
 
 TEST_P(TestTxnCleanup, test_cleanup_compact) {
-    Init();
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -466,11 +472,9 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
-    UnInit();
 }
 
 TEST_P(TestTxnCleanup, test_cleanup_optimize) {
-    Init();
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -581,11 +585,9 @@ TEST_P(TestTxnCleanup, test_cleanup_optimize) {
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
-    UnInit();
 }
 
 TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
-    Init();
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -666,10 +668,6 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
         EXPECT_TRUE(status.ok());
     }
 
-    UnInit();
-
-    Init();
-
     new_txn_mgr_->PrintAllKeyValue();
 
     {
@@ -677,11 +675,9 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_column) {
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
-    UnInit();
 }
 
 TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
-    Init();
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -816,5 +812,4 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
-    UnInit();
 }
