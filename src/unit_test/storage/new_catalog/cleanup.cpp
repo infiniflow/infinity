@@ -67,6 +67,7 @@ import index_filter_evaluators;
 import index_emvb;
 import wal_manager;
 import constant_expr;
+import logger;
 
 using namespace infinity;
 
@@ -109,12 +110,19 @@ public:
         for (auto &file_path : file_paths_) {
             file_path = String(this->GetFullDataDir()) + "/" + file_path;
         }
-
-        for (const auto &file_path : file_paths_) {
-            if (!std::filesystem::path(file_path).is_absolute()) {
-                ADD_FAILURE() << "File path is not absolute: " << file_path;
+        auto *pm = infinity::InfinityContext::instance().persistence_manager();
+        if (pm == nullptr) {
+            for (const auto &file_path : file_paths_) {
+                if (!std::filesystem::path(file_path).is_absolute()) {
+                    ADD_FAILURE() << "File path is not absolute: " << file_path;
+                }
+                EXPECT_FALSE(std::filesystem::exists(file_path));
             }
-            EXPECT_FALSE(std::filesystem::exists(file_path));
+        } else {
+            for (const auto &file_path : file_paths_) {
+                auto persist_read_result = pm->GetObjCache(file_path);
+                EXPECT_TRUE(persist_read_result.obj_addr_.obj_key_.empty());
+            }
         }
 
         file_paths_.clear();
@@ -126,7 +134,9 @@ protected:
     Vector<String> file_paths_;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestTxnCleanup, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         TestTxnCleanup,
+                         ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH, BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, test_cleanup_db) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
@@ -141,6 +151,8 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+        LOG_INFO("db");
+        new_txn_mgr_->PrintAllKeyValue();
     }
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
@@ -148,6 +160,8 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+        LOG_INFO("table");
+        new_txn_mgr_->PrintAllKeyValue();
     }
     SizeT block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
@@ -177,6 +191,8 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+        LOG_INFO("import");
+        new_txn_mgr_->PrintAllKeyValue();
     }
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -188,6 +204,8 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+        LOG_INFO("drop");
+        new_txn_mgr_->PrintAllKeyValue();
     }
     sleep(1); // Fix can't clean up issue
     {
