@@ -725,6 +725,19 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
         EXPECT_TRUE(status.ok());
     }
 
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "my_file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "my_file_name", {column_def2->name()}, {});
+
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
         auto input_block = MakeShared<DataBlock>();
@@ -758,20 +771,16 @@ TEST_P(TestTxnCleanup, test_cleanup_drop_index_and_checkpoint_and_restart) {
         EXPECT_TRUE(status.ok());
     }
 
-    // auto index_name1 = std::make_shared<std::string>("index1");
-    // auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "my_file_name", {column_def1->name()});
-    // auto index_name2 = std::make_shared<String>("index2");
-    // auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "my_file_name", {column_def2->name()}, {});
-    //
-    // auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
-    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
-    //     Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr_->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // };
-    // create_index(index_def1);
+    create_index(index_def1);
     // create_index(index_def2);
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);

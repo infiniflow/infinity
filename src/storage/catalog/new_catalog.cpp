@@ -1160,7 +1160,8 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
         delete_success = mem_index_map_.erase(mem_index_key) > 0;
     }
     if (!delete_success) {
-        return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
+        return Status::OK();
+        // return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
     }
     return Status::OK();
 }
@@ -1492,15 +1493,6 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         if (!status.ok()) {
             UnrecoverableError(fmt::format("Remove clean meta failed. {}", *status.msg_));
         }
-
-        // // Restore buffer_manager
-        // const String &type_str = keys[1];
-        // if (type_str == "blk") {
-        //
-        // } else if (type_str == "blk_col") {
-        //
-        // } else if (type_str == "idx_chunk") {
-        // }
     }
 }
 
