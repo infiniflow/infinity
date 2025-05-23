@@ -37,6 +37,7 @@ class QueryProfilerTest : public BaseTest {
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);

@@ -59,6 +59,7 @@ public:
     void Init() {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
         infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
         std::string config_path_str = GetParam();
         config_path_ = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
@@ -68,7 +69,10 @@ public:
         infinity::InfinityContext::instance().InitPhase2();
     }
 
-    void UnInit() { infinity::InfinityContext::instance().UnInit(); }
+    void UnInit() {
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
+    }
 
 protected:
     std::shared_ptr<String> config_path_;

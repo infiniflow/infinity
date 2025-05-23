@@ -102,6 +102,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
     {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
         infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

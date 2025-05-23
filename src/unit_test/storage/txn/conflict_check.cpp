@@ -51,7 +51,10 @@ protected:
         txn_mgr_ = storage_->new_txn_manager();
     }
 
-    void TearDown() override { infinity::InfinityContext::instance().UnInit(); }
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
+    }
 
     NewTxn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
         auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"), TransactionType::kNormal);
