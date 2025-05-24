@@ -45,8 +45,6 @@ public:
 
     void Stop();
 
-    bool Stopped();
-
     SharedPtr<NewTxn> BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type);
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
@@ -91,6 +89,8 @@ public:
     // This function is only used for unit test.
     void SetNewSystemTS(TxnTimeStamp new_system_ts);
 
+    void SetCurrentTransactionID(TransactionID latest_transaction_id);
+
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
@@ -118,8 +118,6 @@ private:
     void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    u64 NextSequence() { return ++sequence_; }
-
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
 
     // Only used by follower and learner when received the replicated log from leader
@@ -160,16 +158,13 @@ private:
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
+    TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
+    TxnTimeStamp current_ts_{};              // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
-    Atomic<TxnTimeStamp> ckp_begin_ts_ =
-        UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
+    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
     atomic_bool is_running_{false};
-    bool enable_compaction_{};
-
-    u64 sequence_{};
 
     Atomic<u64> total_committed_txn_count_{0};
     Atomic<u64> total_rollbacked_txn_count_{0};

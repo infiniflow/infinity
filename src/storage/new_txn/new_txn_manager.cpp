@@ -120,8 +120,6 @@ void NewTxnManager::Stop() {
     LOG_INFO("NewTxn manager is stopped");
 }
 
-bool NewTxnManager::Stopped() { return !is_running_.load(); }
-
 SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
@@ -129,12 +127,10 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
         UnrecoverableError(error_message);
     }
 
-    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
-
     std::lock_guard guard(locker_);
 
     // Assign a new txn id
-    u64 new_txn_id = ++catalog_ptr->next_txn_id_;
+    u64 new_txn_id = ++current_transaction_id_;
 
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
@@ -152,9 +148,9 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     }
 
     if (txn_text == nullptr) {
-        LOG_DEBUG(fmt::format("NewTxn: {} is Begin. begin ts: {}, No command text", new_txn_id, begin_ts));
+        LOG_DEBUG(fmt::format("Begin new txn: {}, begin ts: {}, No command text", new_txn_id, begin_ts));
     } else {
-        LOG_DEBUG(fmt::format("NewTxn: {} is Begin. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+        LOG_DEBUG(fmt::format("Begin new txn: {}. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
     }
 
     // Create txn instance
@@ -389,8 +385,14 @@ Vector<SharedPtr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
 }
 
 void NewTxnManager::SetNewSystemTS(TxnTimeStamp new_system_ts) {
+    std::lock_guard guard(locker_);
     current_ts_ = new_system_ts;
     prepare_commit_ts_ = new_system_ts;
+}
+
+void NewTxnManager::SetCurrentTransactionID(TransactionID current_transaction_id) {
+    std::lock_guard guard(locker_);
+    current_transaction_id_ = current_transaction_id;
 }
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {

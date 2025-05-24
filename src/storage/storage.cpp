@@ -266,7 +266,7 @@ Status Storage::AdminToWriter() {
 
     Vector<SharedPtr<WalEntry>> replay_entries;
     LOG_INFO("Read WAL files");
-    auto [system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
+    auto [max_txn_id, system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
     // Init database, need to create default_db
     LOG_INFO(fmt::format("Init a new catalog"));
     catalog_ = Catalog::NewCatalog();
@@ -281,9 +281,22 @@ Status Storage::AdminToWriter() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
-    if (config_ptr_->ReplayWal()) {
-        wal_mgr_->ReplayWalEntries(replay_entries);
+    // Replay wal
+    if (config_ptr_->ReplayWal() && !replay_entries.empty()) {
+        auto [wal_max_txn_id, wal_system_start_ts] = wal_mgr_->ReplayWalEntries(replay_entries);
+        if (wal_max_txn_id < max_txn_id) {
+            LOG_WARN(fmt::format("Wal max txn id: {} is less than checkpoint txn id: {}", wal_max_txn_id, max_txn_id));
+        }
+        if (wal_system_start_ts < system_start_ts) {
+            LOG_WARN(fmt::format("Wal max commit ts: {} is less than checkpoint txn commit ts: {}", wal_system_start_ts, system_start_ts));
+        }
+        max_txn_id = std::max(max_txn_id, wal_max_txn_id);
+        system_start_ts = std::max(system_start_ts, wal_system_start_ts);
     }
+
+    // Set correct txn_id and timestamp
+    new_txn_mgr_->SetCurrentTransactionID(max_txn_id);
+    new_txn_mgr_->SetNewSystemTS(system_start_ts);
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
