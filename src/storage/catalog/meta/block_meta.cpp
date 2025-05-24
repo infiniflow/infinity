@@ -216,6 +216,17 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     if (row_cnt_) {
         return {*row_cnt_, Status::OK()};
     }
+
+#if 1
+    TableMeeta &table_meta = segment_meta_.table_meta();
+    row_cnt_ = infinity::GetBlockRowCount(&kv_instance_,
+                                          table_meta.db_id_str(),
+                                          table_meta.table_id_str(),
+                                          segment_meta_.segment_id(),
+                                          block_id_,
+                                          begin_ts_);
+    return {*row_cnt_, Status::OK()};
+#else
     Status status;
 
     SharedPtr<BlockLock> block_lock;
@@ -239,6 +250,7 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     }
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
+#endif
 }
 
 Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {

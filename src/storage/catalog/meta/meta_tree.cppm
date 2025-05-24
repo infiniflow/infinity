@@ -29,6 +29,7 @@ class Storage;
 class SystemCache;
 class DbCache;
 class TableCache;
+class SegmentCache;
 class TableIndexCache;
 
 export struct MetaObject {

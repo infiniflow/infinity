@@ -1569,4 +1569,6 @@ SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_
 
 SystemCache *NewCatalog::GetSystemCachePtr() const { return system_cache_.get(); }
 
+KVStore *NewCatalog::kv_store() const { return kv_store_; }
+
 } // namespace infinity

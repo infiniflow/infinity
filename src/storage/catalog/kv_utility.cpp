@@ -15,6 +15,7 @@
 module;
 
 #include <tuple>
+#include <vector>
 
 module kv_utility;
 
@@ -27,6 +28,13 @@ import third_party;
 import utility;
 // import rocksdb_merge_operator;
 import logger;
+import new_catalog;
+import infinity_context;
+import buffer_handle;
+import buffer_obj;
+import block_version;
+import buffer_manager;
+import infinity_exception;
 
 namespace infinity {
 
@@ -144,6 +152,55 @@ GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String 
     nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);
     SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_json);
     return index_base;
+}
+
+SizeT GetBlockRowCount(KVInstance *kv_instance,
+                       const String &db_id_str,
+                       const String &table_id_str,
+                       SegmentID segment_id,
+                       BlockID block_id,
+                       TxnTimeStamp begin_ts) {
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+
+    SharedPtr<BlockLock> block_lock;
+    Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to get block lock");
+    }
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
+                                          InfinityContext::instance().config()->DataDir(),
+                                          db_id_str,
+                                          table_id_str,
+                                          segment_id,
+                                          block_id,
+                                          BlockVersion::PATH);
+    BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+    if (version_buffer == nullptr) {
+        UnrecoverableError(fmt::format("Get version buffer failed: {}", version_filepath));
+    }
+
+    BufferHandle buffer_handle = version_buffer->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+
+    SizeT row_cnt = 0;
+    {
+        std::shared_lock lock(block_lock->mtx_);
+        row_cnt = block_version->GetRowCount(begin_ts);
+    }
+    return row_cnt;
+}
+
+SizeT GetSegmentRowCount(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, SegmentID segment_id, TxnTimeStamp begin_ts) {
+    Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts);
+    SizeT segment_row_count = 0;
+    for (BlockID block_id : blocks) {
+        SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts);
+        segment_row_count += block_row_cnt;
+    }
+    return segment_row_count;
 }
 
 } // namespace infinity
