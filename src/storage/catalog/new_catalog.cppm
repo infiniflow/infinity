@@ -200,6 +200,8 @@ public:
     SharedPtr<SystemCache> GetSystemCache() const;
     SystemCache *GetSystemCachePtr() const;
 
+    KVStore* kv_store() const;
+
 private:
     KVStore *kv_store_{};
 
