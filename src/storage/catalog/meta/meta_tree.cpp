@@ -37,6 +37,9 @@ import status;
 import kv_code;
 import catalog_cache;
 import check_statement;
+import kv_utility;
+import kv_store;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -761,11 +764,13 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
 
 SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) const {
     auto table_key = static_cast<TableMetaKey *>(meta_key_.get());
+    u64 db_id = 0;
     u64 table_id = 0;
     SegmentID unsealed_segment_id = 0;
     SegmentOffset unsealed_segment_offset = 0;
     SegmentID next_segment_id = 0;
     try {
+        db_id = std::stoull(table_key->db_id_str_);
         table_id = std::stoull(table_key->table_id_str_);
         unsealed_segment_id = this->GetUnsealedSegmentID();
         unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
@@ -780,6 +785,45 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
         table_cache = MakeShared<TableCache>(table_id, table_key->table_name_);
     } else {
         table_cache = MakeShared<TableCache>(table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
+    }
+
+    TxnTimeStamp current_ts = storage_ptr->new_txn_manager()->CurrentTS();
+    KVStore *kv_store = storage_ptr->new_catalog()->kv_store();
+    auto kv_instance_ptr = kv_store->GetInstance();
+    for (const auto &segment_pair : segment_map_) {
+        SegmentID segment_id = segment_pair.first;
+        SharedPtr<SegmentCache> segment_cache = nullptr;
+        if (segment_id == unsealed_segment_id) {
+            table_cache->unsealed_segment_cache_ = MakeShared<SegmentCache>(segment_id, unsealed_segment_offset);
+        } else {
+            SizeT segment_row_count =
+                infinity::GetSegmentRowCount(kv_instance_ptr.get(), table_key->db_id_str_, table_key->table_id_str_, segment_id, current_ts);
+            segment_cache = MakeShared<SegmentCache>(segment_id, segment_row_count);
+        }
+        table_cache->segment_cache_map_.emplace(segment_id, segment_cache);
+    }
+
+    for (const auto &index_pair : index_map_) {
+        const String &index_name = index_pair.first;
+        MetaTableIndexObject *table_index_obj = static_cast<MetaTableIndexObject *>(index_pair.second.get());
+        TableIndexMetaKey *table_index_meta_key = static_cast<TableIndexMetaKey *>(table_index_obj->meta_key_.get());
+        u64 index_id = std::stoull(table_index_meta_key->index_id_str_);
+        SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, index_name);
+        for (const auto &segment_index_pair : table_index_obj->segment_map_) {
+            SegmentID segment_id = segment_index_pair.first;
+            MetaSegmentIndexObject *segment_index_obj = static_cast<MetaSegmentIndexObject *>(segment_index_pair.second.get());
+            SharedPtr<SegmentIndexCache> segment_index_cache = MakeShared<SegmentIndexCache>(segment_id);
+            ChunkID max_chunk_id = 0;
+            for (const auto &chunk_index_pair : segment_index_obj->chunk_map_) {
+                ChunkID chunk_id = chunk_index_pair.first;
+                if (chunk_id > max_chunk_id) {
+                    max_chunk_id = chunk_id;
+                }
+            }
+            segment_index_cache->next_chunk_id_ = max_chunk_id + 1;
+            table_index_cache->segment_index_cache_map_.emplace(segment_id, segment_index_cache);
+        }
+        table_cache->index_cache_map_.emplace(index_id, table_index_cache);
     }
 
     return table_cache;
