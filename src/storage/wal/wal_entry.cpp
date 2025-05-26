@@ -2239,6 +2239,7 @@ String WalCmdDumpIndexV2::ToString() const {
     for (auto &chunk_info : chunk_infos_) {
         ss << chunk_info.ToString() << " | ";
     }
+    ss << std::endl;
     ss << "deprecated chunk ids: ";
     for (auto &chunk_id : deprecate_ids_) {
         ss << chunk_id << " | ";
