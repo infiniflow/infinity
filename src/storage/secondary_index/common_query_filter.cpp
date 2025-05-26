@@ -276,13 +276,14 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     const SegmentID segment_id = tasks_[task_id];
     SegmentMeta *segment_meta = segment_index.at(segment_id).segment_meta_.get();
     TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
+    bool have_filter = true;
     {
         SharedPtr<FastRoughFilter> segment_filter;
         Status status = segment_meta->GetFastRoughFilter(segment_filter);
         if (status.ok()) {
-            if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
+            if (fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_filter)) {
                 // skip this segment
-                return;
+                have_filter = false;
             }
         }
     }
@@ -299,7 +300,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
                                        segment_row_count,
                                        result_elem.count()));
     }
-    if (leftover_filter_) {
+    if (have_filter && leftover_filter_) {
         SizeT segment_row_count_read = 0;
         auto filter_state = ExpressionState::CreateState(leftover_filter_);
         auto db_for_filter_p = MakeUnique<DataBlock>();
