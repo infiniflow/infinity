@@ -31,6 +31,7 @@ import table_index_entry;
 import virtual_store;
 import segment_index_entry;
 import chunk_index_entry;
+import kv_store;
 
 namespace infinity {
 
@@ -105,7 +106,7 @@ void CleanupScanner::Cleanup(CleanupInfoTracer *info_tracer) && {
         entry->Cleanup(info_tracer, dropped);
         entry.reset();
     }
-    buffer_mgr_->RemoveClean();
+    buffer_mgr_->RemoveClean(nullptr);
 }
 
 void CleanupScanner::CleanupDir(const String &abs_dir) {

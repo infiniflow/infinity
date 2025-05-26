@@ -85,7 +85,7 @@ public:
 
     SizeT BufferedObjectCount();
 
-    void RemoveClean(KVInstance *kv_instance = nullptr);
+    void RemoveClean(KVInstance *kv_instance);
 
     void RemoveBufferObjects(const Vector<String> &object_paths);
 

@@ -114,7 +114,7 @@ void BufferManager::Start() {
     VirtualStore::CleanupDirectory(*temp_dir_);
 }
 
-void BufferManager::Stop() { RemoveClean(); }
+void BufferManager::Stop() { RemoveClean(nullptr); }
 
 BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
