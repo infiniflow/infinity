@@ -35,6 +35,7 @@ import logger;
 import persist_result_handler;
 import global_resource_usage;
 import kv_code;
+import kv_store;
 
 namespace infinity {
 
