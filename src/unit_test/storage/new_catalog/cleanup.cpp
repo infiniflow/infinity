@@ -220,11 +220,6 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-    {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-        EXPECT_TRUE(status.ok());
-    }
     this->CheckFilePaths();
 }
 
@@ -478,22 +473,12 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
 
-    // {
-    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-    //     EXPECT_TRUE(status.ok());
-    // }
-
     new_txn_mgr_->PrintAllKeyValue();
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-    // {
-    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-    //     EXPECT_TRUE(status.ok());
-    // }
+
     new_txn_mgr_->PrintAllKeyValue();
     this->CheckFilePaths();
 
@@ -513,11 +498,6 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-    // {
-    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-    //     EXPECT_TRUE(status.ok());
-    // }
     this->CheckFilePaths();
 }
 
