@@ -564,8 +564,6 @@ TEST_P(TestTxnAppendConcurrent, test_append2) {
             }
         }
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnAppendConcurrent, test_append_append) {
@@ -1168,8 +1166,6 @@ TEST_P(TestTxnAppendConcurrent, test_append_append) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnAppendConcurrent, test_append_append_concurrent) {
@@ -1349,6 +1345,4 @@ TEST_P(TestTxnAppendConcurrent, test_append_append_concurrent) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
