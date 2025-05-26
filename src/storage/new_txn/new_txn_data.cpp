@@ -918,11 +918,12 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
     dest_vec.AppendWith(column_vector, source_offset, append_rows);
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-        SizeT chunk_size = var_buffer_mgr->TotalSize();
-        Status status = column_meta.SetChunkOffset(chunk_size);
-        if (!status.ok()) {
-            return status;
-        }
+        // Ensure buffer obj is loaded.
+        SizeT _ = var_buffer_mgr->TotalSize();
+        // Status status = column_meta.SetChunkOffset(chunk_size);
+        // if (!status.ok()) {
+        //     return status;
+        // }
     }
     return Status::OK();
 }
