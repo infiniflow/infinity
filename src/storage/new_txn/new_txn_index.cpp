@@ -1003,7 +1003,6 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
         }
     }
     for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
-        // new_chunk_ids.push_back(chunk_info.chunk_id_);
         status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, chunk_info, this);
         if (!status.ok()) {
             return status;
