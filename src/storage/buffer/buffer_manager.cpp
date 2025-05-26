@@ -30,6 +30,7 @@ import var_file_worker;
 import persistence_manager;
 import virtual_store;
 import global_resource_usage;
+import kv_store;
 
 namespace infinity {
 
@@ -174,7 +175,7 @@ SizeT BufferManager::BufferedObjectCount() {
     return buffer_map_.size();
 }
 
-void BufferManager::RemoveClean() {
+void BufferManager::RemoveClean(KVInstance *kv_instance) {
     Vector<BufferObj *> clean_list;
     {
         std::unique_lock lock(clean_locker_);
@@ -182,7 +183,7 @@ void BufferManager::RemoveClean() {
     }
 
     for (auto *buffer_obj : clean_list) {
-        buffer_obj->CleanupFile();
+        buffer_obj->CleanupFile(kv_instance);
     }
     HashSet<BufferObj *> clean_temp_set;
     {

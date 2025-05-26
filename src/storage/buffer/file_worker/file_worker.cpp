@@ -16,7 +16,6 @@ module;
 
 #include <cerrno>
 #include <cstring>
-#include <sys/mman.h>
 #include <tuple>
 
 module file_worker;
@@ -34,6 +33,7 @@ import infinity_context;
 import logger;
 import persist_result_handler;
 import global_resource_usage;
+import kv_code;
 
 namespace infinity {
 
@@ -77,34 +77,33 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         obj_addr_ = persist_result.obj_addr_;
 
         return all_save;
-    } else {
-        String write_dir = ChooseFileDir(to_spill);
-        if (!VirtualStore::Exists(write_dir)) {
-            VirtualStore::MakeDirectory(write_dir);
-        }
-        String write_path = fmt::format("{}/{}", write_dir, *file_name_);
-
-        auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        file_handle_ = std::move(file_handle);
-        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
-
-        if (to_spill) {
-            LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
-        }
-        bool prepare_success = false;
-
-        bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
-        if (prepare_success) {
-            if (to_spill) {
-                LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
-            }
-            file_handle_->Sync();
-        }
-        return all_save;
     }
+    String write_dir = ChooseFileDir(to_spill);
+    if (!VirtualStore::Exists(write_dir)) {
+        VirtualStore::MakeDirectory(write_dir);
+    }
+    String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+
+    auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    file_handle_ = std::move(file_handle);
+    DeferFn defer_fn([&]() { file_handle_ = nullptr; });
+
+    if (to_spill) {
+        LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
+    }
+    bool prepare_success = false;
+
+    bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
+    if (prepare_success) {
+        if (to_spill) {
+            LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
+        }
+        file_handle_->Sync();
+    }
+    return all_save;
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
@@ -190,12 +189,17 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
     return {std::move(defer_fn), std::move(read_path)};
 }
 
-void FileWorker::CleanupFile() const {
+void FileWorker::CleanupFile(KVInstance *kv_instance) const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
         handler.HandleWriteResult(result);
+        // Delete from RocksDB
+        if (kv_instance != nullptr) {
+            String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
+            kv_instance->Delete(relevant_full_path);
+        }
         return;
     }
 
@@ -203,6 +207,7 @@ void FileWorker::CleanupFile() const {
     if (VirtualStore::Exists(path)) {
         LOG_INFO(fmt::format("Clean file: {}", path));
         VirtualStore::DeleteFile(path);
+        // Delete empty dir
     }
 }
 

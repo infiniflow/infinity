@@ -16,6 +16,7 @@ module;
 
 import stl;
 import third_party;
+import kv_store;
 
 export module buffer_handle;
 

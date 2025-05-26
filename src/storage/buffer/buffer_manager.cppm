@@ -19,6 +19,7 @@ import file_worker;
 // import specific_concurrent_queue;
 import default_values;
 import persistence_manager;
+import kv_store;
 
 export module buffer_manager;
 
@@ -83,7 +84,7 @@ public:
 
     SizeT BufferedObjectCount();
 
-    void RemoveClean();
+    void RemoveClean(KVInstance *kv_instance = nullptr);
 
     void RemoveBufferObjects(const Vector<String> &object_paths);
 

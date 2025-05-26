@@ -26,6 +26,7 @@ import persistence_manager;
 import global_resource_usage;
 import infinity_exception;
 import defer_op;
+import kv_store;
 
 namespace infinity {
 
@@ -72,7 +73,7 @@ public:
     // Get absolute file path. As key of buffer handle.
     String GetFilePath() const;
 
-    void CleanupFile() const;
+    void CleanupFile(KVInstance *kv_instance) const;
 
     void CleanupTempFile() const;
 

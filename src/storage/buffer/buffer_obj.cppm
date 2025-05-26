@@ -18,6 +18,7 @@ import stl;
 import file_worker;
 import buffer_handle;
 import file_worker_type;
+import kv_store;
 
 export module buffer_obj;
 
@@ -104,7 +105,7 @@ public:
 
     void PickForCleanup();
 
-    void CleanupFile() const;
+    void CleanupFile(KVInstance *kv_instance) const;
 
     void CleanupTempFile() const;
 
