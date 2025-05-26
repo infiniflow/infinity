@@ -1241,6 +1241,7 @@ TEST_P(TestTxnAppendConcurrent, test_append_append_concurrent) {
                     int k = 0;
                     do {
                         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append_{}_{}_{}", i, j, k)), TransactionType::kNormal);
+                        txn3->SetTxnType(TransactionType::kAppend);
                         status = txn3->Append(*db_name, *table_name, input_block1);
                         EXPECT_TRUE(status.ok());
                         status = new_txn_mgr->CommitTxn(txn3);
