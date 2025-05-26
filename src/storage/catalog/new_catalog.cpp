@@ -1547,7 +1547,8 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
 
     auto meta_tree = this->MakeMetaTree();
     // Vector<> = meta_tree->Check();
-    LOG_INFO(meta_tree->ToJson().dump());
+    String meta_tree_str = meta_tree->ToJson().dump(4);
+    LOG_INFO(meta_tree_str);
 
     system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
