@@ -16,6 +16,7 @@ module;
 
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <tuple>
 
 module file_worker;
@@ -203,11 +204,22 @@ void FileWorker::CleanupFile(KVInstance *kv_instance) const {
         return;
     }
 
-    String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-    if (VirtualStore::Exists(path)) {
-        LOG_INFO(fmt::format("Clean file: {}", path));
-        VirtualStore::DeleteFile(path);
+    String path_str = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+    if (VirtualStore::Exists(path_str)) {
+        LOG_INFO(fmt::format("Clean file: {}", path_str));
+        VirtualStore::DeleteFile(path_str);
+
         // Delete empty dir
+        Path path;
+        if (file_dir_->empty()) {
+            path = static_cast<Path>(*data_dir_);
+        } else {
+            path = static_cast<Path>(*data_dir_) / *file_dir_;
+        }
+        while (std::filesystem::is_empty(path) && path != static_cast<Path>(*data_dir_)) {
+            VirtualStore::DeleteFile(path);
+            path = path.parent_path();
+        }
     }
 }
 

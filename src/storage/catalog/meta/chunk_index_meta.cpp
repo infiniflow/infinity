@@ -463,8 +463,12 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 PersistResultHandler handler(pm);
                 PersistWriteResult result1 = pm->Cleanup(posting_file);
                 PersistWriteResult result2 = pm->Cleanup(dict_file);
+
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);
+
+                kv_instance_.Delete(KeyEncode::PMObjectKey(posting_file));
+                kv_instance_.Delete(KeyEncode::PMObjectKey(dict_file));
 
             } else {
                 String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
