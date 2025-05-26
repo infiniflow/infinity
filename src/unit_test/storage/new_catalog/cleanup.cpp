@@ -14,6 +14,8 @@
 
 #include "gtest/gtest.h"
 
+#include <filesystem>
+
 import base_test;
 import stl;
 import third_party;
@@ -106,15 +108,27 @@ public:
     }
 
     void CheckFilePaths() {
+        Path data_dir = this->GetFullDataDir();
         for (auto &file_path : file_paths_) {
-            file_path = String(this->GetFullDataDir()) + "/" + file_path;
+            file_path = data_dir / file_path;
         }
+        auto *pm = infinity::InfinityContext::instance().persistence_manager();
+        if (pm == nullptr) {
+            for (const auto &file_path : file_paths_) {
+                if (!std::filesystem::path(file_path).is_absolute()) {
+                    ADD_FAILURE() << "File path is not absolute: " << file_path;
+                }
+                EXPECT_FALSE(std::filesystem::exists(file_path));
 
-        for (const auto &file_path : file_paths_) {
-            if (!std::filesystem::path(file_path).is_absolute()) {
-                ADD_FAILURE() << "File path is not absolute: " << file_path;
+                auto path = static_cast<Path>(file_path).parent_path();
+                EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
+                            std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
             }
-            EXPECT_FALSE(std::filesystem::exists(file_path));
+        } else {
+            for (const auto &file_path : file_paths_) {
+                auto persist_read_result = pm->GetObjCache(file_path);
+                EXPECT_TRUE(persist_read_result.obj_addr_.obj_key_.empty());
+            }
         }
 
         file_paths_.clear();
@@ -126,7 +140,9 @@ protected:
     Vector<String> file_paths_;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestTxnCleanup, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         TestTxnCleanup,
+                         ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH, BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, test_cleanup_db) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
@@ -194,7 +210,6 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-
     this->CheckFilePaths();
 }
 

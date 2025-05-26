@@ -581,7 +581,8 @@ void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &
 String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
-    } else if (!path.starts_with("/")) {
+    }
+    if (!path.starts_with("/")) {
         return path;
     }
     return "";

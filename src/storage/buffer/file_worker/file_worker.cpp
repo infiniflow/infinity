@@ -16,7 +16,7 @@ module;
 
 #include <cerrno>
 #include <cstring>
-#include <sys/mman.h>
+#include <filesystem>
 #include <tuple>
 
 module file_worker;
@@ -34,6 +34,8 @@ import infinity_context;
 import logger;
 import persist_result_handler;
 import global_resource_usage;
+import kv_code;
+import kv_store;
 
 namespace infinity {
 
@@ -190,19 +192,36 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
     return {std::move(defer_fn), std::move(read_path)};
 }
 
-void FileWorker::CleanupFile() const {
+void FileWorker::CleanupFile(KVInstance *kv_instance) const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
         handler.HandleWriteResult(result);
+        // Delete from RocksDB
+        if (kv_instance != nullptr) {
+            String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
+            kv_instance->Delete(relevant_full_path);
+        }
         return;
     }
 
-    String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-    if (VirtualStore::Exists(path)) {
-        LOG_INFO(fmt::format("Clean file: {}", path));
-        VirtualStore::DeleteFile(path);
+    String path_str = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+    if (VirtualStore::Exists(path_str)) {
+        LOG_INFO(fmt::format("Clean file: {}", path_str));
+        VirtualStore::DeleteFile(path_str);
+
+        // Delete empty dir
+        Path path;
+        if (file_dir_->empty()) {
+            path = static_cast<Path>(*data_dir_);
+        } else {
+            path = static_cast<Path>(*data_dir_) / *file_dir_;
+        }
+        while (std::filesystem::is_empty(path) && path != static_cast<Path>(*data_dir_)) {
+            VirtualStore::DeleteFile(path);
+            path = path.parent_path();
+        }
     }
 }
 
