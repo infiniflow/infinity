@@ -158,8 +158,6 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        LOG_INFO("db");
-        new_txn_mgr_->PrintAllKeyValue();
     }
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
@@ -167,8 +165,6 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        LOG_INFO("table");
-        new_txn_mgr_->PrintAllKeyValue();
     }
     SizeT block_row_cnt = 8192;
     auto make_input_block = [&](const Value &v1, const Value &v2) {
@@ -198,8 +194,6 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        LOG_INFO("import");
-        new_txn_mgr_->PrintAllKeyValue();
     }
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -211,11 +205,8 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-        LOG_INFO("drop");
-        new_txn_mgr_->PrintAllKeyValue();
     }
     sleep(1); // Fix can't clean up issue
-
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
@@ -472,13 +463,11 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
     new_txn_mgr_->PrintAllKeyValue();
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-
     new_txn_mgr_->PrintAllKeyValue();
     this->CheckFilePaths();
 
