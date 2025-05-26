@@ -187,7 +187,7 @@ bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
         UnrecoverableError("Mmap data is already allocated.");
     }
 #ifdef INDEX_HANDLER
-    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get()).release()));
+    mmap_data_ = reinterpret_cast<u8 *>(new HnswHandlerPtr(HnswHandler::Make(index_base_.get(), column_def_.get(), false).release()));
     auto *hnsw_handler = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
     (*hnsw_handler)->LoadFromPtr(static_cast<const char *>(ptr), size);
 #else
