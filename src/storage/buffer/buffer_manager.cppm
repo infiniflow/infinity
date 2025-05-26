@@ -18,8 +18,6 @@ import stl;
 import file_worker;
 // import specific_concurrent_queue;
 import default_values;
-import persistence_manager;
-import kv_store;
 
 export module buffer_manager;
 
@@ -27,6 +25,9 @@ namespace infinity {
 
 class BufferObj;
 class BufferObjectInfo;
+class KVInstance;
+class PersistenceManager;
+class ObjAddr;
 
 class LRUCache {
 public:

@@ -26,9 +26,10 @@ import persistence_manager;
 import global_resource_usage;
 import infinity_exception;
 import defer_op;
-import kv_store;
 
 namespace infinity {
+
+class KVInstance;
 
 export struct FileWorkerSaveCtx {};
 
