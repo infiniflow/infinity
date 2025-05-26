@@ -29,6 +29,8 @@ import defer_op;
 
 namespace infinity {
 
+class KVInstance;
+
 export struct FileWorkerSaveCtx {};
 
 export class FileWorker {
@@ -72,7 +74,7 @@ public:
     // Get absolute file path. As key of buffer handle.
     String GetFilePath() const;
 
-    void CleanupFile() const;
+    void CleanupFile(KVInstance *kv_instance) const;
 
     void CleanupTempFile() const;
 

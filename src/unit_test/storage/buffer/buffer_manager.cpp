@@ -32,6 +32,7 @@ import config;
 import infinity_exception;
 import persistence_manager;
 import default_values;
+import kv_store;
 
 using namespace infinity;
 
@@ -116,7 +117,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
             auto file_name = MakeShared<String>(fmt::format("file_{}", i));
             auto file_worker =
                 MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
-            auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
+            BufferObj *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
             buffer_obj->AddObjRc();
             buffer_objs.push_back(buffer_obj);
             {
@@ -167,7 +168,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
             EXPECT_GE(write_n, 0ull);
             EXPECT_LE(write_n, k);
 
-            buffer_mgr.RemoveClean();
+            buffer_mgr.RemoveClean(nullptr);
             CheckFileNum(file_num, file_num - k - file_num1);
         }
         for (SizeT i = file_num1; i < file_num; ++i) {
@@ -182,13 +183,13 @@ TEST_F(BufferManagerTest, cleanup_test) {
             buffer_obj->Save();
         }
         CheckFileNum(file_num, file_num - file_num1);
-        buffer_mgr.RemoveClean();
+        buffer_mgr.RemoveClean(nullptr);
         CheckFileNum(file_num, 0);
 
         for (auto *buffer_obj : buffer_objs) {
             buffer_obj->PickForCleanup();
         }
-        buffer_mgr.RemoveClean();
+        buffer_mgr.RemoveClean(nullptr);
         CheckFileNum(0, 0);
     }
 }
@@ -430,7 +431,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
             }
         }
         EXPECT_EQ(buffer_mgr->memory_usage(), 0);
-        buffer_mgr->RemoveClean();
+        buffer_mgr->RemoveClean(nullptr);
 
         //        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
         ResetDir();
@@ -537,7 +538,7 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         }
 
         ASSERT_EQ(buffer_mgr->memory_usage(), 0);
-        buffer_mgr->RemoveClean();
+        buffer_mgr->RemoveClean(nullptr);
 
         //        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
         ResetDir();

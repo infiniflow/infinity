@@ -4203,7 +4203,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
         }
     }
 
-    buffer_mgr->RemoveClean();
+    buffer_mgr->RemoveClean(kv_instance);
     return Status::OK();
 }
 
