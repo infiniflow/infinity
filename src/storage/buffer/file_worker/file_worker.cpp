@@ -78,33 +78,34 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         obj_addr_ = persist_result.obj_addr_;
 
         return all_save;
-    }
-    String write_dir = ChooseFileDir(to_spill);
-    if (!VirtualStore::Exists(write_dir)) {
-        VirtualStore::MakeDirectory(write_dir);
-    }
-    String write_path = fmt::format("{}/{}", write_dir, *file_name_);
-
-    auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    file_handle_ = std::move(file_handle);
-    DeferFn defer_fn([&]() { file_handle_ = nullptr; });
-
-    if (to_spill) {
-        LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
-    }
-    bool prepare_success = false;
-
-    bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
-    if (prepare_success) {
-        if (to_spill) {
-            LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
+    } else {
+        String write_dir = ChooseFileDir(to_spill);
+        if (!VirtualStore::Exists(write_dir)) {
+            VirtualStore::MakeDirectory(write_dir);
         }
-        file_handle_->Sync();
+        String write_path = fmt::format("{}/{}", write_dir, *file_name_);
+
+        auto [file_handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        file_handle_ = std::move(file_handle);
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
+
+        if (to_spill) {
+            LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
+        }
+        bool prepare_success = false;
+
+        bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
+        if (prepare_success) {
+            if (to_spill) {
+                LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
+            }
+            file_handle_->Sync();
+        }
+        return all_save;
     }
-    return all_save;
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {

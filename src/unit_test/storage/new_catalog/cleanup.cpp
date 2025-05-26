@@ -69,7 +69,6 @@ import index_filter_evaluators;
 import index_emvb;
 import wal_manager;
 import constant_expr;
-import logger;
 
 using namespace infinity;
 
