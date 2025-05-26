@@ -407,7 +407,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     is_spilled_ = spill;
-    Reset();
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting

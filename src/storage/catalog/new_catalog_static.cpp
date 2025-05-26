@@ -374,13 +374,10 @@ Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance,
         }
         for (SegmentID segment_id : *index_segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-
-            SharedPtr<MemIndex> mem_index;
-            Status status = segment_index_meta.GetMemIndex(mem_index);
-            if (!status.ok()) {
-                return status;
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            if (mem_index == nullptr) {
+                continue;
             }
-
             mem_indexes.push_back(mem_index);
             mem_index_ids.push_back(MemIndexID{db_name, table_name, index_name, segment_id});
         }

@@ -207,9 +207,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -259,9 +257,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -731,9 +728,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -783,9 +779,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -1339,9 +1334,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -1391,9 +1385,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -1961,9 +1954,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -2013,9 +2005,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -2546,9 +2537,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -2598,9 +2588,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -3085,9 +3074,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -3137,9 +3125,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -3366,9 +3353,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -3418,9 +3404,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -3914,9 +3899,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -3966,9 +3950,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -4017,9 +4000,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -4069,9 +4051,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -4659,9 +4640,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -4711,9 +4691,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -4763,9 +4742,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         {
             auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
@@ -4796,9 +4774,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         {
             auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
@@ -5270,9 +5247,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -5855,9 +5831,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -5907,9 +5882,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));

@@ -41,6 +41,31 @@ export struct MemIndex {
     void ClearMemIndex();
 
     BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
+    SharedPtr<HnswIndexInMem> GetHnswIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_hnsw_index_;
+    }
+    SharedPtr<IVFIndexInMem> GetIVFIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_ivf_index_;
+    }
+    SharedPtr<MemoryIndexer> GetFulltextIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_indexer_;
+    }
+    SharedPtr<SecondaryIndexInMem> GetSecondaryIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_secondary_index_;
+    }
+    SharedPtr<EMVBIndexInMem> GetEMVBIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_emvb_index_;
+    }
+
+    SharedPtr<BMPIndexInMem> GetBMPIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_bmp_index_;
+    }
 
     std::mutex mtx_; // Used by append / mem index dump / clear
 

@@ -114,6 +114,9 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         if (!status.ok()) {
             return status;
         }
+        if (new_chunk_id == (ChunkID)(-1)) {
+            continue;
+        }
         ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
         status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
         if (!status.ok()) {
@@ -156,6 +159,9 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     status = this->DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
     if (!status.ok()) {
         return status;
+    }
+    if (new_chunk_id == (ChunkID)(-1)) {
+        return Status::OK();
     }
 
     // Put the data into local txn store
@@ -653,7 +659,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, 
     cur_row_cnt = append_range.second;
     if (!segment_meta || segment_meta->segment_id() != segment_id) {
         segment_meta.emplace(segment_id, table_index_meta.table_meta());
-        if (!table_index_meta.HasSegmentIndexID(segment_id)) {
+        if (!table_index_meta.HasSegmentIndexID(segment_id) && append_range.first.segment_offset_ == 0) {
             Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
             if (!status.ok()) {
                 return status;
@@ -686,12 +692,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         return index_status;
     }
     SharedPtr<MemIndex> mem_index;
-    {
-        Status status = segment_index_meta.GetAndWriteMemIndex(mem_index);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    segment_index_meta.GetOrSetMemIndex(mem_index);
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             SharedPtr<SecondaryIndexInMem> memory_secondary_index;
@@ -902,6 +903,9 @@ Status NewTxn::PopulateIndex(const String &db_name,
             if (!status.ok()) {
                 return status;
             }
+            if (new_chunk_id == (ChunkID)-1 && segment_row_cnt > 0) {
+                UnrecoverableError(fmt::format("Failed to dump {} rows", segment_row_cnt));
+            }
         }
     }
 
@@ -1062,10 +1066,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
     }
     Status status;
     SharedPtr<MemIndex> mem_index;
-    status = segment_index_meta.GetAndWriteMemIndex(mem_index);
-    if (!status.ok()) {
-        return status;
-    }
+    segment_index_meta.GetOrSetMemIndex(mem_index);
     mem_index->memory_indexer_ =
         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
     MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
@@ -1378,11 +1379,7 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
     if (!status.ok()) {
         return status;
     }
-    SharedPtr<MemIndex> mem_index;
-    status = segment_index_meta.GetMemIndex(mem_index);
-    if (!status.ok()) {
-        return status;
-    }
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     switch (index_base->index_type_) {
         case IndexType::kBMP: {
@@ -1428,9 +1425,10 @@ Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta
                 optimize_index(*abstract_bmp);
 #endif
             }
-            if (mem_index && mem_index->memory_bmp_index_) {
+            SharedPtr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
+            if (bmp_index) {
 #ifdef INDEX_HANDLER
-                BMPHandlerPtr bmp_handler = mem_index->memory_bmp_index_->get();
+                BMPHandlerPtr bmp_handler = bmp_index->get();
                 bmp_handler->Optimize(options);
 #else
                 optimize_index(mem_index->memory_bmp_index_->get());
@@ -1525,21 +1523,15 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+    if (mem_index == nullptr) {
+        new_chunk_id = (ChunkID)-1;
+        return Status::OK();
+    }
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
-    }
-    SharedPtr<MemIndex> mem_index;
-    {
-        Status status = segment_index_meta.GetMemIndex(mem_index);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.SetNoMemIndex();
-        if (!status.ok()) {
-            return status;
-        }
     }
     ChunkID chunk_id = 0;
     {
@@ -1557,58 +1549,70 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
     u32 row_count = 0;
     String base_name;
     SizeT index_size = 0;
+    SharedPtr<SecondaryIndexInMem> memory_secondary_index = nullptr;
+    SharedPtr<MemoryIndexer> memory_indexer = nullptr;
+    SharedPtr<IVFIndexInMem> memory_ivf_index = nullptr;
+    SharedPtr<HnswIndexInMem> memory_hnsw_index = nullptr;
+    SharedPtr<BMPIndexInMem> memory_bmp_index = nullptr;
+    SharedPtr<EMVBIndexInMem> memory_emvb_index = nullptr;
 
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            if (mem_index->memory_secondary_index_ == nullptr) {
-                return Status::DumpingMemIndex("No secondary mem index on segment");
+            memory_secondary_index = mem_index->GetSecondaryIndex();
+            if (memory_secondary_index == nullptr) {
+                return Status::OK();
             }
-            row_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            row_count = mem_index->memory_secondary_index_->GetRowCount();
+            row_id = memory_secondary_index->GetBeginRowID();
+            row_count = memory_secondary_index->GetRowCount();
             break;
         }
         case IndexType::kFullText: {
-            if (mem_index->memory_indexer_ == nullptr) {
-                return Status::DumpingMemIndex("No full text mem index on segment");
+            memory_indexer = mem_index->GetFulltextIndex();
+            if (memory_indexer == nullptr) {
+                return Status::OK();
             }
-            base_name = mem_index->memory_indexer_->GetBaseName();
-            row_id = mem_index->memory_indexer_->GetBaseRowId();
-            row_count = mem_index->memory_indexer_->GetDocCount();
+            base_name = memory_indexer->GetBaseName();
+            row_id = memory_indexer->GetBaseRowId();
+            row_count = memory_indexer->GetDocCount();
             break;
         }
         case IndexType::kIVF: {
-            if (mem_index->memory_ivf_index_ == nullptr) {
-                return Status::DumpingMemIndex("No IVF index on segment");
+            memory_ivf_index = mem_index->GetIVFIndex();
+            if (memory_ivf_index == nullptr) {
+                return Status::OK();
             }
-            row_id = mem_index->memory_ivf_index_->GetBeginRowID();
-            row_count = mem_index->memory_ivf_index_->GetRowCount();
+            row_id = memory_ivf_index->GetBeginRowID();
+            row_count = memory_ivf_index->GetRowCount();
             break;
         }
         case IndexType::kHnsw: {
-            if (mem_index->memory_hnsw_index_ == nullptr) {
-                return Status::DumpingMemIndex("No HNSW index on segment");
+            memory_hnsw_index = mem_index->GetHnswIndex();
+            if (memory_hnsw_index == nullptr) {
+                return Status::OK();
             }
-            row_id = mem_index->memory_hnsw_index_->GetBeginRowID();
-            row_count = mem_index->memory_hnsw_index_->GetRowCount();
-            index_size = mem_index->memory_hnsw_index_->GetSizeInBytes();
+            row_id = memory_hnsw_index->GetBeginRowID();
+            row_count = memory_hnsw_index->GetRowCount();
+            index_size = memory_hnsw_index->GetSizeInBytes();
             break;
         }
         case IndexType::kBMP: {
-            if (mem_index->memory_bmp_index_ == nullptr) {
-                return Status::DumpingMemIndex("No BMP index on segment");
+            memory_bmp_index = mem_index->GetBMPIndex();
+            if (memory_bmp_index == nullptr) {
+                return Status::OK();
             }
-            row_id = mem_index->memory_bmp_index_->GetBeginRowID();
-            row_count = mem_index->memory_bmp_index_->GetRowCount();
-            index_size = mem_index->memory_bmp_index_->GetSizeInBytes();
+            row_id = memory_bmp_index->GetBeginRowID();
+            row_count = memory_bmp_index->GetRowCount();
+            index_size = memory_bmp_index->GetSizeInBytes();
             break;
         }
         case IndexType::kEMVB: {
-            if (mem_index->memory_emvb_index_ == nullptr) {
-                return Status::DumpingMemIndex("No EMVB index on segment");
+            memory_emvb_index = mem_index->GetEMVBIndex();
+            if (memory_emvb_index == nullptr) {
+                return Status::OK();
             }
-            row_id = mem_index->memory_emvb_index_->GetBeginRowID();
-            row_count = mem_index->memory_emvb_index_->GetRowCount();
+            row_id = memory_emvb_index->GetBeginRowID();
+            row_count = memory_emvb_index->GetRowCount();
             break;
         }
         case IndexType::kDiskAnn: {
@@ -1637,12 +1641,12 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
     }
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            mem_index->memory_secondary_index_->Dump(buffer_obj);
+            memory_secondary_index->Dump(buffer_obj);
             buffer_obj->Save();
             break;
         }
         case IndexType::kFullText: {
-            mem_index->memory_indexer_->Dump(false /*offline*/, false /*spill*/);
+            memory_indexer->Dump(false /*offline*/, false /*spill*/);
             u64 len_sum = mem_index->memory_indexer_->GetColumnLengthSum();
             u32 len_cnt = mem_index->memory_indexer_->GetDocCount();
             Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
@@ -1652,12 +1656,12 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             break;
         }
         case IndexType::kIVF: {
-            mem_index->memory_ivf_index_->Dump(buffer_obj);
+            memory_ivf_index->Dump(buffer_obj);
             buffer_obj->Save();
             break;
         }
         case IndexType::kHnsw: {
-            mem_index->memory_hnsw_index_->Dump(buffer_obj);
+            memory_hnsw_index->Dump(buffer_obj);
             buffer_obj->Save();
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
@@ -1665,7 +1669,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             break;
         }
         case IndexType::kBMP: {
-            mem_index->memory_bmp_index_->Dump(buffer_obj);
+            memory_bmp_index->Dump(buffer_obj);
             buffer_obj->Save();
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
@@ -1673,7 +1677,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             break;
         }
         case IndexType::kEMVB: {
-            mem_index->memory_emvb_index_->Dump(buffer_obj);
+            memory_emvb_index->Dump(buffer_obj);
             buffer_obj->Save();
             break;
         }
@@ -1856,13 +1860,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     for (SegmentID segment_id : *index_segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        Status status = segment_index_meta.GetMemIndex(mem_index);
-        if (!status.ok()) {
-            return status;
-        }
-
-        SharedPtr<MemoryIndexer> memory_indexer = mem_index->memory_indexer_;
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        SharedPtr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->memory_indexer_;
         if (memory_indexer) {
             memory_indexer->Commit();
         }
@@ -2025,12 +2024,10 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);
     if (dump_index_cmd->clear_mem_index_) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        SharedPtr<MemIndex> mem_index;
-        Status status = segment_index_meta.GetMemIndexRaw(mem_index);
-        if (!status.ok()) {
-            return status;
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        if (mem_index != nullptr) {
+            mem_index->ClearMemIndex();
         }
-        mem_index->ClearMemIndex();
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;

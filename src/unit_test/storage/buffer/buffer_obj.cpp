@@ -648,9 +648,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             SegmentID segment_id = 0;
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta.GetMemIndex(mem_index);
-            EXPECT_TRUE(status.ok());
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             EXPECT_NE(mem_index, nullptr);
         }
 

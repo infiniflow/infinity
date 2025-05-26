@@ -221,8 +221,8 @@ private:
     HashMap<String, SharedPtr<BlockLock>> block_lock_map_{};
 
 public:
-    Status AddMemIndex(String mem_index_key, SharedPtr<MemIndex> mem_index);
-    Status GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
+    SharedPtr<MemIndex> GetMemIndex(const String &mem_index_key);
+    bool GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
