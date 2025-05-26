@@ -384,8 +384,13 @@ SharedPtr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
         if (input_blocks_.size() == 1) {
             input_block = input_blocks_[0];
         } else {
-            input_block->Init(input_blocks_[0], 0, input_blocks_[0]->column_count());
-            for (SizeT i = 1; i < input_blocks_.size(); i++) {
+            SizeT total_row_count = 0;
+            for (SizeT i = 0; i < row_ranges_.size(); ++i) {
+                total_row_count += row_ranges_[i].second;
+            }
+            input_block = MakeShared<DataBlock>();
+            input_block->Init(input_blocks_[0]->types(), total_row_count);
+            for (SizeT i = 0; i < input_blocks_.size(); ++i) {
                 input_block->AppendWith(input_blocks_[i]);
             }
             input_block->Finalize();

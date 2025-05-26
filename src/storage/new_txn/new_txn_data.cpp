@@ -917,13 +917,13 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
     }
     dest_vec.AppendWith(column_vector, source_offset, append_rows);
 
-    // if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-    //     SizeT chunk_size = var_buffer_mgr->TotalSize();
-    //     Status status = column_meta.SetChunkOffset(chunk_size);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
+    if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+        SizeT chunk_size = var_buffer_mgr->TotalSize();
+        Status status = column_meta.SetChunkOffset(chunk_size);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -1487,7 +1487,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             return status;
         }
         for (auto &table_index_meta : table_index_metas) {
-            status = this->AppendIndex(table_index_meta, append_ranges);
+            status = this->AppendIndex(table_index_meta, range);
             if (!status.ok()) {
                 return status;
             }

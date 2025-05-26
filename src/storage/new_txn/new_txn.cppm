@@ -476,7 +476,7 @@ private:
 
     Status DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids);
 
-    Status AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Pair<RowID, u64>> &append_ranges);
+    Status AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, u64> &append_range);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 

@@ -610,7 +610,7 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     return Status::OK();
 }
 
-Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Pair<RowID, u64>> &append_ranges) {
+Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, u64> &append_range) {
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -647,27 +647,28 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Pair<
         return Status::OK();
     };
 
-    for (const Pair<RowID, u64> &range : append_ranges) {
-        SegmentID segment_id = range.first.segment_id_;
-        BlockID block_id = range.first.segment_offset_ >> BLOCK_OFFSET_SHIFT;
-        cur_offset = range.first.segment_offset_ & BLOCK_OFFSET_MASK;
-        cur_row_cnt = range.second;
-        if (!segment_meta || segment_meta->segment_id() != segment_id) {
-            segment_meta.emplace(segment_id, table_index_meta.table_meta());
-            if (!table_index_meta.HasSegmentIndexID(segment_id)) {
-                Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
-                if (!status.ok()) {
-                    return status;
-                }
-            } else {
-                segment_index_meta.emplace(segment_id, table_index_meta);
+    SegmentID segment_id = append_range.first.segment_id_;
+    BlockID block_id = append_range.first.segment_offset_ >> BLOCK_OFFSET_SHIFT;
+    cur_offset = append_range.first.segment_offset_ & BLOCK_OFFSET_MASK;
+    cur_row_cnt = append_range.second;
+    if (!segment_meta || segment_meta->segment_id() != segment_id) {
+        segment_meta.emplace(segment_id, table_index_meta.table_meta());
+        if (!table_index_meta.HasSegmentIndexID(segment_id)) {
+            Status status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
+            if (!status.ok()) {
+                return status;
             }
+        } else {
+            segment_index_meta.emplace(segment_id, table_index_meta);
         }
-        if (!block_meta || block_meta->block_id() != block_id) {
-            block_meta.emplace(block_id, segment_meta.value());
-            column_meta.emplace(column_idx, block_meta.value());
-        }
-        append_in_column();
+    }
+    if (!block_meta || block_meta->block_id() != block_id) {
+        block_meta.emplace(block_id, segment_meta.value());
+        column_meta.emplace(column_idx, block_meta.value());
+    }
+    Status status = append_in_column();
+    if (!status.ok()) {
+        return status;
     }
 
     return Status::OK();
@@ -1826,9 +1827,11 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
             }
         }
     }
-    status = this->AppendIndex(table_index_meta, append_ranges);
-    if (!status.ok()) {
-        return status;
+    for (const auto &range : append_ranges) {
+        status = this->AppendIndex(table_index_meta, range);
+        if (!status.ok()) {
+            return status;
+        }
     }
     return Status::OK();
 }
