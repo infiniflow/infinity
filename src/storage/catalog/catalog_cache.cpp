@@ -51,17 +51,17 @@ SharedPtr<AppendPrepareInfo> TableCache::PrepareAppendNolock(SizeT row_count, Tr
         ++next_segment_id_;
     } else {
         if (unsealed_segment_cache_->row_count_ + row_count < DEFAULT_SEGMENT_CAPACITY) {
-            // Don't need to add new segment
+            // Don't need to add a new segment
             append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), row_count);
             unsealed_segment_cache_->row_count_ += row_count;
 
             prepare_segment_offset_ += row_count;
         } else if (unsealed_segment_cache_->row_count_ + row_count == DEFAULT_SEGMENT_CAPACITY) {
-            // Need to add new segment
+            // Need to add a new segment
             append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), row_count);
             unsealed_segment_cache_->row_count_ += row_count;
             unsealed_segment_cache_->sealed_ = true;
-            sealed_segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+            segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
 
             prepare_segment_offset_ += row_count;
         } else {
@@ -69,14 +69,14 @@ SharedPtr<AppendPrepareInfo> TableCache::PrepareAppendNolock(SizeT row_count, Tr
             append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), first_row_count);
             unsealed_segment_cache_->row_count_ += first_row_count;
             unsealed_segment_cache_->sealed_ = true;
-            sealed_segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+            segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
 
             // Update prepare info
             SizeT second_row_count = row_count - first_row_count;
             prepare_segment_id_ = next_segment_id_;
             prepare_segment_offset_ = second_row_count;
 
-            // create new segment
+            // create a new segment
             unsealed_segment_cache_ = MakeShared<SegmentCache>(next_segment_id_, second_row_count);
             unsealed_segment_cache_->sealed_ = false;
             append_info->ranges_.emplace_back(RowID(next_segment_id_, 0), second_row_count);

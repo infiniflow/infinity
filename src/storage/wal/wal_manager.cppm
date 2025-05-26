@@ -128,9 +128,9 @@ public:
 
     i64 ReplayWalFile(StorageMode targe_storage_mode);
 
-    Pair<TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
+    Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
 
-    void ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
+    Tuple<TransactionID, TxnTimeStamp> ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
 
     Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> GetCatalogFiles() const;
 

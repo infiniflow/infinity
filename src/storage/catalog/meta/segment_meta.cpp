@@ -388,7 +388,10 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
         return {*row_cnt_, Status::OK()};
     }
     Status status;
-
+#if 1
+    row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
+    return {*row_cnt_, Status::OK()};
+#else
     SizeT row_cnt = 0;
     {
         Vector<BlockID> *block_ids_ptr = nullptr;
@@ -407,6 +410,7 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
     }
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
+#endif
 }
 
 Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {
