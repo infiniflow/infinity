@@ -14,6 +14,8 @@
 
 #include "gtest/gtest.h"
 
+#include <filesystem>
+
 import base_test;
 import stl;
 import third_party;
@@ -107,8 +109,9 @@ public:
     }
 
     void CheckFilePaths() {
+        Path data_dir = this->GetFullDataDir();
         for (auto &file_path : file_paths_) {
-            file_path = String(this->GetFullDataDir()) + "/" + file_path;
+            file_path = data_dir / file_path;
         }
         auto *pm = infinity::InfinityContext::instance().persistence_manager();
         if (pm == nullptr) {
@@ -117,6 +120,10 @@ public:
                     ADD_FAILURE() << "File path is not absolute: " << file_path;
                 }
                 EXPECT_FALSE(std::filesystem::exists(file_path));
+
+                auto path = static_cast<Path>(file_path).parent_path();
+                EXPECT_TRUE(!std::filesystem::exists(path) || std::filesystem::is_directory(path) && !std::filesystem::is_empty(path) ||
+                            std::filesystem::is_directory(path) && std::filesystem::is_empty(path) && path == data_dir);
             }
         } else {
             for (const auto &file_path : file_paths_) {
@@ -208,11 +215,16 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         new_txn_mgr_->PrintAllKeyValue();
     }
     sleep(1); // Fix can't clean up issue
+
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
+    }
     this->CheckFilePaths();
 }
 
@@ -465,11 +477,23 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+
+    // {
+    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    //     EXPECT_TRUE(status.ok());
+    // }
+
     new_txn_mgr_->PrintAllKeyValue();
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
+    // {
+    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    //     EXPECT_TRUE(status.ok());
+    // }
     new_txn_mgr_->PrintAllKeyValue();
     this->CheckFilePaths();
 
@@ -489,6 +513,11 @@ TEST_P(TestTxnCleanup, test_cleanup_compact) {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
     }
+    // {
+    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    //     EXPECT_TRUE(status.ok());
+    // }
     this->CheckFilePaths();
 }
 
