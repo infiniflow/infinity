@@ -18,7 +18,6 @@ import stl;
 import file_worker;
 import buffer_handle;
 import file_worker_type;
-import kv_store;
 
 export module buffer_obj;
 
@@ -26,6 +25,7 @@ namespace infinity {
 
 class BufferManager;
 class VarBuffer;
+class KVInstance;
 
 export enum class BufferStatus {
     kLoaded,
