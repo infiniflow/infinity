@@ -20,7 +20,7 @@ This example is to connect local infinity instance, create table, insert data, s
 Checkout https://github.com/infiniflow/resource.git under /var/infinity (defined by 'resource_dir' of config file). The jieba dict is
 /var/infinity/resource/jieba/dict/jieba.dict.utf8
 """
-# import infinity_embedded as infinity
+
 import infinity
 import sys
 

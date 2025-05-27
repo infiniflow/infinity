@@ -4,7 +4,6 @@ import os
 import pytest
 from common import common_values
 import infinity
-import infinity_embedded
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
@@ -18,25 +17,14 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
-
-@pytest.fixture(scope="class")
-def local_infinity(request):
-    return request.config.getoption("--local-infinity")
-
-
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
 
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity, http):
-    if local_infinity:
-        module = importlib.import_module("infinity_embedded.index")
-        globals()["index"] = module
-        uri = common_values.TEST_LOCAL_PATH
-        request.cls.infinity_obj = infinity_embedded.connect(uri)
-    elif http:
+def setup_class(request, http):
+    if http:
         uri = common_values.TEST_LOCAL_HOST
         request.cls.infinity_obj = infinity_http()
     else:
