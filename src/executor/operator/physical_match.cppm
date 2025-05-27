@@ -40,7 +40,7 @@ import parse_fulltext_options;
 namespace infinity {
 
 class ResultCacheManager;
-class DataBlock;
+struct DataBlock;
 
 export class PhysicalMatch final : public PhysicalOperator {
 public:

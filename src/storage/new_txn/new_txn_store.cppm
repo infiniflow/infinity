@@ -37,7 +37,7 @@ struct TableEntry;
 struct SegmentEntry;
 struct BlockEntry;
 struct BlockColumnEntry;
-class DataBlock;
+struct DataBlock;
 struct SegmentIndexEntry;
 struct ChunkIndexEntry;
 class BGTaskProcessor;

@@ -17,12 +17,6 @@ export module new_txn;
 
 import stl;
 import statement_common;
-import meta_info;
-import table_def;
-import index_base;
-import data_block;
-import meta_state;
-import buffer_manager;
 import txn_state;
 import new_txn_store;
 import database_detail;
@@ -31,10 +25,8 @@ import extra_ddl_info;
 import internal_types;
 import value;
 import snapshot_info;
-import txn_context;
 import column_def;
 import column_vector;
-import buffer_handle;
 
 namespace infinity {
 
@@ -93,7 +85,6 @@ struct AppendState;
 struct AppendRange;
 enum class DumpIndexCause;
 struct IndexReader;
-struct TxnCommitterTask;
 
 struct BaseTxnStore;
 struct CreateDBTxnStore;
@@ -112,6 +103,19 @@ struct DeleteTxnStore;
 struct DropTableTxnStore;
 struct RenameTableTxnStore;
 struct UpdateTxnStore;
+class BufferManager;
+class IndexBase;
+struct DataBlock;
+class TableDef;
+struct TxnContext;
+struct TableInfo;
+struct DatabaseInfo;
+struct TableIndexInfo;
+struct SegmentIndexInfo;
+struct SegmentInfo;
+struct BlockInfo;
+struct BlockColumnInfo;
+struct TableDetail;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -209,7 +213,7 @@ public:
     Status ListDatabase(Vector<String> &db_names);
 
     // Table and Collection OPs
-    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array);
+    Status GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &output_table_array);
 
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
@@ -222,8 +226,6 @@ public:
     // Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
     // Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
-
-    Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
     Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
 
@@ -253,8 +255,6 @@ public:
 
     Tuple<SharedPtr<BlockColumnInfo>, Status>
     GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
-
-    Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
@@ -309,16 +309,6 @@ public:
 
     // Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
 
-    // View Ops
-    // Fixme: view definition should be given
-    Status CreateView(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry);
-
-    Status DropViewByName(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry);
-
-    Status GetViewByName(const String &db_name, const String &view_name, BaseEntry *&view_entry);
-
-    Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
-
     // DML
     // Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
 
@@ -371,7 +361,7 @@ public:
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    inline TransactionID TxnID() const { return txn_context_ptr_->txn_id_; }
+    TransactionID TxnID() const;
 
     TxnTimeStamp CommitTS() const;
 
@@ -426,8 +416,8 @@ public:
     BaseTxnStore *GetTxnStore() const { return base_txn_store_.get(); }
 
     SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
-    void AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
-    Vector<SharedPtr<String>> GetOperations() const { return txn_context_ptr_->GetOperations(); }
+    void AddOperation(const SharedPtr<String> &operation_text);
+    Vector<SharedPtr<String>> GetOperations() const;
 
     KVInstance *kv_instance() const { return kv_instance_.get(); }
 

@@ -31,7 +31,7 @@ namespace infinity {
 
 struct LoadMeta;
 class ResultCacheManager;
-class DataBlock;
+struct DataBlock;
 
 export class PhysicalMergeMatchTensor final : public PhysicalOperator {
 public:

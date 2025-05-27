@@ -44,7 +44,7 @@ namespace infinity {
 class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
-class DataBlock;
+struct DataBlock;
 struct WalBlockInfo;
 
 /// class BlockEntry

@@ -22,7 +22,7 @@ import txn_state;
 
 namespace infinity {
 
-class DataBlock;
+struct DataBlock;
 class IndexBase;
 class ColumnDef;
 
