@@ -310,11 +310,14 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
 
     Status constant_status;
 
-    auto insert_rows = new Vector<InsertRowExpr *>();
+    Vector<InsertRowExpr *> *insert_rows = new Vector<InsertRowExpr *>();
     DeferFn delete_insert_rows([&insert_rows] {
-        if (insert_rows) {
-            for (auto *insert_row : *insert_rows) {
-                delete insert_row;
+        if (insert_rows != nullptr) {
+            for (auto &insert_row : *insert_rows) {
+                if (insert_row != nullptr) {
+                    delete insert_row;
+                }
+                insert_row = nullptr;
             }
             delete insert_rows;
             insert_rows = nullptr;
@@ -336,7 +339,6 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         insert_rows->emplace_back(insert_row.release());
     }
     auto result = infinity->Insert(request.db_name, request.table_name, insert_rows);
-    insert_rows = nullptr;
     ProcessQueryResult(response, result);
 }
 

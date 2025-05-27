@@ -92,6 +92,7 @@ void NewTxnManager::Start() {
 void NewTxnManager::Stop() {
     if (!is_running_) {
         // FIXME: protect the double stop, the double stop need to be fixed.
+        LOG_INFO("WAL manager was stopped...");
         return;
     }
 
