@@ -5,7 +5,6 @@ import pytest
 from infinity.errors import ErrorCode
 from common import common_values
 import infinity
-import infinity_embedded
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType, InfinityException
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,21 +13,12 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
-@pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup(self, local_infinity, http):
-        if local_infinity:
-            module = importlib.import_module("infinity_embedded.common")
-            func = getattr(module, 'ConflictType')
-            globals()['ConflictType'] = func
-            func = getattr(module, 'InfinityException')
-            globals()['InfinityException'] = func
-            self.uri = common_values.TEST_LOCAL_PATH
-            self.infinity_obj = infinity_embedded.connect(self.uri)
-        elif http:
+    def setup(self, http):
+        if http:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity_http()
         else:
