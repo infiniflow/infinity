@@ -71,7 +71,6 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Build debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
@@ -92,7 +91,7 @@ jobs:
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=restart_tsan.log ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && TSAN_OPTIONS=log_path=restart_tsan.log ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
           sudo sysctl -w vm.mmap_rnd_bits=$old_value
   
       - name: Collect restart test output with thread sanitizer
@@ -140,7 +139,7 @@ jobs:
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         id: run_tests_debug
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}

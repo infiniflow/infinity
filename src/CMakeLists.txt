@@ -381,84 +381,84 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
-if (SKBUILD)
-    add_library(embedded_infinity_ext MODULE
-            embedded_infinity_ext.cpp
-            embedded_infinity/wrap_infinity.cpp
-    )
+# if (SKBUILD)
+#    add_library(embedded_infinity_ext MODULE
+#            embedded_infinity_ext.cpp
+#            embedded_infinity/wrap_infinity.cpp
+#    )
+#
+#    target_sources(embedded_infinity_ext
+#            PRIVATE
+#            FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+#            embedded_infinity/wrap_infinity.cppm
+#    )
 
-    target_sources(embedded_infinity_ext
-            PRIVATE
-            FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-            embedded_infinity/wrap_infinity.cppm
-    )
+#    nanobind_compile_options(embedded_infinity_ext)
+#    nanobind_link_options(embedded_infinity_ext)
+#    set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
+#    set(libname "nanobind-static-abi3")
+#    nanobind_build_library(${libname})
+#    nanobind_extension_abi3(embedded_infinity_ext)
+#    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static)
 
-    nanobind_compile_options(embedded_infinity_ext)
-    nanobind_link_options(embedded_infinity_ext)
-    set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
-    set(libname "nanobind-static-abi3")
-    nanobind_build_library(${libname})
-    nanobind_extension_abi3(embedded_infinity_ext)
-    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static)
-
-    target_link_libraries(embedded_infinity_ext PRIVATE
-            ${libname}
-            infinity_core
-            sql_parser
-            onnxruntime_mlas
-            zsv_parser
-            newpfor
-            fastpfor
-            jma
-            opencc
-            dl
-            lz4.a
-            atomic.a
-            event.a
-            oatpp.a
-            c++.a
-            c++abi.a
-            parquet.a
-            arrow.a
-            thrift.a
-            thriftnb.a
-            snappy.a
-            ${JEMALLOC_STATIC_LIB}
-            miniocpp.a
-            pugixml-static
-            curlpp_static
-            inih.a
-            libcurl_static
-            ssl.a
-            crypto.a
-            re2.a
-            pcre2-8-static
-            rocksdb.a
-    )
+#    target_link_libraries(embedded_infinity_ext PRIVATE
+#            ${libname}
+#            infinity_core
+#            sql_parser
+#            onnxruntime_mlas
+#            zsv_parser
+#            newpfor
+#            fastpfor
+#            jma
+#            opencc
+#            dl
+#            lz4.a
+#            atomic.a
+#            event.a
+#            oatpp.a
+#            c++.a
+#            c++abi.a
+#            parquet.a
+#            arrow.a
+#            thrift.a
+#            thriftnb.a
+#            snappy.a
+#            ${JEMALLOC_STATIC_LIB}
+#            miniocpp.a
+#            pugixml-static
+#            curlpp_static
+#            inih.a
+#            libcurl_static
+#            ssl.a
+#            crypto.a
+#            re2.a
+#            pcre2-8-static
+#            rocksdb.a
+#    )
 
     # WARN: python modules shall not link to static libstdc++!!!
-    target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
-    set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
-
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
-    target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
-    nanobind_disable_stack_protector(embedded_infinity_ext)
-    nanobind_opt_size(embedded_infinity_ext)
-    nanobind_strip(embedded_infinity_ext)
-
-    install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity_embedded)
-endif ()
+#    target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
+#    set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
+#
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
+#    target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
+#    nanobind_disable_stack_protector(embedded_infinity_ext)
+#    nanobind_opt_size(embedded_infinity_ext)
+#    nanobind_strip(embedded_infinity_ext)
+#
+#    install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity_embedded)
+# endif ()
 
 ### unit test
 
