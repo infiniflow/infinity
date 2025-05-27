@@ -721,6 +721,7 @@ Status Storage::UnInitFromWriter() {
 
     std::unique_lock<std::mutex> lock(mutex_);
     current_storage_mode_ = StorageMode::kUnInitialized;
+    LOG_INFO("Storage, un-initialized from writable mode to un-initialized");
     return Status::OK();
 }
 

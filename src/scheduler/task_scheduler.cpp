@@ -100,10 +100,12 @@ void TaskScheduler::UnInit() {
     initialized_ = false;
     UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>(true);
 
+    LOG_INFO("Shutting down TaskScheduler...");
     for (const auto &worker : worker_array_) {
         worker.queue_->Enqueue(terminate_task.get());
         worker.thread_->join();
     }
+    LOG_INFO("TaskScheduler is shut down.");
 }
 
 u64 TaskScheduler::FindLeastWorkloadWorker() {

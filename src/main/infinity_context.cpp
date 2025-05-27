@@ -500,6 +500,7 @@ void InfinityContext::UnInit() {
 
     session_mgr_.reset();
     resource_manager_.reset();
+    LOG_INFO("Infinity context is un-initialized.");
     Logger::Shutdown();
     config_.reset();
 }
