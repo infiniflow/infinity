@@ -1544,7 +1544,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             return status;
         }
     }
-    new_chunk_id = chunk_id;
     RowID row_id{};
     u32 row_count = 0;
     String base_name;
@@ -1685,6 +1684,8 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             UnrecoverableError("Not implemented yet");
         }
     }
+    mem_index->ClearMemIndex();
+    new_chunk_id = chunk_id;
     return Status::OK();
 }
 

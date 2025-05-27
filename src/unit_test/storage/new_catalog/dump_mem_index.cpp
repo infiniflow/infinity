@@ -4861,7 +4861,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
     }
@@ -4892,7 +4896,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
     }
@@ -5916,7 +5924,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                                     |------------------|-------------|
-    //                                    t2                dump (fail)   rollback (success)
+    //                                    t2            dump (success)   commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -5933,8 +5941,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
 
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
