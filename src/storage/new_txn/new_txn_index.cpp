@@ -691,7 +691,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     if (!index_status.ok()) {
         return index_status;
     }
-    SharedPtr<MemIndex> mem_index;
+    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
     segment_index_meta.GetOrSetMemIndex(mem_index);
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -1065,7 +1065,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
     }
     Status status;
-    SharedPtr<MemIndex> mem_index;
+    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
     segment_index_meta.GetOrSetMemIndex(mem_index);
     mem_index->memory_indexer_ =
         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
