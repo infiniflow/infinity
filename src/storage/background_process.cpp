@@ -191,7 +191,7 @@ void BGTaskProcessor::Process() {
                             status = checkpoint_task->ExecuteWithinTxn();
                         }
                         if (!status.ok()) {
-                            UnrecoverableError(fmt::format("Fail to checkpoint"));
+                            UnrecoverableError(fmt::format("Fail to checkpoint: {}", status.message()));
                         }
                         LOG_DEBUG("Checkpoint in background done");
                     }

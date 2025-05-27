@@ -103,7 +103,7 @@ void TxnAllocator::Process() {
                         UnrecoverableError(fmt::format("Transaction type {} is not supported", TransactionType2Str(txn_type)));
                     }
                 }
-                LOG_INFO(*txn->GetTxnText());
+                // LOG_INFO(*txn->GetTxnText());
             }
             txn_allocator_task->Complete();
         }

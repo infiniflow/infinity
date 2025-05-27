@@ -579,6 +579,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
 nlohmann::json MetaTree::ToJson() const {
     nlohmann::json json_res;
+    for (const auto &tag_pair : system_tag_map_) {
+        json_res["system_tags"].push_back({{"tag_name", tag_pair.first}, {"value", tag_pair.second}});
+    }
+
     for (const auto &db_pair : db_map_) {
         json_res["databases"].push_back(db_pair.second->ToJson());
     }

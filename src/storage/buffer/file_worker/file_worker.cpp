@@ -39,6 +39,22 @@ import kv_store;
 
 namespace infinity {
 
+FileWorker::FileWorker(SharedPtr<String> data_dir,
+                       SharedPtr<String> temp_dir,
+                       SharedPtr<String> file_dir,
+                       SharedPtr<String> file_name,
+                       PersistenceManager *persistence_manager)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)),
+      persistence_manager_(persistence_manager) {
+    if (std::filesystem::path(*file_dir_).is_absolute()) {
+        String error_message = fmt::format("File directory {} is an absolute path.", *file_dir_);
+        UnrecoverableError(error_message);
+    }
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("FileWorker");
+#endif
+}
+
 FileWorker::~FileWorker() {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::DecrObjectCount("FileWorker");
@@ -275,5 +291,12 @@ void FileWorker::Munmap() {
 }
 
 void FileWorker::MmapNotNeed() {}
+
+bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] SizeT size) {
+    UnrecoverableError("Not implemented");
+    return false;
+}
+
+void FileWorker::FreeFromMmapImpl() { UnrecoverableError("Not implemented"); }
 
 } // namespace infinity
