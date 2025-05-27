@@ -99,7 +99,7 @@ jobs:
 #      - name: Run restart test
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_restart_test
-#        run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+#        run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
 #
 #      - name: Collect restart test output
 #        if: ${{ !cancelled() }} # always run this step even if previous steps failed
@@ -116,7 +116,7 @@ jobs:
 #      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_tests_debug_minio
-#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel.py" && sleep 1s
 #
 #      - name: Stop infinity pysdk & http_api & sqllogictest debug
 #        if: ${{ !cancelled() }}
@@ -146,7 +146,7 @@ jobs:
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Stop sqllogictest debug
         if: ${{ !cancelled() }}
@@ -173,7 +173,7 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
         if: ${{ !cancelled() && failure() }}
@@ -188,7 +188,7 @@ jobs:
       - name: Run pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_pysdk_remote_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
 
       - name: Stop infinity pysdk_remote test
         if: ${{ !cancelled() }}
@@ -218,7 +218,7 @@ jobs:
       - name: Run HTTP infinity test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_http_remote_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
 
       - name: Stop infinity HTTP test
         if: ${{ !cancelled() }}
@@ -248,7 +248,7 @@ jobs:
       - name: Run pysdk parallel test debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_parallel_test_debug
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
 
       - name: Stop infinity pysdk parallel test
         if: ${{ !cancelled() }}
