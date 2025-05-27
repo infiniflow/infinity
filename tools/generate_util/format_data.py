@@ -1,4 +1,5 @@
-from infinity_embedded.embedded_infinity_ext import test_helper_float32_to_chars
+def test_helper_float32_to_chars(x: float) -> str:
+    return str(x)
 
 
 def format_float1(f: float) -> str:

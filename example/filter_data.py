@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# import infinity_embedded as infinity
 import infinity
 import sys
 

@@ -5,7 +5,6 @@ from numpy import dtype
 import pytest
 from common import common_values
 import infinity
-import infinity_embedded
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
@@ -25,18 +24,12 @@ test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 test_export_jsonl_file_part = "export_embedding_int_dim3_part.jsonl"
 
 
-@pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup(self, local_infinity, http):
-        if local_infinity:
-            module = importlib.import_module("infinity_embedded.index")
-            globals()["index"] = module
-            self.uri = common_values.TEST_LOCAL_PATH
-            self.infinity_obj = infinity_embedded.connect(self.uri)
-        elif http:
+    def setup(self, http):
+        if http:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity_http()
         else:
@@ -49,29 +42,23 @@ class TestInfinity:
 
     # def test_version(self):
     #     self.test_infinity_obj._test_version()
-    def test_connection(self, local_infinity):
+    def test_connection(self):
         """
         target: test connect and disconnect server ok
         method: connect server
         expect: connect and disconnect successfully
         """
-        if local_infinity:
-            infinity_obj = infinity_embedded.connect(self.uri)
-        else:
-            infinity_obj = infinity.connect(self.uri)
+        infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    def test_create_db_with_invalid_name(self, local_infinity):
+    def test_create_db_with_invalid_name(self):
         """
         target: test db name limitation
         method: create db with empty name
         expect: create db fail with error message
         """
-        if local_infinity:
-            infinity_obj = infinity_embedded.connect(self.uri)
-        else:
-            infinity_obj = infinity.connect(self.uri)
+        infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
 
         db_name = ""

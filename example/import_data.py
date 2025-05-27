@@ -21,7 +21,6 @@ import os
 current_path = os.path.abspath(__file__)
 project_directory = os.path.dirname(current_path)
 
-# import infinity_embedded as infinity
 import infinity
 import sys
 
