@@ -181,6 +181,10 @@ Status VirtualStore::DeleteFile(const String &file_name) {
     }
     std::error_code error_code;
     Path p{file_name};
+    if (!std::filesystem::exists(p)) {
+        LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
+        return Status::OK();
+    }
     bool is_deleted = std::filesystem::remove(p, error_code);
     if (error_code.value() == 0) {
         if (!is_deleted) {
