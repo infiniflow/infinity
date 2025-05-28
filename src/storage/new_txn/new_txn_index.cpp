@@ -68,6 +68,7 @@ import bmp_util;
 import defer_op;
 import base_txn_store;
 import kv_code;
+import buffer_handle;
 
 namespace infinity {
 

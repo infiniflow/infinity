@@ -80,6 +80,7 @@ import segment_entry;
 import txn_allocator_task;
 import meta_type;
 import base_txn_store;
+import buffer_handle;
 
 namespace infinity {
 
@@ -141,6 +142,11 @@ NewTxn::~NewTxn() {
     GlobalResourceUsage::DecrObjectCount("NewTxn");
 #endif
 }
+
+TransactionID NewTxn::TxnID() const { return txn_context_ptr_->txn_id_; }
+
+void NewTxn::AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
+Vector<SharedPtr<String>> NewTxn::GetOperations() const { return txn_context_ptr_->GetOperations(); }
 
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
@@ -292,7 +298,7 @@ Status NewTxn::ListDatabase(Vector<String> &db_names) {
 }
 
 // Table and Collection OPs
-Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
+Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &output_table_array) {
     this->CheckTxn(db_name);
 
     Vector<String> table_names;
@@ -307,8 +313,8 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
         if (!status.ok()) {
             return status;
         }
-        output_table_array.push_back(TableDetail{});
-        status = table_meta->GetTableDetail(output_table_array.back(), db_name, table_name);
+        output_table_array.push_back(MakeShared<TableDetail>());
+        status = table_meta->GetTableDetail(*output_table_array.back(), db_name, table_name);
         if (!status.ok()) {
             return status;
         }
@@ -963,30 +969,6 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const Strin
 
 Status NewTxn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
     return catalog_->ApplyTableSnapshot(table_snapshot_info, nullptr);
-}
-
-Status NewTxn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
-    return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: CreateCollection"};
-}
-
-Status NewTxn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
-    return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetCollectionByName"};
-}
-
-Status NewTxn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
-    return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: CreateView"};
-}
-
-Status NewTxn::DropViewByName(const String &, const String &, ConflictType, BaseEntry *&) {
-    return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: DropViewByName"};
-}
-
-Status NewTxn::GetViewByName(const String &, const String &, BaseEntry *&) {
-    return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetViewByName"};
-}
-
-Status NewTxn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
-    return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetViews"};
 }
 
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
