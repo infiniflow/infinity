@@ -28,7 +28,6 @@ import os
 import time
 import httputils
 
-
 class TestIndex(HttpTest):
     def test_http_create_index_IVF(self):
         db_name = "default_db"

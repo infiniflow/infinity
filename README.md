@@ -60,14 +60,14 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 Infinity supports two working modes, embedded mode and client-server mode. Infinity's embedded mode enables you to quickly embed Infinity into your Python applications, without the need to connect to a separate backend server. The following shows how to operate in embedded mode:
 
    ```bash
-   pip install infinity-embedded-sdk==0.6.0.dev3
+   pip install infinity-sdk==0.6.0.dev3
    ```
    Use Infinity to conduct a dense vector search:
    ```python
-   import infinity_embedded
+   import infinity
 
    # Connect to infinity
-   infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
+   infinity_object = infinity.connect("/absolute/path/to/save/to")
    # Retrieve a database object named default_db
    db_object = infinity_object.get_database("default_db")
    # Create a table with an integer column, a varchar column, and a dense vector column

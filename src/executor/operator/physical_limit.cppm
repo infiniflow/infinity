@@ -32,7 +32,7 @@ export module physical_limit;
 
 namespace infinity {
 
-class DataBlock;
+struct DataBlock;
 
 export class LimitCounter {
 public:

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-# import infinity_embedded as infinity
 import infinity
 import sys
 

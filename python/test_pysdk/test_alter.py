@@ -3,7 +3,6 @@ import pytest
 import os
 import sys
 from common import common_values
-import infinity_embedded
 import infinity
 import pandas as pd
 from infinity.common import ConflictType
@@ -19,13 +18,8 @@ from infinity_http import infinity_http
 
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup_and_teardown(self, local_infinity, http, suffix):
-        if local_infinity:
-            module = importlib.import_module("infinity_embedded.index")
-            globals()["index"] = module
-            self.uri = common_values.TEST_LOCAL_PATH
-            self.infinity_obj = infinity_embedded.connect(self.uri)
-        elif http:
+    def setup_and_teardown(self, http, suffix):
+        if http:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity_http()
         else:

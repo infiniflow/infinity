@@ -7,7 +7,6 @@ import pytest
 from common import common_values
 import infinity
 import infinity.index as index
-import infinity_embedded
 from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, SortType
@@ -20,30 +19,13 @@ from infinity_http import infinity_http
 from common.utils import copy_data
 from datetime import date, time, datetime
 
-
-@pytest.fixture(scope="class")
-def local_infinity(request):
-    return request.config.getoption("--local-infinity")
-
-
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
 
-
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity, http):
-    if local_infinity:
-        module = importlib.import_module("infinity_embedded.index")
-        globals()["index"] = module
-        module = importlib.import_module("infinity_embedded.common")
-        func = getattr(module, "ConflictType")
-        globals()["ConflictType"] = func
-        func = getattr(module, "InfinityException")
-        globals()["InfinityException"] = func
-        uri = common_values.TEST_LOCAL_PATH
-        request.cls.infinity_obj = infinity_embedded.connect(uri)
-    elif http:
+def setup_class(request, http):
+    if http:
         uri = common_values.TEST_LOCAL_HOST
         request.cls.infinity_obj = infinity_http()
     else:
