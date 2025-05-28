@@ -41,7 +41,8 @@ import kv_utility;
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
-    : begin_ts_(segment_meta.begin_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta), block_id_(block_id) {}
+    : begin_ts_(segment_meta.begin_ts()), commit_ts_(segment_meta.commit_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta),
+      block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();

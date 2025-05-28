@@ -39,9 +39,8 @@ import memory_indexer;
 namespace infinity {
 
 SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta)
-    : kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {
-    begin_ts_ = table_index_meta_.table_meta().begin_ts();
-}
+    : begin_ts_(table_index_meta.table_meta().begin_ts()), commit_ts_(table_index_meta.table_meta().commit_ts()),
+      kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
 
 SegmentIndexMeta::~SegmentIndexMeta() = default;
 

@@ -34,6 +34,7 @@ public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
+    TxnTimeStamp commit_ts() const { return commit_ts_; }
 
     KVInstance &kv_instance() { return kv_instance_; }
 
@@ -97,6 +98,7 @@ private:
 
 private:
     TxnTimeStamp begin_ts_;
+    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;

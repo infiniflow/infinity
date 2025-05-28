@@ -186,7 +186,7 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
                         tmp_optional_table_meta->SetUnsealedSegmentID(unsealed_id);
                     } else if (merge_flag == MergeFlag::kUpdate) {
                         // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts);
-                        TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                        TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts, MAX_TIMESTAMP};
                         status = this->CleanTable(table_meta, *table_name, begin_ts, UsageFlag::kTransform);
                         if (!status.ok()) {
                             return status;
@@ -215,7 +215,7 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
 
                     // auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                     // auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
-                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts, MAX_TIMESTAMP};
                     SegmentMeta segment_meta{segment_id, table_meta};
 
                     if (fast_rough_filter->IsValid()) {
@@ -264,7 +264,7 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
                     SharedPtr<FastRoughFilter> fast_rough_filter = MakeShared<FastRoughFilter>();
                     fast_rough_filter->DeserializeFromString(block_filter_binary_data);
 
-                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts, MAX_TIMESTAMP};
                     SegmentMeta segment_meta{segment_id, table_meta};
                     BlockMeta block_meta{block_id, segment_meta};
                     if (fast_rough_filter->IsValid()) {
@@ -311,7 +311,7 @@ Status NewCatalog::TransformDeltaMeta(Config *config_ptr, const Vector<String> &
                     ColumnID column_id = 0;
                     std::from_chars(decodes[4].begin(), decodes[4].end(), column_id);
                     // const auto [next_outline_idx, last_chunk_offset] = add_column_entry_op->outline_info_;
-                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts};
+                    TableMeeta table_meta{db_id_str, table_id_str, *kv_instance, begin_ts, MAX_TIMESTAMP};
                     SegmentMeta segment_meta{segment_id, table_meta};
                     BlockMeta block_meta{block_id, segment_meta};
                     ColumnMeta column_meta{column_id, block_meta};

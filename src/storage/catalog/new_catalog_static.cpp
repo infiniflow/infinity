@@ -199,7 +199,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, checkpoint_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, checkpoint_ts, MAX_TIMESTAMP);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -263,6 +263,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
 Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     Status status;
     TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
     KVInstance *kv_instance = txn->kv_instance();
 
     Vector<String> *db_id_strs_ptr;
@@ -293,7 +294,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts, commit_ts);
             status = IndexRecoverTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -315,6 +316,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     Status status;
 
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     KVInstance *kv_instance = new_txn->kv_instance();
 
     Vector<String> *db_id_strs_ptr;
@@ -345,7 +347,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts, commit_ts);
             status = IndexCommitTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -363,10 +365,12 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     return Status::OK();
 }
 
-Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance,
-                                    TxnTimeStamp begin_ts,
+Status NewCatalog::GetAllMemIndexes(NewTxn *txn,
                                     Vector<SharedPtr<MemIndex>> &mem_indexes,
                                     Vector<MemIndexID> &mem_index_ids) {
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
+    KVInstance *kv_instance = txn->kv_instance();
     auto TraverseTableIndex = [&](TableIndexMeeta &table_index_meta, const String &db_name, const String &table_name, const String &index_name) {
         auto [index_segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
         if (!status.ok()) {
@@ -414,7 +418,7 @@ Status NewCatalog::GetAllMemIndexes(KVInstance *kv_instance,
         for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
             const String &table_id_str = (*table_id_strs_ptr)[i];
             const String &table_name = (*table_names_ptr)[i];
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts, commit_ts);
             status = TraverseTable(table_meta, db_name, table_name);
             if (!status.ok()) {
                 return status;
@@ -488,7 +492,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp
     for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
         const String &table_id_str = (*table_id_strs_ptr)[i];
         const String &table_name = (*table_names_ptr)[i];
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, MAX_TIMESTAMP);
         status = NewCatalog::CleanTable(table_meta, table_name, begin_ts, usage_flag);
         if (!status.ok()) {
             return status;
@@ -517,7 +521,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
         return status;
     }
 
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, commit_ts);
     status = table_meta->InitSet(table_def);
     if (!status.ok()) {
         return status;
@@ -1301,14 +1305,14 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT 
     return Status::OK();
 }
 
-Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
+Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
     Vector<String> *table_id_strs_ptr = nullptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts, commit_ts);
         status = GetTableFilePaths(begin_ts, table_meta, file_paths);
         if (!status.ok()) {
             return status;
