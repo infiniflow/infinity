@@ -4192,7 +4192,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     auto data_dir = static_cast<Path>(*data_dir_str);
     // Delete empty dir
     VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
-    return Status::OK();
+
+    return status;
 }
 
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
