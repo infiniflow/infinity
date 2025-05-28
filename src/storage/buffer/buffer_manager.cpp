@@ -186,11 +186,10 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
     }
-    Status inner_status;
     for (auto *buffer_obj : clean_list) {
-        inner_status = buffer_obj->CleanupFile(kv_instance);
-        if (!inner_status.ok() && status.ok()) {
-            status = inner_status;
+        status = buffer_obj->CleanupFile(kv_instance);
+        if (!status.ok()) {
+            return status;
         }
     }
     HashSet<BufferObj *> clean_temp_set;
@@ -217,7 +216,7 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
         }
         buffer_map_.rehash(buffer_map_.size());
     }
-    return status;
+    return Status::OK();
 }
 
 Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
