@@ -62,7 +62,7 @@ public:
 
     void SetData(void *data);
 
-    // Get absolute file path. As key of buffer handle.
+    // Get an absolute file path. As key of a buffer handle.
     String GetFilePath() const;
 
     void CleanupFile(KVInstance *kv_instance) const;
