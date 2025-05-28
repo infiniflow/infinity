@@ -46,6 +46,9 @@ BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def,
     : bmp_(InitAbstractIndex(index_base, column_def, own_mem)) {
     const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
     const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
+    if (!own_mem) {
+        return;
+    }
     SizeT term_num = sparse_info->Dimension();
     SizeT block_size = index_bmp->block_size_;
     std::visit(
