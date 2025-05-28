@@ -27,7 +27,7 @@ export class KVInstance;
 
 export class KVIterator {
 public:
-    KVIterator(rocksdb::Iterator *iterator_);
+    explicit KVIterator(rocksdb::Iterator *iterator_);
     KVIterator(rocksdb::Transaction *transaction, rocksdb::ReadOptions &read_options, const String &upper_bound);
     ~KVIterator();
 
