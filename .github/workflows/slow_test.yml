@@ -217,6 +217,6 @@ jobs:
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
         run: |
-          if [ -n "${BUILDER_CONTAINER}" ]; then
-            sudo docker rm -f -v ${BUILDER_CONTAINER}
-          fi
+            if [ -n "${BUILDER_CONTAINER}" ]; then
+              sudo docker rm -f -v ${BUILDER_CONTAINER}
+            fi
