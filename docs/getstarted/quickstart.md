@@ -36,7 +36,7 @@ This section provides instructions on deploying the Infinity using Docker on Lin
   values={[
     {label: 'Linux x86_64 & MacOS x86_64', value: 'linux_mac'},
     {label: 'Windows', value: 'windows'},
-   ]}>
+  ]}>
    <TabItem value="linux_mac">
 
 ```bash
