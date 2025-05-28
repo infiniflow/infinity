@@ -41,7 +41,7 @@ import meta_info;
 
 namespace infinity {
 
-class DataBlock;
+struct DataBlock;
 
 class ZxvParserCtx {
 public:
