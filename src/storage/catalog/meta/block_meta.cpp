@@ -225,7 +225,8 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
                                           table_meta.table_id_str(),
                                           segment_meta_.segment_id(),
                                           block_id_,
-                                          begin_ts_);
+                                          begin_ts_,
+                                          commit_ts_);
     return {*row_cnt_, Status::OK()};
 #else
     Status status;

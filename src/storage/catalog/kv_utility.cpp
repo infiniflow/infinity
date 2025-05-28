@@ -91,17 +91,21 @@ Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
     return segment_ids;
 }
 
-Vector<BlockID>
-GetTableSegmentBlocks(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, SegmentID segment_id, TxnTimeStamp begin_ts) {
+Vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
+                                      const String &db_id_str,
+                                      const String &table_id_str,
+                                      SegmentID segment_id,
+                                      TxnTimeStamp begin_ts,
+                                      TxnTimeStamp commit_ts) {
     Vector<BlockID> block_ids;
 
     String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(db_id_str, table_id_str, segment_id);
     auto iter = kv_instance->GetIterator();
     iter->Seek(block_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-            LOG_DEBUG(fmt::format("SKIP BLOCK: {} {} {}", iter->Key().ToString(), commit_ts, begin_ts));
+        TxnTimeStamp block_commit_ts = std::stoull(iter->Value().ToString());
+        if (block_commit_ts > begin_ts and block_commit_ts != commit_ts and block_commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            LOG_DEBUG(fmt::format("SKIP BLOCK: {} {} {}", iter->Key().ToString(), block_commit_ts, begin_ts));
             iter->Next();
             continue;
         }
@@ -159,7 +163,8 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
                        const String &table_id_str,
                        SegmentID segment_id,
                        BlockID block_id,
-                       TxnTimeStamp begin_ts) {
+                       TxnTimeStamp begin_ts,
+                       TxnTimeStamp commit_ts) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
 
@@ -193,11 +198,16 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
     return row_cnt;
 }
 
-SizeT GetSegmentRowCount(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, SegmentID segment_id, TxnTimeStamp begin_ts) {
-    Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts);
+SizeT GetSegmentRowCount(KVInstance *kv_instance,
+                         const String &db_id_str,
+                         const String &table_id_str,
+                         SegmentID segment_id,
+                         TxnTimeStamp begin_ts,
+                         TxnTimeStamp commit_ts) {
+    Vector<BlockID> blocks = GetTableSegmentBlocks(kv_instance, db_id_str, table_id_str, segment_id, begin_ts, commit_ts);
     SizeT segment_row_count = 0;
     for (BlockID block_id : blocks) {
-        SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts);
+        SizeT block_row_cnt = GetBlockRowCount(kv_instance, db_id_str, table_id_str, segment_id, block_id, begin_ts, commit_ts);
         segment_row_count += block_row_cnt;
     }
     return segment_row_count;

@@ -800,8 +800,12 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
         if (segment_id == unsealed_segment_id) {
             table_cache->unsealed_segment_cache_ = MakeShared<SegmentCache>(segment_id, unsealed_segment_offset);
         } else {
-            SizeT segment_row_count =
-                infinity::GetSegmentRowCount(kv_instance_ptr.get(), table_key->db_id_str_, table_key->table_id_str_, segment_id, current_ts);
+            SizeT segment_row_count = infinity::GetSegmentRowCount(kv_instance_ptr.get(),
+                                                                   table_key->db_id_str_,
+                                                                   table_key->table_id_str_,
+                                                                   segment_id,
+                                                                   current_ts,
+                                                                   MAX_TIMESTAMP);
             segment_cache = MakeShared<SegmentCache>(segment_id, segment_row_count);
         }
         table_cache->segment_cache_map_.emplace(segment_id, segment_cache);

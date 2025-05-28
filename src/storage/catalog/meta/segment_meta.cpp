@@ -209,7 +209,8 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
 // }
 
 Status SegmentMeta::LoadBlockIDs1() {
-    block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
+    block_ids1_ =
+        infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
     return Status::OK();
 }
 
@@ -369,7 +370,8 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
 
 Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     if (!block_ids1_) {
-        block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
+        block_ids1_ =
+            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
     }
     return {&*block_ids1_, Status::OK()};
 }
@@ -390,7 +392,7 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
     }
     Status status;
 #if 1
-    row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
+    row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
     return {*row_cnt_, Status::OK()};
 #else
     SizeT row_cnt = 0;
