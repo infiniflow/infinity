@@ -29,6 +29,7 @@ import file_worker_type;
 import var_file_worker;
 import global_resource_usage;
 import kv_store;
+import status;
 
 namespace infinity {
 
@@ -258,7 +259,7 @@ void BufferObj::PickForCleanup() {
     }
 }
 
-void BufferObj::CleanupFile(KVInstance *kv_instance) const {
+Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
     if (status_ != BufferStatus::kClean) {
         String error_message = "Invalid status";
         UnrecoverableError(error_message);
@@ -267,7 +268,7 @@ void BufferObj::CleanupFile(KVInstance *kv_instance) const {
         String error_message = "Buffer is not freed.";
         UnrecoverableError(error_message);
     }
-    file_worker_->CleanupFile(kv_instance);
+    return file_worker_->CleanupFile(kv_instance);
 }
 
 void BufferObj::CleanupTempFile() const {

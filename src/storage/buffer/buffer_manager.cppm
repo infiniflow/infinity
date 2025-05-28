@@ -28,6 +28,7 @@ class BufferObjectInfo;
 class KVInstance;
 class PersistenceManager;
 class ObjAddr;
+class Status;
 
 class LRUCache {
 public:
@@ -85,7 +86,7 @@ public:
 
     SizeT BufferedObjectCount();
 
-    void RemoveClean(KVInstance *kv_instance);
+    Status RemoveClean(KVInstance *kv_instance);
 
     void RemoveBufferObjects(const Vector<String> &object_paths);
 

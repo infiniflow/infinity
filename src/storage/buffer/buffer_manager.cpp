@@ -31,6 +31,7 @@ import persistence_manager;
 import virtual_store;
 import global_resource_usage;
 import kv_store;
+import status;
 
 namespace infinity {
 
@@ -178,15 +179,19 @@ SizeT BufferManager::BufferedObjectCount() {
     return buffer_map_.size();
 }
 
-void BufferManager::RemoveClean(KVInstance *kv_instance) {
+Status BufferManager::RemoveClean(KVInstance *kv_instance) {
+    Status status;
     Vector<BufferObj *> clean_list;
     {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
     }
-
+    Status inner_status;
     for (auto *buffer_obj : clean_list) {
-        buffer_obj->CleanupFile(kv_instance);
+        inner_status = buffer_obj->CleanupFile(kv_instance);
+        if (!inner_status.ok() && status.ok()) {
+            status = inner_status;
+        }
     }
     HashSet<BufferObj *> clean_temp_set;
     {
@@ -194,7 +199,7 @@ void BufferManager::RemoveClean(KVInstance *kv_instance) {
         clean_temp_set.swap(clean_temp_set_);
     }
     for (auto *buffer_obj : clean_temp_set) {
-        buffer_obj->CleanupTempFile();
+        buffer_obj->CleanupTempFile(); // cleanup_temp status?
     }
 
     for (auto &lru_cache : lru_caches_) {
@@ -212,6 +217,7 @@ void BufferManager::RemoveClean(KVInstance *kv_instance) {
         }
         buffer_map_.rehash(buffer_map_.size());
     }
+    return status;
 }
 
 Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
