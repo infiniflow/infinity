@@ -3624,13 +3624,7 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
-                    if (!mem_index_status.ok()) {
-                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
-                    }
-                }
+                // auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::COMPACT_V2: {
@@ -3709,17 +3703,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kDumpMemIndex: {
-            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-
-            Status mem_index_status = new_catalog_->UnsetMemIndexDump(dump_index_txn_store->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_txn_store->table_name_, mem_index_status.message()));
-            }
-
-            // Restore memory index here
-            // TODO: Not implemented.
-            UnrecoverableError("Not implemented");
             break;
         }
         case TransactionType::kOptimizeIndex: {

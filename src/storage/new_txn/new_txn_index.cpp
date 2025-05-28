@@ -98,9 +98,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     DeferFn defer_fn([&] {
-        if (status.ok()) {
-            return;
-        }
         Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
         if (!mem_index_status.ok()) {
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
@@ -146,9 +143,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     DeferFn defer_fn([&] {
-        if (status.ok()) {
-            return;
-        }
         Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
         if (!mem_index_status.ok()) {
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
@@ -2008,16 +2002,6 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
     const String &table_id_str = dump_index_cmd->table_id_;
     const String &index_id_str = dump_index_cmd->index_id_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
-
-    //    const String &table_key = dump_index_cmd->table_key_;
-
-    //    if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-    //        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
-    //        if (!mem_index_status.ok()) {
-    //            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_cmd->table_name_,
-    //            mem_index_status.message()));
-    //        }
-    //    }
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
 
