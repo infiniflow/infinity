@@ -1121,7 +1121,7 @@ SharedPtr<MemIndex> NewCatalog::GetMemIndex(const String &mem_index_key) {
 }
 
 bool NewCatalog::GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
-    std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
+    std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
         mem_index = iter->second;
         return false;
