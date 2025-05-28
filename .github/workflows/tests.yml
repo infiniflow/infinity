@@ -78,18 +78,18 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
 
-      #      - name: Run cluster test
-      #        if: ${{ !cancelled() && !failure() }}
-      #        id: run_cluster_test
-      #        run: |
-      #          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
-      #
-      #      - name: Collect cluster test output
-      #        if: ${{ !cancelled() }}
-      #        run: |
-      #          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-      #          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-      #
+#      - name: Run cluster test
+#        if: ${{ !cancelled() && !failure() }}
+#        id: run_cluster_test
+#        run: |
+#          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
+#
+#      - name: Collect cluster test output
+#        if: ${{ !cancelled() }}
+#        run: |
+#          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
+#          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}
         run: |
