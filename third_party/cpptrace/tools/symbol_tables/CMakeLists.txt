@@ -1,0 +1,1 @@
+binary(symbol_tables)

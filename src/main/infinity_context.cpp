@@ -73,6 +73,9 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultCo
         std::exit(static_cast<int>(status.code()));
     }
 
+    // Printing stack trace costs several seconds, so we don't enable it in unit tests.
+    SetPrintStacktrace(true);
+
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
     session_mgr_ = MakeUnique<SessionManager>();
