@@ -4216,8 +4216,8 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
                 EXPECT_EQ(range.second, 8192);
                 offset = range.second;
                 has_next = state.Next(offset, range);
-                EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, 8192);
+                EXPECT_EQ(range.first, range.second);
+                EXPECT_TRUE(state.end());
                 EXPECT_FALSE(has_next);
             }
         }

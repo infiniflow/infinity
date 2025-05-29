@@ -108,6 +108,8 @@ public:
 
     BlockOffset block_offset_end() const { return block_offset_end_; }
 
+    bool end() const { return end_; }
+
 private:
     SharedPtr<BlockLock> block_lock_;
     BufferHandle version_buffer_handle_;
