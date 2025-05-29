@@ -118,7 +118,7 @@ class InfinityRunner:
             try:
                 if infinity_obj is None:
                     infinity_obj = infinity.connect(uri, self.logger)
-                    time.sleep(3)
+                    time.sleep(1)
                 ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
