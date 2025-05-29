@@ -498,6 +498,7 @@ void InfinityContext::UnInit() {
     //    commiting_thread_pool_.stop(true);
     //    hnsw_build_thread_pool_.stop(true);
 
+    VirtualStore::MunmapAllFiles();
     session_mgr_.reset();
     resource_manager_.reset();
     LOG_INFO("Infinity context is un-initialized.");

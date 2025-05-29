@@ -403,6 +403,12 @@ TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
 }
 
 void NewTxnManager::CommitBottom(NewTxn *txn) {
+    if (txn->IsReplay()) {
+        txn->SetTxnBottomDone();
+
+        // We do not update catalog cache during replay as system_cache_ is still nullptr right now.
+        return;
+    }
     TxnTimeStamp commit_ts = txn->CommitTS();
     TransactionID txn_id = txn->TxnID();
     std::lock_guard guard(locker_);
@@ -484,7 +490,7 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             if (base_txn_store != nullptr) {
                 // base_txn_store means the creation with ignore if exists
                 CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store);
-                system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, *txn_store->index_base_->index_name_);
             }
             break;
         }

@@ -640,11 +640,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta->GetMemIndex(mem_index);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
+            SharedPtr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
             return std::make_tuple(chunk_ids_ptr, mem_index);
         };
 

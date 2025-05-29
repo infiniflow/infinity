@@ -781,13 +781,12 @@ Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, Co
             }
             trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
         }
-        SharedPtr<MemIndex> mem_index;
-        status = index_meta->GetMemIndex(mem_index);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        if (mem_index && mem_index->memory_secondary_index_) {
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, mem_index->memory_secondary_index_));
+        SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
+        if (mem_index) {
+            SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
+            if (secondary_index) {
+                trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, secondary_index));
+            }
         }
     }
     // output result

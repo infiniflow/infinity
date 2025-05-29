@@ -107,6 +107,8 @@ String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", Ke
 
 String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
+String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}:{}", object_key_, value_); }
+
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["db_id"] = std::stoull(db_id_str_);
@@ -247,6 +249,13 @@ nlohmann::json PmObjectMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["object"] = object_key_;
     json_res["stat"] = nlohmann::json::parse(value_);
+    return json_res;
+}
+
+nlohmann::json DropMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["drop_key"] = object_key_;
+    json_res["value"] = nlohmann::json::parse(value_);
     return json_res;
 }
 
@@ -407,6 +416,13 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             return pm_object_meta_key;
         }
         UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
+    }
+
+    if (fields[0] == "drop") {
+        const String &object_key = fields[1];
+        SharedPtr<DropMetaKey> drop_meta_key = MakeShared<DropMetaKey>(object_key);
+        drop_meta_key->value_ = value;
+        return drop_meta_key;
     }
 
     const String &tag_name_str = fields[0];

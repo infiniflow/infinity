@@ -82,6 +82,18 @@ Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
     return {&*segment_ids_, Status::OK()};
 }
 
+bool TableIndexMeeta::HasSegmentIndexID(SegmentID segment_id) {
+    auto [segment_ids_ptr, status] = GetSegmentIndexIDs1();
+    if (!status.ok()) {
+        return false;
+    }
+    auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id);
+    if (iter == segment_ids_ptr->end()) {
+        return false;
+    }
+    return true;
+}
+
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
     String segment_ids_key = GetTableIndexTag("segment_ids");
     String segment_ids_str = nlohmann::json(segment_ids).dump();

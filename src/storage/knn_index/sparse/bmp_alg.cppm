@@ -334,6 +334,7 @@ public:
             UnrecoverableError(fmt::format("BMPAlg::Save: write_n != sizeof(size) + size: {} != {}", write_n, sizeof(size) + size));
         }
         file_handle.Append(buffer.get(), sizeof(size) + size);
+        file_handle.Sync();
     }
 
     static BMPAlg<DataType, IdxType, CompressType> Load(LocalFileHandle &file_handle) {
@@ -372,6 +373,7 @@ public:
             UnrecoverableError(fmt::format("BMPAlg::SaveToPtr: write_n != size: {} != {}", write_n, size));
         }
         file_handle.Append(buffer.get(), size);
+        file_handle.Sync();
     }
 
     static BMPAlg<DataType, IdxType, CompressType> LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {

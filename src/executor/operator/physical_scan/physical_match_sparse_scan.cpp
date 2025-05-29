@@ -582,12 +582,6 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta->GetMemIndex(mem_index);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                 BufferObj *index_buffer = nullptr;
@@ -604,8 +598,12 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 bmp_search(*bmp_index, 0, false, filter);
 #endif
             }
-            if (mem_index && mem_index->memory_bmp_index_) {
-                bmp_search(mem_index->memory_bmp_index_->get(), 0, true, filter);
+            SharedPtr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
+            if (mem_index) {
+                SharedPtr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
+                if (bmp_index) {
+                    bmp_search(bmp_index->get(), 0, true, filter);
+                }
             }
         };
 

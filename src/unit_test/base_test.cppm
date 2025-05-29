@@ -171,6 +171,8 @@ export using BaseTest = BaseTestWithParam<void>;
 export class BaseTestNoParam : public BaseTestWithParam<void> {
 public:
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -182,6 +184,7 @@ public:
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -193,6 +196,8 @@ public:
 export class NewBaseTestNoParam : public BaseTestWithParam<void> {
 public:
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -204,6 +209,7 @@ public:
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -215,6 +221,8 @@ public:
 export class BaseTestParamStr : public BaseTestWithParam<std::string> {
 public:
     void SetUp() override {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -230,6 +238,7 @@ public:
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);

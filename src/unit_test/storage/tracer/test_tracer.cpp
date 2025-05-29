@@ -231,7 +231,8 @@ void TestMemIndexTracer::DumpRoutine() {
 class MemIndexTracerTest : public BaseTest {};
 
 TEST_F(MemIndexTracerTest, test1) {
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();
@@ -252,7 +253,8 @@ TEST_F(MemIndexTracerTest, test1) {
 }
 
 TEST_F(MemIndexTracerTest, test2) {
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();

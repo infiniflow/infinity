@@ -39,6 +39,8 @@ public:
 
     ValueType Get(SizeT i) {
         std::shared_lock<std::shared_mutex> lock(mutex_);
+        if (i >= vec_.size())
+            return std::numeric_limits<ValueType>::max();
         return vec_[i];
     }
 
