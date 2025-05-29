@@ -132,7 +132,9 @@ class InfinityRunner:
                         raise e
                 else:
                     print(e)
-                print(f"retry connect {i}")
+                sleep_time = 1 * (i + 1)
+                print(f"Retrying connection attempt {i + 1} after {sleep_time} seconds.")
+                time.sleep(sleep_time)
         else:
             raise Exception(f"Cannot connect to infinity after {try_n} retries.")
         return infinity_obj
