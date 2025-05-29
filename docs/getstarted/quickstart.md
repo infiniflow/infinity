@@ -15,37 +15,83 @@ A quickstart guide.
   - Windows 10+ with WSL/WSL2.
 - Python: Python 3.10+.
 
-## Install embedded Infinity
+## Deploy Infinity using Docker 
 
-If you wish to embed Infinity into your Python application without the need for a separate backend server:  
+This section provides guidance on deploying the Infinity database using Docker, with the client and server as separate processes. 
 
-1. Install the Infinity-embedded SDK:
+### Prerequisites
+
+- CPU: x86_64 with AVX2 support.
+- OS: 
+  - Linux with glibc 2.17+. 
+  - Windows 10+ with WSL/WSL2. 
+  - MacOS
+
+### Install Infinity server
+
+This section provides instructions on deploying the Infinity using Docker on Linux x86_64, MacOS x86_64, and Windows WSL/WSL2. 
+
+<Tabs
+  defaultValue="linux_mac"
+  values={[
+    {label: 'Linux x86_64 & MacOS x86_64', value: 'linux_mac'},
+    {label: 'Windows', value: 'windows'},
+  ]}>
+   <TabItem value="linux_mac">
+
+```bash
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+docker pull infiniflow/infinity:nightly
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+```
+  </TabItem>
+  <TabItem value="windows">
+
+If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using Docker. Suppose you've installed Ubuntu in WSL2:
+
+1. Follow [this](https://learn.microsoft.com/en-us/windows/wsl/systemd) to enable systemd inside WSL2.
+2. Install docker-ce according to the [instructions here](https://docs.docker.com/engine/install/ubuntu).
+3. If you have installed Docker Desktop version 4.29+ for Windows: **Settings** **>** **Features in development**, then select **Enable host networking**.
+4. Pull the Docker image and start Infinity: 
+
    ```bash
-   pip install infinity-embedded-sdk==0.6.0.dev3
-   ```
-2. Use Infinity to conduct a dense vector search:
-   ```python
-   import infinity_embedded
-
-   # Connect to infinity
-   infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
-   # Retrieve a database object named default_db
-   db_object = infinity_object.get_database("default_db")
-   # Create a table with an integer column, a varchar column, and a dense vector column
-   table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
-   # Insert two rows into the table
-   table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-   table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-   # Conduct a dense vector search
-   res = table_object.output(["*"])
-                     .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
-                     .to_pl()
-   print(res)
+   sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+   docker pull infiniflow/infinity:nightly
+   docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
    ```
 
-## Deploy Infinity in client-server mode
+  </TabItem>
+</Tabs>
 
-If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+### Install Infinity client
+
+```
+pip install infinity-sdk==0.6.0.dev3
+```
+
+### Run a vector search
+
+```python
+import infinity
+
+infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+db_object = infinity_object.get_database("default_db")
+table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+res = table_object.output(["*"])
+                  .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                  .to_pl()
+print(res)
+```
+
+:::tip NOTE
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+:::
+
+:::info NOTE
+If you wish to deploy Infinity *using binary* with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+:::
 
 ## Build from Source
 
