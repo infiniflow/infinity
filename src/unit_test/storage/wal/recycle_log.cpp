@@ -56,6 +56,9 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

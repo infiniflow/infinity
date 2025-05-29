@@ -208,11 +208,8 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->comment_ptr_ = comment;
+    txn_store->db_id_str_ = db_id_str;
     txn_store->db_id_ = std::stoull(db_id_str);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabaseV2>(db_name, db_id_str, *comment);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
@@ -251,10 +248,6 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     String db_id_str = db_meta->db_id_str();
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_id_ = std::stoull(db_id_str);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabaseV2>(db_name, db_meta->db_id_str());
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
@@ -369,12 +362,9 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = *table_def->table_name();
+    txn_store->table_id_str_ = table_id_str;
     txn_store->table_id_ = std::stoull(table_id_str);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableV2>(db_name, db_meta->db_id_str(), table_id_str, table_def);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->table_def_ = table_def;
     LOG_TRACE("NewTxn::CreateTable created table entry is inserted.");
     return Status::OK();
 }
@@ -422,15 +412,10 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
-    for (auto &column_def : column_defs) {
-        txn_store->column_defs_.emplace_back(column_def.get());
-    }
-
-    // Generate add column cmd
-    auto wal_command = MakeShared<WalCmdAddColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_defs);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+    txn_store->table_id_str_ = table_meta->table_id_str();
+    txn_store->table_id_ = std::stoull(table_meta->table_id_str());
+    txn_store->column_defs_ = column_defs;
+    txn_store->table_key_ = table_key;
 
     return Status::OK();
 }
@@ -510,14 +495,11 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     txn_store->db_id_str_ = db_meta->db_id_str();
     txn_store->db_id_ = std::stoull(db_meta->db_id_str());
     txn_store->table_name_ = table_name;
+    txn_store->table_id_str_ = table_meta->table_id_str();
+    txn_store->table_id_ = std::stoull(table_meta->table_id_str());
     txn_store->column_names_ = column_names;
-
-    auto wal_command =
-        MakeShared<WalCmdDropColumnsV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), column_names, column_ids);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->column_ids_ = column_ids;
+    txn_store->table_key_ = table_key;
     return Status::OK();
 }
 
@@ -564,12 +546,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->table_id_ = std::stoull(table_id_str);
-
-    auto wal_command = MakeShared<WalCmdDropTableV2>(db_name, db_meta->db_id_str(), table_name, table_id_str);
-    wal_command->table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->table_key_ = table_key;
     LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
     return Status::OK();
 }
@@ -617,12 +594,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     txn_store->old_table_name_ = old_table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->new_table_name_ = new_table_name;
-
-    auto wal_command = MakeShared<WalCmdRenameTableV2>(db_name, db_meta->db_id_str(), old_table_name, table_id_str, new_table_name);
-    wal_command->old_table_key_ = table_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
+    txn_store->old_table_key_ = table_key;
     LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
 }
@@ -696,14 +668,15 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_meta->table_id_str();
     txn_store->table_id_ = std::stoull(txn_store->table_id_str_);
+    txn_store->index_id_str_ = index_id_str;
     txn_store->index_base_ = index_base;
+    txn_store->table_key_ = table_key;
 
     auto wal_command =
-        MakeShared<WalCmdCreateIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_id_str, index_base);
+        MakeShared<WalCmdCreateIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_id_str, index_base, table_key);
     wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
     LOG_TRACE("NewTxn::CreateIndex created index entry is inserted.");
     return Status::OK();
 }
@@ -778,11 +751,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     txn_store->index_name_ = index_name;
     txn_store->index_id_str_ = index_id;
     txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
-
-    auto wal_command = MakeShared<WalCmdDropIndexV2>(db_name, db_meta->db_id_str(), table_name, table_meta->table_id_str(), index_name, index_id);
-    wal_command->index_key_ = index_key;
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+    txn_store->index_key_ = index_key;
 
     LOG_TRACE(fmt::format("NewTxn::DropIndexByName dropped index: {}.{}.{}", db_name, table_name, index_name));
     return Status::OK();
@@ -1041,9 +1010,13 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return status;
     }
 
-    auto checkpoint_cmd = MakeShared<WalCmdCheckpointV2>(option.checkpoint_ts_);
-    wal_entry_->cmds_.push_back(checkpoint_cmd);
-    txn_context_ptr_->AddOperation(MakeShared<String>(checkpoint_cmd->ToString()));
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<CheckpointTxnStore>();
+    CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
+    txn_store->max_commit_ts_ = option.checkpoint_ts_;
 
     return Status::OK();
 }
@@ -1215,13 +1188,13 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 
 Status NewTxn::Commit() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
-    if ((wal_entry_->cmds_.empty() && base_txn_store_ == nullptr && txn_store_.ReadOnly() && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
+    if ((base_txn_store_ == nullptr && txn_store_.ReadOnly() && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
         LOG_TRACE(fmt::format("Commit READ txn: {}. begin ts: {}, Command: {}", txn_context_ptr_->txn_id_, BeginTS(), *GetTxnText()));
-        return PostReadTxnCommit();
+        return Status::OK();
     }
 
     StorageMode current_storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -1283,7 +1256,7 @@ Status NewTxn::Commit() {
     }
 
     if (status.ok()) {
-        status = this->PrepareCommit(commit_ts);
+        status = this->PrepareCommit();
     }
 
     if (!status.ok()) {
@@ -1313,10 +1286,12 @@ Status NewTxn::CommitReplay() {
 
     this->SetTxnCommitting(commit_ts);
 
-    Status status = this->PrepareCommitReplay(commit_ts);
+    Status status = this->PrepareCommit();
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Replay transaction, prepare commit: {}", status.message()));
     }
+
+    CommitBottom();
 
     // Try to commit the transaction
     status = kv_instance_->Commit();
@@ -1328,174 +1303,6 @@ Status NewTxn::CommitReplay() {
     return Status::OK();
 }
 
-Status NewTxn::PrepareCommitReplay(TxnTimeStamp commit_ts) {
-    // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
-    for (auto &command : wal_entry_->cmds_) {
-        WalCommandType command_type = command->GetType();
-        switch (command_type) {
-            case WalCommandType::DUMMY: {
-                break;
-            }
-            case WalCommandType::CREATE_DATABASE_V2: {
-                auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
-                Status status = CommitReplayCreateDB(create_db_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_DATABASE_V2: {
-                auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
-                Status status = CommitDropDB(drop_db_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::CREATE_TABLE_V2: {
-                auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
-                Status status = CommitCreateTable(create_table_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_TABLE_V2: {
-                auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
-                Status status = CommitDropTable(drop_table_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::RENAME_TABLE_V2: {
-                auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
-                Status status = CommitRenameTable(rename_table_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::ADD_COLUMNS_V2: {
-                auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
-                Status status = CommitAddColumns(add_column_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_COLUMNS_V2: {
-                auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
-                Status status = CommitDropColumns(drop_column_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::CREATE_INDEX_V2: {
-                auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
-                Status status = CommitCreateIndex(create_index_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DROP_INDEX_V2: {
-                auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
-                Status status = CommitDropIndex(drop_index_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DUMP_INDEX_V2: {
-                // TODO: move follow to post commit
-                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::APPEND_V2: {
-                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
-                Status status = CommitAppend(append_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = PostCommitAppend(append_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::DELETE_V2: {
-                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
-
-                Status status = PrepareCommitDelete(delete_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::IMPORT_V2: {
-                auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
-                Status status = CommitImport(import_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::COMPACT_V2: {
-                auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
-                Status status = CommitCompact(compact_cmd);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case WalCommandType::CHECKPOINT_V2: {
-                auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-                Status status = CommitCheckpoint(checkpoint_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to checkpoint");
-                }
-                break;
-            }
-            case WalCommandType::OPTIMIZE_V2: {
-                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
-                break;
-            }
-            default: {
-                UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
-                break;
-            }
-        }
-    }
-
-    String commit_ts_str = std::to_string(commit_ts);
-    for (const String &meta_key : keys_wait_for_commit_) {
-        kv_instance_->Put(meta_key, commit_ts_str);
-    }
-    return Status::OK();
-}
-
-Status NewTxn::CommitReplayCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
-    Optional<DBMeeta> db_meta;
-    const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
-    Status status = NewCatalog::AddNewDB(kv_instance_.get(), create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
-    if (!status.ok()) {
-        return status;
-    }
-    // IncreaseLatestDBID
-    SizeT id_num = std::stoull(create_db_cmd->db_id_);
-    ++id_num;
-    status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
-    return status;
-}
-
 Status NewTxn::CommitRecovery() {
     // Try to commit the rocksdb transaction
     Status status = kv_instance_->Commit();
@@ -1505,22 +1312,12 @@ Status NewTxn::CommitRecovery() {
     return Status::OK();
 }
 
-Status NewTxn::PostReadTxnCommit() {
-    // Restore the mem index reference count
-    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
-        }
-    }
-
-    return Status::OK();
-}
-
-Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
+Status NewTxn::PrepareCommit() {
     // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
+    // TODO: CreateIndex has populated wal_entry_ via PopulateIndex(). Need to unify the way.
+    if (base_txn_store_.get() != nullptr && GetTxnType() != TransactionType::kCreateIndex) {
+        wal_entry_ = base_txn_store_->ToWalEntry(this->CommitTS());
+    }
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
@@ -1609,15 +1406,6 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
                 break;
             }
             case WalCommandType::APPEND_V2: {
-                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
-                Status status = CommitAppend(append_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = PostCommitAppend(append_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
                 break;
             }
             case WalCommandType::DELETE_V2: {
@@ -1662,11 +1450,6 @@ Status NewTxn::PrepareCommit(TxnTimeStamp commit_ts) {
                 break;
             }
         }
-    }
-
-    String commit_ts_str = std::to_string(commit_ts);
-    for (const String &meta_key : keys_wait_for_commit_) {
-        kv_instance_->Put(meta_key, commit_ts_str);
     }
     return Status::OK();
 }
@@ -2044,7 +1827,7 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kUpdate: {
             return CheckConflictTxnStore(static_cast<const UpdateTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
-        case TransactionType::kCheckpoint:
+        case TransactionType::kNewCheckpoint:
         default: {
             return false;
         }
@@ -2375,11 +2158,6 @@ bool NewTxn::CheckConflictCmd(const WalCmdAppendV2 &cmd, NewTxn *previous_txn, S
 bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
-    Set<SegmentID> segment_ids;
-    for (const auto &row_range : txn_store.row_ranges_) {
-        RowID row_id = row_range.first;
-        segment_ids.insert(row_id.segment_id_);
-    }
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCreateIndex: {
@@ -2412,14 +2190,6 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
             }
             break;
         }
-        case TransactionType::kDumpMemIndex: {
-            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name &&
-                segment_ids.contains(dump_index_txn_store->segment_id_)) {
-                conflict = true;
-            }
-            break;
-        }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
@@ -2431,6 +2201,14 @@ bool NewTxn::CheckConflictTxnStore(const AppendTxnStore &txn_store, NewTxn *prev
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kRenameTable: {
+            RenameTableTxnStore *rename_table_txn_store = static_cast<RenameTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (rename_table_txn_store->db_name_ == db_name && rename_table_txn_store->old_table_name_ == table_name) {
                 retry_query = false;
                 conflict = true;
             }
@@ -2933,7 +2711,7 @@ bool NewTxn::CheckConflictCmd(const WalCmdCompactV2 &cmd, NewTxn *previous_txn, 
 bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     const String &table_name = txn_store.table_name_;
-    const Vector<SegmentID> &segment_ids = txn_store.segment_ids_;
+    const Vector<SegmentID> &segment_ids = txn_store.deprecated_segment_ids_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCompact: {
@@ -3408,8 +3186,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name &&
                 std::find_first_of(segment_ids.begin(),
                                    segment_ids.end(),
-                                   compact_txn_store->segment_ids_.begin(),
-                                   compact_txn_store->segment_ids_.end()) != segment_ids.end()) {
+                                   compact_txn_store->deprecated_segment_ids_.begin(),
+                                   compact_txn_store->deprecated_segment_ids_.end()) != segment_ids.end()) {
                 conflict = true;
             }
             break;
@@ -3672,9 +3450,13 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
         }
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name &&
-                segment_ids.contains(dump_index_txn_store->segment_id_)) {
-                conflict = true;
+            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name) {
+                for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
+                    if (segment_ids.contains(segment_id)) {
+                        conflict = true;
+                        break;
+                    }
+                }
             }
             break;
         }
@@ -3751,7 +3533,29 @@ void NewTxn::CommitBottom() {
     if (txn_state != TxnState::kCommitting) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
-    // TODO: Append, Update, DumpMemoryIndex
+    // TODO: DumpMemoryIndex
+    for (auto &command : wal_entry_->cmds_) {
+        WalCommandType command_type = command->GetType();
+        switch (command_type) {
+            case WalCommandType::APPEND_V2: {
+                auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
+                Status status = CommitBottomAppend(append_cmd);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("CommitBottomAppend faield: {}", status.message()));
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    TxnTimeStamp commit_ts = this->CommitTS();
+    String commit_ts_str = std::to_string(commit_ts);
+    for (const String &meta_key : keys_wait_for_commit_) {
+        kv_instance_->Put(meta_key, commit_ts_str);
+    }
     txn_mgr_->CommitBottom(this);
 }
 
@@ -3824,13 +3628,7 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
-                    if (!mem_index_status.ok()) {
-                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
-                    }
-                }
+                // auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::COMPACT_V2: {
@@ -3840,16 +3638,6 @@ void NewTxn::PostCommit() {
             default: {
                 break;
             }
-        }
-    }
-
-    // Restore the mem index reference count
-    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
         }
     }
 
@@ -3873,77 +3661,91 @@ void NewTxn::CancelCommitBottom() {
 }
 
 Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
-        WalCommandType command_type = wal_cmd->GetType();
-        switch (command_type) {
-            case WalCommandType::ADD_COLUMNS_V2: {
-                //                auto *cmd = static_cast<WalCmdAddColumnsV2 *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::DROP_COLUMNS_V2: {
-                //                auto *cmd = static_cast<WalCmdDropColumnsV2 *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::DROP_TABLE_V2: {
-                //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::RENAME_TABLE_V2: {
-                //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::CREATE_INDEX_V2: {
-                break;
-            }
-            case WalCommandType::DROP_INDEX_V2: {
-                //                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::APPEND_V2: {
-                //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                break;
-            }
-            case WalCommandType::DELETE_V2: {
-                auto *cmd = static_cast<WalCmdDeleteV2 *>(wal_cmd.get());
-                Status status = RollbackDelete(cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to rollback delete operation");
-                }
-                break;
-            }
-            case WalCommandType::IMPORT_V2: {
-                ImportTxnStore *append_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+    TransactionType txn_type = TransactionType::kInvalid;
+    if (base_txn_store_ != nullptr) {
+        txn_type = base_txn_store_->type_;
+    }
+    switch (txn_type) {
+        case TransactionType::kCreateDB: {
+            break;
+        }
+        case TransactionType::kDropDB: {
+            break;
+        }
+        case TransactionType::kCreateTable: {
+            break;
+        }
+        case TransactionType::kAppend: {
+            break;
+        }
+        case TransactionType::kImport: {
+            ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
-                SizeT data_block_count = append_txn_store->input_blocks_.size();
-                for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
-                    append_txn_store->input_blocks_[block_idx]->UnInit();
-                }
-                break;
+            SizeT data_block_count = import_txn_store->input_blocks_in_imports_[0].size();
+            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+                import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
             }
-            case WalCommandType::DUMP_INDEX_V2: {
-                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
-                    if (!mem_index_status.ok()) {
-                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
-                    }
-                }
+
+            if (import_txn_store->index_names_.size() > 0) {
                 // Restore memory index here
-                // TODO: Not implemented.
                 UnrecoverableError("Not implemented");
-                break;
             }
-            case WalCommandType::COMPACT_V2: {
-                //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                break;
+            break;
+        }
+        case TransactionType::kCompact: {
+            CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+            if (compact_txn_store->index_names_.size() > 0) {
+                // Restore memory index here
+                UnrecoverableError("Not implemented");
             }
-            case WalCommandType::CHECKPOINT_V2: {
-                UnrecoverableError("Unexpected case: rollback checkpoint");
-                break;
+            break;
+        }
+        case TransactionType::kCreateIndex: {
+            break;
+        }
+        case TransactionType::kDropIndex: {
+            break;
+        }
+        case TransactionType::kDumpMemIndex: {
+            break;
+        }
+        case TransactionType::kOptimizeIndex: {
+            OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+
+            if (optimize_index_txn_store->index_names_.size() > 0) {
+                // Restore memory index here
+                UnrecoverableError("Not implemented");
             }
-            default: {
-                break;
+            break;
+        }
+        case TransactionType::kDelete: {
+            DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
+            Status status = RollbackDelete(delete_txn_store, kv_instance_.get());
+            if (!status.ok()) {
+                UnrecoverableError("Fail to rollback delete operation");
             }
+            break;
+        }
+        case TransactionType::kAddColumn: {
+            break;
+        }
+        case TransactionType::kDropColumn: {
+            break;
+        }
+        case TransactionType::kDropTable: {
+            break;
+        }
+        case TransactionType::kRenameTable: {
+            break;
+        }
+        case TransactionType::kUpdate: {
+            break;
+        }
+        case TransactionType::kNewCheckpoint: {
+            UnrecoverableError("Unexpected case: rollback checkpoint");
+            break;
+        }
+        default: {
         }
     }
 
@@ -4022,16 +3824,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         return status;
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
-
-    // Restore the mem index reference count
-    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
-        const auto &table_key = ref_cnt_pair.first;
-        const auto &ref_cnt = ref_cnt_pair.second;
-        status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post rollback phase: {}", status.message()));
-        }
-    }
 
     if (conflicted_txn_ != nullptr) {
         // Wait for dependent transaction finished
@@ -4194,6 +3986,14 @@ bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == Transactio
 Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
     WalCommandType command_type = command->GetType();
     switch (command_type) {
+        case WalCommandType::CREATE_DATABASE_V2: {
+            auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
+
+            // IncreaseLatestDBID
+            SizeT id_num = std::stoull(create_db_cmd->db_id_);
+            Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
+            break;
+        }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
@@ -4422,23 +4222,8 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, file_paths);
 }
 
-Status NewTxn::IncreaseMemIndexReferenceCount(const String &table_key) {
-    Status status = new_catalog_->IncreaseTableReferenceCountForMemIndex(table_key);
-    if (status.ok()) {
-        ++mem_index_reference_count_[table_key];
-    }
-    return status;
-}
-
-SizeT NewTxn::GetMemIndexReferenceCount(const String &table_key) {
-    if (mem_index_reference_count_.find(table_key) == mem_index_reference_count_.end()) {
-        return 0;
-    }
-    return mem_index_reference_count_[table_key];
-}
-
 Status NewTxn::Dummy() {
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDummy>());
+    base_txn_store_ = MakeShared<DummyTxnStore>();
     return Status::OK();
 }
 
