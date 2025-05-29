@@ -3996,16 +3996,20 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             break;
         }
         case WalCommandType::CREATE_TABLE_V2: {
-            auto *create_index_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
+            auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
 
             Optional<DBMeeta> db_meta;
             String table_key;
-            Status status = GetDBMeta(create_index_cmd->db_name_, db_meta);
+            Status status = GetDBMeta(create_table_cmd->db_name_, db_meta);
             if (!status.ok()) {
                 return status;
             }
 
-            status = db_meta->SetNextTableID(create_index_cmd->table_id_);
+            u64 next_table_id = std::stoull(create_table_cmd->table_id_);
+            ++next_table_id;
+            String next_table_id_str = std::to_string(next_table_id);
+
+            status = db_meta->SetNextTableID(next_table_id_str);
             if (!status.ok()) {
                 return status;
             }
@@ -4021,7 +4025,12 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            status = table_meta->SetNextIndexID(create_index_cmd->index_id_);
+
+            u64 next_index_id = std::stoull(create_index_cmd->index_id_);
+            ++next_index_id;
+            String next_index_id_str = std::to_string(next_index_id);
+
+            status = table_meta->SetNextIndexID(next_index_id_str);
             if (!status.ok()) {
                 return status;
             }
