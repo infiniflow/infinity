@@ -636,13 +636,6 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
-    // Get latest index id and lock the id
-    String index_id_str;
-    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
-    if (!status.ok()) {
-        return status;
-    }
-
     String index_key;
     String index_id;
     status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
@@ -650,8 +643,16 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
+        LOG_ERROR(fmt::format("CreateIndex: index {} already exists, index_key: {}, index_id: {}", *index_base->index_name_, index_key, index_id));
         return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     } else if (status.code() != ErrorCode::kIndexNotExist) {
+        return status;
+    }
+
+    // Get the latest index id and lock the id
+    String index_id_str;
+    std::tie(index_id_str, status) = table_meta->GetNextIndexID();
+    if (!status.ok()) {
         return status;
     }
 
@@ -3994,6 +3995,22 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
             break;
         }
+        case WalCommandType::CREATE_TABLE_V2: {
+            auto *create_index_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
+
+            Optional<DBMeeta> db_meta;
+            String table_key;
+            Status status = GetDBMeta(create_index_cmd->db_name_, db_meta);
+            if (!status.ok()) {
+                return status;
+            }
+
+            status = db_meta->SetNextTableID(create_index_cmd->table_id_);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
@@ -4004,9 +4021,10 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            create_index_cmd->db_id_ = db_meta->db_id_str();
-            create_index_cmd->table_id_ = table_meta->table_id_str();
-            create_index_cmd->table_key_ = std::move(table_key);
+            status = table_meta->SetNextIndexID(create_index_cmd->index_id_);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::APPEND_V2: {

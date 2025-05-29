@@ -137,6 +137,10 @@ public:
 
     Status GetNextRowID(RowID &next_row_id);
 
+    Tuple<String, Status> GetNextIndexID();
+
+    Status SetNextIndexID(const String &index_id_str);
+
 private:
     Status LoadComment();
 
