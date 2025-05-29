@@ -164,7 +164,13 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             // Print back strace
             infinity::PrintTransactionHistory();
             infinity::PrintStacktrace("SEGMENT FAULTS");
-            exit(-1);
+
+            // Restore default behavior and raise again to generate a coredump
+            struct sigaction sa;
+            sa.sa_handler = SIG_DFL;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sigaction(SIGSEGV, &sa, nullptr);
             break;
         }
 #if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
