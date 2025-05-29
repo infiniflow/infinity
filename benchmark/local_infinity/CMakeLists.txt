@@ -38,6 +38,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -94,6 +97,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -147,6 +153,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -202,6 +211,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -255,6 +267,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -307,6 +322,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -359,6 +377,9 @@ target_link_libraries(
     ssl.a
     crypto.a
     rocksdb.a
+    cpptrace.a
+    dwarf.a
+    zstd.a
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")

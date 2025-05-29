@@ -54,6 +54,9 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
+        cpptrace.a
+        dwarf.a
+        zstd.a
 )
 
 # add_definitions(-march=native)

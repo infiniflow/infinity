@@ -41,11 +41,7 @@ import logical_type;
 import data_type;
 
 using namespace infinity;
-class SmallIntegerCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override {}
-};
+class SmallIntegerCastTest : public BaseTest {};
 
 TEST_F(SmallIntegerCastTest, small_integer_cast0) {
     using namespace infinity;
