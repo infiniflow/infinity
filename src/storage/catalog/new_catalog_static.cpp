@@ -80,10 +80,10 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
 
     if (block_offset_begin == block_offset_end_) {
-        auto offsets = block_version->GetCommitRowCount(commit_ts_);
-        visible_range = {offsets.first, offsets.second};
+        auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
+        visible_range = {offset, offset + commit_cnt};
         end_ = true;
-        return offsets.first != offsets.second;
+        return commit_cnt;
     }
 
     std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);

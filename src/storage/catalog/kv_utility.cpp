@@ -194,8 +194,8 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
     {
         std::shared_lock lock(block_lock->mtx_);
         row_cnt = block_version->GetRowCount(begin_ts);
-        auto offsets = block_version->GetCommitRowCount(commit_ts);
-        row_cnt += offsets.second - offsets.first;
+        auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
+        row_cnt += commit_cnt;
     }
     return row_cnt;
 }
