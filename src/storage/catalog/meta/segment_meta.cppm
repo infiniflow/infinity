@@ -60,9 +60,9 @@ public:
 
     // New
     Status Init();
-    // Status AddBlockID(BlockID block_id);
 
     Pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
+    Status AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id);
 
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
 

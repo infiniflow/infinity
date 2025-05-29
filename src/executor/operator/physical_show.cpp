@@ -1372,8 +1372,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
     // Get tables from catalog
     NewTxn *txn = query_context->GetNewTxn();
-    auto [chunk_index_info, status] =
-        txn->GetChunkIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value(), chunk_id_.value());
+    auto [chunk_index_info, status] = txn->GetChunkIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value(), chunk_id_.value());
     if (!status.ok()) {
         RecoverableError(status);
         return;
@@ -1554,7 +1553,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     // Get tables from catalog
-    Vector<TableDetail> tables_detail;
+    Vector<SharedPtr<TableDetail>> tables_detail;
     Status status;
     NewTxn *txn = query_context->GetNewTxn();
     status = txn->GetTables(db_name_, tables_detail);
@@ -1570,7 +1569,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    for (auto &table_detail : tables_detail) {
+    for (auto &table_detail_ptr : tables_detail) {
         // Initialize the output data block
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1580,7 +1579,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
         SizeT column_id = 0;
         {
             // Append schema name to the 0 column
-            const String *db_name = table_detail.db_name_.get();
+            const String *db_name = table_detail_ptr->db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1589,14 +1588,14 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             // Append table name to the 1 column
-            const String *table_name = table_detail.table_name_.get();
+            const String *table_name = table_detail_ptr->table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
-        TableEntryType table_type = table_detail.table_entry_type_;
+        TableEntryType table_type = table_detail_ptr->table_entry_type_;
         {
             // Append base table type to the 2 column
             const String &base_table_type_str = ToString(table_type);
@@ -1610,7 +1609,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             // Append column count the 3 column
             switch (table_type) {
                 case TableEntryType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.column_count_));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->column_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -1631,7 +1630,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             switch (table_type) {
                 case TableEntryType::kTableEntry:
                 case TableEntryType::kCollectionEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.block_count_));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->block_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -1649,7 +1648,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             switch (table_type) {
                 case TableEntryType::kCollectionEntry:
                 case TableEntryType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.block_capacity_));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->block_capacity_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -1667,7 +1666,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             switch (table_type) {
                 case TableEntryType::kCollectionEntry:
                 case TableEntryType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.segment_count_));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail_ptr->segment_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -1682,7 +1681,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             // Append segment capacity the 7 column
-            SizeT default_row_size = table_detail.segment_capacity_;
+            SizeT default_row_size = table_detail_ptr->segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1691,7 +1690,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
         ++column_id;
         {
             // Append segment capacity the 8 column
-            Value value = Value::MakeVarchar(*table_detail.table_comment_);
+            Value value = Value::MakeVarchar(*table_detail_ptr->table_comment_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1711,71 +1710,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
 }
 
 void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    // Define output table schema
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    // Get tables from catalog
-    Vector<ViewDetail> views_detail;
-    Status status;
-    NewTxn *txn = query_context->GetNewTxn();
-    status = txn->GetViews(db_name_, views_detail);
-    if (!status.ok()) {
-        show_operator_state->status_ = status.clone();
-        RecoverableError(status);
-    }
-
-    // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
-    SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
-
-    for (auto &view_detail : views_detail) {
-        if (!output_block_ptr) {
-            output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
-        }
-
-        SizeT column_id = 0;
-        {
-            // Append schema name to the 0 column
-            const String *db_name = view_detail.db_name_.get();
-            Value value = Value::MakeVarchar(*db_name);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append table name to the 1 column
-            const String *table_name = view_detail.view_name_.get();
-            Value value = Value::MakeVarchar(*table_name);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append base table type to the 2 column
-            Value value = Value::MakeBigInt(static_cast<i64>(view_detail.column_count_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        if (++row_count == output_block_ptr->capacity()) {
-            output_block_ptr->Finalize();
-            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
-            output_block_ptr = nullptr;
-            row_count = 0;
-        }
-    }
-
-    if (output_block_ptr) {
-        output_block_ptr->Finalize();
-        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
-    }
+    RecoverableError(Status::NotSupport("SHOW VIEW isn't implemented"));
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {

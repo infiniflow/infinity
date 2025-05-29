@@ -23,7 +23,7 @@ namespace infinity {
 struct SegmentEntry;
 struct BlockEntry;
 struct BlockColumnEntry;
-class DataBlock;
+struct DataBlock;
 class ColumnVector;
 
 export struct MetaColumnVectorState {

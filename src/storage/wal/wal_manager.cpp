@@ -1228,8 +1228,7 @@ Tuple<TransactionID, TxnTimeStamp> WalManager::ReplayWalEntries(const Vector<Sha
 
         UniquePtr<NewTxn> replay_txn = txn_mgr->BeginReplayTxn(replay_entry);
         for (const auto &cmd : replay_entry->cmds_) {
-            LOG_INFO(
-                fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), replay_entry->commit_ts_));
+            LOG_INFO(fmt::format("Replay wal cmd: {}, commit ts: {}", cmd->ToString(), replay_entry->commit_ts_));
 
             Status status = replay_txn->ReplayWalCmd(cmd);
             if (!status.ok()) {

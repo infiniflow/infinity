@@ -389,14 +389,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta.GetMemIndex(mem_index);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            SharedPtr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
             // 1. in mem index
-            if (const EMVBIndexInMem *emvb_index_in_mem = mem_index->memory_emvb_index_.get(); emvb_index_in_mem) {
+            if (emvb_index_in_mem) {
                 // TODO: fix the parameters
                 const auto result =
                     emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),

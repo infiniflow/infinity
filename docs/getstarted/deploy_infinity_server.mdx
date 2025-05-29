@@ -3,140 +3,24 @@ sidebar_position: 3
 slug: /deploy_infinity_server
 ---
 
-# Deploy Infinity
+# Deploy Infinity using binary
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Three ways to deploy Infinity.
+Deploy the Infinity database using binary.
 
 ---
 
-This document provides guidance on deploying the Infinity database. In general, you can deploy Infinity in the following three ways: 
+This document provides guidance on deploying the Infinity database using binary, with the client and server as separate processes. 
 
-- [Import Infinity as a Python module](#import-infinity-as-a-python-module): To run Infinity locally as a Python module.
-- [Deploy Infinity using Docker](#deploy-infinity-using-docker): To run Infinity with the client and server as separate processes.
-- [Deploy Infinity using binary](#deploy-infinity-using-binary): To run Infinity with the client and server as separate processes.
-
-## Import Infinity as a Python module
-
-:::caution IMPORTANT
-This approach allows you to call Infinity as a Python module. To deploy Infinity with the client and server as separate processes, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
-:::
-
-### Prerequisites
-
-- CPU: x86_64 with AVX2 support.
-- Python: Python 3.10+.
-- OS: 
-  - Linux with glibc 2.17+.
-  - Windows 10+ with WSL/WSL2.
-
-### Install Infinity as a module
-
-```
-pip install infinity-embedded-sdk==0.6.0.dev3
-```
-
-### Create an Infinity object
-
-```python
-import infinity_embedded
-
-infinity_obj = infinity_embedded.connect("absolute/path/to/save/to")
-```
-
-:::tip NOTE
-For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
-:::
-
-
-## Deploy Infinity using Docker 
-
-To deploy Infinity with the client and server as separate processes, consider either [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary). Be aware of the respective system requirements for each approach.
-
-### Prerequisites
-
-- CPU: x86_64 with AVX2 support.
-- OS: 
-  - Linux with glibc 2.17+. 
-  - Windows 10+ with WSL/WSL2. 
-  - MacOS
-
-### Install Infinity server
-
-This section provides instructions on deploying the Infinity using Docker on Linux x86_64, MacOS x86_64, and Windows WSL/WSL2. 
-
-<Tabs
-  defaultValue="linux_mac"
-  values={[
-    {label: 'Linux x86_64 & MacOS x86_64', value: 'linux_mac'},
-    {label: 'Windows', value: 'windows'},
-  ]}>
-   <TabItem value="linux_mac">
-
-```bash
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
-```
-  </TabItem>
-  <TabItem value="windows">
-
-If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using Docker. Suppose you've installed Ubuntu in WSL2:
-
-1. Follow [this](https://learn.microsoft.com/en-us/windows/wsl/systemd) to enable systemd inside WSL2.
-2. Install docker-ce according to the [instructions here](https://docs.docker.com/engine/install/ubuntu).
-3. If you have installed Docker Desktop version 4.29+ for Windows: **Settings** **>** **Features in development**, then select **Enable host networking**.
-4. Pull the Docker image and start Infinity: 
-
-   ```bash
-   sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-   docker pull infiniflow/infinity:nightly
-   docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
-   ```
-
-  </TabItem>
-</Tabs>
-
-### Install Infinity client
-
-```
-pip install infinity-sdk==0.6.0.dev3
-```
-
-### Run a vector search
-
-```python
-import infinity
-
-infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
-db_object = infinity_object.get_database("default_db")
-table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
-table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-res = table_object.output(["*"])
-                  .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
-                  .to_pl()
-print(res)
-```
-
-:::tip NOTE
-For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
-:::
-
-## Deploy Infinity using binary
-
-
-To deploy Infinity with the client and server as separate processes, consider either [Deploy Infinity using binary](#deploy-infinity-using-binary) or [Deploy Infinity using Docker](#deploy-infinity-using-docker). Be aware of the respective system requirements for each approach.
-
-### Prerequisites
+## Prerequisites
 
 - CPU: x86_64 with AVX2 support.
 - OS: 
   - Linux with glibc 2.17+.
   - Windows 10+ with WSL/WSL2.
 
-### Install Infinity server
+## Install Infinity server
 
 This section provides instructions on deploying Infinity using binary package on Linux x86_64. You can download the binary package (deb, rpm, or tgz) for your Linux system from https://github.com/infiniflow/infinity/releases. The prebuilt packages are compatible with Linux distributions based on glibc 2.17 or later, for example, RHEL 7, Debian 8, Ubuntu 14.04.
 
@@ -172,13 +56,13 @@ sudo systemctl start infinity
   </TabItem>
 </Tabs>
 
-### Install Infinity client
+## Install Infinity client
 
 ```
 pip install infinity-sdk==0.6.0.dev3
 ```
 
-### Run a vector search
+## Run a vector search
 
 ```python
 import infinity

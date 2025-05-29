@@ -203,9 +203,8 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         EXPECT_EQ(mem_index->memory_hnsw_index_, nullptr);
         txn_mgr->PrintAllKeyValue();
         {
@@ -323,9 +322,8 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         EXPECT_EQ(mem_index->memory_secondary_index_, nullptr);
         txn_mgr->PrintAllKeyValue();
         {

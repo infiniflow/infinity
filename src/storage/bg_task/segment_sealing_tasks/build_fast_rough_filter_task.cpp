@@ -741,9 +741,9 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentMeta *segment_me
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job begin.", segment_meta->segment_id()));
 
     auto segment_filters = BuildingSegmentFastFilters::Make(segment_meta);
-    // step 1. when build minmax, set timestamp
+    // step 1. when building minmax, set timestamp
     segment_filters->CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask();
-    // step2. when build minmax, init filters to size of column_count
+    // step2. when building minmax, init filters to size of column_count
     u32 column_count = 0;
     {
         auto [column_defs, status] = segment_meta->table_meta().GetColumnDefs();

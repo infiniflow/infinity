@@ -71,12 +71,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Build debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DENABLE_SANITIZER_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
-    
+
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }}
         run: |
@@ -94,11 +93,11 @@ jobs:
           sudo sysctl -w vm.mmap_rnd_bits=28
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=restart_tsan.log ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
           sudo sysctl -w vm.mmap_rnd_bits=$old_value
-  
+
       - name: Collect restart test output with thread sanitizer
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }} # always run this step even if previous steps failed
           # remove symbolic link
-          # find all log file like [debug.log.*] in directory, and cat to stdout
+        # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           failure="${{ steps.run_restart_test_sanitizer.outcome == 'failure'}}"
           sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=restart_tsan.log
@@ -135,7 +134,7 @@ jobs:
             cat debug_error.log
             exit 1
           fi
-    
+
       - name: Run pytest parallel with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         id: run_tests_debug
@@ -177,7 +176,7 @@ jobs:
       - name: Collect restart test output
         if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }} # always run this step even if previous steps failed
           # remove symbolic link
-          # find all log file like [debug.log.*] in directory, and cat to stdout
+        # find all log file like [debug.log.*] in directory, and cat to stdout
         run: |
           sudo python3 scripts/prepare_restart_test_data.py --op=remove
           failure="${{ steps.run_restart_test.outcome == 'failure'}}"
@@ -221,4 +220,3 @@ jobs:
             if [ -n "${BUILDER_CONTAINER}" ]; then
               sudo docker rm -f -v ${BUILDER_CONTAINER}
             fi
-  

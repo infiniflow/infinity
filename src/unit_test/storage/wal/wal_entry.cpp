@@ -179,7 +179,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "2", "tbl1", "1"));
+        entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "2", "tbl1", "1", "table_key"));
         entry->commit_ts_ = 4;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -200,6 +200,8 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 }
 
 TEST_F(WalEntryTest, ReadWrite) {
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(nullptr);
     infinity::InfinityContext::instance().InitPhase2();
@@ -296,6 +298,8 @@ TEST_F(WalEntryTest, ReadWrite) {
 }
 
 TEST_F(WalEntryTest, ReadWriteV2) {
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
     infinity::InfinityContext::instance().InitPhase1(config_path);
@@ -304,7 +308,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     entry->cmds_.push_back(MakeShared<WalCmdCreateDatabaseV2>("db1", "1", "default2_comment"));
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabaseV2>("db1", "1"));
     entry->cmds_.push_back(MakeShared<WalCmdCreateTableV2>("db1", "1", "2", MockTableDesc2()));
-    entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "1", "tbl1", "2"));
+    entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "1", "tbl1", "2", "table_key"));
     {
         WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
         entry->cmds_.push_back(MakeShared<WalCmdImportV2>("db1", "1", "tbl1", "2", std::move(segment_info)));
@@ -316,9 +320,9 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         for (auto parameter : parameters) {
             delete parameter;
         }
-        entry->cmds_.push_back(MakeShared<WalCmdCreateIndexV2>("db1", "1", "tbl1", "2", "3", index_base));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateIndexV2>("db1", "1", "tbl1", "2", "3", index_base, "table_key"));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3"));
+    entry->cmds_.push_back(MakeShared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", "index_key"));
     {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -352,10 +356,11 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         info.deprecate_ts_ = 0;
         Vector<WalChunkIndexInfo> chunk_infos{info};
         Vector<ChunkID> deprecate_ids{0, 1};
-        entry->cmds_.push_back(MakeShared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids));
+        entry->cmds_.push_back(
+            MakeShared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids, "table_key"));
     }
     {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2"));
+        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
     }
     {
         Vector<SharedPtr<ColumnDef>> column_defs;
@@ -368,13 +373,14 @@ TEST_F(WalEntryTest, ReadWriteV2) {
 
         column_defs.push_back(column_def3);
         column_defs.push_back(column_def4);
-        entry->cmds_.push_back(MakeShared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_defs)));
+        entry->cmds_.push_back(MakeShared<WalCmdAddColumnsV2>("db1", "1", "tbl1", "2", std::move(column_defs), "table_key"));
     }
     {
         Vector<String> column_names;
         column_names.push_back("boolean_col");
         column_names.push_back("embedding_col");
-        entry->cmds_.push_back(MakeShared<WalCmdDropColumnsV2>("db1", "1", "tbl1", "2", std::move(column_names), Vector<ColumnID>{3, 4}));
+        entry->cmds_.push_back(
+            MakeShared<WalCmdDropColumnsV2>("db1", "1", "tbl1", "2", std::move(column_names), Vector<ColumnID>{3, 4}, "table_key"));
     }
 
     i32 exp_size = entry->GetSizeInBytes();

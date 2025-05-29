@@ -389,13 +389,10 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
         }
         for (SegmentID segment_id : *index_segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-
-            SharedPtr<MemIndex> mem_index;
-            Status status = segment_index_meta.GetMemIndex(mem_index);
-            if (!status.ok()) {
-                return status;
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            if (mem_index == nullptr) {
+                continue;
             }
-
             mem_indexes.push_back(mem_index);
             mem_index_ids.push_back(MemIndexID{db_name, table_name, index_name, segment_id});
         }
@@ -858,6 +855,34 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     return Status::OK();
 }
 
+Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id) {
+    Status status = segment_meta.AddBlockWithID(commit_ts, block_id);
+    if (!status.ok()) {
+        return status;
+    }
+    block_meta.emplace(block_id, segment_meta);
+    status = block_meta->InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    {
+        TableMeeta &table_meta = segment_meta.table_meta();
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, *block_meta);
+        status = column_meta.InitSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
     Status status;
 
@@ -912,23 +937,25 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
             return status;
         }
     }
-    for (const auto &column_def : *column_defs_ptr) {
-        const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
-        ColumnMeta column_meta(column_def->id(), block_meta);
-        status = column_meta.SetChunkOffset(chunk_offset);
-        if (!status.ok()) {
-            return status;
-        }
+     for (const auto &column_def : *column_defs_ptr) {
+     //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
+         ColumnMeta column_meta(column_def->id(), block_meta);
+     //    status = column_meta.SetChunkOffset(chunk_offset);
+     //    if (!status.ok()) {
+     //        return status;
+     //    }
 
-        status = column_meta.LoadSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    // status = block_meta.SetRowCnt(block_info.row_count_);
-    // if (!status.ok()) {
-    //     return status;
-    // }
+         status = column_meta.LoadSet();
+         if (!status.ok()) {
+             return status;
+         }
+     }
+     /*
+     status = block_meta.SetRowCnt(block_info.row_count_);
+     if (!status.ok()) {
+         return status;
+     }
+     */
 
     return Status::OK();
 }
@@ -1162,31 +1189,38 @@ Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, c
 
 Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
     Status status;
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm) {
-        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
+    ChunkID next_chunk_id = 0;
+    status = segment_index_meta.GetNextChunkID(next_chunk_id);
+    if (!status.ok()) {
+        return status;
     }
-
-    ChunkID chunk_id = 0;
-    {
-        status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        if (chunk_id != chunk_info.chunk_id_) {
-            UnrecoverableError(fmt::format("Chunk id mismatch, expect: {}, actual: {}", chunk_id, chunk_info.chunk_id_));
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
+    if (next_chunk_id <= chunk_info.chunk_id_) {
+        status = segment_index_meta.SetNextChunkID(chunk_info.chunk_id_ + 1);
         if (!status.ok()) {
             return status;
         }
     }
-    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+    Vector<ChunkID> *chunk_ids_ptr = nullptr;
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    auto iter = std::find(chunk_ids_ptr->begin(), chunk_ids_ptr->end(), chunk_info.chunk_id_);
+    if (iter != chunk_ids_ptr->end()) {
+        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+        LOG_WARN(fmt::format("Chunk index {}/{}/{}/{} already exists in KV",
+                             table_meta.db_id_str(),
+                             table_meta.table_id_str(),
+                             segment_index_meta.segment_id(),
+                             chunk_info.chunk_id_));
+        return Status::OK();
+    }
+
+    status = segment_index_meta.AddChunkIndexID1(chunk_info.chunk_id_, new_txn);
+    if (!status.ok()) {
+        return status;
+    }
+    ChunkIndexMeta chunk_index_meta(chunk_info.chunk_id_, segment_index_meta);
 
     ChunkIndexMetaInfo chunk_meta_info;
     {
@@ -1204,6 +1238,10 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
         return status;
     }
 
+    auto *pm = InfinityContext::instance().persistence_manager();
+    if (pm) {
+        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
+    }
     return Status::OK();
 }
 

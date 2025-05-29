@@ -354,9 +354,8 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
 
         auto [row_id, row_cnt] = check_mem_index(mem_index);
         EXPECT_EQ(row_id, RowID(0, 0));

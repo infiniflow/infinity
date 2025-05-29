@@ -691,6 +691,12 @@ Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
     return Status::OK();
 }
 
+Status TableMeeta::DelUnsealedSegmentID() {
+    String unsealed_id_key = GetTableTag("unsealed_segment_id");
+    Status status = kv_instance_.Delete(unsealed_id_key);
+    return status;
+}
+
 Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column_name) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
     String column_value_str;

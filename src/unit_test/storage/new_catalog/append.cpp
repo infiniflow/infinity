@@ -286,9 +286,9 @@ TEST_P(TestTxnAppend, test_append1) {
         new_txn_mgr->PrintAllKeyValue();
 
         status2 = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status2.ok());
+        EXPECT_TRUE(status2.ok());
     }
-    SizeT total_row_count = 6;
+    SizeT total_row_count = 8;
 
     // Check the appended data.
     {
@@ -459,7 +459,7 @@ TEST_P(TestTxnAppend, test_append2) {
     //    t1      append                 commit (success)
     //    |----------|-------------------------|
     //            |----------------------|----------|
-    //           t2                  append      commit (fail)
+    //           t2                  append      commit (success)
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
@@ -472,9 +472,9 @@ TEST_P(TestTxnAppend, test_append2) {
         status1 = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status1.ok());
         status2 = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status2.ok());
+        EXPECT_TRUE(status2.ok());
     }
-    SizeT total_row_count = insert_row * 3;
+    SizeT total_row_count = insert_row * 4;
 
     // Check the appended data.
     {
@@ -2579,7 +2579,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (conflict)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
     //                    t2        rename table (success) commit (success)
@@ -2611,7 +2611,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2630,7 +2630,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                    commit (success)
+    //    t1                                      append                                    commit (conflict)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|------------------------------|
     //                    t2                rename                 commit (success)
@@ -2663,7 +2663,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2682,10 +2682,10 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (conflict)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
-    //                    t2                  drop column  commit (success)
+    //                    t2                  rename table  commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -2714,7 +2714,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2766,7 +2766,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -2788,7 +2788,7 @@ TEST_P(TestTxnAppend, test_append_rename) {
     //                                                           t1                  append(fail)                          rollback (success)
     //                                                          |--------------------|------------------------------------------|
     //                    |-----------------|----------|
-    //                    t2           drop column   commit (success)
+    //                    t2           rename table   commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -2972,7 +2972,7 @@ TEST_P(TestTxnAppend, test_append_append) {
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |----------------------|----------|
-    //                    t2                  append    commit (fail)
+    //                    t2                  append    commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -3000,12 +3000,12 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         SizeT row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(row_count, 4096);
+        EXPECT_EQ(row_count, 8192);
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -3027,7 +3027,7 @@ TEST_P(TestTxnAppend, test_append_append) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  append             commit (fail)
+    //                    t2                  append             commit (success)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -3055,7 +3055,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // Check the appended data.
         {
@@ -3089,14 +3089,14 @@ TEST_P(TestTxnAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 4096);
+            EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
@@ -3116,7 +3116,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      append                                   commit (fail)
+    //    t1      append                                   commit (success)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
     //                    t2        append           commit (success)
@@ -3146,12 +3146,12 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         SizeT row_count = 0;
         std::tie(row_count, status) = GetTableRowCount(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(row_count, 4096);
+        EXPECT_EQ(row_count, 8192);
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -3170,7 +3170,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                   commit (fail)
+    //    t1                                      append                                   commit (success)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  append   commit (success)
@@ -3202,7 +3202,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // Check the appended data.
         {
@@ -3236,14 +3236,14 @@ TEST_P(TestTxnAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 4096);
+            EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
@@ -3263,7 +3263,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                                   append                                   commit (fail)
+    //    t1                                                   append                                   commit (success)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column  commit (success)
@@ -3293,7 +3293,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // Check the appended data.
         {
@@ -3327,14 +3327,14 @@ TEST_P(TestTxnAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 4096);
+            EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
@@ -3354,7 +3354,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                                                  t1                  append                                   commit (fail)
+    //                                                  t1                  append                                   commit (success)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  append   commit (success)
@@ -3385,7 +3385,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // Check the appended data.
         {
@@ -3419,14 +3419,14 @@ TEST_P(TestTxnAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 4096);
+            EXPECT_EQ(row_count, 8192);
         }
 
         // drop database
@@ -4811,7 +4811,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  compact (fail)          commit (success)
+    //                    t2                  compact                   commit (success)
     {
         PrepareForCompact();
 
@@ -4827,12 +4827,12 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -4840,7 +4840,7 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
     //    t1      append                                   commit (success)
     //    |----------|-----------------------------------------------|
     //                    |-------------|-----------------------|
-    //                    t2        compact (fail)    rollback (success)
+    //                    t2        compact          commit (success)
     {
         PrepareForCompact();
 
@@ -4858,9 +4858,9 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -4886,9 +4886,9 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -4913,9 +4913,9 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }
@@ -4941,9 +4941,9 @@ TEST_P(TestTxnAppend, test_append_and_compact) {
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        CheckTable({2});
+        CheckTable({2, 3});
 
         DropDB();
     }

@@ -22,7 +22,6 @@ This document provides instructions for loading configuration file for Infinity 
   values={[
     {label: 'Docker', value: 'docker'},
     {label: 'DEB/RPM', value: 'binary'},
-    {label: 'Embedded Infinity', value: 'embedded'},
   ]}>
   <TabItem value="docker">
 
@@ -39,14 +38,6 @@ To load a configuration file when you start up Infinity using Docker:
   <TabItem value="binary">
 
 If you start up Infinity from DEB or RPM, the configuration file will be in the `/usr/etc` directory. When the Infinity service starts, it will load this configuration file.
-
-</TabItem>
-  <TabItem value="embedded">
-
-Infinity embedded does not have an *explicit* configuration file. Its configuration file should meet the following requirements:
-
-- It is in the local folder where Infinity embedded is opened (the path that you specify when calling `connect()`), for example `/var/infinity/`:
-- Its name must exactly match **infinity_conf.toml**.
 
 </TabItem>
 </Tabs>

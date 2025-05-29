@@ -140,21 +140,15 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                 ColumnReaderChunkInfo{index_buffer, chunk_info_ptr->base_row_id_, u32(chunk_info_ptr->row_cnt_), chunk_id, segment_id});
         }
 
-        SharedPtr<MemoryIndexer> memory_indexer;
         {
-            SharedPtr<MemIndex> mem_index;
-            Status status = segment_index_meta.GetMemIndex(mem_index);
-            if (!status.ok()) {
-                return status;
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            SharedPtr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->GetFulltextIndex();
+            if (memory_indexer && memory_indexer->GetDocCount() != 0) {
+                SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
+                segment_readers_.push_back(std::move(segment_reader));
+                // for loading column length file
+                memory_indexer_ = memory_indexer;
             }
-            memory_indexer = mem_index->memory_indexer_;
-        }
-        if (memory_indexer && memory_indexer->GetDocCount() != 0) {
-            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
-            segment_readers_.push_back(std::move(segment_reader));
-            // for loading column length file
-            assert(memory_indexer_.get() == nullptr);
-            memory_indexer_ = memory_indexer;
         }
 
         SharedPtr<SegmentIndexFtInfo> ft_info_ptr;

@@ -108,7 +108,8 @@ public:
 // Test status transfer of buffer handle.
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();
@@ -522,6 +523,8 @@ TEST_F(BufferObjTest, test1) {
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -645,9 +648,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             SegmentID segment_id = 0;
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta.GetMemIndex(mem_index);
-            EXPECT_TRUE(status.ok());
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             EXPECT_NE(mem_index, nullptr);
         }
 
@@ -668,6 +669,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
@@ -798,6 +801,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
 TEST_F(BufferObjTest, test_multiple_threads_read) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
