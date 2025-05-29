@@ -3450,9 +3450,13 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
         }
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name &&
-                segment_ids.contains(dump_index_txn_store->segment_id_)) {
-                conflict = true;
+            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name) {
+                for (SegmentID segment_id : dump_index_txn_store->segment_ids_) {
+                    if (segment_ids.contains(segment_id)) {
+                        conflict = true;
+                        break;
+                    }
+                }
             }
             break;
         }

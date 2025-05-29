@@ -270,7 +270,8 @@ export struct DumpMemIndexTxnStore : public BaseTxnStore {
     String index_name_{};
     String index_id_str_{};
     u64 index_id_{};
-    SegmentID segment_id_{};
+    Vector<SegmentID> segment_ids_{};
+    Map<SegmentID, Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
     String table_key_{};
 
     String ToString() const final;
