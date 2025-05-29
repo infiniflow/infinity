@@ -285,8 +285,9 @@ export struct PmObjectMetaKey final : public MetaKey {
 };
 
 export struct DropMetaKey final : public MetaKey {
-    DropMetaKey(String object_key) : MetaKey(MetaType::kDrop), object_key_(std::move(object_key)) {}
+    DropMetaKey(String scope, String object_key) : MetaKey(MetaType::kDrop), scope_(std::move(scope)), object_key_(std::move(object_key)) {}
 
+    String scope_{};
     String object_key_{};
     String value_{};
 
