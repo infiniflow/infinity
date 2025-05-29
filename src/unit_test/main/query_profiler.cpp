@@ -33,6 +33,7 @@ class QueryProfilerTest : public BaseTest {
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
+        SetPrintStacktrace(false);
     }
 
     void TearDown() override {

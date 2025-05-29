@@ -46,6 +46,7 @@ class BoolCastTest : public BaseTest {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
+        SetPrintStacktrace(false);
     }
 
     void TearDown() override {}

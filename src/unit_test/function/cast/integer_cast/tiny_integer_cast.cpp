@@ -42,11 +42,7 @@ import data_type;
 
 using namespace infinity;
 
-class TinyIntegerCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class TinyIntegerCastTest : public BaseTest {};
 
 TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
     using namespace infinity;

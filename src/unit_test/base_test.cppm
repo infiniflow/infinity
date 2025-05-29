@@ -27,6 +27,7 @@ export module base_test;
 import stl;
 import infinity_context;
 import global_resource_usage;
+import infinity_exception;
 
 namespace fs = std::filesystem;
 
@@ -47,7 +48,7 @@ public:
 
     ~BaseTestWithParam() override = default;
 
-    void SetUp() override {}
+    void SetUp() override { SetPrintStacktrace(false); }
     void TearDown() override {}
 
 public:
@@ -182,6 +183,7 @@ public:
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NULL_CONFIG_PATH);
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
+        SetPrintStacktrace(false);
     }
 
     void TearDown() override {
@@ -207,6 +209,7 @@ public:
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
+        SetPrintStacktrace(false);
     }
 
     void TearDown() override {
@@ -236,6 +239,7 @@ public:
         }
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
+        SetPrintStacktrace(false);
     }
 
     void TearDown() override {
