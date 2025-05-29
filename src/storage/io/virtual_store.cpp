@@ -568,6 +568,15 @@ i32 VirtualStore::MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length) {
     return munmap(aligned_ptr, align_length);
 }
 
+void VirtualStore::MunmapAllFiles() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    for (auto it = mapped_files_.begin(); it != mapped_files_.end(); ++it) {
+        auto &mmap_info = it->second;
+        munmap(mmap_info.data_ptr_, mmap_info.data_len_);
+    }
+    mapped_files_.clear();
+}
+
 // Remote storage
 StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
 String VirtualStore::bucket_ = "infinity";

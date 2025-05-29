@@ -396,6 +396,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
 
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
     file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
+    file_handle->Sync();
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
@@ -407,7 +408,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     is_spilled_ = spill;
-    Reset();
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting

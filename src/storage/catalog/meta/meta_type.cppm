@@ -40,6 +40,7 @@ export enum class MetaType {
     kSystemTag,
     kPmPath,
     kPmObject,
+    kDrop,
 };
 
 }

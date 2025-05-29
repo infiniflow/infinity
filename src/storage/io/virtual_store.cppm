@@ -82,6 +82,8 @@ public:
     static i32 MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr);
     static i32 MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length);
 
+    static void MunmapAllFiles();
+
     static Status InitRemoteStore(StorageType storage_type = StorageType::kMinio,
                                   const String &URL = "http://localhost:9000",
                                   bool HTTPS = false,

@@ -91,6 +91,8 @@ public:
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
+    Status DelUnsealedSegmentID();
+
     // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);

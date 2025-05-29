@@ -231,7 +231,7 @@ Status FileWorker::CleanupFile(KVInstance *kv_instance) const {
 void FileWorker::CleanupTempFile() const {
     String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     if (VirtualStore::Exists(path)) {
-        LOG_INFO(fmt::format("Clean file: {}", path));
+        LOG_INFO(fmt::format("Clean temp file: {}", path));
         VirtualStore::DeleteFile(path);
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);

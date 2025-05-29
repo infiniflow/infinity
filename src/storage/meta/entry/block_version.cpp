@@ -80,10 +80,7 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
 }
 
 i64 BlockVersion::GetRowCount() const {
-    i64 row_count = 0;
-    for (const auto &created : created_) {
-        row_count += created.row_count_;
-    }
+    i64 row_count = created_.empty() ? 0 : created_.back().row_count_;
     return row_count;
 }
 
