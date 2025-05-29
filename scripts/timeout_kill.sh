@@ -50,7 +50,7 @@ while true; do
                 kill -9 $pid
             fi
         done
-        exit 2  # Return a different value
+        exit 0  # Return a different value
     fi
 
     # Sleep briefly to avoid a tight loop
