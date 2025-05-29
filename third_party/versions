@@ -22,3 +22,4 @@ pugixml 1.14
 inih r58
 curl 8.10.1
 rocksdb 9.10.0
+cpptrace v1.0.1
