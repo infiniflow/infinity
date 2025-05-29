@@ -68,6 +68,22 @@ bool BlockVersion::operator==(const BlockVersion &rhs) const {
     return true;
 }
 
+Pair<i64, i64> BlockVersion::GetCommitRowCount(TxnTimeStamp commit_ts) const {
+    if (commit_ts == MAX_TIMESTAMP) {
+        return {};
+    }
+    struct Comp {
+        bool operator()(const CreateField &field, TxnTimeStamp ts) const { return field.create_ts_ < ts; }
+        bool operator()(TxnTimeStamp ts, const CreateField &field) const { return ts < field.create_ts_; }
+    };
+    auto [left, right] = std::equal_range(created_.begin(), created_.end(), commit_ts, Comp{});
+    if (left == right) {
+        return {};
+    }
+    --right;
+    return {left->row_count_, right->row_count_};
+}
+
 i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     // use binary search find the last create_field that has create_ts_ <= check_ts
     auto iter =

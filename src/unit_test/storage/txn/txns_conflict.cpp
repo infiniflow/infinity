@@ -52,6 +52,7 @@ public:
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -71,7 +72,7 @@ public:
         BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;

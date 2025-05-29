@@ -49,6 +49,7 @@ export struct BlockVersion {
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
 
+    Pair<i64, i64> GetCommitRowCount(TxnTimeStamp commit_ts) const;
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
 

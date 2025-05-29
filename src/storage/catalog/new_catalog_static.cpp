@@ -57,10 +57,14 @@ namespace infinity {
 
 // } // namespace
 
-void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts) {
+void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock,
+                                      BufferHandle version_buffer_handle,
+                                      TxnTimeStamp begin_ts,
+                                      TxnTimeStamp commit_ts) {
     block_lock_ = std::move(block_lock);
     version_buffer_handle_ = std::move(version_buffer_handle);
     begin_ts_ = begin_ts;
+    commit_ts_ = commit_ts;
     {
         std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
         const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
@@ -69,10 +73,18 @@ void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock, BufferHan
 }
 
 bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range) {
-    if (block_offset_begin == block_offset_end_) {
+    if (end_) {
         return false;
     }
+
     const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
+
+    if (block_offset_begin == block_offset_end_) {
+        auto offsets = block_version->GetCommitRowCount(commit_ts_);
+        visible_range = {offsets.first, offsets.second};
+        end_ = true;
+        return offsets.first != offsets.second;
+    }
 
     std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
     while (block_offset_begin < block_offset_end_ && block_version->CheckDelete(block_offset_begin, begin_ts_)) {
@@ -93,6 +105,7 @@ Optional<BlockOffset> NewTxnBlockVisitor::Next() {
         return None;
     }
     while (cur_ >= visible_range_.second) {
+        // get next range (without delete) in [0, block_offset_end_) & commit_ts block
         bool has_next = visit_state_->Next(visible_range_.second, visible_range_);
         if (!has_next) {
             end_ = true;
@@ -365,9 +378,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
     return Status::OK();
 }
 
-Status NewCatalog::GetAllMemIndexes(NewTxn *txn,
-                                    Vector<SharedPtr<MemIndex>> &mem_indexes,
-                                    Vector<MemIndexID> &mem_index_ids) {
+Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
     KVInstance *kv_instance = txn->kv_instance();
@@ -1241,7 +1252,7 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, con
     return Status::OK();
 }
 
-Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state) {
+Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state) {
     auto [version_buffer, status] = block_meta.GetVersionBuffer();
     if (!status.ok()) {
         return status;
@@ -1255,7 +1266,7 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
             return status;
         }
     }
-    state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
+    state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts, commit_ts);
     return Status::OK();
 }
 
@@ -1501,9 +1512,9 @@ Status NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin
     return Status::OK();
 }
 
-Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, Bitmask &bitmask) {
+Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask) {
     NewTxnGetVisibleRangeState state;
-    Status status = GetBlockVisibleRange(block_meta, begin_ts, state);
+    Status status = GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
     if (!status.ok()) {
         return status;
     }
@@ -1527,7 +1538,7 @@ Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp beg
     return Status::OK();
 }
 
-Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, Bitmask &bitmask) {
+Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask) {
     TxnTimeStamp first_delete_ts = 0;
     Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
     if (!status.ok()) {
@@ -1543,7 +1554,7 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
     }
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, bitmask);
+        Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             return status;
         }

@@ -122,6 +122,7 @@ TEST_P(TestTxnDelete, test_delete) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -143,7 +144,7 @@ TEST_P(TestTxnDelete, test_delete) {
 
         BlockMeta block_meta(block_id, segment_meta);
 
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -267,6 +268,7 @@ TEST_P(TestTxnDelete, test_delete_multiple_blocks) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -285,7 +287,7 @@ TEST_P(TestTxnDelete, test_delete_multiple_blocks) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -343,6 +345,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -361,7 +364,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_db) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -635,6 +638,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -653,7 +657,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_table) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -955,6 +959,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -973,7 +978,7 @@ TEST_P(TestTxnDelete, test_delete_and_add_column) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -1603,6 +1608,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -1621,7 +1627,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_column) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -2220,6 +2226,7 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -2238,7 +2245,7 @@ TEST_P(TestTxnDelete, test_delete_and_rename) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -2824,6 +2831,7 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -2842,7 +2850,7 @@ TEST_P(TestTxnDelete, test_delete_and_create_index) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -3444,6 +3452,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -3462,7 +3471,7 @@ TEST_P(TestTxnDelete, test_delete_and_drop_index) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -4146,6 +4155,7 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4165,7 +4175,7 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
             for (const auto block_id : *block_ids_ptr) {
                 BlockMeta block_meta(block_id, segment_meta);
 
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
                 Pair<BlockOffset, BlockOffset> range;
                 BlockOffset offset = 0;
@@ -4196,7 +4206,7 @@ TEST_P(TestTxnDelete, test_delete_and_import) {
             for (const auto block_id : *block_ids_ptr) {
                 BlockMeta block_meta(block_id, segment_meta);
 
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
                 Pair<BlockOffset, BlockOffset> range;
                 BlockOffset offset = 0;
@@ -4890,6 +4900,7 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4910,7 +4921,7 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
             {
                 BlockMeta block_meta(0, segment_meta);
 
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
                 Pair<BlockOffset, BlockOffset> range;
                 BlockOffset offset = 0;
@@ -4929,7 +4940,7 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
             {
                 BlockMeta block_meta(1, segment_meta);
 
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
                 Pair<BlockOffset, BlockOffset> range;
                 BlockOffset offset = 0;
@@ -5591,6 +5602,7 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -5611,7 +5623,7 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
             {
                 BlockMeta block_meta(0, segment_meta);
 
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
                 Pair<BlockOffset, BlockOffset> range;
                 BlockOffset offset = 0;
@@ -5630,7 +5642,7 @@ TEST_P(TestTxnDelete, test_delete_and_delete) {
             //            {
             //                BlockMeta block_meta(1, segment_meta);
             //
-            //                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            //                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             //                EXPECT_TRUE(status.ok());
             //                Pair<BlockOffset, BlockOffset> range;
             //                BlockOffset offset = 0;
@@ -6175,6 +6187,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -6194,7 +6207,7 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         EXPECT_EQ(block_ids_ptr->size(), 1);
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -6614,6 +6627,7 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
     auto CheckTable = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -6633,7 +6647,7 @@ TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
         EXPECT_EQ(block_ids_ptr->size(), 3);
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;

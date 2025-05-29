@@ -5332,6 +5332,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -5350,7 +5351,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;

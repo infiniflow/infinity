@@ -1109,7 +1109,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
 
     NewTxnGetVisibleRangeState range_state;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, range_state);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, range_state);
     if (!status.ok()) {
         return status;
     }
