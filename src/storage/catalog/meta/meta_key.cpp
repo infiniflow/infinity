@@ -14,6 +14,7 @@
 
 module;
 
+#include "base64.hpp"
 #include <string>
 
 module meta_key;
@@ -177,7 +178,7 @@ nlohmann::json BlockMetaKey::ToJson() const {
 
 nlohmann::json BlockTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
+    json_res[tag_name_] = base64::to_base64(value_);
     return json_res;
 }
 
@@ -305,6 +306,20 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         auto segment_tag_meta_key = MakeShared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
         segment_tag_meta_key->value_ = value;
         return segment_tag_meta_key;
+    }
+
+    // construct blk tag meta key
+    if (fields[0] == "blk") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &segment_id_str = fields[3];
+        const String &block_id_str = fields[4];
+        const String &tag_name_str = fields[5];
+        SegmentID segment_id = std::stoul(segment_id_str);
+        BlockID block_id = std::stoul(block_id_str);
+        auto block_tag_meta_key = MakeShared<BlockTagMetaKey>(db_id_str, table_id_str, segment_id, block_id, tag_name_str);
+        block_tag_meta_key->value_ = value;
+        return block_tag_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "blk") {
