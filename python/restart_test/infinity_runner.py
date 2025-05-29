@@ -118,6 +118,7 @@ class InfinityRunner:
             try:
                 if infinity_obj is None:
                     infinity_obj = infinity.connect(uri, self.logger)
+                    time.sleep(3)
                 ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
@@ -131,7 +132,6 @@ class InfinityRunner:
                         raise e
                 else:
                     print(e)
-                time.sleep(1)
                 print(f"retry connect {i}")
         else:
             raise Exception(f"Cannot connect to infinity after {try_n} retries.")
