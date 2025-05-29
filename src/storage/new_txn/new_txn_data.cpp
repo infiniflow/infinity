@@ -1393,20 +1393,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp begin_ts = BeginTS();
     TxnTimeStamp commit_ts = CommitTS();
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commite_ts);
-
-    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
-    AppendState *append_state = txn_table_store->append_state();
-    if (append_state == nullptr) {
-        status = txn_table_store->Append(append_cmd->block_);
-        if (!status.ok()) {
-            return status;
-        }
-        append_state = txn_table_store->append_state();
-        append_state->Finalize();
-    }
-
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     SizeT copied_row_cnt = 0;
