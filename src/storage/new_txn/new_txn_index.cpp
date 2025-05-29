@@ -131,24 +131,21 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
-        base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
-        DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-        txn_store->db_name_ = db_name;
-        txn_store->db_id_str_ = table_index_meta->table_meta().db_id_str();
-        txn_store->table_name_ = table_name;
-        txn_store->table_id_str_ = table_index_meta->table_meta().table_id_str();
-        txn_store->index_name_ = index_name;
-        txn_store->index_id_str_ = table_index_meta->index_id_str();
-        txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
-        txn_store->segment_ids_ = *segment_ids_ptr;
-        txn_store->table_key_ = table_key;
-        txn_store->chunk_infos_in_segments_ = segment_chunk_infos;
-    } else {
-        DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-        txn_store->segment_ids_ = *segment_ids_ptr;
-        txn_store->chunk_infos_in_segments_ = segment_chunk_infos;
+    if (base_txn_store_ != nullptr) {
+        UnrecoverableError("txn store of dump mem index can't be null");
     }
+    base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
+    DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = table_index_meta->table_meta().db_id_str();
+    txn_store->table_name_ = table_name;
+    txn_store->table_id_str_ = table_index_meta->table_meta().table_id_str();
+    txn_store->index_name_ = index_name;
+    txn_store->index_id_str_ = table_index_meta->index_id_str();
+    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
+    txn_store->segment_ids_ = *segment_ids_ptr;
+    txn_store->table_key_ = table_key;
+    txn_store->chunk_infos_in_segments_ = segment_chunk_infos;
 
     return Status::OK();
 }
@@ -193,6 +190,9 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         return Status::UnexpectedError("txn store is not null");
     }
 
+    if (base_txn_store_ != nullptr) {
+        UnrecoverableError("txn store of dump mem index can't be null");
+    }
     base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
     DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
