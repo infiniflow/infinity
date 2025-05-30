@@ -377,8 +377,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
-                    String error_message = fmt::format("Segment not found: {}, idx: {}", block_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    // Segment is compacted
+                    String error_message = fmt::format("Segment not found, maybe is compacted: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_message);
+                    continue;
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
