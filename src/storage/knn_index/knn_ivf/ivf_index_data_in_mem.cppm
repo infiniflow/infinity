@@ -26,6 +26,7 @@ import buffer_handle;
 import base_memindex;
 import memindex_tracer;
 import table_index_entry;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -85,6 +86,8 @@ public:
     NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id, SegmentIndexEntry *segment_index_entry);
 
     virtual SizeT MemoryUsed() const = 0;
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
 private:
     virtual void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,

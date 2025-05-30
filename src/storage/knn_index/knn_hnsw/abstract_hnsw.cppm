@@ -43,6 +43,7 @@ import memindex_tracer;
 import table_index_entry;
 import buffer_handle;
 import third_party;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -219,6 +220,8 @@ public:
     AbstractHnsw *get_ptr() { return &hnsw_; }
 
     TableIndexEntry *table_index_entry() const override;
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
 protected:
     MemIndexTracerInfo GetInfo() const override;

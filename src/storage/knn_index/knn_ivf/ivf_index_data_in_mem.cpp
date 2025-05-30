@@ -72,6 +72,8 @@ u32 IVFIndexInMem::GetInputRowCount() const {
     return input_row_count_;
 }
 
+const ChunkIndexMetaInfo IVFIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, input_row_count_, 0}; }
+
 template <LogicalType column_logical_type, EmbeddingDataType embedding_data_type>
 struct InMemStorage;
 
@@ -121,7 +123,11 @@ public:
     MemIndexTracerInfo GetInfo() const override {
         const auto mem = MemoryUsed();
         if (segment_index_entry_ == nullptr) {
-            return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem, input_row_count_);
+            return MemIndexTracerInfo(MakeShared<String>(index_name_),
+                                      MakeShared<String>(table_name_),
+                                      MakeShared<String>(db_name_),
+                                      mem,
+                                      input_row_count_);
         }
 
         auto *table_index_entry = segment_index_entry_->table_index_entry();
@@ -154,7 +160,8 @@ public:
         InsertBlockData(block_offset, column_vector, row_offset, row_count);
     }
 
-    void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &column_vector, BlockOffset row_offset, BlockOffset row_count) override {
+    void
+    InsertBlockData(const SegmentOffset block_offset, const ColumnVector &column_vector, BlockOffset row_offset, BlockOffset row_count) override {
         std::unique_lock lock(rw_mutex_);
         SizeT mem1 = MemoryUsed();
         if (have_ivf_index_.test(std::memory_order_acquire)) {
