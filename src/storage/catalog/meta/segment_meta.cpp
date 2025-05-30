@@ -331,7 +331,7 @@ Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
     BlockID block_id = 0;
     {
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = GetBlockIDs1(commit_ts);
         if (!status.ok()) {
             return {INVALID_BLOCK_ID, status};
         }
@@ -383,6 +383,14 @@ Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     if (!block_ids1_) {
         block_ids1_ =
             infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
+    }
+    return {&*block_ids1_, Status::OK()};
+}
+
+Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp commit_ts) {
+    if (!block_ids1_) {
+        block_ids1_ =
+            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts);
     }
     return {&*block_ids1_, Status::OK()};
 }

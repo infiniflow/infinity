@@ -70,6 +70,7 @@ public:
     // Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 
     Tuple<Vector<BlockID> *, Status> GetBlockIDs1();
+    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
 
     // Tuple<SizeT, Status> GetRowCnt();
     Tuple<SizeT, Status> GetRowCnt1();
