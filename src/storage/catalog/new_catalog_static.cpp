@@ -346,7 +346,7 @@ Status NewCatalog::MemIndexCommit(NewTxn *new_txn) {
         }
         for (const String &index_id_str : *index_id_strs_ptr) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
-            status = NewTxn::CommitMemIndex(table_index_meta);
+            status = new_txn->CommitMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
             }

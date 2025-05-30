@@ -1401,11 +1401,14 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                // TODO: move follow to post commit
+                // Commit of dump mem index command is handled in CommitBottom().
+                // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
+                if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
+                    Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                    if (!status.ok()) {
+                        return status;
+                    }
                 }
                 break;
             }
@@ -3539,7 +3542,7 @@ void NewTxn::CommitBottom() {
     if (txn_state != TxnState::kCommitting) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
-    // TODO: DumpMemoryIndex
+
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
@@ -3547,7 +3550,17 @@ void NewTxn::CommitBottom() {
                 auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
                 Status status = CommitBottomAppend(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError(fmt::format("CommitBottomAppend faield: {}", status.message()));
+                    UnrecoverableError(fmt::format("CommitBottomAppend failed: {}", status.message()));
+                }
+                break;
+            }
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
+                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                    Status status = CommitBottomDumpMemIndex(dump_index_cmd);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
+                    }
                 }
                 break;
             }
@@ -3634,8 +3647,14 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                // auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                break;
+                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
+                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
+                    if (!mem_index_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
+                    }
+                    break;
+                }
             }
             case WalCommandType::COMPACT_V2: {
                 // auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
@@ -3713,6 +3732,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+            Status mem_index_status = new_catalog_->UnsetMemIndexDump(dump_index_txn_store->table_key_);
+            if (!mem_index_status.ok()) {
+                UnrecoverableError(
+                    fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_txn_store->table_name_, mem_index_status.message()));
+            }
             break;
         }
         case TransactionType::kOptimizeIndex: {

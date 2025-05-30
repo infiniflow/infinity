@@ -69,6 +69,7 @@ import defer_op;
 import base_txn_store;
 import kv_code;
 import buffer_handle;
+import segment_entry;
 
 namespace infinity {
 
@@ -98,6 +99,9 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     DeferFn defer_fn([&] {
+        if (status.ok()) {
+            return;
+        }
         Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
         if (!mem_index_status.ok()) {
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
@@ -106,16 +110,35 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-        ChunkID new_chunk_id = 0;
-        LOG_TRACE(fmt::format("Dumping mem index for segment: {}, table: {}, index: {}", segment_id, table_name, index_name));
-        status = this->DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        if (new_chunk_id == (ChunkID)(-1)) {
+
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
             continue;
         }
-        ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
+
+        ChunkID chunk_id = 0;
+        {
+            Status status = segment_index_meta.GetNextChunkID(chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+            status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        ChunkIndexMetaInfo chunk_index_meta_info;
+        if (mem_index->GetBaseMemIndex() != nullptr) {
+            chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+        } else if (mem_index->GetEMVBIndex() != nullptr) {
+            chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+        } else {
+            return Status::UnexpectedError("Invalid mem index.");
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+        chunk_index_meta.SetChunkInfoNoPutKV(chunk_index_meta_info);
+
         status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
         if (!status.ok()) {
             return status;
@@ -132,7 +155,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
-        UnrecoverableError("txn store of dump mem index can't be null");
+        return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
     DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
@@ -162,7 +185,14 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     if (!status.ok()) {
         return status;
     }
+
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+
+    // Return when there is no mem index to dump.
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        return Status::OK();
+    }
 
     status = new_catalog_->SetMemIndexDump(table_key);
     if (!status.ok()) {
@@ -170,42 +200,40 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
 
     DeferFn defer_fn([&] {
+        if (status.ok()) {
+            return;
+        }
         Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
         if (!mem_index_status.ok()) {
             UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
         }
     });
 
-    ChunkID new_chunk_id = 0;
-    status = this->DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
-    if (!status.ok()) {
-        return status;
-    }
-    if (new_chunk_id == (ChunkID)(-1)) {
-        return Status::OK();
+    // Get chunk id of the chunk index to dump mem index to.
+    ChunkID chunk_id = 0;
+    {
+        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
+    // Get chunk index info of the mem index and put it to chunk index meta.
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    if (mem_index->GetBaseMemIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetEMVBIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else {
+        return Status::UnexpectedError("Invalid mem index.");
     }
+    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+    chunk_index_meta.SetChunkInfoNoPutKV(chunk_index_meta_info);
 
-    if (base_txn_store_ != nullptr) {
-        UnrecoverableError("txn store of dump mem index can't be null");
-    }
-    base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
-    DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-    txn_store->db_name_ = db_name;
-    txn_store->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
-    txn_store->table_name_ = table_name;
-    txn_store->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
-    txn_store->index_name_ = index_name;
-    txn_store->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
-    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
-    txn_store->segment_ids_ = {segment_index_meta.segment_id()};
-    txn_store->table_key_ = table_key;
-
-    ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
     if (!status.ok()) {
         return status;
@@ -218,7 +246,68 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
             segment_chunk_infos.emplace(dump_cmd->segment_id_, dump_cmd->chunk_infos_);
         }
     }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
+    DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
+    txn_store->table_name_ = table_name;
+    txn_store->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
+    txn_store->index_name_ = index_name;
+    txn_store->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
+    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
+    txn_store->segment_ids_ = {segment_index_meta.segment_id()};
+    txn_store->table_key_ = table_key;
     txn_store->chunk_infos_in_segments_ = segment_chunk_infos;
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
+    Status status;
+    const String &db_name = dump_index_cmd->db_name_;
+    const String &table_name = dump_index_cmd->table_name_;
+    const String &index_name = dump_index_cmd->index_name_;
+    const SegmentID &segment_id = dump_index_cmd->segment_id_;
+
+    DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+    ChunkID chunk_id = dump_index_txn_store->chunk_infos_in_segments_.at(segment_id)[0].chunk_id_;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+    // Dump Mem Index
+    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Clean Mem Index
+    if (dump_index_cmd->clear_mem_index_) {
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        if (mem_index != nullptr) {
+            mem_index->ClearMemIndex();
+        }
+    }
+
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    auto [index_base, status2] = table_index_meta->GetIndexBase();
+    if (!status2.ok()) {
+        return status2;
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        table_index_meta->UpdateFulltextSegmentTS(commit_ts);
+    }
 
     return Status::OK();
 }
@@ -1555,32 +1644,17 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
     return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
 }
 
-Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
+Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-    if (mem_index == nullptr) {
-        new_chunk_id = (ChunkID)-1;
-        return Status::OK();
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        UnrecoverableError("Invalid mem index");
     }
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
     }
-    ChunkID chunk_id = 0;
-    {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    RowID row_id{};
-    u32 row_count = 0;
-    String base_name;
-    SizeT index_size = 0;
+
     SharedPtr<SecondaryIndexInMem> memory_secondary_index = nullptr;
     SharedPtr<MemoryIndexer> memory_indexer = nullptr;
     SharedPtr<IVFIndexInMem> memory_ivf_index = nullptr;
@@ -1595,8 +1669,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             if (memory_secondary_index == nullptr) {
                 return Status::OK();
             }
-            row_id = memory_secondary_index->GetBeginRowID();
-            row_count = memory_secondary_index->GetRowCount();
             break;
         }
         case IndexType::kFullText: {
@@ -1604,9 +1676,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             if (memory_indexer == nullptr) {
                 return Status::OK();
             }
-            base_name = memory_indexer->GetBaseName();
-            row_id = memory_indexer->GetBaseRowId();
-            row_count = memory_indexer->GetDocCount();
             break;
         }
         case IndexType::kIVF: {
@@ -1614,8 +1683,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             if (memory_ivf_index == nullptr) {
                 return Status::OK();
             }
-            row_id = memory_ivf_index->GetBeginRowID();
-            row_count = memory_ivf_index->GetRowCount();
             break;
         }
         case IndexType::kHnsw: {
@@ -1623,9 +1690,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             if (memory_hnsw_index == nullptr) {
                 return Status::OK();
             }
-            row_id = memory_hnsw_index->GetBeginRowID();
-            row_count = memory_hnsw_index->GetRowCount();
-            index_size = memory_hnsw_index->GetSizeInBytes();
             break;
         }
         case IndexType::kBMP: {
@@ -1633,9 +1697,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             if (memory_bmp_index == nullptr) {
                 return Status::OK();
             }
-            row_id = memory_bmp_index->GetBeginRowID();
-            row_count = memory_bmp_index->GetRowCount();
-            index_size = memory_bmp_index->GetSizeInBytes();
             break;
         }
         case IndexType::kEMVB: {
@@ -1643,8 +1704,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             if (memory_emvb_index == nullptr) {
                 return Status::OK();
             }
-            row_id = memory_emvb_index->GetBeginRowID();
-            row_count = memory_emvb_index->GetRowCount();
             break;
         }
         case IndexType::kDiskAnn: {
@@ -1655,16 +1714,33 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
             UnrecoverableError("Not implemented yet");
         }
     }
+
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    if (mem_index->GetBaseMemIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetEMVBIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else {
+        UnrecoverableError("Invalid mem index");
+    }
+
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta, this, chunk_id, row_id, row_count, base_name, index_size, chunk_index_meta);
+        Status status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                                      this,
+                                                      new_chunk_id,
+                                                      chunk_index_meta_info.base_row_id_,
+                                                      chunk_index_meta_info.row_cnt_,
+                                                      chunk_index_meta_info.base_name_,
+                                                      chunk_index_meta_info.index_size_,
+                                                      chunk_index_meta);
         if (!status.ok()) {
             return status;
         }
 
         chunk_infos_.push_back(
-            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), chunk_id});
+            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), new_chunk_id});
 
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
@@ -1718,7 +1794,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
         }
     }
     mem_index->ClearMemIndex();
-    new_chunk_id = chunk_id;
     return Status::OK();
 }
 
@@ -1882,10 +1957,6 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
         return status;
     }
 
-    if (index_base->index_type_ != IndexType::kFullText) {
-        return Status::OK();
-    }
-
     Vector<SegmentID> *index_segment_ids_ptr = nullptr;
     std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
@@ -1898,6 +1969,109 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
         SharedPtr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->memory_indexer_;
         if (memory_indexer) {
             memory_indexer->Commit();
+        }
+    }
+
+    TableMeeta &table_meta = table_index_meta.table_meta();
+    DBMeeta db_meta(table_meta.db_id_str(), *kv_instance_);
+    String table_id_str = table_meta.table_id_str();
+    String table_name{};
+    String table_key{};
+
+    Vector<String> *table_id_strs_ptr = nullptr;
+    Vector<String> *table_names_ptr = nullptr;
+    status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
+        // const String &table_id_str = (*table_id_strs_ptr)[i];
+        if (table_id_str == (*table_id_strs_ptr)[i]) {
+            table_name = (*table_names_ptr)[i];
+            break;
+        }
+    }
+
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->SetMemIndexDump(table_key);
+    if (!status.ok()) {
+        // Wait for next execution of this function to dump.
+        return Status::OK();
+    }
+
+    DeferFn defer_fn([&] {
+        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+        if (!mem_index_status.ok()) {
+            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
+        }
+    });
+
+    // Dump mem index on sealed segments.
+    for (SegmentID segment_id : *index_segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            continue;
+        }
+
+        SegmentMeta segment_meta(segment_id, table_meta);
+        SharedPtr<SegmentInfo> segment_info;
+        std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
+        if (!status.ok()) {
+            return status;
+        }
+
+        ChunkIndexMetaInfo chunk_index_meta_info;
+        if (mem_index->GetBaseMemIndex() != nullptr) {
+            chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+        } else if (mem_index->GetEMVBIndex() != nullptr) {
+            chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+        } else {
+            return Status::UnexpectedError("Invalid mem index");
+        }
+
+        if (segment_info->status_ == SegmentStatus::kSealed &&
+            static_cast<i64>(chunk_index_meta_info.row_cnt_) == InfinityContext::instance().config()->MemIndexCapacity()) {
+
+            // Get chunk id of the chunk index to dump mem index to.
+            ChunkID chunk_id = 0;
+            {
+                Status status = segment_index_meta.GetNextChunkID(chunk_id);
+                if (!status.ok()) {
+                    return status;
+                }
+                status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+
+            // Dump Mem Index
+            status = DumpSegmentMemIndex(segment_index_meta, chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // Clean Mem Index
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            if (mem_index != nullptr) {
+                mem_index->ClearMemIndex();
+            }
+
+            TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+            auto [index_base, status2] = table_index_meta.GetIndexBase();
+            if (!status2.ok()) {
+                return status2;
+            }
+            if (index_base->index_type_ == IndexType::kFullText) {
+                table_index_meta.UpdateFulltextSegmentTS(commit_ts);
+            }
         }
     }
 
