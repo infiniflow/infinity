@@ -346,6 +346,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return status;
     }
 
+    // Get the latest table id
     std::tie(table_id_str, status) = db_meta->GetNextTableID();
     if (!status.ok()) {
         return status;

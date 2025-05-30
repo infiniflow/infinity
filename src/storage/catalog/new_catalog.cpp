@@ -739,11 +739,12 @@ Status NewCatalog::TransformCatalogTable(DBMeeta &db_meta,
                 continue;
             }
 
-            String table_id_str;
-            Status status = IncrLatestID(table_id_str, NEXT_TABLE_ID);
+            // Get the latest table id
+            auto [table_id_str, status] = db_meta.GetNextTableID();
             if (!status.ok()) {
                 return status;
             }
+
             auto table_full_name_str = fmt::format("{}.{}", db_name, table_name);
             dbname_to_idstr_[table_full_name_str] = table_id_str;
 
@@ -904,8 +905,8 @@ Status NewCatalog::TransformCatalogBlockColumn(BlockMeta &block_meta, const nloh
 }
 
 Status NewCatalog::TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json) {
-    String index_id_str;
-    Status status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
+    // Get the latest index id and lock the id
+    auto [index_id_str, status] = table_meta.GetNextIndexID();
     if (!status.ok()) {
         return status;
     }
