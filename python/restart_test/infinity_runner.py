@@ -64,7 +64,7 @@ class InfinityRunner:
         elif self.use_new_catalog:
             config_path = make_new_config(config_path)
 
-        cmd = f"{self.infinity_path} --config={config_path}"
+        cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
 
         pids = [
             proc.pid
