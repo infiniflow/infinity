@@ -179,6 +179,7 @@ SizeT BufferManager::BufferedObjectCount() {
 }
 
 void BufferManager::RemoveClean(KVInstance *kv_instance) {
+    LOG_TRACE(fmt::format("BufferManager::RemoveClean, start to clean objects"));
     Vector<BufferObj *> clean_list;
     {
         std::unique_lock lock(clean_locker_);

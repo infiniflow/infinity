@@ -218,6 +218,7 @@ void FileWorker::CleanupFile(KVInstance *kv_instance) const {
         if (kv_instance != nullptr) {
             String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
             kv_instance->Delete(relevant_full_path);
+            LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
         }
         return;
     }
@@ -244,7 +245,7 @@ void FileWorker::CleanupFile(KVInstance *kv_instance) const {
 void FileWorker::CleanupTempFile() const {
     String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     if (VirtualStore::Exists(path)) {
-        LOG_INFO(fmt::format("Clean temp file: {}", path));
+        LOG_TRACE(fmt::format("Clean temp file: {}", path));
         VirtualStore::DeleteFile(path);
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
