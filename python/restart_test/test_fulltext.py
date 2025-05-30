@@ -304,7 +304,7 @@ class TestFullText:
                 },
                 ConflictType.Error,
             )
-            # table_obj.drop_index("ft_index")
+            table_obj.drop_index("ft_index")
             table_obj.create_index(
                 "ft_index",
                 index.IndexInfo("body", index.IndexType.FullText, {"realtime": "true"}),
