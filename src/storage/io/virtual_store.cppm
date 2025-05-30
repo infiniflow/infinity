@@ -61,6 +61,7 @@ public:
     static Status MakeDirectory(const String &path);
     static Status RemoveDirectory(const String &path);
     static Status CleanupDirectory(const String &path);
+    static void RecursiveCleanupAllEmptyDir(const String &path);
     static Status Rename(const String &old_path, const String &new_path);
     static Status Truncate(const String &file_name, SizeT new_length);
     static Status Merge(const String &dst_file, const String &src_file);
