@@ -59,7 +59,7 @@ def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
     print("data_dir path is {}".format(data_dir))
 
     test_cnt = 0
-    skipped_files = {'cached_fulltext.slt'} # FIXME: fulltext index build might be not ready when search
+    skipped_files = {}
     for dirpath, dirnames, filenames in os.walk(slt_dir):
         for filename in filenames:
             file = os.path.join(dirpath, filename)
