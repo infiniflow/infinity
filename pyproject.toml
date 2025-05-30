@@ -38,17 +38,17 @@
 #wheel.py-api = "cp310"
 #wheel.packages = ["python/infinity_embedded"]
 #
-#[tool.pytest.ini_options]
-#addopts = "--strict-markers"
-#markers = [
-#    "L0",
-#    "L1",
-#    "L2",
-#    "L3",
-#    "complex",
-#    "slow",
-#    "nightly",
-#]
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "complex",
+    "slow",
+    "nightly",
+]
 #
 #filterwarnings = [
 #    "error",

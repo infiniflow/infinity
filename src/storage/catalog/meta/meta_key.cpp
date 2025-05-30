@@ -108,7 +108,7 @@ String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", Ke
 
 String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
-String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}:{}", object_key_, value_); }
+String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
 
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
@@ -255,7 +255,8 @@ nlohmann::json PmObjectMetaKey::ToJson() const {
 
 nlohmann::json DropMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res["drop_key"] = object_key_;
+    json_res["scope"] = scope_;
+    json_res["key"] = object_key_;
     json_res["value"] = nlohmann::json::parse(value_);
     return json_res;
 }
@@ -434,8 +435,9 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     }
 
     if (fields[0] == "drop") {
-        const String &object_key = fields[1];
-        SharedPtr<DropMetaKey> drop_meta_key = MakeShared<DropMetaKey>(object_key);
+        const String &scope = fields[1];
+        const String &object_key = fields[2];
+        SharedPtr<DropMetaKey> drop_meta_key = MakeShared<DropMetaKey>(scope, object_key);
         drop_meta_key->value_ = value;
         return drop_meta_key;
     }

@@ -26,6 +26,7 @@ namespace infinity {
 class BufferManager;
 class VarBuffer;
 class KVInstance;
+class Status;
 
 export enum class BufferStatus {
     kLoaded,
@@ -105,7 +106,7 @@ public:
 
     void PickForCleanup();
 
-    void CleanupFile(KVInstance *kv_instance) const;
+    Status CleanupFile(KVInstance *kv_instance) const;
 
     void CleanupTempFile() const;
 

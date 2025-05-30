@@ -81,6 +81,7 @@ import txn_allocator_task;
 import meta_type;
 import base_txn_store;
 import buffer_handle;
+import virtual_store;
 
 namespace infinity {
 
@@ -3980,8 +3981,14 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
         }
     }
 
-    buffer_mgr->RemoveClean(kv_instance);
-    return Status::OK();
+    Status status = buffer_mgr->RemoveClean(kv_instance);
+
+    auto data_dir_str = buffer_mgr->GetFullDataDir();
+    auto data_dir = static_cast<Path>(*data_dir_str);
+    // Delete empty dir
+    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+
+    return status;
 }
 
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
