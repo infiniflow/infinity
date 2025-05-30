@@ -16,6 +16,6 @@ persistence_dir = ""
 
 [buffer]
 [wal]
-full_checkpoint_interval = "3s"
+full_checkpoint_interval = "1s"
 
 [resource]
