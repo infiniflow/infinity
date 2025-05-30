@@ -34,6 +34,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           echo "Workflow triggered by ${{ github.event_name }}"
+          echo "Run id: ${{ github.run_id }} run attempt: ${{ github.run_attempt }}"
           if [[ ${{ github.event_name }} == 'pull_request' ]]; then
             echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
           fi
@@ -135,7 +136,7 @@ jobs:
 #        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
 #        run: |
 #          failure="${{ steps.run_tests_debug_minio.outcome == 'failure' || steps.stop_tests_debug_minio.outcome == 'failure' }}"
-#          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --stderror_path=vfs_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+#          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=vfs_debug.log --stderror_path=vfs_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 #
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -165,7 +166,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Build unit test
         if: ${{ !cancelled() && !failure() }}
@@ -173,11 +174,14 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
+        id: unit_test_debug
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main>unittest_debug.log 2>unittest_debug_error.log"  &
 
       - name: Collect infinity unit test debug output
-        if: ${{ !cancelled() && failure() }}
-        run: cat unittest_debug.log 2>/dev/null || true
+        if: ${{ !cancelled() }}
+        run: |
+          failure="${{ steps.unit_test_debug.outcome == 'failure' }}"
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=unittest_debug.log --stderror_path=unittest_debug_error.log --executable_path=cmake-build-debug/src/test_main --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -207,7 +211,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_pysdk_remote_debug.outcome == 'failure' || steps.stop_pysdk_remote_debug.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=pysdk_remote_debug.log --stderror_path=pysdk_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=pysdk_remote_debug.log --stderror_path=pysdk_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -237,7 +241,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_http_remote_debug.outcome == 'failure' || steps.stop_http_remote_debug.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=http_remote_debug.log --stderror_path=http_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=http_remote_debug.log --stderror_path=http_remote_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -267,7 +271,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_parallel_test_debug.outcome == 'failure' || steps.stop_parallel_test_debug.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=parallel_test_debug.log --stderror_path=parallel_test_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=parallel_test_debug.log --stderror_path=parallel_test_debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed
@@ -413,7 +417,7 @@ jobs:
       #        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
       #        run: |
       #          failure="${{ steps.run_tests_release_minio.outcome == 'failure' || steps.stop_tests_release_minio.outcome == 'failure' }}"
-      #          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stderror_path=vfs_release_error.log --stdout_path=vfs_release.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+      #          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stderror_path=vfs_release_error.log --stdout_path=vfs_release.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -443,7 +447,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_tests_release.outcome == 'failure' || steps.stop_tests_release.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Build unit test
         if: ${{ !cancelled() && !failure() }}
@@ -451,11 +455,14 @@ jobs:
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
+        id: unit_test_release
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main>unittest_release.log 2>unittest_release_error.log"  &
 
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() }}
-        run: cat unittest_release.log 2>/dev/null || true
+        run: |
+          failure="${{ steps.unit_test_release.outcome == 'failure' }}"
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=unittest_debug.log --stderror_path=unittest_debug_error.log --executable_path=cmake-build-debug/src/test_main --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -485,7 +492,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_pysdk_remote_release.outcome == 'failure' || steps.stop_pysdk_remote_release.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=pysdk_remote_release.log --stderror_path=pysdk_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=pysdk_remote_release.log --stderror_path=pysdk_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -515,7 +522,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_http_remote_release.outcome == 'failure' || steps.stop_http_remote_release.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=http_remote_release.log --stderror_path=http_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=http_remote_release.log --stderror_path=http_remote_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
@@ -545,7 +552,7 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_parallel_test_release.outcome == 'failure' || steps.stop_parallel_test_release.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_log.py --run_id=${{ github.run_id }} --run_attempt=${{ github.run_attempt }} --log_path=/var/infinity/log/infinity.log --stdout_path=parallel_test_release.log --stderror_path=parallel_test_release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
 #      - name: Prepare sift dataset
 #        if: ${{ !cancelled() && !failure() }}
