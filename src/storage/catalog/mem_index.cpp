@@ -67,4 +67,24 @@ BaseMemIndex *MemIndex::GetBaseMemIndex(const MemIndexID &mem_index_id) {
     return res;
 }
 
+const BaseMemIndex *MemIndex::GetBaseMemIndex() const{
+    std::unique_lock<std::mutex> lock(mtx_);
+    BaseMemIndex *res = nullptr;
+    if (memory_hnsw_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
+    } else if (memory_ivf_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_ivf_index_.get());
+    } else if (memory_indexer_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_indexer_.get());
+    } else if (memory_secondary_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
+    } else if (memory_bmp_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else {
+        return nullptr;
+    }
+
+    return res;
+}
+
 } // namespace infinity

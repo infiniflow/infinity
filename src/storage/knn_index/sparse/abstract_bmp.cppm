@@ -33,6 +33,7 @@ import buffer_handle;
 import base_memindex;
 import memindex_tracer;
 import table_index_entry;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -168,6 +169,8 @@ public:
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
     void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
 private:
     RowID begin_row_id_ = {};
