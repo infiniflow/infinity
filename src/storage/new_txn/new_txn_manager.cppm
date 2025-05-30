@@ -64,8 +64,6 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
 
-    TxnTimeStamp GetReplayWriteCommitTS(NewTxn *txn);
-
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
     bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
@@ -118,8 +116,6 @@ private:
     void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    bool InCheckpointProcess(TxnTimeStamp commit_ts);
-
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 

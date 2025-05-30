@@ -192,7 +192,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
 
     //    current_ts_ += 2;
     prepare_commit_ts_ = current_ts_ + 2;
-    TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used, actually.
+    TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used
     TxnTimeStamp begin_ts = current_ts_ + 1;  // current_ts_ > 0
 
     // Create txn instance
@@ -235,14 +235,6 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     if (txn->NeedToAllocate()) {
         allocator_map_.emplace(commit_ts, nullptr);
     }
-    txn->SetTxnWrite();
-    return commit_ts;
-}
-
-TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
-    std::lock_guard guard(locker_);
-    prepare_commit_ts_ += 2;
-    TxnTimeStamp commit_ts = prepare_commit_ts_;
     txn->SetTxnWrite();
     return commit_ts;
 }
@@ -429,7 +421,7 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 
     // ensure notify top half orderly per commit_ts
     while (!bottom_txns_.empty()) {
-        auto iter = bottom_txns_.begin();
+        iter = bottom_txns_.begin();
         TxnTimeStamp it_ts = iter->first;
         SharedPtr<NewTxn> it_txn = iter->second;
         if (current_ts_ > it_ts || it_ts > prepare_commit_ts_) {
@@ -515,7 +507,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
     TransactionID txn_id = txn->TxnID();
     LOG_DEBUG(fmt::format("Cleanup txn, id: {}, begin_ts: {}", txn_id, begin_ts));
     if (is_write_transaction) {
-        // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
+        // For writing txn, we need to update the state: committing->committed, rollbacking->rollbacked
         TxnState txn_state = txn->GetTxnState();
         switch (txn_state) {
             case TxnState::kCommitting: {
@@ -584,16 +576,6 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
                               first_begin_ts));
         check_txn_map_.erase(check_txn_map_.begin());
     }
-}
-
-bool NewTxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
-    std::lock_guard guard(locker_);
-    if (commit_ts > ckp_begin_ts_) {
-        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
-        ckp_begin_ts_ = UNCOMMIT_TS;
-        return true;
-    }
-    return false;
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
