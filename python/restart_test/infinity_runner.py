@@ -111,13 +111,14 @@ class InfinityRunner:
         return self.process is not None
 
     def connect(self, uri: str):
-        try_n = 100
-        time.sleep(0.5)
+        try_n = 5
+        time.sleep(1)
         infinity_obj = None
         for i in range(try_n):
             try:
                 if infinity_obj is None:
                     infinity_obj = infinity.connect(uri, self.logger)
+                    time.sleep(3)
                 ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
@@ -125,15 +126,15 @@ class InfinityRunner:
                     if isinstance(e, InfinityException):
                         if e.error_code == ErrorCode.INFINITY_IS_INITING:
                             print("wait infinity starting")
-                            time.sleep(0.5)
                         else:
                             raise e
                     else:
                         raise e
                 else:
                     print(e)
-                    time.sleep(0.5)
-                print(f"retry connect {i}")
+                sleep_time = 1 * (i + 1)
+                print(f"Retrying connection attempt {i + 1} after {sleep_time} seconds.")
+                time.sleep(sleep_time)
         else:
             raise Exception(f"Cannot connect to infinity after {try_n} retries.")
         return infinity_obj
