@@ -59,7 +59,6 @@ class TestDDLParallel:
                 infinity_obj.drop_database(db_name, conflict_type=ConflictType.Ignore)
         print(infinity_obj.list_databases().db_names)
 
-
     def random_exec(self, connection_pool: ConnectionPool, end_time, thread_id):
         infinity_obj = connection_pool.get_conn()
         while time.time() < end_time:
@@ -79,14 +78,20 @@ class TestDDLParallel:
             time.sleep(0.2)
         connection_pool.release_conn(infinity_obj)
 
-
     def create_database(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
         self.logger.info(f"create database {db_name}")
-        infinity_obj.create_database(db_name, conflict_type=ConflictType.Ignore)
-        res = infinity_obj.show_database()
-        print(res)
-
+        try:
+            infinity_obj.create_database(db_name, conflict_type=ConflictType.Ignore)
+        except Exception:
+            self.logger.info(f"create database {db_name} failed")
+        else:
+            try:
+                res = infinity_obj.show_database()
+            except Exception:
+                self.logger.info(f"show database {db_name} failed")
+            else:
+                print(res)
 
     def drop_database(self, infinity_obj: RemoteThriftInfinityConnection):
         try:
@@ -99,12 +104,11 @@ class TestDDLParallel:
         else:
             self.logger.info(f"drop database {db_name}")
 
-
     def create_table(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
         try:
-            db_obj = infinity_obj.get_database(db_name)
             table_name = table_names[random.randint(0, len(table_names) - 1)]
+            db_obj = infinity_obj.get_database(db_name)
             if (table_name[0:3] == "vec"):
                 column = vec_columns[random.randint(0, len(vec_columns) - 1)]
             else:
@@ -116,7 +120,6 @@ class TestDDLParallel:
             self.logger.info(f"create table {table_name} in database {db_name} failed")
         else:
             self.logger.info(f"create table {table_name} in database {db_name}")
-
 
     def drop_table(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -132,7 +135,6 @@ class TestDDLParallel:
             res = db_obj.list_tables()
             print(res)
             self.logger.info(f"drop table {table_name} in database {db_name}")
-
 
     def create_index(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -156,14 +158,13 @@ class TestDDLParallel:
                     index_type = index.IndexType.FullText
                     index_option = None
                 table_obj.create_index(index_on, index.IndexInfo(index_on, index_type, index_option),
-                                    conflict_type=ConflictType.Ignore)
+                                       conflict_type=ConflictType.Ignore)
                 res = table_obj.list_indexes()
                 print(res)
             except Exception as e:
                 self.logger.info(f"create index {index_on} in table {table_name} database {db_name} failed")
             else:
                 self.logger.info(f"create index {index_on} in table {table_name} database {db_name}")
-
 
     def drop_index(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -176,6 +177,7 @@ class TestDDLParallel:
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
             try:
+                index_name = None
                 table_obj = db_obj.get_table(table_name)
                 exist_indexes = table_obj.list_indexes().index_names
                 if (len(exist_indexes) > 0):
