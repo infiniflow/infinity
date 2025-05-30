@@ -73,12 +73,10 @@ namespace infinity {
 WalManager::WalManager(Storage *storage,
                        String wal_dir,
                        u64 wal_size_threshold,
-                       u64 delta_checkpoint_interval_wal_bytes,
                        FlushOptionType flush_option)
-    : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
-      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option),
-      bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
-      last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+    : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage),
+      running_(false), flush_option_(flush_option), bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())),
+      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("WalManager");
 #endif
@@ -88,10 +86,9 @@ WalManager::WalManager(Storage *storage,
                        String wal_dir,
                        String data_dir,
                        u64 wal_size_threshold,
-                       u64 delta_checkpoint_interval_wal_bytes,
                        FlushOptionType flush_option)
-    : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
-      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir), storage_(storage), running_(false), flush_option_(flush_option),
+    : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir),
+      storage_(storage), running_(false), flush_option_(flush_option),
       bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
       last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
 #ifdef INFINITY_DEBUG
@@ -422,15 +419,6 @@ void WalManager::Flush() {
             throw e;
         }
 
-        // Check if total wal is too large, do delta checkpoint
-        i64 last_ckp_wal_size = GetLastCkpWalSize();
-        if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
-            LOG_TRACE("Reach the WAL limit trigger the DELTA checkpoint");
-            auto checkpoint_task = MakeShared<CheckpointTask>(false /*delta checkpoint*/);
-            if (!this->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
-                LOG_TRACE("Skip delta checkpoint(size) because there is already a checkpoint task running.");
-            }
-        }
         LOG_TRACE("WAL flush is finished.");
     }
     LOG_TRACE("WalManager::Flush mainloop end");
@@ -556,20 +544,6 @@ void WalManager::NewFlush() {
             throw e;
         }
 
-        // Check if total wal is too large, do delta checkpoint
-        i64 last_ckp_wal_size = GetLastCkpWalSize();
-        if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
-            LOG_INFO(fmt::format("Reach the WAL limit trigger the checkpoint: {} - {} > {}",
-                                 wal_size_,
-                                 last_ckp_wal_size,
-                                 cfg_delta_checkpoint_interval_wal_bytes_));
-            if (IsCheckpointing()) {
-                LOG_INFO("There is a running checkpoint task, skip this checkpoint triggered by WAL size");
-            } else {
-                auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size_);
-                storage_->bg_processor()->Submit(std::move(checkpoint_task));
-            }
-        }
         LOG_TRACE("WAL flush is finished.");
     }
     LOG_TRACE("WalManager::Flush mainloop end");

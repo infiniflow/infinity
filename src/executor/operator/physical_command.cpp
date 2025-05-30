@@ -290,20 +290,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             config->SetFullCheckpointInterval(interval);
                             break;
                         }
-                        case GlobalOptionIndex::kDeltaCheckpointInterval: {
-                            if (set_command->value_type() != SetVarType::kInteger) {
-                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
-                                RecoverableError(status);
-                            }
-                            i64 interval = set_command->value_int();
-                            if (interval < 0) {
-                                Status status = Status::InvalidCommand(fmt::format("Attempt to set delta checkpoint interval: {}", interval));
-                                RecoverableError(status);
-                            }
-                            query_context->storage()->periodic_trigger_thread()->delta_checkpoint_trigger_->UpdateInternal(interval);
-                            config->SetDeltaCheckpointInterval(interval);
-                            break;
-                        }
                         case GlobalOptionIndex::kCompactInterval: {
                             if (set_command->value_type() != SetVarType::kInteger) {
                                 Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
