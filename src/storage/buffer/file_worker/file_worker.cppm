@@ -14,8 +14,6 @@
 
 module;
 
-#include <cassert>
-
 export module file_worker;
 
 import stl;
@@ -28,6 +26,7 @@ namespace infinity {
 
 class KVInstance;
 class LocalFileHandle;
+class Status;
 
 export struct FileWorkerSaveCtx {};
 
@@ -65,7 +64,7 @@ public:
     // Get an absolute file path. As key of a buffer handle.
     String GetFilePath() const;
 
-    void CleanupFile(KVInstance *kv_instance) const;
+    Status CleanupFile(KVInstance *kv_instance) const;
 
     void CleanupTempFile() const;
 
