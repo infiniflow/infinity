@@ -38,24 +38,24 @@
 #wheel.py-api = "cp310"
 #wheel.packages = ["python/infinity_embedded"]
 #
-#[tool.pytest.ini_options]
-#addopts = "--strict-markers"
-#markers = [
-#    "L0",
-#    "L1",
-#    "L2",
-#    "L3",
-#    "complex",
-#    "slow",
-#    "nightly",
-#]
-#
-#filterwarnings = [
-#    "error",
-#    "ignore::UserWarning",
-#    "ignore::ResourceWarning",
-#    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
-#    # "ignore::thrift.transport.TTransport",
-#    # note the use of single quote below to denote "raw" strings in TOML
-#    'ignore:function ham\(\) is deprecated:DeprecationWarning',
-#]
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "complex",
+    "slow",
+    "nightly",
+]
+
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::ResourceWarning",
+    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+    # "ignore::thrift.transport.TTransport",
+    # note the use of single quote below to denote "raw" strings in TOML
+    'ignore:function ham\(\) is deprecated:DeprecationWarning',
+]
