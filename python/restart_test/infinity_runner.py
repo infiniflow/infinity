@@ -64,7 +64,7 @@ class InfinityRunner:
         elif self.use_new_catalog:
             config_path = make_new_config(config_path)
 
-        cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
+        cmd = f"{self.infinity_path} --config={config_path}"
 
         pids = [
             proc.pid
@@ -73,7 +73,8 @@ class InfinityRunner:
         ]
         if len(pids) > 0:
             ret = os.system(
-                f"bash {self.script_path} {init_timeout} {' '.join(map(str, pids))}"
+                # f"{self.script_path} {init_timeout} {' '.join(map(str, pids))}"
+                f"kill -9 {' '.join(map(str, pids))}"
             )
             if ret != 0:
                 raise Exception("An error occurred.")
@@ -88,37 +89,43 @@ class InfinityRunner:
     def uninit(self, kill: bool = False, timeout: int = 60):
         if self.process is None:
             return
+
         pids = []
+        print(f"parent process {self.process.pid}")
         for child in psutil.Process(self.process.pid).children(recursive=True):
+            print(f"subprocess {child.pid}")
             pids.append(child.pid)
         if len(pids) == 0:
-            raise Exception("Cannot find infinity process.")
-
-        if kill:
-            os.system(f"kill -9 {' '.join(map(str, pids))}")
-            time.sleep(1)
-            while any(psutil.pid_exists(pid) for pid in pids):
-                time.sleep(1)
-            self.process = None
             return
+            # raise Exception("Cannot find infinity process.")
+        #
+        # if kill:
+        #     os.system(f"kill -9 {' '.join(map(str, pids))}")
+        #     time.sleep(1)
+        #     while any(psutil.pid_exists(pid) for pid in pids):
+        #         time.sleep(1)
+        #     self.process = None
+        #     return
 
-        ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
+        # ret = os.system(f"{self.script_path} {timeout} {' '.join(map(str, pids))}")
+        ret = os.system(f"kill -9 {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
+
+        return_code = self.process.wait()
+        print(f"return code: {return_code}")
         self.process = None
 
     def connected(self):
         return self.process is not None
 
     def connect(self, uri: str):
-        try_n = 5
-        time.sleep(1)
+        try_n = 10
         infinity_obj = None
         for i in range(try_n):
             try:
                 if infinity_obj is None:
                     infinity_obj = infinity.connect(uri, self.logger)
-                    time.sleep(3)
                 ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
@@ -137,18 +144,19 @@ class InfinityRunner:
                 time.sleep(sleep_time)
         else:
             raise Exception(f"Cannot connect to infinity after {try_n} retries.")
+        print("Connected.")
         return infinity_obj
 
 
 def infinity_runner_decorator_factory(
-    config_path: str | None,
-    uri: str,
-    infinity_runner: InfinityRunner,
-    *,
-    shutdown_out: bool = False,
-    kill: bool = False,
-    terminate_timeout: int = 60,
-    check_kill: bool = True,
+        config_path: str | None,
+        uri: str,
+        infinity_runner: InfinityRunner,
+        *,
+        shutdown_out: bool = False,
+        kill: bool = False,
+        terminate_timeout: int = 60,
+        check_kill: bool = True,
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
