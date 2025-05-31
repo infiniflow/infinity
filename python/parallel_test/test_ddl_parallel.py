@@ -147,6 +147,7 @@ class TestDDLParallel:
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
             try:
+                index_on = "untitled_index_name"
                 table_obj = db_obj.get_table(table_name)
                 if table_name[0:3] == "vec":
                     index_on = vec_indexes_on[random.randint(0, len(vec_indexes_on) - 1)]
