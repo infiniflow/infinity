@@ -98,3 +98,8 @@ target_compile_options(
 )
 
 add_subdirectory(rocksdb)
+
+find_package(zstd REQUIRED)
+set(CPPTRACE_USE_EXTERNAL_LIBDWARF ON)
+set(CPPTRACE_USE_EXTERNAL_ZSTD ON)
+add_subdirectory(cpptrace)

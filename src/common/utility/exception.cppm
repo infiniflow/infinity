@@ -20,6 +20,9 @@ import status;
 
 namespace infinity {
 
+bool print_stacktrace = false;
+export bool GetPrintStacktrace() { return print_stacktrace; }
+export void SetPrintStacktrace(bool enable) { print_stacktrace = enable; }
 export void PrintStacktrace(const String &err_msg);
 export void PrintTransactionHistory();
 

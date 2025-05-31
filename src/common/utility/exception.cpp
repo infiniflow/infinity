@@ -14,6 +14,7 @@
 
 module;
 
+#include <cpptrace/cpptrace.hpp>
 #include <cstdlib>
 #include <execinfo.h>
 #include <iostream>
@@ -47,16 +48,8 @@ void PrintTransactionHistory() {
 
 void PrintStacktrace(const String &err_msg) {
     int trace_stack_depth = 256;
-    void *array[256];
-    int stack_num = backtrace(array, trace_stack_depth);
-    char **stacktrace = backtrace_symbols(array, stack_num);
-
-    LOG_CRITICAL(fmt::format("Error: {}", err_msg));
-    for (int i = 0; i < stack_num; ++i) {
-        String info = stacktrace[i];
-        LOG_CRITICAL(fmt::format("{}, {}", i, info));
-    }
-    free(stacktrace);
+    String trace = cpptrace::generate_trace(0, trace_stack_depth).to_string();
+    LOG_CRITICAL(trace);
 }
 
 #define ADD_LOG_INFO
@@ -89,7 +82,7 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     //     LOG_ERROR(std::move(error_msg));
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
-    if (IS_LOGGER_INITIALIZED()) {
+    if (IS_LOGGER_INITIALIZED() && GetPrintStacktrace()) {
 
         PrintStacktrace(location_message);
     }
