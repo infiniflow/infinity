@@ -220,11 +220,19 @@ void BGTaskProcessor::Process() {
                         UnrecoverableError("Uninitialized storage mode");
                     }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
-                        LOG_DEBUG("NewCleanup in background");
+
+                        {
+                            std::unique_lock<std::mutex> locker(task_mutex_);
+                            task_text_ = bg_task->ToString();
+                        }
 
                         auto task = static_cast<NewCleanupTask *>(bg_task.get());
                         TxnTimeStamp last_cleanup_ts = this->last_cleanup_ts();
                         TxnTimeStamp cur_cleanup_ts = 0;
+
+                        LOG_DEBUG(fmt::format("NewCleanup task in background, last_cleanup_ts: {}, current_cleanup_ts: {}",
+                                              last_cleanup_ts,
+                                              cur_cleanup_ts));
                         Status status = task->Execute(last_cleanup_ts, cur_cleanup_ts);
                         if (!status.ok()) {
                             RecoverableError(status);
@@ -234,7 +242,7 @@ void BGTaskProcessor::Process() {
                             last_cleanup_ts_ = cur_cleanup_ts;
                         }
 
-                        LOG_DEBUG("NewCleanup in background done");
+                        LOG_DEBUG("NewCleanup task in background done");
                     }
                     break;
                 }

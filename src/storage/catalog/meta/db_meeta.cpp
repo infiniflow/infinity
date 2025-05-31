@@ -183,4 +183,13 @@ Status DBMeeta::LoadTableIDs() {
 
 String DBMeeta::GetDBTag(const String &tag) const { return KeyEncode::CatalogDbTagKey(db_id_str_, tag); }
 
+Status DBMeeta::SetNextTableID(const String &table_id_str) {
+    String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
+    Status status = kv_instance_.Put(next_table_id_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 } // namespace infinity

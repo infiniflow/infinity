@@ -475,6 +475,7 @@ Status NewCatalog::AddNewDB(KVInstance *kv_instance,
 }
 
 Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanDB: cleaning database: {}, db_id: {}", db_name, db_meta.db_id_str()));
     KVInstance &kv_instance = db_meta.kv_instance();
     String db_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter = kv_instance.GetIterator();
@@ -485,6 +486,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp
         if (!status.ok()) {
             return status;
         }
+        LOG_TRACE(fmt::format("CleanDB: delete key: {}", db_key));
         iter->Next();
     }
 
@@ -539,6 +541,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
 }
 
 Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanTable: cleaning table: {}, table_id: {}", table_name, table_meta.table_id_str()));
     KVInstance &kv_instance = table_meta.kv_instance();
     String table_prefix = KeyEncode::CatalogTablePrefix(table_meta.db_id_str(), table_name);
     auto iter = kv_instance.GetIterator();
@@ -549,6 +552,7 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, 
         if (!status.ok()) {
             return status;
         }
+        LOG_TRACE(fmt::format("CleanTable: delete key: {}", table_key));
         iter->Next();
     }
 
@@ -614,6 +618,10 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
 }
 
 Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanTableIndex: cleaning table id: {}, index: {}, index_id: {}",
+                          table_index_meta.table_meta().table_id_str(),
+                          index_name,
+                          table_index_meta.index_id_str()));
     KVInstance &kv_instance = table_index_meta.kv_instance();
     String index_prefix =
         KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
@@ -625,6 +633,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Stri
         if (!status.ok()) {
             return status;
         }
+        LOG_TRACE(fmt::format("CleanTableIndex: delete key: {}", index_key));
         iter->Next();
     }
 
@@ -775,6 +784,7 @@ Status NewCatalog::LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentI
 }
 
 Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanSegment: cleaning table: {}, segment_id: {}", segment_meta.table_meta().table_id_str(), segment_meta.segment_id()));
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -937,30 +947,34 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
             return status;
         }
     }
-     for (const auto &column_def : *column_defs_ptr) {
-     //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
-         ColumnMeta column_meta(column_def->id(), block_meta);
-     //    status = column_meta.SetChunkOffset(chunk_offset);
-     //    if (!status.ok()) {
-     //        return status;
-     //    }
+    for (const auto &column_def : *column_defs_ptr) {
+        //    const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
+        ColumnMeta column_meta(column_def->id(), block_meta);
+        //    status = column_meta.SetChunkOffset(chunk_offset);
+        //    if (!status.ok()) {
+        //        return status;
+        //    }
 
-         status = column_meta.LoadSet();
-         if (!status.ok()) {
-             return status;
-         }
-     }
-     /*
-     status = block_meta.SetRowCnt(block_info.row_count_);
-     if (!status.ok()) {
-         return status;
-     }
-     */
+        status = column_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    /*
+    status = block_meta.SetRowCnt(block_info.row_count_);
+    if (!status.ok()) {
+        return status;
+    }
+    */
 
     return Status::OK();
 }
 
 Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanBlock: cleaning table id: {}, segment_id: {}, block_id: {}",
+                          block_meta.segment_meta().table_meta().table_id_str(),
+                          block_meta.segment_meta().segment_id(),
+                          block_meta.block_id()));
     block_meta.RestoreSet();
     Status status;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
@@ -973,7 +987,7 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta, UsageFlag usage_flag) {
 
     for (const auto &column_def : *column_defs_ptr) {
         ColumnMeta column_meta(column_def->id(), block_meta);
-        Status status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
+        status = NewCatalog::CleanBlockColumn(column_meta, column_def.get(), usage_flag);
         if (!status.ok()) {
             return status;
         }
@@ -1017,6 +1031,11 @@ Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT co
 }
 
 Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanBlockColumn: cleaning table id: {}, segment_id: {}, block_id: {}, column_id: {}",
+                          column_meta.block_meta().segment_meta().table_meta().table_id_str(),
+                          column_meta.block_meta().segment_meta().segment_id(),
+                          column_meta.block_meta().block_id(),
+                          column_def->id()));
     column_meta.RestoreSet(column_def);
     Status status;
 
@@ -1063,6 +1082,10 @@ Status NewCatalog::AddNewSegmentIndex1(TableIndexMeeta &table_index_meta,
 }
 
 Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanSegmentIndex: cleaning table id: {}, segment_id: {}, index_id: {}",
+                          segment_index_meta.table_index_meta().table_meta().table_id_str(),
+                          segment_index_meta.segment_id(),
+                          segment_index_meta.table_index_meta().index_id_str()));
     auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
@@ -1246,6 +1269,11 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
 }
 
 Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag) {
+    LOG_TRACE(fmt::format("CleanChunkIndex: cleaning table id: {}, segment_id: {}, index_id: {}, chunk_id: {}",
+                          chunk_index_meta.segment_index_meta().table_index_meta().table_meta().table_id_str(),
+                          chunk_index_meta.segment_index_meta().segment_id(),
+                          chunk_index_meta.segment_index_meta().table_index_meta().index_id_str(),
+                          chunk_index_meta.chunk_id()));
     chunk_index_meta.RestoreSet();
     Status status;
 

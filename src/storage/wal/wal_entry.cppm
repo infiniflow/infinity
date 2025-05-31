@@ -418,7 +418,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
     SharedPtr<IndexBase> index_base_{};
     Vector<WalSegmentIndexInfo> segment_index_infos_;
 
-    // Redudant but useful in commit phase.
+    // Redundant but useful in commit phase.
     String table_key_{};
 };
 

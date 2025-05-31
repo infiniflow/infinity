@@ -168,13 +168,15 @@ class TestCleanup:
                 table_obj.insert([data_line])
 
             res = table_obj.dump_index(index_name)
-            res = table_obj.dump_index(index_name2)
-
             assert res.error_code == infinity.ErrorCode.OK
+            res = table_obj.dump_index(index_name2)
+            assert res.error_code == infinity.ErrorCode.OK
+
             res = table_obj.drop_index(index_name)
             assert res.error_code == infinity.ErrorCode.OK
 
-            infinity_obj.cleanup()
+            res = infinity_obj.cleanup()
+            assert res.error_code == infinity.ErrorCode.OK
 
             # check
             dropped_dirs = []
@@ -192,6 +194,7 @@ class TestCleanup:
             assert self.files_num(dropped_dirs) > 0
 
             res = table_obj.drop_index(index_name2)
+            assert res.error_code == infinity.ErrorCode.OK
 
         part1()
 

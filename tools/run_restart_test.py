@@ -60,6 +60,8 @@ if __name__ == "__main__":
                     "-s",
                     "-m",
                     "not slow",
+                    # "-W",
+                    # "error",
                     # "-k",
                     # "test_optimize_from_different_database"
                 ]

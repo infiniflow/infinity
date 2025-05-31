@@ -78,13 +78,6 @@ class TestFullText:
             )
             assert res.error_code == ErrorCode.OK
 
-            res = table_obj.create_index(
-                "ft_index",
-                index.IndexInfo("body", index.IndexType.FullText),
-                ConflictType.Error,
-            )
-            assert res.error_code == ErrorCode.OK
-
         part1()
 
         cur_insert_n = 0
@@ -300,7 +293,8 @@ class TestFullText:
             table_name = "test_fulltext"
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table(table_name, ConflictType.Ignore)
-
+            infinity_obj.flush_data()
+            # infinity_obj.cleanup()
             table_obj = db_obj.create_table(
                 table_name,
                 {
@@ -311,6 +305,7 @@ class TestFullText:
                 },
                 ConflictType.Error,
             )
+            # table_obj.drop_index("ft_index")
             table_obj.create_index(
                 "ft_index",
                 index.IndexInfo("body", index.IndexType.FullText, {"realtime": "true"}),
