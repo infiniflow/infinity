@@ -180,6 +180,7 @@ SizeT BufferManager::BufferedObjectCount() {
 }
 
 Status BufferManager::RemoveClean(KVInstance *kv_instance) {
+    LOG_TRACE(fmt::format("BufferManager::RemoveClean, start to clean objects"));
     Status status;
     Vector<BufferObj *> clean_list;
     {

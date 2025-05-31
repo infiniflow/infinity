@@ -37,6 +37,7 @@ import column_meta;
 import fast_rough_filter;
 import kv_code;
 import kv_utility;
+import logger;
 
 namespace infinity {
 
@@ -137,6 +138,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {
             String block_lock_key = GetBlockTag("lock");
+            LOG_TRACE(fmt::format("UninitSet: dropping block lock for block key: {}", block_lock_key));
             Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
             if (!status.ok()) {
                 return status;
@@ -145,6 +147,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     }
     {
         String filter_key = GetBlockTag("fast_rough_filter");
+        LOG_TRACE(fmt::format("UninitSet: fast rough filter key: {}", filter_key));
         Status status = kv_instance_.Delete(filter_key);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
