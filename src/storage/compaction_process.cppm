@@ -64,8 +64,6 @@ public:
 
     void Submit(SharedPtr<BGTask> bg_task);
 
-    void DoCompact();
-
     void NewDoCompact();
 
     Status NewManualCompact(const String &db_name, const String &table_name);
@@ -80,10 +78,6 @@ public:
     void AddTestCommand(BGTaskType type, const String &command) { test_commander_.Add(type, command); }
 
 private:
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
-
-    void ScanAndOptimize();
-
     void NewScanAndOptimize();
 
     void DoDump(DumpIndexTask *dump_task);

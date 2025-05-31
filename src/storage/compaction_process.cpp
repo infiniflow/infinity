@@ -87,38 +87,6 @@ void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
     ++task_count_;
 }
 
-void CompactionProcessor::DoCompact() {
-    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"), TransactionType::kNormal);
-    bool success = false;
-    DeferFn defer_fn([&] {
-        if (!success) {
-            txn_mgr_->RollBackTxn(scan_txn);
-        }
-    });
-
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> statements = this->ScanForCompact(scan_txn);
-    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
-    for (const auto &[statement, txn] : statements) {
-        BGQueryContextWrapper wrapper(txn);
-        BGQueryState state;
-        try {
-            bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
-            if (res) {
-                wrappers.emplace_back(std::move(wrapper), std::move(state));
-            }
-        } catch (const std::exception &e) {
-            LOG_CRITICAL(fmt::format("DoCompact failed: {}", e.what()));
-            throw;
-        }
-    }
-    for (auto &[wrapper, query_state] : wrappers) {
-        TxnTimeStamp commit_ts_out = 0;
-        wrapper.query_context_->JoinBGStatement(query_state, commit_ts_out);
-    }
-    txn_mgr_->CommitTxn(scan_txn);
-    success = true;
-}
-
 void CompactionProcessor::NewDoCompact() {
     LOG_TRACE("Background task triggered compaction");
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
@@ -268,50 +236,6 @@ CompactionProcessor::ManualDoCompact(const String &schema_name, const String &ta
     return out_commit_ts;
 }
 
-Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompact(Txn *scan_txn) {
-
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> compaction_tasks;
-    TransactionID txn_id = scan_txn->TxnID();
-    TxnTimeStamp begin_ts = scan_txn->BeginTS();
-    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
-    for (auto *db_entry : db_entries) {
-        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
-        for (auto *table_entry : table_entries) {
-            while (true) {
-                Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Compact"), TransactionType::kNormal);
-                TransactionID txn_id = txn->TxnID();
-                auto compact_segments = table_entry->CheckCompaction(txn_id);
-                if (compact_segments.empty()) {
-                    txn_mgr_->RollBackTxn(txn);
-                    break;
-                }
-
-                LOG_TRACE("Construct compact task: ");
-                for (SegmentEntry *segment_ptr : compact_segments) {
-                    LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
-                }
-
-                compaction_tasks.emplace_back(
-                    MakeUnique<AutoCompactStatement>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(compact_segments)),
-                    txn);
-            }
-        }
-    }
-
-    return compaction_tasks;
-}
-
-void CompactionProcessor::ScanAndOptimize() {
-    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"), TransactionType::kNormal);
-    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", txn->BeginTS()));
-    txn->OptimizeIndexes();
-    try {
-        txn_mgr_->CommitTxn(txn);
-    } catch (const RecoverableException &e) {
-        txn_mgr_->RollBackTxn(txn);
-    }
-}
-
 void CompactionProcessor::NewScanAndOptimize() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
@@ -439,19 +363,15 @@ void CompactionProcessor::Process() {
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Do compact start.");
 
-                        auto *compact_task = static_cast<NotifyCompactTask *>(bg_task.get());
-                        if (compact_task->new_compact_) {
-                            NewDoCompact();
-                        } else {
-                            DoCompact();
-                        }
+                        //                        auto *compact_task = static_cast<NotifyCompactTask *>(bg_task.get());
+                        NewDoCompact();
 
                         LOG_DEBUG("Do compact end.");
                     }
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
-                    auto *optimize_task = static_cast<NotifyOptimizeTask *>(bg_task.get());
+                    //                    auto *optimize_task = static_cast<NotifyOptimizeTask *>(bg_task.get());
 
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
@@ -460,11 +380,7 @@ void CompactionProcessor::Process() {
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Optimize start.");
 
-                        if (!optimize_task->new_optimize_) {
-                            ScanAndOptimize();
-                        } else {
-                            NewScanAndOptimize();
-                        }
+                        NewScanAndOptimize();
                         LOG_DEBUG("Optimize done.");
                     }
                     break;
