@@ -56,6 +56,7 @@ Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, cons
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get row count"), TransactionType::kNormal);
     TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
@@ -84,7 +85,7 @@ Tuple<SizeT, Status> TestTxnAppend::GetTableRowCount(const String &db_name, cons
         for (auto &block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             if (!status.ok()) {
                 return {0, status};
             }
@@ -293,6 +294,7 @@ TEST_P(TestTxnAppend, test_append1) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -312,7 +314,7 @@ TEST_P(TestTxnAppend, test_append1) {
         BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -478,6 +480,7 @@ TEST_P(TestTxnAppend, test_append2) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -504,7 +507,7 @@ TEST_P(TestTxnAppend, test_append2) {
             EXPECT_EQ(block_id, idx);
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             Pair<BlockOffset, BlockOffset> range;
@@ -2911,6 +2914,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -2930,7 +2934,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             {
                 Pair<BlockOffset, BlockOffset> range;
@@ -3057,6 +3061,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -3076,7 +3081,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             {
                 Pair<BlockOffset, BlockOffset> range;
@@ -3203,6 +3208,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -3222,7 +3228,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             {
                 Pair<BlockOffset, BlockOffset> range;
@@ -3293,6 +3299,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -3312,7 +3319,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             {
                 Pair<BlockOffset, BlockOffset> range;
@@ -3384,6 +3391,7 @@ TEST_P(TestTxnAppend, test_append_append) {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -3403,7 +3411,7 @@ TEST_P(TestTxnAppend, test_append_append) {
             BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             {
                 Pair<BlockOffset, BlockOffset> range;
@@ -3529,6 +3537,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -3554,7 +3563,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                     BlockMeta block_meta(block_id, segment_meta);
 
                     NewTxnGetVisibleRangeState state;
-                    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                     EXPECT_TRUE(status.ok());
                     SizeT row_count = state.block_offset_end();
                     {
@@ -3671,6 +3680,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         Status status;
         Vector<BlockID> *block_ids_ptr = nullptr;
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
@@ -3679,7 +3689,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         BlockMeta block_meta(0, segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -4169,6 +4179,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         Status status;
         Vector<BlockID> *block_ids_ptr = nullptr;
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
@@ -4177,7 +4188,7 @@ TEST_P(TestTxnAppend, test_append_and_drop_index) {
         BlockMeta block_meta(0, segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;

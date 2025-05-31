@@ -42,7 +42,8 @@ import logger;
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
-    : begin_ts_(segment_meta.begin_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta), block_id_(block_id) {}
+    : begin_ts_(segment_meta.begin_ts()), commit_ts_(segment_meta.commit_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta),
+      block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -227,7 +228,8 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
                                           table_meta.table_id_str(),
                                           segment_meta_.segment_id(),
                                           block_id_,
-                                          begin_ts_);
+                                          begin_ts_,
+                                          commit_ts_);
     return {*row_cnt_, Status::OK()};
 #else
     Status status;

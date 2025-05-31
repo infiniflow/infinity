@@ -1941,7 +1941,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     String table_key = create_index_cmd->table_key_;
     String index_id_str = create_index_cmd->index_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
     Optional<TableIndexMeeta> table_index_meta_opt;
     Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
@@ -2021,7 +2021,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     auto ts_str = std::to_string(commit_ts);
     kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_), ts_str);
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);
     SharedPtr<IndexBase> index_base;
     std::tie(index_base, status) = table_index_meta.GetIndexBase();
@@ -2037,12 +2037,13 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
 
 Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = dump_index_cmd->db_id_;
     const String &table_id_str = dump_index_cmd->table_id_;
     const String &index_id_str = dump_index_cmd->index_id_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
 
     const String &index_id_str_ = dump_index_cmd->index_id_;
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);
@@ -2053,8 +2054,6 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
             mem_index->ClearMemIndex();
         }
     }
-
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {

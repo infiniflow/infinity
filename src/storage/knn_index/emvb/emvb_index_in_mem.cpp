@@ -127,7 +127,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
             emvb_index_ =
                 MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
 
-            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts);
+            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
             SegmentMeta segment_meta(segment_id_, table_meta);
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {

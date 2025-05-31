@@ -276,6 +276,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     const SegmentID segment_id = tasks_[task_id];
     SegmentMeta *segment_meta = segment_index.at(segment_id).segment_meta_.get();
     TxnTimeStamp begin_ts = new_txn_ptr_->BeginTS();
+    TxnTimeStamp commit_ts = new_txn_ptr_->CommitTS();
     {
         SharedPtr<FastRoughFilter> segment_filter;
         Status status = segment_meta->GetFastRoughFilter(segment_filter);
@@ -349,7 +350,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         }
     }
     // Remove deleted rows from the result
-    Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, result_elem);
+    Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

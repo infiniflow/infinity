@@ -295,6 +295,7 @@ template <CanBuildBloomFilter ValueType>
 void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &arg) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job begin for column: {}", arg.column_id_));
     TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
+    TxnTimeStamp commit_ts = arg.segment_meta_->commit_ts();
     auto [block_ids_ptr, status] = arg.segment_meta_->GetBlockIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -326,7 +327,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
         std::swap(arg.distinct_keys_, arg.distinct_keys_backup_);
         // step 2. collect data in row
         NewTxnGetVisibleRangeState visit_state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, visit_state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, visit_state);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -442,6 +443,7 @@ template <CanBuildMinMaxFilter ValueType>
 void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg &arg) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job begin for column: {}", arg.column_id_));
     TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
+    TxnTimeStamp commit_ts = arg.segment_meta_->commit_ts();
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     // step 0. prepare min and max value
@@ -473,7 +475,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
             UnrecoverableError(status.message());
         }
         NewTxnGetVisibleRangeState visit_state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, visit_state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, visit_state);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -582,6 +584,7 @@ template <CanBuildMinMaxFilterAndBloomFilter ValueType>
 void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilterArg &arg) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildMinMaxAndBloomFilter job begin for column: {}", arg.column_id_));
     TxnTimeStamp begin_ts = arg.segment_meta_->begin_ts();
+    TxnTimeStamp commit_ts = arg.segment_meta_->commit_ts();
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     // step 0. prepare min and max value
@@ -617,7 +620,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
             UnrecoverableError(status.message());
         }
         NewTxnGetVisibleRangeState visit_state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, visit_state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, visit_state);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

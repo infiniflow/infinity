@@ -51,7 +51,7 @@ void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &t
     if (!status.ok()) {
         RecoverableError(status);
     }
-    table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(), table_meta->table_id_str(), table_meta->kv_instance(), table_meta->begin_ts());
+    table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(), table_meta->table_id_str(), table_meta->kv_instance(), table_meta->begin_ts(), table_meta->commit_ts());
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();
     if (!status.ok()) {

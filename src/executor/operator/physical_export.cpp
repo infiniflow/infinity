@@ -276,6 +276,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
 
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     const Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
@@ -337,7 +338,7 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
             }
 
             Bitmask bitmask(block_row_count);
-            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -432,6 +433,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
@@ -453,7 +455,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             }
 
             Bitmask bitmask(block_row_count);
-            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -603,6 +605,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -640,7 +643,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 }
             }
             Bitmask bitmask(block_row_count);
-            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
             if (!status.ok()) {
                 RecoverableError(status);
             }

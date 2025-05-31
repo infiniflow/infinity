@@ -98,7 +98,7 @@ export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
 
-    void Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts);
+    void Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
 
     bool Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range);
 
@@ -108,12 +108,16 @@ public:
 
     BlockOffset block_offset_end() const { return block_offset_end_; }
 
+    bool end() const { return end_; }
+
 private:
     SharedPtr<BlockLock> block_lock_;
     BufferHandle version_buffer_handle_;
     TxnTimeStamp begin_ts_ = 0;
+    TxnTimeStamp commit_ts_ = 0;
     BlockOffset block_offset_begin_ = 0;
     BlockOffset block_offset_end_ = 0;
+    bool end_ = false;
 };
 
 export class NewTxnBlockVisitor {
@@ -295,7 +299,7 @@ public:
     static Status MemIndexCommit(NewTxn *txn);
 
     static Status
-    GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
+    GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
@@ -388,13 +392,13 @@ public:
 
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
 
-    static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state);
+    static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 
     static Status GetCreateTSVector(BlockMeta &block_meta, SizeT offset, SizeT row_count, ColumnVector &column_vector);
 
     static Status GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT row_count, ColumnVector &column_vector);
 
-    static Status GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths);
+    static Status GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths);
 
     static Status
     GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def = nullptr);
@@ -418,8 +422,8 @@ public:
 
     static Status CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete);
 
-    static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
+    static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
-    static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
+    static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 };
 } // namespace infinity

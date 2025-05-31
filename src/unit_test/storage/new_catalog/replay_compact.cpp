@@ -126,6 +126,7 @@ TEST_P(TestTxnReplayCompact, test_compact0) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -143,7 +144,7 @@ TEST_P(TestTxnReplayCompact, test_compact0) {
         auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             {
                 Pair<BlockOffset, BlockOffset> range;

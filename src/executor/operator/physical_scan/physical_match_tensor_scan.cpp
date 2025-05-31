@@ -329,6 +329,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
     const TxnTimeStamp begin_ts = new_txn->BeginTS();
+    const TxnTimeStamp commit_ts = new_txn->CommitTS();
     if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
@@ -412,7 +413,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                      function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
                                  }
                              },
-                             [this, begin_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
+                             [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
                                  const auto &[start_offset, total_row_count] = in_mem_result;
                                  BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
                                  BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
@@ -422,7 +423,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                      Bitmask block_bitmask;
                                      if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
                                          BlockMeta block_meta(block_id, *segment_meta);
-                                         Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, block_bitmask);
+                                         Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
                                          if (!status.ok()) {
                                              UnrecoverableError(status.message());
                                          }
@@ -488,7 +489,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
 
         Bitmask bitmask;
         if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
-            Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+            Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }

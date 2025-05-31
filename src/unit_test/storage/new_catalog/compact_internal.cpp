@@ -155,6 +155,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -174,7 +175,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         {
             BlockMeta block_meta(0, segment_meta);
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -209,7 +210,7 @@ TEST_P(TestTxnCompactInternal, test_compact) {
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -342,6 +343,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -361,7 +363,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         {
             BlockMeta block_meta(0, segment_meta);
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -396,7 +398,7 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;

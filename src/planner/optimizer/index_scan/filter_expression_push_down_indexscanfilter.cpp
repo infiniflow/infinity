@@ -130,7 +130,7 @@ struct ExpressionIndexScanInfo {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
             base_table_ref->block_index_->table_meta_ =
-                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS());
+                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS(), new_txn->CommitTS());
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
 

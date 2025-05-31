@@ -1026,6 +1026,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
     TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
 
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
@@ -1033,7 +1034,7 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
         Status status = this->CheckpointTable(table_meta, option);
         if (!status.ok()) {
             return status;
@@ -1491,13 +1492,14 @@ Status NewTxn::GetTableMeta(const String &db_name,
 
 Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key_ptr) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     String table_key;
     String table_id_str;
     Status status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts);
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
     }
@@ -1737,13 +1739,14 @@ Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
         Status status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -3758,7 +3761,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         switch (meta->type_) {
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
 
@@ -3778,7 +3781,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -3801,7 +3804,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -3901,7 +3904,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -3910,7 +3913,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
                 Status status = NewCatalog::CleanSegment(segment_meta, ts, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -3920,7 +3923,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
                 Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
@@ -3931,7 +3934,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -3943,7 +3946,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kTableIndex: {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
                 Status status = NewCatalog::CleanTableIndex(table_index_meta, table_index_meta_key->index_name_, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -3953,7 +3956,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
@@ -3964,7 +3967,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -4122,7 +4125,8 @@ Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths)
         return status;
     }
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    return NewCatalog::GetDBFilePaths(begin_ts, *db_meta, file_paths);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    return NewCatalog::GetDBFilePaths(begin_ts, commit_ts, *db_meta, file_paths);
 }
 
 Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths) {
