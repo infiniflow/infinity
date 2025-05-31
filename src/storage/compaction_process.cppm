@@ -25,7 +25,6 @@ import status;
 
 namespace infinity {
 
-class Catalog;
 class TxnManager;
 class SessionManager;
 class NewTxn;
@@ -55,7 +54,7 @@ private:
 
 export class CompactionProcessor {
 public:
-    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    CompactionProcessor(TxnManager *txn_mgr);
     ~CompactionProcessor();
 
     void Start();
@@ -91,7 +90,6 @@ private:
 
     Thread processor_thread_{};
 
-    Catalog *catalog_{};
     TxnManager *txn_mgr_{};
     SessionManager *session_mgr_{};
 

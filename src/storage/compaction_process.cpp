@@ -56,7 +56,7 @@ import segment_meta;
 
 namespace infinity {
 
-CompactionProcessor::CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr) : catalog_(catalog), txn_mgr_(txn_mgr) {
+CompactionProcessor::CompactionProcessor(TxnManager *txn_mgr) : txn_mgr_(txn_mgr) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("CompactionProcessor");
 #endif
