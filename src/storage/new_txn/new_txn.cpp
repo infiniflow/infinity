@@ -347,6 +347,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return status;
     }
 
+    // Get the latest table id
     std::tie(table_id_str, status) = db_meta->GetNextTableID();
     if (!status.ok()) {
         return status;
@@ -637,13 +638,6 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
-    // Get latest index id and lock the id
-    String index_id_str;
-    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
-    if (!status.ok()) {
-        return status;
-    }
-
     String index_key;
     String index_id;
     status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
@@ -651,8 +645,16 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
+        LOG_ERROR(fmt::format("CreateIndex: index {} already exists, index_key: {}, index_id: {}", *index_base->index_name_, index_key, index_id));
         return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     } else if (status.code() != ErrorCode::kIndexNotExist) {
+        return status;
+    }
+
+    // Get the latest index id and lock the id
+    String index_id_str;
+    std::tie(index_id_str, status) = table_meta->GetNextIndexID();
+    if (!status.ok()) {
         return status;
     }
 
@@ -4001,6 +4003,26 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
             break;
         }
+        case WalCommandType::CREATE_TABLE_V2: {
+            auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
+
+            Optional<DBMeeta> db_meta;
+            String table_key;
+            Status status = GetDBMeta(create_table_cmd->db_name_, db_meta);
+            if (!status.ok()) {
+                return status;
+            }
+
+            u64 next_table_id = std::stoull(create_table_cmd->table_id_);
+            ++next_table_id;
+            String next_table_id_str = std::to_string(next_table_id);
+
+            status = db_meta->SetNextTableID(next_table_id_str);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
@@ -4011,9 +4033,15 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            create_index_cmd->db_id_ = db_meta->db_id_str();
-            create_index_cmd->table_id_ = table_meta->table_id_str();
-            create_index_cmd->table_key_ = std::move(table_key);
+
+            u64 next_index_id = std::stoull(create_index_cmd->index_id_);
+            ++next_index_id;
+            String next_index_id_str = std::to_string(next_index_id);
+
+            status = table_meta->SetNextIndexID(next_index_id_str);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::APPEND_V2: {
