@@ -704,7 +704,7 @@ class TestMemIdx:
                 ]
             )
             # dump by line submit here
-            infinity_obj.flush_delta()
+            infinity_obj.flush_data()
             for i in range(100):
                 table_obj.insert(
                     [
@@ -767,10 +767,10 @@ class TestMemIdx:
             table_obj.insert(
                 [{"c1": 1, "c2": "hello world. hello world. hello world."}]
             )
-            infinity_obj.flush_delta()
+            infinity_obj.flush_data()
 
             table_obj.insert([{"c1": 2, "c2": "hello c++. hello c++. hello c++."}])
-            infinity_obj.flush_delta()
+            infinity_obj.flush_data()
 
         part1()
 

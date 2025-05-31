@@ -92,7 +92,6 @@ Status Storage::InitToAdmin() {
                                           config_ptr_->WALDir(),
                                           config_ptr_->DataDir(),
                                           config_ptr_->WALCompactThreshold(),
-                                          config_ptr_->DeltaCheckpointThreshold(),
                                           config_ptr_->FlushMethodAtCommit());
 
         switch (config_ptr_->StorageType()) {
@@ -377,10 +376,6 @@ Status Storage::AdminToWriter() {
         periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
 
         i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-        if (!full_checkpoint_interval_sec && delta_checkpoint_interval_sec) {
-            full_checkpoint_interval_sec = delta_checkpoint_interval_sec;
-        }
         periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
 
         periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
@@ -395,12 +390,9 @@ Status Storage::AdminToWriter() {
         i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
         i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
         i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
 
         periodic_trigger_thread_->full_checkpoint_trigger_ =
             MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-        periodic_trigger_thread_->delta_checkpoint_trigger_ =
-            MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
         periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
         periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
 
@@ -615,7 +607,6 @@ Status Storage::WriterToAdmin() {
                                       config_ptr_->WALDir(),
                                       config_ptr_->DataDir(),
                                       config_ptr_->WALCompactThreshold(),
-                                      config_ptr_->DeltaCheckpointThreshold(),
                                       config_ptr_->FlushMethodAtCommit());
 
     std::unique_lock<std::mutex> lock(mutex_);

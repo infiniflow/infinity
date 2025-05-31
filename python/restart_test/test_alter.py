@@ -117,7 +117,7 @@ class TestAlter:
             table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])
 
             if flush and flush_mid:
-                infinity_obj.flush_delta()
+                infinity_obj.flush_data()
 
             res = table_obj.add_columns({"c4": {"type": "varchar", "default": "tttt"}})
             assert res.error_code == ErrorCode.OK
@@ -134,7 +134,7 @@ class TestAlter:
             assert res.error_code == ErrorCode.OK
 
             if flush:
-                infinity_obj.flush_delta()
+                infinity_obj.flush_data()
 
         @decorator
         def part2(infinity_obj):
@@ -275,7 +275,7 @@ class TestAlter:
 
             table_obj.drop_columns(["c3"])
 
-            infinity_obj.flush_delta()
+            infinity_obj.flush_data()
 
         part1()
 

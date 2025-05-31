@@ -86,13 +86,8 @@ export struct ReplayWalOptions {
 
 export class WalManager {
 public:
-    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
-    WalManager(Storage *storage,
-               String wal_dir,
-               String data_dir,
-               u64 wal_size_threshold,
-               u64 delta_checkpoint_interval_wal_bytes,
-               FlushOptionType flush_option);
+    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, FlushOptionType flush_option);
+    WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -187,7 +182,6 @@ private:
 
 public:
     u64 cfg_wal_size_threshold_{};
-    u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
     const String &wal_dir() const { return wal_dir_; }
     const String &data_path() const { return data_path_; }

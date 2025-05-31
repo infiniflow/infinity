@@ -23,7 +23,7 @@ class TestCompact:
             table_obj = db_obj.create_table("test_compact", columns)
             table_obj.import_data(import_file, {"file_type": "jsonl"})
             table_obj.import_data(import_file, {"file_type": "jsonl"})
-            infinity_obj.flush_delta()
+            infinity_obj.flush_data()
             table_obj.compact()
             for index_info in indexes:
                 table_obj.create_index(f"idx_{index_info.column_name}", index_info)
@@ -72,7 +72,7 @@ class TestCompact:
 
             table_obj.import_data(dataset_path, import_options)
             table_obj.compact()
-            infinity_obj.flush_delta()
+            infinity_obj.flush_data()
 
             table_obj.import_data(dataset_path, import_options)
             table_obj.compact()
