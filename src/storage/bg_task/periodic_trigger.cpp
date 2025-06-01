@@ -45,35 +45,6 @@ bool PeriodicTrigger::Check() {
     return true;
 }
 
-SharedPtr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask(TxnTimeStamp visible_ts) {
-    LOG_DEBUG(fmt::format("Trigger cleanup task, after {} seconds", duration_.load()));
-    std::lock_guard lck(mtx_);
-    if (visible_ts == 0) {
-        visible_ts = txn_mgr_->GetCleanupScanTS() + 1;
-    }
-    if (visible_ts == last_visible_ts_) {
-        LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
-        return nullptr;
-    }
-    if (visible_ts < last_visible_ts_) {
-        UnrecoverableError("The visible timestamp is not monotonic.");
-        return nullptr;
-    }
-    last_visible_ts_ = visible_ts;
-    LOG_DEBUG(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-
-    auto buffer_mgr = txn_mgr_->GetBufferMgr();
-    return MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);
-}
-
-void CleanupPeriodicTrigger::Trigger() {
-    auto cleanup_task = CreateCleanupTask();
-    if (cleanup_task.get() == nullptr) {
-        return;
-    }
-    bg_processor_->Submit(std::move(cleanup_task));
-}
-
 SharedPtr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();

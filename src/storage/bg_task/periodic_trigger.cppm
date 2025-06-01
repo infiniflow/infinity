@@ -57,24 +57,6 @@ protected:
     Atomic<i64> duration_{0};
 };
 
-export class CleanupPeriodicTrigger final : public PeriodicTrigger {
-public:
-    CleanupPeriodicTrigger(i64 interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
-        : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
-
-    SharedPtr<CleanupTask> CreateCleanupTask(TxnTimeStamp visible_ts = 0);
-
-    virtual void Trigger() override;
-
-private:
-    BGTaskProcessor *const bg_processor_{};
-    Catalog *const catalog_{};
-    TxnManager *const txn_mgr_{};
-
-    std::mutex mtx_;
-    TxnTimeStamp last_visible_ts_{0};
-};
-
 export class NewCleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
     NewCleanupPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}

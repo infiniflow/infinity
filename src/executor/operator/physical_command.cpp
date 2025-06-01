@@ -272,7 +272,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set cleanup interval: {}", interval));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->periodic_trigger_thread()->cleanup_trigger_->UpdateInternal(interval);
+                            query_context->storage()->periodic_trigger_thread()->new_cleanup_trigger_->UpdateInternal(interval);
                             config->SetCleanupInterval(interval);
                             break;
                         }
@@ -455,9 +455,23 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             {
                 // Full checkpoint
-                Txn *txn = query_context->GetTxn();
-                auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, true);
-                query_context->storage()->bg_processor()->Submit(checkpoint_task);
+                auto *wal_manager = query_context->storage()->wal_manager();
+                if (wal_manager->IsCheckpointing()) {
+                    LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
+                    Status status = Status::Checkpointing();
+                    RecoverableError(status);
+                }
+
+                TxnTimeStamp max_commit_ts{};
+                i64 wal_size{};
+                std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+                auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                NewTxn *new_txn = query_context->GetNewTxn();
+                checkpoint_task->new_txn_ = new_txn;
+
+                auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+                bg_processor->Submit(checkpoint_task);
                 checkpoint_task->Wait();
             }
 
