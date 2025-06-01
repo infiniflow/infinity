@@ -332,7 +332,7 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>(txn_mgr_.get());
+    compact_processor_ = MakeUnique<CompactionProcessor>();
     compact_processor_->Start();
 
     // recover index after start compact process
@@ -533,7 +533,7 @@ Status Storage::ReaderToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>(txn_mgr_.get());
+    compact_processor_ = MakeUnique<CompactionProcessor>();
     compact_processor_->Start();
 
     periodic_trigger_thread_->Stop();

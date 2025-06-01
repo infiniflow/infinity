@@ -77,18 +77,8 @@ Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_c
 NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_name)
     : BGTask(BGTaskType::kNewCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
-DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, Txn *txn) : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), txn_(txn) {}
-
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn)
     : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_(new_txn) {}
-
-DumpIndexBylineTask::DumpIndexBylineTask(SharedPtr<String> db_name,
-                                         SharedPtr<String> table_name,
-                                         SharedPtr<String> index_name,
-                                         SegmentID segment_id,
-                                         SharedPtr<ChunkIndexEntry> dumped_chunk)
-    : BGTask(BGTaskType::kDumpIndexByline, true), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
-      dumped_chunk_(dumped_chunk) {}
 
 TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
