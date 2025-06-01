@@ -25,7 +25,6 @@ import status;
 
 namespace infinity {
 
-class Catalog;
 class TxnManager;
 class SessionManager;
 class NewTxn;
@@ -55,7 +54,7 @@ private:
 
 export class CompactionProcessor {
 public:
-    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    CompactionProcessor(TxnManager *txn_mgr);
     ~CompactionProcessor();
 
     void Start();
@@ -63,8 +62,6 @@ public:
     void Stop();
 
     void Submit(SharedPtr<BGTask> bg_task);
-
-    void DoCompact();
 
     void NewDoCompact();
 
@@ -80,10 +77,6 @@ public:
     void AddTestCommand(BGTaskType type, const String &command) { test_commander_.Add(type, command); }
 
 private:
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
-
-    void ScanAndOptimize();
-
     void NewScanAndOptimize();
 
     void DoDump(DumpIndexTask *dump_task);
@@ -97,7 +90,6 @@ private:
 
     Thread processor_thread_{};
 
-    Catalog *catalog_{};
     TxnManager *txn_mgr_{};
     SessionManager *session_mgr_{};
 
