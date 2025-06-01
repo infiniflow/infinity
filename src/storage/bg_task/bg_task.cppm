@@ -29,14 +29,11 @@ namespace infinity {
 
 export enum class BGTaskType {
     kStopProcessor,
-    kAddDeltaEntry,
-    kCheckpoint,
     kNewCheckpoint,
     kForceCheckpoint, // Manually triggered by PhysicalFlush
     kNotifyCompact,
     kNewCompact,
     kNotifyOptimize,
-    kCleanup,
     kNewCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
@@ -98,30 +95,8 @@ export struct StopProcessorTask final : public BGTask {
     String ToString() const final { return "Stop Task"; }
 };
 
-export struct AddDeltaEntryTask final : public BGTask {
-    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry) : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)) {}
-
-    String ToString() const final { return fmt::format("DeltaLog: {}", delta_entry_->ToString()); }
-
-    UniquePtr<CatalogDeltaEntry> delta_entry_{};
-};
-
 export struct CheckpointTaskBase : public BGTask {
     CheckpointTaskBase(BGTaskType type, bool async) : BGTask(type, async) {}
-};
-
-export struct CheckpointTask final : public CheckpointTaskBase {
-    CheckpointTask(bool full_checkpoint) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
-
-    String ToString() const final {
-        if (is_full_checkpoint_) {
-            return "Full checkpoint";
-        } else {
-            return "Delta checkpoint";
-        }
-    }
-
-    bool is_full_checkpoint_{};
 };
 
 export struct NewCheckpointTask final : public CheckpointTaskBase {
@@ -134,47 +109,6 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
 
     NewTxn *new_txn_{};
     i64 wal_size_{};
-};
-
-export struct ForceCheckpointTask final : public CheckpointTaskBase {
-    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
-    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
-
-    ~ForceCheckpointTask();
-
-    String ToString() const override {
-        if (is_full_checkpoint_) {
-            return fmt::format("Force full checkpoint, txn: ", txn_->TxnID());
-        } else {
-            return fmt::format("Force delta checkpoint, txn: ", txn_->TxnID());
-        }
-    }
-
-    Txn *txn_{};
-    NewTxn *new_txn_{};
-    bool is_full_checkpoint_{};
-    TxnTimeStamp cleanup_ts_ = 0;
-};
-
-export class CleanupTask final : public BGTask {
-public:
-    // Try clean up is async task?
-    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
-        : BGTask(BGTaskType::kCleanup, false), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
-
-public:
-    ~CleanupTask() override = default;
-
-    String ToString() const override { return fmt::format("CleanupTask, visible timestamp: {}", visible_ts_); }
-
-    void Execute();
-
-private:
-    Catalog *const catalog_;
-
-    const TxnTimeStamp visible_ts_;
-
-    BufferManager *buffer_mgr_;
 };
 
 export class NewCleanupTask final : public BGTask {

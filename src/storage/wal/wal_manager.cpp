@@ -70,10 +70,7 @@ module wal_manager;
 
 namespace infinity {
 
-WalManager::WalManager(Storage *storage,
-                       String wal_dir,
-                       u64 wal_size_threshold,
-                       FlushOptionType flush_option)
+WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage),
       running_(false), flush_option_(flush_option), bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())),
       last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
@@ -82,11 +79,7 @@ WalManager::WalManager(Storage *storage,
 #endif
 }
 
-WalManager::WalManager(Storage *storage,
-                       String wal_dir,
-                       String data_dir,
-                       u64 wal_size_threshold,
-                       FlushOptionType flush_option)
+WalManager::WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir),
       storage_(storage), running_(false), flush_option_(flush_option),
       bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
@@ -645,14 +638,7 @@ void WalManager::Checkpoint(bool is_full_checkpoint) {
     txn_mgr->CommitTxn(txn);
 }
 
-void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
-    bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
-    if (is_full_checkpoint) {
-        FullCheckpointInner(ckp_task->new_txn_);
-    } else {
-        DeltaCheckpointInner(ckp_task->new_txn_);
-    }
-}
+void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) { UnrecoverableError("Not implemented"); }
 
 void WalManager::FullCheckpointInner(Txn *txn) {
     DeferFn defer([&] { checkpoint_in_progress_.store(false); });
