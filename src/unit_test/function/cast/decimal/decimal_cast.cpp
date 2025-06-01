@@ -42,11 +42,7 @@ import data_type;
 
 using namespace infinity;
 
-class DecimalCastTest : public BaseTest {
-    void SetUp() override { BaseTest::SetUp(); }
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class DecimalCastTest : public BaseTest {};
 
 TEST_F(DecimalCastTest, decimal_cast0) {
     using namespace infinity;
