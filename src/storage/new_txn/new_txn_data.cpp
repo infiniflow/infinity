@@ -1028,7 +1028,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
 
     NewTxnGetVisibleRangeState range_state;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, range_state);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, range_state);
     if (!status.ok()) {
         return status;
     }
@@ -1361,7 +1362,7 @@ Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
     const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1392,7 +1393,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp begin_ts = BeginTS();
     TxnTimeStamp commit_ts = CommitTS();
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     SizeT copied_row_cnt = 0;
@@ -1511,7 +1512,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance 
     const String &db_id_str = delete_cmd->db_id_;
     const String &table_id_str = delete_cmd->table_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1560,10 +1561,11 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance 
 
 Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = delete_txn_store->db_id_str_;
     const String &table_id_str = delete_txn_store->table_id_str_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1608,7 +1610,7 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
     WalSegmentInfo &segment_info = segment_infos[0];
     Vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts, commit_ts);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);

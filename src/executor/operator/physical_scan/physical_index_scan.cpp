@@ -118,6 +118,7 @@ SizeT PhysicalIndexScan::TaskletCount() { return base_table_ref_->block_index_->
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     auto &output_data_blocks = index_scan_operator_state->data_block_array_;
     auto &segment_ids = *(index_scan_operator_state->segment_ids_);
@@ -220,7 +221,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     if (result_elem.CountTrue() > 0) {
         // Remove deleted rows from the result
         // segment_entry->CheckRowsVisible(result_elem, begin_ts);
-        Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, result_elem);
+        Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

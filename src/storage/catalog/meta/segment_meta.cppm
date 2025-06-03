@@ -34,6 +34,7 @@ public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
+    TxnTimeStamp commit_ts() const { return commit_ts_; }
 
     KVInstance &kv_instance() { return kv_instance_; }
 
@@ -69,6 +70,7 @@ public:
     // Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 
     Tuple<Vector<BlockID> *, Status> GetBlockIDs1();
+    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp commit_ts);
 
     // Tuple<SizeT, Status> GetRowCnt();
     Tuple<SizeT, Status> GetRowCnt1();
@@ -97,6 +99,7 @@ private:
 
 private:
     TxnTimeStamp begin_ts_;
+    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;

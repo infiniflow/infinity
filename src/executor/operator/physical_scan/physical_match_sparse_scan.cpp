@@ -420,6 +420,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
     if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
@@ -475,7 +476,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
             break;
         }
-        Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+        Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

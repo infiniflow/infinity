@@ -119,6 +119,7 @@ TEST_P(TestTxnImport, test_import1) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -131,7 +132,7 @@ TEST_P(TestTxnImport, test_import1) {
 
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -589,9 +590,9 @@ TEST_P(TestTxnImport, test_import_drop_db) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -635,6 +636,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -642,7 +644,7 @@ TEST_P(TestTxnImport, test_import_drop_db) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
@@ -1127,9 +1129,9 @@ TEST_P(TestTxnImport, test_import_drop_table) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -1173,6 +1175,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -1180,7 +1183,7 @@ TEST_P(TestTxnImport, test_import_drop_table) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
@@ -1721,9 +1724,9 @@ TEST_P(TestTxnImport, test_import_add_columns) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -1767,6 +1770,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -1774,7 +1778,7 @@ TEST_P(TestTxnImport, test_import_add_columns) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
@@ -2353,9 +2357,9 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -2386,13 +2390,14 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
@@ -2947,6 +2952,7 @@ TEST_P(TestTxnImport, test_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -2955,7 +2961,7 @@ TEST_P(TestTxnImport, test_import) {
 
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -3063,9 +3069,9 @@ TEST_P(TestTxnImport, test_import_append_table) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -3109,6 +3115,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -3116,7 +3123,7 @@ TEST_P(TestTxnImport, test_import_append_table) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
 
@@ -3673,9 +3680,9 @@ TEST_P(TestTxnImport, test_import_import_table) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -3719,6 +3726,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -3726,7 +3734,7 @@ TEST_P(TestTxnImport, test_import_import_table) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
 
@@ -4518,9 +4526,9 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -4564,6 +4572,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -4571,7 +4580,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
 
@@ -5139,9 +5148,9 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         return input_block;
     };
 
-    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
         NewTxnGetVisibleRangeState state;
-        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
 
         BlockOffset offset = 0;
@@ -5185,6 +5194,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
@@ -5192,7 +5202,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
 
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            check_block(block_meta, begin_ts);
+            check_block(block_meta, begin_ts, commit_ts);
         }
     };
 

@@ -725,6 +725,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -749,7 +750,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             EXPECT_EQ(block_id, idx);
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             Pair<BlockOffset, BlockOffset> range;
@@ -856,6 +857,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
         std::thread th([&]() {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -880,7 +882,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
                 EXPECT_EQ(block_id, idx);
                 BlockMeta block_meta(block_id, segment_meta);
                 NewTxnGetVisibleRangeState state;
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
 
                 Pair<BlockOffset, BlockOffset> range;

@@ -377,8 +377,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
-                    String error_message = fmt::format("Segment not found: {}, idx: {}", block_tag->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    // Segment is compacted
+                    String error_message = fmt::format("Segment not found, maybe is compacted: {}, idx: {}", block_tag->ToString(), idx);
+                    LOG_WARN(error_message);
+                    continue;
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
@@ -800,8 +802,12 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
         if (segment_id == unsealed_segment_id) {
             table_cache->unsealed_segment_cache_ = MakeShared<SegmentCache>(segment_id, unsealed_segment_offset);
         } else {
-            SizeT segment_row_count =
-                infinity::GetSegmentRowCount(kv_instance_ptr.get(), table_key->db_id_str_, table_key->table_id_str_, segment_id, current_ts);
+            SizeT segment_row_count = infinity::GetSegmentRowCount(kv_instance_ptr.get(),
+                                                                   table_key->db_id_str_,
+                                                                   table_key->table_id_str_,
+                                                                   segment_id,
+                                                                   current_ts,
+                                                                   MAX_TIMESTAMP);
             segment_cache = MakeShared<SegmentCache>(segment_id, segment_row_count);
         }
         table_cache->segment_cache_map_.emplace(segment_id, segment_cache);
