@@ -121,10 +121,10 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *co
 
 HnswHandler::~HnswHandler() {
     std::visit(
-        [&](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                delete arg;
+                delete index;
             }
         },
         hnsw_);
@@ -171,12 +171,12 @@ UniquePtr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, const Colu
 }
 
 SizeT HnswHandler::InsertVecs(SizeT block_offset,
-                                BlockColumnEntry *block_column_entry,
-                                BufferManager *buffer_manager,
-                                SizeT row_offset,
-                                SizeT row_count,
-                                const HnswInsertConfig &config,
-                                SizeT kBuildBucketSize) {
+                              BlockColumnEntry *block_column_entry,
+                              BufferManager *buffer_manager,
+                              SizeT row_offset,
+                              SizeT row_count,
+                              const HnswInsertConfig &config,
+                              SizeT kBuildBucketSize) {
     SizeT mem_usage{};
     std::visit(
         [&](auto &&index) {
@@ -216,11 +216,11 @@ SizeT HnswHandler::InsertVecs(SizeT block_offset,
 }
 
 SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
-                                const ColumnVector &col,
-                                BlockOffset offset,
-                                BlockOffset row_count,
-                                const HnswInsertConfig &config,
-                                SizeT kBuildBucketSize) {
+                              const ColumnVector &col,
+                              BlockOffset offset,
+                              BlockOffset row_count,
+                              const HnswInsertConfig &config,
+                              SizeT kBuildBucketSize) {
     SizeT mem_usage{};
     std::visit(
         [&](auto &&index) {
@@ -257,18 +257,18 @@ SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
             }
         },
         hnsw_);
-   return mem_usage;
+    return mem_usage;
 }
 
 SizeT HnswHandler::InsertVecs(const SegmentEntry *segment_entry,
-                                BufferManager *buffer_mgr,
-                                SizeT column_id,
-                                TxnTimeStamp begin_ts,
-                                bool check_ts,
-                                const HnswInsertConfig &config,
-                                SizeT kBuildBucketSize) {
-        SizeT mem_usage{};
-        std::visit(
+                              BufferManager *buffer_mgr,
+                              SizeT column_id,
+                              TxnTimeStamp begin_ts,
+                              bool check_ts,
+                              const HnswInsertConfig &config,
+                              SizeT kBuildBucketSize) {
+    SizeT mem_usage{};
+    std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
@@ -296,8 +296,8 @@ SizeT HnswHandler::InsertVecs(const SegmentEntry *segment_entry,
                                 OneColumnIterator<MultiVectorRef<DataType>> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
                                 HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
                             } else {
-                                OneColumnIterator<MultiVectorRef<DataType>, false> iter(segment_entry, buffer_mgr, column_id, begin_ts,
-                                ele_size); HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                                OneColumnIterator<MultiVectorRef<DataType>, false> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
+                                HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
                             }
                             break;
                         }
@@ -314,12 +314,12 @@ SizeT HnswHandler::InsertVecs(const SegmentEntry *segment_entry,
 }
 
 SizeT HnswHandler::InsertVecs(int row_count,
-                                const SegmentEntry *segment_entry,
-                                BufferManager *buffer_mgr,
-                                SizeT column_id,
-                                TxnTimeStamp begin_ts,
-                                const HnswInsertConfig &config,
-                                SizeT kBuildBucketSize) {
+                              const SegmentEntry *segment_entry,
+                              BufferManager *buffer_mgr,
+                              SizeT column_id,
+                              TxnTimeStamp begin_ts,
+                              const HnswInsertConfig &config,
+                              SizeT kBuildBucketSize) {
     SizeT mem_usage{};
     std::visit(
         [&](auto &index) {
@@ -443,6 +443,7 @@ void HnswHandler::Load(LocalFileHandle &file_handle) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = IndexT::Load(file_handle).release();
                 } else {
                     UnrecoverableError("Invalid index type.");
@@ -461,6 +462,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = IndexT::LoadFromPtr(file_handle, file_size).release();
                 } else {
                     UnrecoverableError("Invalid index type.");
@@ -481,6 +483,7 @@ void HnswHandler::LoadFromPtr(const char *ptr, SizeT size) {
                 if constexpr (IndexT::kOwnMem) {
                     UnrecoverableError("Invalid index type.");
                 } else {
+                    delete index;
                     index = IndexT::LoadFromPtr(ptr, size).release();
                 }
             }
@@ -567,10 +570,10 @@ HnswIndexInMem::~HnswIndexInMem() {
 }
 
 UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
-                                                 const IndexBase *index_base,
-                                                 const ColumnDef *column_def,
-                                                 SegmentIndexEntry *segment_index_entry,
-                                                 bool trace) {
+                                               const IndexBase *index_base,
+                                               const ColumnDef *column_def,
+                                               SegmentIndexEntry *segment_index_entry,
+                                               bool trace) {
     auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, segment_index_entry, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
@@ -605,30 +608,30 @@ MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
 }
 
 void HnswIndexInMem::InsertVecs(SizeT block_offset,
-                 BlockColumnEntry *block_column_entry,
-                 BufferManager *buffer_manager,
-                 SizeT row_offset,
-                 SizeT row_count,
-                 const HnswInsertConfig &config) {
+                                BlockColumnEntry *block_column_entry,
+                                BufferManager *buffer_manager,
+                                SizeT row_offset,
+                                SizeT row_count,
+                                const HnswInsertConfig &config) {
     SizeT mem_usage = hnsw_handler_->InsertVecs(block_offset, block_column_entry, buffer_manager, row_offset, row_count, config, kBuildBucketSize);
     this->IncreaseMemoryUsageBase(mem_usage);
 }
 
 void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
-                const ColumnVector &col,
-                BlockOffset offset,
-                BlockOffset row_count,
-                const HnswInsertConfig &config) {
+                                const ColumnVector &col,
+                                BlockOffset offset,
+                                BlockOffset row_count,
+                                const HnswInsertConfig &config) {
     SizeT mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
     this->IncreaseMemoryUsageBase(mem_usage);
 }
 
 void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
-                BufferManager *buffer_mgr,
-                SizeT column_id,
-                TxnTimeStamp begin_ts,
-                bool check_ts,
-                const HnswInsertConfig &config) {
+                                BufferManager *buffer_mgr,
+                                SizeT column_id,
+                                TxnTimeStamp begin_ts,
+                                bool check_ts,
+                                const HnswInsertConfig &config) {
     SizeT mem_usage = hnsw_handler_->InsertVecs(segment_entry, buffer_mgr, column_id, begin_ts, check_ts, config, kBuildBucketSize);
     this->IncreaseMemoryUsageBase(mem_usage);
 }
@@ -669,13 +672,9 @@ void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) { hnsw_han
 
 TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
-SizeT HnswIndexInMem::GetRowCount() const {
-    return hnsw_handler_->GetRowCount();
-}
+SizeT HnswIndexInMem::GetRowCount() const { return hnsw_handler_->GetRowCount(); }
 
-SizeT HnswIndexInMem::GetSizeInBytes() const {
-    return hnsw_handler_->GetSizeInBytes();
-}
+SizeT HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
 
 void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
     segment_index_entry_ = segment_index_entry;
