@@ -1982,6 +1982,12 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
         return status;
     }
 
+    SegmentID unsealed_segment_id = 0;
+    status = table_meta.GetUnsealedSegmentID(unsealed_segment_id);
+    if (!status.ok()) {
+        return status;
+    }
+
     status = new_catalog_->SetMemIndexDump(table_key);
     if (!status.ok()) {
         // Wait for next execution of this function to dump.
@@ -2004,13 +2010,6 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
             continue;
         }
 
-        SegmentMeta segment_meta(segment_id, table_meta);
-        SharedPtr<SegmentInfo> segment_info;
-        std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
-        if (!status.ok()) {
-            return status;
-        }
-
         ChunkIndexMetaInfo chunk_index_meta_info;
         if (mem_index->GetBaseMemIndex() != nullptr) {
             chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
@@ -2020,9 +2019,8 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
             return Status::UnexpectedError("Invalid mem index");
         }
 
-        if (segment_info->status_ == SegmentStatus::kSealed &&
+        if (segment_id != unsealed_segment_id &&
             static_cast<i64>(chunk_index_meta_info.row_cnt_) == InfinityContext::instance().config()->MemIndexCapacity()) {
-
             // Get chunk id of the chunk index to dump mem index to.
             ChunkID chunk_id = 0;
             {
