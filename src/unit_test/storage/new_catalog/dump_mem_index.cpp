@@ -571,7 +571,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
@@ -1118,7 +1117,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
@@ -1753,7 +1751,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
@@ -2378,7 +2375,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
@@ -2915,7 +2911,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
@@ -3194,7 +3189,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
@@ -3733,7 +3727,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_import) {
@@ -4474,7 +4467,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_append) {
@@ -5089,7 +5081,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
@@ -5674,7 +5665,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
@@ -6155,7 +6145,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
@@ -6518,7 +6507,6 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         DropDB();
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
@@ -6868,5 +6856,4 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         DropDB();
     }
 
-    RemoveDbDirs();
 }

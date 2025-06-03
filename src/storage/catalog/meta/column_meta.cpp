@@ -318,7 +318,6 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
     if (buffer_type == VectorBufferType::kVarBuffer) {
         String outline_filename = fmt::format("col_{}_out_0", column_id);
         String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         outline_buffer_ = buffer_mgr->GetBufferObject(outline_filepath);
         if (outline_buffer_ == nullptr) {
             return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
