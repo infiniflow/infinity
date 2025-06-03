@@ -317,7 +317,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
     check_index(*index_name2);
 }
 
-#if 0
+// #if 0
 TEST_P(TestTxnImport, test_import_with_index_rollback) {
 
     using namespace infinity;
@@ -411,7 +411,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         EXPECT_TRUE(status.ok());
     }
 }
-#endif
+// #endif
 
 TEST_P(TestTxnImport, test_insert_and_import) {
     using namespace infinity;

@@ -3687,6 +3687,17 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
+            auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
+
+            auto db_id_str = import_txn_store->db_id_str_;
+            auto table_id_str = import_txn_store->table_id_str_;
+            auto index_id_str = import_txn_store->index_ids_str_[0];
+
+            TableMeeta table_meta{db_id_str, table_id_str, *kv_instance_, BeginTS(), CommitTS()};
+            TableIndexMeeta table_index_meta{index_id_str, table_meta};
+            SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
+            ChunkIndexMeta chunk_index_meta{chunk_id, segment_index_meta};
+
             SizeT data_block_count = import_txn_store->input_blocks_in_imports_[0].size();
             for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
                 import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
@@ -3694,7 +3705,15 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 
             if (import_txn_store->index_names_.size() > 0) {
                 // Restore memory index here
-                UnrecoverableError("Not implemented");
+                BufferObj *buffer_obj;
+                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+                if (!status.ok()) {
+                    return status;
+                }
+                status = buffer_obj->CleanupFile(kv_instance_.get()); // rc?
+                if (!status.ok()) {
+                    return status;
+                }
             }
             break;
         }
@@ -3702,7 +3721,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
             if (compact_txn_store->index_names_.size() > 0) {
                 // Restore memory index here
-                UnrecoverableError("Not implemented");
             }
             break;
         }
@@ -3956,7 +3974,11 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
+                                      segment_index_meta_key->table_id_str_,
+                                      *kv_instance,
+                                      begin_ts,
+                                      MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
