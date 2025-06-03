@@ -159,6 +159,48 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCompact,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
+#if 0
+TEST_P(TestTxnCompact, compact_with_index_rollback) {
+    Status status;
+    {
+        PrepareForCompact();
+        auto index_name1 = std::make_shared<std::string>("index1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_name2 = std::make_shared<String>("index2");
+        auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+        auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        };
+        create_index(index_def1);
+        create_index(index_def2);
+
+        //  t1            compact     commit (fail)
+        //  |--------------|---------------|
+        //         |-----|----------|
+        //        t2   drop db    commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn2->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+    }
+}
+#endif
+
 TEST_P(TestTxnCompact, compact_and_drop_db) {
     Status status;
     {

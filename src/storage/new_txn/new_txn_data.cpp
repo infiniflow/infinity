@@ -1361,7 +1361,7 @@ Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
     const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
