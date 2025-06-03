@@ -112,7 +112,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         if (!status.ok()) {
             return status;
         }
-        if (new_chunk_id == (ChunkID)(-1)) {
+        if (new_chunk_id == static_cast<ChunkID>(-1)) {
             continue;
         }
         ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
@@ -936,7 +936,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
             if (!status.ok()) {
                 return status;
             }
-            if (new_chunk_id == (ChunkID)-1 && segment_row_cnt > 0) {
+            if (new_chunk_id == static_cast<ChunkID>(-1) && segment_row_cnt > 0) {
                 UnrecoverableError(fmt::format("Failed to dump {} rows", segment_row_cnt));
             }
         }
@@ -1558,7 +1558,7 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
     SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
     if (mem_index == nullptr) {
-        new_chunk_id = (ChunkID)-1;
+        new_chunk_id = static_cast<ChunkID>(-1);
         return Status::OK();
     }
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
