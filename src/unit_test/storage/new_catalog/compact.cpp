@@ -159,7 +159,6 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCompact,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-#if 0
 TEST_P(TestTxnCompact, compact_with_index_rollback) {
     Status status;
     {
@@ -199,7 +198,6 @@ TEST_P(TestTxnCompact, compact_with_index_rollback) {
         EXPECT_FALSE(status.ok());
     }
 }
-#endif
 
 TEST_P(TestTxnCompact, compact_and_drop_db) {
     Status status;
