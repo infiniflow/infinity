@@ -119,10 +119,17 @@ unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
-sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf libssl-dev libdwarf-dev
-wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
+sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf libssl-dev
+wget https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+tar xf zstd-1.5.7.tar.gz && cd zstd-1.5.7 && sudo CFLAGS="-fPIC" CXXFLAGS="-fPIC" make -j lib-mt && sudo make install && cd ..
+sudo ldconfig && sudo rm -rf zstd-1.5.7.tar.gz zstd-1.5.7
+wget https://github.com/davea42/libdwarf-code/releases/download/v2.0.0/libdwarf-2.0.0.tar.xz
+wget https://github.com/jeremy-rifkin/cpptrace/archive/refs/tags/v0.8.3.tar.gz
+tar xJvf libdwarf-2.0.0.tar.xz && tar xf v0.8.3.tar.gz && cp cpptrace-0.8.3/cmake/Findzstd.cmake libdwarf-2.0.0/cmake/Findzstd.cmake && cd libdwarf-2.0.0 && mkdir build && cd build && cmake -DENABLE_DECOMPRESSION=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && make -j && sudo make install && cd ../..
+sudo ldconfig && sudo rm -rf libdwarf-2.0.0 cpptrace-0.8.3 libdwarf-2.0.0.tar.xz v0.8.3.tar.gz
+wget https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
+tar xjf jemalloc-5.3.0.tar.bz2 && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
+sudo ldconfig && sudo rm -rf jemalloc-5.3.0.tar.bz2
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
@@ -139,10 +146,17 @@ wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-lin
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf libssl-dev libdwarf-dev
-wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
-tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
-sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
+sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev python3-dev autoconf libssl-dev
+wget https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+tar xf zstd-1.5.7.tar.gz && cd zstd-1.5.7 && sudo CFLAGS="-fPIC" CXXFLAGS="-fPIC" make -j lib-mt && sudo make install && cd ..
+sudo ldconfig && sudo rm -rf zstd-1.5.7.tar.gz zstd-1.5.7
+wget https://github.com/davea42/libdwarf-code/releases/download/v2.0.0/libdwarf-2.0.0.tar.xz
+wget https://github.com/jeremy-rifkin/cpptrace/archive/refs/tags/v0.8.3.tar.gz
+tar xJvf libdwarf-2.0.0.tar.xz && tar xf v0.8.3.tar.gz && cp cpptrace-0.8.3/cmake/Findzstd.cmake libdwarf-2.0.0/cmake/Findzstd.cmake && cd libdwarf-2.0.0 && mkdir build && cd build && cmake -DENABLE_DECOMPRESSION=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && make -j && sudo make install && cd ../..
+sudo ldconfig && sudo rm -rf libdwarf-2.0.0 cpptrace-0.8.3 libdwarf-2.0.0.tar.xz v0.8.3.tar.gz
+wget https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
+tar xjf jemalloc-5.3.0.tar.bz2 && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
+sudo ldconfig && sudo rm -rf jemalloc-5.3.0.tar.bz2
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
