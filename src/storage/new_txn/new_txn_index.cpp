@@ -1977,22 +1977,7 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     String table_id_str = table_meta.table_id_str();
     String table_name{};
     String table_key{};
-
-    Vector<String> *table_id_strs_ptr = nullptr;
-    Vector<String> *table_names_ptr = nullptr;
-    status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
-    for (SizeT i = 0; i < table_id_strs_ptr->size(); ++i) {
-        // const String &table_id_str = (*table_id_strs_ptr)[i];
-        if (table_id_str == (*table_id_strs_ptr)[i]) {
-            table_name = (*table_names_ptr)[i];
-            break;
-        }
-    }
-
-    status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    status = db_meta.GetTableName(table_id_str, table_key, table_name);
     if (!status.ok()) {
         return status;
     }
