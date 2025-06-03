@@ -19,6 +19,5 @@ cleanup_interval         = "0s"
 
 [wal]
 full_checkpoint_interval      = "0s"
-delta_checkpoint_interval     = "0s"
 
 [resource]

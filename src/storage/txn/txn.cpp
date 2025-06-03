@@ -889,10 +889,10 @@ void Txn::Rollback() {
 }
 
 SharedPtr<AddDeltaEntryTask> Txn::MakeAddDeltaEntryTask() {
-    if (!txn_delta_ops_entry_->operations().empty()) {
-        LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
-        return MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_));
-    }
+    //    if (!txn_delta_ops_entry_->operations().empty()) {
+    //        LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
+    //        return MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_));
+    //    }
     return nullptr;
 }
 

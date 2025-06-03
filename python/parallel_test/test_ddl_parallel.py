@@ -2,7 +2,6 @@ import logging
 import time
 
 import infinity.index as index
-import pytest
 import random
 from threading import Thread
 from infinity.common import ConflictType
@@ -83,15 +82,14 @@ class TestDDLParallel:
         self.logger.info(f"create database {db_name}")
         try:
             infinity_obj.create_database(db_name, conflict_type=ConflictType.Ignore)
-        except Exception:
-            self.logger.info(f"create database {db_name} failed")
+        except Exception as e:
+            self.logger.info(f"create database {db_name} failed: {e}")
         else:
             try:
-                res = infinity_obj.show_database()
+                infinity_obj.show_database()
             except Exception:
                 self.logger.info(f"show database {db_name} failed")
-            else:
-                print(res)
+
 
     def drop_database(self, infinity_obj: RemoteThriftInfinityConnection):
         try:
@@ -100,14 +98,12 @@ class TestDDLParallel:
             # res = infinity_obj.show_database()
             # print(res)
         except Exception as e:
-            self.logger.info(f"drop database {db_name} failed")
-        else:
-            self.logger.info(f"drop database {db_name}")
+            self.logger.info(f"drop database {db_name} failed: {e}")
 
     def create_table(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
+        table_name = table_names[random.randint(0, len(table_names) - 1)]
         try:
-            table_name = table_names[random.randint(0, len(table_names) - 1)]
             db_obj = infinity_obj.get_database(db_name)
             if (table_name[0:3] == "vec"):
                 column = vec_columns[random.randint(0, len(vec_columns) - 1)]
@@ -117,9 +113,7 @@ class TestDDLParallel:
             # res = db_obj.list_tables()
             # print(res)
         except Exception as e:
-            self.logger.info(f"create table {table_name} in database {db_name} failed")
-        else:
-            self.logger.info(f"create table {table_name} in database {db_name}")
+            self.logger.info(f"create table {table_name} in database {db_name} failed: {e}")
 
     def drop_table(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -127,14 +121,16 @@ class TestDDLParallel:
             db_obj = infinity_obj.get_database(db_name)
             exist_tables = db_obj.list_tables().table_names
         except Exception as e:
-            self.logger.info(f"drop table in database {db_name} failed")
+            self.logger.info(f"drop table in database {db_name} failed: {e}")
             return
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
-            db_obj.drop_table(table_name, ConflictType.Ignore)
-            res = db_obj.list_tables()
-            print(res)
-            self.logger.info(f"drop table {table_name} in database {db_name}")
+            try:
+                db_obj.drop_table(table_name, ConflictType.Ignore)
+                res = db_obj.list_tables()
+                print(res)
+            except Exception as e:
+                self.logger.info(f"drop table {table_name} in database {db_name} failed: {e}")
 
     def create_index(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -142,11 +138,13 @@ class TestDDLParallel:
             db_obj = infinity_obj.get_database(db_name)
             exist_tables = db_obj.list_tables().table_names
         except Exception as e:
-            self.logger.info(f"create index in database {db_name} failed")
+            self.logger.info(f"create index in database {db_name} failed: {e}")
             return
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
+            index_on = None
             try:
+                index_on = "untitled_index_name"
                 table_obj = db_obj.get_table(table_name)
                 if table_name[0:3] == "vec":
                     index_on = vec_indexes_on[random.randint(0, len(vec_indexes_on) - 1)]
@@ -159,12 +157,9 @@ class TestDDLParallel:
                     index_option = None
                 table_obj.create_index(index_on, index.IndexInfo(index_on, index_type, index_option),
                                        conflict_type=ConflictType.Ignore)
-                res = table_obj.list_indexes()
-                print(res)
+                table_obj.list_indexes()
             except Exception as e:
-                self.logger.info(f"create index {index_on} in table {table_name} database {db_name} failed")
-            else:
-                self.logger.info(f"create index {index_on} in table {table_name} database {db_name}")
+                self.logger.info(f"create index {index_on} in table {table_name} database {db_name} failed: {e}")
 
     def drop_index(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -172,20 +167,17 @@ class TestDDLParallel:
             db_obj = infinity_obj.get_database(db_name)
             exist_tables = db_obj.list_tables().table_names
         except Exception as e:
-            self.logger.info(f"drop index in database {db_name} failed")
+            self.logger.info(f"drop index in database {db_name} failed: {e}")
             return
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
+            index_name = None
             try:
-                index_name = None
                 table_obj = db_obj.get_table(table_name)
                 exist_indexes = table_obj.list_indexes().index_names
                 if (len(exist_indexes) > 0):
                     index_name = exist_indexes[random.randint(0, len(exist_indexes) - 1)]
                     table_obj.drop_index(index_name, conflict_type=ConflictType.Ignore)
-                    res = table_obj.list_indexes()
-                    print(res)
+                    table_obj.list_indexes()
             except Exception as e:
-                self.logger.info(f"drop index {index_name} in table {table_name} database {db_name} failed")
-            else:
-                self.logger.info(f"drop index {index_name} in table {table_name} database {db_name}")
+                self.logger.info(f"drop index {index_name} in table {table_name} database {db_name} failed: {e}")

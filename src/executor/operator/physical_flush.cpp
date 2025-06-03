@@ -90,26 +90,6 @@ void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *opera
     return;
 }
 
-void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
-    // full checkpoint here
-
-    bool is_full_checkpoint = flush_type_ == FlushType::kData;
-    SharedPtr<ForceCheckpointTask> force_ckp_task = nullptr;
-    if (!is_full_checkpoint) {
-        LOG_WARN("Delta checkpoint is not supported in new catalog");
-    }
-    auto *new_txn = query_context->GetNewTxn();
-    force_ckp_task = MakeShared<ForceCheckpointTask>(new_txn, is_full_checkpoint);
-
-    auto *wal_mgr = query_context->storage()->wal_manager();
-    if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
-        LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));
-        return;
-    }
-    force_ckp_task->Wait();
-    LOG_TRACE("Flushed data");
-}
-
 void PhysicalFlush::FlushLog(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
     Status status = Status::NotSupport("Flush log");

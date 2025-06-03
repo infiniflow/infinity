@@ -73,6 +73,9 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultCo
         std::exit(static_cast<int>(status.code()));
     }
 
+    // Printing stack trace costs several seconds, so it's disabled by default.
+    SetPrintStacktrace(true);
+
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
     session_mgr_ = MakeUnique<SessionManager>();
@@ -504,6 +507,9 @@ void InfinityContext::UnInit() {
     LOG_INFO("Infinity context is un-initialized.");
     Logger::Shutdown();
     config_.reset();
+
+    // Printing stack trace costs several seconds, so it's disabled by default.
+    SetPrintStacktrace(false);
 }
 
 void InfinityContext::SetIndexThreadPool() {

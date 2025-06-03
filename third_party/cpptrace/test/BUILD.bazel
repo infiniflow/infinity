@@ -1,0 +1,28 @@
+cc_test(
+    name = "unittest",
+    deps = [
+        "//:cpptrace",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main"
+    ],
+    srcs = [
+        "unit/main.cpp",
+        "unit/tracing/common.hpp",
+        "unit/tracing/raw_trace.cpp",
+        "unit/tracing/object_trace.cpp",
+        "unit/tracing/stacktrace.cpp",
+        "unit/tracing/from_current.cpp",
+        "unit/tracing/from_current_z.cpp",
+        "unit/tracing/traced_exception.cpp",
+        "unit/internals/optional.cpp",
+        "unit/internals/result.cpp",
+        "unit/internals/string_utils.cpp",
+        "unit/internals/general.cpp",
+        "unit/lib/formatting.cpp",
+        "unit/lib/nullable.cpp"
+    ],
+    local_defines = [
+        "CPPTRACE_NO_TEST_SNIPPETS"
+    ],
+    linkstatic = 1,
+)

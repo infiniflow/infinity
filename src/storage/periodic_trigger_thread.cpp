@@ -57,9 +57,6 @@ void PeriodicTriggerThread::Run() {
         if (!running_) {
             break;
         }
-        if (cleanup_trigger_ != nullptr && cleanup_trigger_->Check()) {
-            cleanup_trigger_->Trigger();
-        }
 
         if (full_checkpoint_trigger_ != nullptr && full_checkpoint_trigger_->Check()) {
             full_checkpoint_trigger_->Trigger();

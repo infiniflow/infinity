@@ -92,7 +92,6 @@ Status Storage::InitToAdmin() {
                                           config_ptr_->WALDir(),
                                           config_ptr_->DataDir(),
                                           config_ptr_->WALCompactThreshold(),
-                                          config_ptr_->DeltaCheckpointThreshold(),
                                           config_ptr_->FlushMethodAtCommit());
 
         switch (config_ptr_->StorageType()) {
@@ -333,97 +332,54 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>(catalog_.get(), txn_mgr_.get());
+    compact_processor_ = MakeUnique<CompactionProcessor>();
     compact_processor_->Start();
 
     // recover index after start compact process
     catalog_->StartMemoryIndexCommit();
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
-    if (new_txn_mgr_) {
-        this->RecoverMemIndex();
+    this->RecoverMemIndex();
 
-        auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
-        Status status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
-        if (!status.ok()) {
-            UnrecoverableError("Failed to checkpoint");
-        }
-        status = new_txn_mgr_->CommitTxn(new_txn);
-        if (!status.ok()) {
-            UnrecoverableError("Failed to commit txn for checkpoint");
-        }
-
-        status = new_catalog_->RestoreCatalogCache(this);
-        if (!status.ok()) {
-            UnrecoverableError("Failed to restore catalog cache");
-        }
-
-        new_txn_mgr_->SetSystemCache();
-
-        if (system_start_ts == 0) {
-            CreateDefaultDB();
-        }
-
-        if (periodic_trigger_thread_ != nullptr) {
-            UnrecoverableError("periodic trigger was initialized before.");
-        }
-        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-
-        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-        periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
-
-        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
-
-        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-        if (!full_checkpoint_interval_sec && delta_checkpoint_interval_sec) {
-            full_checkpoint_interval_sec = delta_checkpoint_interval_sec;
-        }
-        periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
-
-        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
-
-        periodic_trigger_thread_->Start();
-    } else {
-        if (periodic_trigger_thread_ != nullptr) {
-            UnrecoverableError("periodic trigger was initialized before.");
-        }
-        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-
-        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-
-        periodic_trigger_thread_->full_checkpoint_trigger_ =
-            MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-        periodic_trigger_thread_->delta_checkpoint_trigger_ =
-            MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-
-        periodic_trigger_thread_->cleanup_trigger_ =
-            MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
-        bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
-
-        if (wal_mgr_->IsCheckpointing()) {
-            UnrecoverableError("There is a running checkpoint task at start phase");
-        }
-
-        TxnTimeStamp max_commit_ts{};
-        i64 wal_size{};
-        std::tie(max_commit_ts, wal_size) = wal_mgr_->GetCommitState();
-        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("Checkpoint"), TransactionType::kNewCheckpoint);
-        txn->SetReaderAllowed(true);
-        bg_processor_->Submit(checkpoint_task);
-        checkpoint_task->Wait();
-        txn_mgr_->CommitTxn(txn);
-
-        periodic_trigger_thread_->Start();
+    Status status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
+    if (!status.ok()) {
+        UnrecoverableError("Failed to checkpoint");
     }
+    status = new_txn_mgr_->CommitTxn(new_txn);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to commit txn for checkpoint");
+    }
+
+    status = new_catalog_->RestoreCatalogCache(this);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to restore catalog cache");
+    }
+
+    new_txn_mgr_->SetSystemCache();
+
+    if (system_start_ts == 0) {
+        CreateDefaultDB();
+    }
+
+    if (periodic_trigger_thread_ != nullptr) {
+        UnrecoverableError("periodic trigger was initialized before.");
+    }
+    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+    periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+
+    i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
+
+    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+    periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
+
+    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
+
+    periodic_trigger_thread_->Start();
 
     return Status::OK();
 }
@@ -541,7 +497,7 @@ Status Storage::ReaderToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>(catalog_.get(), txn_mgr_.get());
+    compact_processor_ = MakeUnique<CompactionProcessor>();
     compact_processor_->Start();
 
     periodic_trigger_thread_->Stop();
@@ -615,7 +571,6 @@ Status Storage::WriterToAdmin() {
                                       config_ptr_->WALDir(),
                                       config_ptr_->DataDir(),
                                       config_ptr_->WALCompactThreshold(),
-                                      config_ptr_->DeltaCheckpointThreshold(),
                                       config_ptr_->FlushMethodAtCommit());
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -636,9 +591,8 @@ Status Storage::WriterToReader() {
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
     periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-    periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
-    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+    periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
+
     periodic_trigger_thread_->Start();
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -861,9 +815,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
-    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+    periodic_trigger_thread_->new_cleanup_trigger_ = MakeShared<NewCleanupPeriodicTrigger>(cleanup_interval);
 
     periodic_trigger_thread_->Start();
     reader_init_phase_ = ReaderInitPhase::kPhase2;

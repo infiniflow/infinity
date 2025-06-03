@@ -68,6 +68,8 @@ public:
 
     Tuple<String, Status> GetNextTableID();
 
+    Status SetNextTableID(const String &table_id_str);
+
 private:
     Status LoadComment();
 

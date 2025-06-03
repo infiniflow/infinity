@@ -34,7 +34,6 @@ public:
     void Run();
 
 public:
-    SharedPtr<CleanupPeriodicTrigger> cleanup_trigger_;
     SharedPtr<NewCleanupPeriodicTrigger> new_cleanup_trigger_;
 
     SharedPtr<CheckpointPeriodicTrigger> full_checkpoint_trigger_;

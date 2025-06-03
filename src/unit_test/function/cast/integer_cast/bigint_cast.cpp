@@ -41,11 +41,7 @@ import logical_type;
 import data_type;
 
 using namespace infinity;
-class BigIntCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class BigIntCastTest : public BaseTest {};
 
 TEST_F(BigIntCastTest, bigint_cast0) {
     using namespace infinity;

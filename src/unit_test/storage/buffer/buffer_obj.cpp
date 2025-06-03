@@ -79,12 +79,9 @@ public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
     void WaitCleanup(Storage *storage) {
-        Catalog *catalog = storage->catalog();
-        BufferManager *buffer_mgr = storage->buffer_manager();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
-        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS1();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
-        cleanup_task->Execute();
+        auto cleanup_task = MakeShared<NewCleanupTask>();
+        TxnTimeStamp cur_cleanup_ts;
+        cleanup_task->Execute(0, cur_cleanup_ts);
     }
 
     void WaitFlushOp(Storage *storage) {

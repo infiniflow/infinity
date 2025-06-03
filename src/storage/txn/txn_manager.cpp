@@ -368,33 +368,33 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
                 UnrecoverableError(error_message);
             }
         }
-        SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
-        {
-            // cleanup the txn from committing_txn and txm_map
-            auto commit_ts = txn->CommitTS();
-            std::lock_guard guard(locker_);
-            SizeT remove_n = committing_txns_.erase(commit_ts);
-            if (remove_n == 0) {
-                UnrecoverableError("Txn not found in committing_txns_");
-            }
-            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-            if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-                txn_context_histories_.pop_front();
-            }
-            txn_context_histories_.push_back(txn_ptr->txn_context());
-            remove_n = txn_map_.erase(txn_id);
-            if (remove_n == 0) {
-                String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
-                UnrecoverableError(error_message);
-            }
-            if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
-                max_committed_ts_ = commit_ts;
-            }
-        }
-        if (commit && add_delta_entry_task) {
-            // Submit delta entry must be after max_committed_ts_ is updated
-            InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
-        }
+        //        SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
+        //        {
+        //            // cleanup the txn from committing_txn and txm_map
+        //            auto commit_ts = txn->CommitTS();
+        //            std::lock_guard guard(locker_);
+        //            SizeT remove_n = committing_txns_.erase(commit_ts);
+        //            if (remove_n == 0) {
+        //                UnrecoverableError("Txn not found in committing_txns_");
+        //            }
+        //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+        //            if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        //                txn_context_histories_.pop_front();
+        //            }
+        //            txn_context_histories_.push_back(txn_ptr->txn_context());
+        //            remove_n = txn_map_.erase(txn_id);
+        //            if (remove_n == 0) {
+        //                String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
+        //                UnrecoverableError(error_message);
+        //            }
+        //            if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
+        //                max_committed_ts_ = commit_ts;
+        //            }
+        //        }
+        //        if (commit && add_delta_entry_task) {
+        //            // Submit delta entry must be after max_committed_ts_ is updated
+        //            InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
+        //        }
     } else {
         // For read-only Txn only remove txn from txn_map
         std::lock_guard guard(locker_);

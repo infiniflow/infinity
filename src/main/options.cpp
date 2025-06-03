@@ -92,8 +92,6 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;
     name2index_[String(FULL_CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kFullCheckpointInterval;
 
-    name2index_[String(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kDeltaCheckpointInterval;
-    name2index_[String(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kDeltaCheckpointThreshold;
     name2index_[String(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
     name2index_[String(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;
     name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
