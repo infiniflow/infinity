@@ -4714,39 +4714,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
     };
 
-
-    auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Optional<TableIndexMeeta> table_index_meta;
-        String table_key;
-        String index_key;
-        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
-        EXPECT_TRUE(status.ok());
-
-        {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-        }
-        SegmentID segment_id = 0;
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-
-        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        ASSERT_NE(mem_index, nullptr);
-        check_mem_index(mem_index);
-        {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
-        }
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
-
     auto check_index3 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
@@ -4922,7 +4889,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
     }
@@ -4954,7 +4921,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
     }
@@ -4986,7 +4953,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
     }
@@ -5971,8 +5938,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         EXPECT_TRUE(status.ok());
 
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -6421,7 +6388,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         DropDB();
     }
 
-    //    t1                                                       dump index                                   commit (success)
+    //    t1                                                       dump index (fail)                       Rollback (success)
     //    |-----------------------------------------------------------|------------------------------------------|
     //                    |----------------------|--------------|
     //                    t2                  optimize index   commit (success)

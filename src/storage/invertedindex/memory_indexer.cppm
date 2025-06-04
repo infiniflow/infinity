@@ -39,6 +39,7 @@ import memindex_tracer;
 import segment_index_entry;
 import table_index_entry;
 import mem_usage_change;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -105,7 +106,7 @@ public:
 
     RowID GetBaseRowId() const { return base_row_id_; }
 
-    u32 GetDocCount() {
+    u32 GetDocCount() const {
         std::unique_lock<std::mutex> lock(mutex_);
         return doc_count_;
     }
@@ -123,6 +124,8 @@ public:
     MemIndexTracerInfo GetInfo() const override;
 
     TableIndexEntry *table_index_entry() const override;
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
     SizeT MemUsed() const;
 
@@ -165,7 +168,7 @@ private:
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
     std::condition_variable cv_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::mutex mutex_commit_;
     std::shared_mutex mutex_commit_sync_share_;
 
