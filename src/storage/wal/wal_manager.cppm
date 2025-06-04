@@ -95,14 +95,12 @@ public:
 
     void Stop();
 
-    void SubmitTxn(Vector<Txn *> &txn_batch);
     void SubmitTxn(Vector<NewTxn *> &txn_batch);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
     // ~10s. So it's necessary to sync for a batch of transactions, and to
     // checkpoint for a batch of sync.
-    void Flush();
     void NewFlush();
 
     void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
@@ -112,10 +110,6 @@ public:
     bool SetCheckpointing();
     bool UnsetCheckpoint();
     bool IsCheckpointing() const;
-
-    void Checkpoint(bool is_full_checkpoint);
-
-    void Checkpoint(ForceCheckpointTask *ckp_task);
 
     void SwapWalFile(TxnTimeStamp max_commit_ts, bool error_if_duplicate);
 
@@ -139,16 +133,7 @@ public:
     Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 
-private:
-    // Checkpoint Helper
-    void FullCheckpointInner(Txn *txn);
-    void DeltaCheckpointInner(Txn *txn);
-    void FullCheckpointInner(NewTxn *txn);
-    void DeltaCheckpointInner(NewTxn *txn);
-
 public:
-    void CommitFullCheckpoint(TxnTimeStamp max_commit_ts);
-    void CommitDeltaCheckpoint(TxnTimeStamp max_commit_ts);
 
     Tuple<TxnTimeStamp, i64> GetCommitState();
     void SetLastCkpWalSize(i64 wal_size);
@@ -200,7 +185,6 @@ private:
     Thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members
-    BlockingQueue<Txn *> wait_flush_{"WalManager"};
     BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
@@ -219,7 +203,6 @@ private:
     // Only Checkpoint/Cleanup thread access following members
     mutable std::mutex last_ckp_ts_mutex_{};
     TxnTimeStamp last_ckp_ts_{};
-    TxnTimeStamp last_full_ckp_ts_{};
 };
 
 } // namespace infinity
