@@ -40,16 +40,16 @@ void BottomExecutor::Start(SizeT executor_size) {
             while (true) {
                 queue->DequeueBulk(txns);
                 SizeT txns_size = txns.size();
-                for (SizeT i = 0; i < txns_size; ++i) {
-                    NewTxn *txn = txns[i];
+                for (SizeT txn_idx = 0; txn_idx < txns_size; ++txn_idx) {
+                    NewTxn *txn = txns[txn_idx];
                     if (txn == nullptr) {
                         // Stop signal
-                        LOG_INFO(fmt::format("Stop bottom executor {}", i));
+                        LOG_INFO("Stop a bottom executor");
                         return;
                     }
-                    TxnState txn_state = txns[i]->GetTxnState();
+                    TxnState txn_state = txn->GetTxnState();
                     if (txn_state == TxnState::kCommitting) {
-                        txns[i]->CommitBottom();
+                        txn->CommitBottom();
                     }
                 }
                 txns.clear();
