@@ -33,6 +33,7 @@ import periodic_trigger;
 import infinity_context;
 import status;
 import new_txn;
+import bg_task_type;
 
 namespace infinity {
 

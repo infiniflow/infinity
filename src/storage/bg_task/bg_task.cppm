@@ -17,29 +17,12 @@ module;
 export module bg_task;
 
 import stl;
-import txn;
-import catalog;
-import catalog_delta_entry;
-import buffer_manager;
 import third_party;
 import global_resource_usage;
 import status;
+import bg_task_type;
 
 namespace infinity {
-
-export enum class BGTaskType {
-    kStopProcessor,
-    kNewCheckpoint,
-    kForceCheckpoint, // Manually triggered by PhysicalFlush
-    kNotifyCompact,
-    kNewCompact,
-    kNotifyOptimize,
-    kNewCleanup,
-    kUpdateSegmentBloomFilterData, // Not used
-    kDumpIndex,
-    kTestCommand,
-    kInvalid
-};
 
 class BaseMemIndex;
 struct ChunkIndexEntry;
@@ -124,13 +107,11 @@ private:
 
 export class NotifyCompactTask final : public BGTask {
 public:
-    NotifyCompactTask(bool new_compact = false) : BGTask(BGTaskType::kNotifyCompact, true), new_compact_(new_compact) {}
+    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
 
     ~NotifyCompactTask() override = default;
 
     String ToString() const override { return "NotifyCompactTask"; }
-
-    bool new_compact_ = false;
 };
 
 export class NewCompactTask final : public BGTask {
