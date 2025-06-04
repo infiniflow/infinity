@@ -3738,22 +3738,25 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-
-            auto index_names_size = compact_txn_store->index_names_.size();
-            for (SizeT i = 0; i < index_names_size; ++i) {
-                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
-                auto db_id_str = compact_txn_store->db_id_str_;
-                auto table_id_str = compact_txn_store->table_id_str_;
-                auto index_id_str = compact_txn_store->index_ids_str_[0];
-
-                // for (SegmentID segment_id : deprecated_ids) {
-                auto ts_str = std::to_string(BeginTS());
-                kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
-                // }
-
-                kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
+            if (compact_txn_store->index_names_.size() > 0) {
+                // Restore memory index here
+                UnrecoverableError("Not implemented");
             }
-            need_set_clean_flag = true;
+            // auto index_names_size = compact_txn_store->index_names_.size();
+            // for (SizeT i = 0; i < index_names_size; ++i) {
+            //     auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
+            //     auto db_id_str = compact_txn_store->db_id_str_;
+            //     auto table_id_str = compact_txn_store->table_id_str_;
+            //     auto index_id_str = compact_txn_store->index_ids_str_[0];
+            //
+            //     // for (SegmentID segment_id : deprecated_ids) {
+            //     auto ts_str = std::to_string(BeginTS());
+            //     kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
+            //     // }
+            //
+            //     kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
+            // }
+            // need_set_clean_flag = true;
             break;
         }
         case TransactionType::kCreateIndex: {
