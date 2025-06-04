@@ -3749,11 +3749,10 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto table_id_str = compact_txn_store->table_id_str_;
                 auto index_id_str = compact_txn_store->index_ids_str_[0];
                 const Vector<SegmentID> &deprecated_ids = compact_txn_store->deprecated_segment_ids_;
+                auto ts_str = std::to_string(BeginTS());
                 for (SegmentID segment_id : deprecated_ids) {
-                    auto ts_str = std::to_string(BeginTS());
                     kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
                 }
-
                 kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
             }
             need_set_clean_flag = true;
