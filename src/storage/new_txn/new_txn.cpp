@@ -3667,6 +3667,7 @@ void NewTxn::CancelCommitBottom() {
 }
 
 Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
+    bool need_set_clean_flag = false;
     TransactionType txn_type = TransactionType::kInvalid;
     if (base_txn_store_ != nullptr) {
         txn_type = base_txn_store_->type_;
@@ -3692,58 +3693,67 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
             }
 
-            if (import_txn_store->index_names_.size() > 0) {
-                // Restore memory index here
-
-                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
-
+            auto index_names_size = import_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
+                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[i];
                 auto db_id_str = import_txn_store->db_id_str_;
                 auto table_id_str = import_txn_store->table_id_str_;
-                auto index_id_str = import_txn_store->index_ids_str_[0];
+                auto index_id_str = import_txn_store->index_ids_str_[i];
+                kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), std::to_string(BeginTS()));
+            }
 
-                TableMeeta table_meta{db_id_str, table_id_str, *kv_instance_, BeginTS(), CommitTS()};
-                TableIndexMeeta table_index_meta{index_id_str, table_meta};
-                SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
-                ChunkIndexMeta chunk_index_meta{chunk_id, segment_index_meta};
+            const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
+            for (auto &meta : metas) {
+                switch (meta->type_) {
+                    case MetaType::kBlock: {
+                        auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
+                        TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
+                        SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
+                        BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
 
-                BufferObj *buffer_obj;
-                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-                status = buffer_obj->CleanupFile(kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
+                        auto [version_buffer, status1] = block_meta.GetVersionBuffer();
+                        if (!status1.ok()) {
+                            return status1;
+                        }
+                        Vector<String> object_paths{version_buffer->GetFilename()};
+                        buffer_mgr_->RemoveBufferObjects(object_paths);
+
+                        String block_lock_key = block_meta.GetBlockTag("lock");
+                        Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
                 }
             }
+
+            need_set_clean_flag = true;
+
+            return kv_instance_->Commit();
             break;
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
 
-            if (compact_txn_store->index_names_.size() > 0) {
-                // Restore memory index here
+            auto index_names_size = compact_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
                 auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
-
                 auto db_id_str = compact_txn_store->db_id_str_;
                 auto table_id_str = compact_txn_store->table_id_str_;
                 auto index_id_str = compact_txn_store->index_ids_str_[0];
 
-                TableMeeta table_meta{db_id_str, table_id_str, *kv_instance_, BeginTS(), CommitTS()};
-                TableIndexMeeta table_index_meta{index_id_str, table_meta};
-                SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
-                ChunkIndexMeta chunk_index_meta{chunk_id, segment_index_meta};
+                // for (SegmentID segment_id : deprecated_ids) {
+                auto ts_str = std::to_string(BeginTS());
+                kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
+                // }
 
-                BufferObj *buffer_obj;
-                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-                status = buffer_obj->CleanupFile(kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
+                kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
             }
+            need_set_clean_flag = true;
             break;
         }
         case TransactionType::kCreateIndex: {
@@ -3864,8 +3874,12 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
         }
     }
-
-    Status status = kv_instance_->Rollback();
+    Status status;
+    if (need_set_clean_flag) {
+        status = kv_instance_->Commit();
+    } else {
+        status = kv_instance_->Rollback();
+    }
     if (!status.ok()) {
         return status;
     }

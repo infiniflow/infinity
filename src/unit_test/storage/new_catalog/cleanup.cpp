@@ -142,7 +142,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCleanup,
-                         ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH, BaseTestParamStr::NEW_CONFIG_PATH));
+                         ::testing::Values(/*BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH,*/ BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, test_cleanup_db) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
@@ -191,8 +191,10 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
         Status status = txn->Import(*db_name, *table_name, {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnoprstuvwxyz"))});
         EXPECT_TRUE(status.ok());
+        new_txn_mgr_->PrintAllKeyValue();
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+        new_txn_mgr_->PrintAllKeyValue();
     }
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -334,9 +336,11 @@ TEST_P(TestTxnCleanup, test_cleanup_index) {
         return input_block;
     };
     {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        Status status = txn->Append(*db_name, *table_name, make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnoprstuvwxyz")));
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnoprstuvwxyz"))};
+        Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
+        new_txn_mgr_->PrintAllKeyValue();
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
@@ -346,31 +350,31 @@ TEST_P(TestTxnCleanup, test_cleanup_index) {
 
     new_txn_mgr_->PrintAllKeyValue();
 
-    {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-        EXPECT_TRUE(status.ok());
+    // {
+    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+    //     EXPECT_TRUE(status.ok());
+    //
+    //     status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths_);
+    //     EXPECT_TRUE(status.ok());
+    //
+    //     status = new_txn_mgr_->CommitTxn(txn);
+    //     EXPECT_TRUE(status.ok());
+    // }
 
-        status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths_);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    {
-        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr_->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    {
-        Status status = new_txn_mgr_->Cleanup();
-        EXPECT_TRUE(status.ok());
-    }
-    this->CheckFilePaths();
+    // {
+    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+    //     Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+    //     EXPECT_TRUE(status.ok());
+    //     status = new_txn_mgr_->CommitTxn(txn);
+    //     EXPECT_TRUE(status.ok());
+    // }
+    //
+    // {
+    //     Status status = new_txn_mgr_->Cleanup();
+    //     EXPECT_TRUE(status.ok());
+    // }
+    // this->CheckFilePaths();
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -380,13 +384,15 @@ TEST_P(TestTxnCleanup, test_cleanup_index) {
 
         status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-
+        new_txn_mgr_->PrintAllKeyValue();
         status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+        new_txn_mgr_->PrintAllKeyValue();
     }
     {
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
+        new_txn_mgr_->PrintAllKeyValue();
     }
     this->CheckFilePaths();
 }

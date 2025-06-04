@@ -572,6 +572,7 @@ void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &
     }
     String key = KeyEncode::PMObjectKey(RemovePrefix(path));
     String value = obj_addr.Serialize().dump();
+    // Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat.ToString());
     Status status = kv_store->Put(key, value);
     if (!status.ok()) {
         UnrecoverableError(status.message());

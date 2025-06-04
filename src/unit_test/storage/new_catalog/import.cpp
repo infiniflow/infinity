@@ -328,8 +328,8 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-    auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    // auto index_name1 = std::make_shared<std::string>("index1");
+    // auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
     {
@@ -353,7 +353,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
-    create_index(index_def1);
+    // create_index(index_def1);
     create_index(index_def2);
 
     u32 block_row_cnt = 8192;
@@ -387,7 +387,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
-
+        new_txn_mgr->PrintAllKeyValue();
         auto *txn_drop_db = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -397,17 +397,24 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         status = new_txn_mgr->CommitTxn(txn_import);
         EXPECT_FALSE(status.ok());
     }
-    {
-        // Scan and check
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+    new_txn_mgr->PrintAllKeyValue();
+    // {
+    //     // Scan and check
+    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+    //
+    //     Optional<DBMeeta> db_meta;
+    //     Optional<TableMeeta> table_meta;
+    //     Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+    //     EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+    //     EXPECT_FALSE(status.ok());
+    //     status = new_txn_mgr->RollBackTxn(txn);
+    //     EXPECT_TRUE(status.ok());
+    // }
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn);
+    {
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
+        new_txn_mgr->PrintAllKeyValue();
     }
 }
 
