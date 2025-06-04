@@ -2147,7 +2147,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     }
     if (create_index_cmd->index_base_->index_type_ == IndexType::kFullText) {
         auto ft_cache = MakeShared<TableIndexReaderCache>(db_id_str, table_id_str);
-        Status status = table_meta.AddFtIndexCache(ft_cache);
+        status = table_meta.AddFtIndexCache(ft_cache);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kCatalogError) {
                 return status;
