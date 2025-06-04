@@ -398,19 +398,6 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         EXPECT_FALSE(status.ok());
     }
     new_txn_mgr->PrintAllKeyValue();
-    // {
-    //     // Scan and check
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-    //
-    //     Optional<DBMeeta> db_meta;
-    //     Optional<TableMeeta> table_meta;
-    //     Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-    //     EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
-    //     EXPECT_FALSE(status.ok());
-    //     status = new_txn_mgr->RollBackTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
-
     {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());

@@ -3742,21 +3742,49 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 // Restore memory index here
                 UnrecoverableError("Not implemented");
             }
-            // auto index_names_size = compact_txn_store->index_names_.size();
-            // for (SizeT i = 0; i < index_names_size; ++i) {
-            //     auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
-            //     auto db_id_str = compact_txn_store->db_id_str_;
-            //     auto table_id_str = compact_txn_store->table_id_str_;
-            //     auto index_id_str = compact_txn_store->index_ids_str_[0];
-            //
-            //     // for (SegmentID segment_id : deprecated_ids) {
-            //     auto ts_str = std::to_string(BeginTS());
-            //     kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
-            //     // }
-            //
-            //     kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
-            // }
-            // need_set_clean_flag = true;
+            auto index_names_size = compact_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
+                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
+                auto db_id_str = compact_txn_store->db_id_str_;
+                auto table_id_str = compact_txn_store->table_id_str_;
+                auto index_id_str = compact_txn_store->index_ids_str_[0];
+                const Vector<SegmentID> &deprecated_ids = compact_txn_store->deprecated_segment_ids_;
+                for (SegmentID segment_id : deprecated_ids) {
+                    auto ts_str = std::to_string(BeginTS());
+                    kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
+                }
+
+                kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
+            }
+            need_set_clean_flag = true;
+            const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
+            for (auto &meta : metas) {
+                switch (meta->type_) {
+                    case MetaType::kBlock: {
+                        auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
+                        TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
+                        SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
+                        BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
+
+                        auto [version_buffer, status1] = block_meta.GetVersionBuffer();
+                        if (!status1.ok()) {
+                            return status1;
+                        }
+                        Vector<String> object_paths{version_buffer->GetFilename()};
+                        buffer_mgr_->RemoveBufferObjects(object_paths);
+
+                        String block_lock_key = block_meta.GetBlockTag("lock");
+                        Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
             break;
         }
         case TransactionType::kCreateIndex: {
