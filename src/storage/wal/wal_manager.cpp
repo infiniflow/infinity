@@ -72,8 +72,8 @@ namespace infinity {
 
 WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage),
-      running_(false), flush_option_(flush_option), bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())),
-      last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
+      running_(false), flush_option_(flush_option), last_ckp_wal_size_(0), checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS),
+      last_full_ckp_ts_(UNCOMMIT_TS) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("WalManager");
 #endif
@@ -81,8 +81,7 @@ WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold,
 
 WalManager::WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), wal_dir_(wal_dir), wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), data_path_(data_dir),
-      storage_(storage), running_(false), flush_option_(flush_option),
-      bottom_executor_(MakeUnique<BottomExecutor>(storage->config()->BottomExecutorWorker())), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
+      storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0), checkpoint_in_progress_(false),
       last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("WalManager");
@@ -118,6 +117,9 @@ void WalManager::Start() {
     wal_size_ = 0;
     new_flush_thread_ = Thread([this] { NewFlush(); });
     // checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
+
+    bottom_executor_ = MakeUnique<BottomExecutor>();
+    bottom_executor_->Start(storage_->config()->BottomExecutorWorker());
     LOG_INFO("WAL manager is started.");
 }
 
@@ -130,6 +132,8 @@ void WalManager::Stop() {
         LOG_INFO("WAL manager was stopped...");
         return;
     }
+
+    bottom_executor_->Stop();
 
     LOG_TRACE("WalManager::Stop begin to stop txn manager.");
     // Notify txn manager to stop.

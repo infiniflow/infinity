@@ -14,55 +14,61 @@
 
 module;
 
+module bottom_executor;
+
 import stl;
 import third_party;
 import crc;
 import blocking_queue;
 import new_txn;
 import txn_state;
-
-module bottom_executor;
+import logger;
 
 namespace infinity {
 
-BottomExecutor::BottomExecutor(SizeT pool_size) {
-    for (SizeT i = 0; i < pool_size; ++i) {
-        String name = fmt::format("BottomExecutor_{}", i);
+BottomExecutor::BottomExecutor() = default;
+
+BottomExecutor::~BottomExecutor() = default;
+
+void BottomExecutor::Start(SizeT executor_size) {
+    for (SizeT i = 0; i < executor_size; ++i) {
+        String name = fmt::format("Start bottom executor {}", i);
         txn_queues_.emplace_back(MakeShared<BlockingQueue<NewTxn *>>(name));
         SharedPtr<BlockingQueue<NewTxn *>> queue = txn_queues_.back();
         auto executor = [&, queue] {
-            Vector<NewTxn *> txns;
-            while (running_.load()) {
-                bool got = queue->TryDequeueBulkWait(txns, 10);
-                if (got) {
-                    SizeT txns_size = txns.size();
-                    for (SizeT i = 0; i < txns_size; ++i) {
-                        TxnState txn_state = txns[i]->GetTxnState();
-                        if (txn_state == TxnState::kCommitting) {
-                            txns[i]->CommitBottom();
-                        }
+            Deque<NewTxn *> txns;
+            while (true) {
+                queue->DequeueBulk(txns);
+                SizeT txns_size = txns.size();
+                for (SizeT i = 0; i < txns_size; ++i) {
+                    NewTxn *txn = txns[i];
+                    if (txn == nullptr) {
+                        // Stop signal
+                        LOG_INFO(fmt::format("Stop bottom executor {}", i));
+                        return;
                     }
-                    txns.clear();
-                    std::unique_lock<std::mutex> lock(mutex_);
-                    cnt_ -= txns_size;
-                    if (cnt_ == 0) {
-                        cv_.notify_one();
+                    TxnState txn_state = txns[i]->GetTxnState();
+                    if (txn_state == TxnState::kCommitting) {
+                        txns[i]->CommitBottom();
                     }
                 }
+                txns.clear();
             }
         };
         auto thr = Thread(executor);
         executors_.emplace_back(std::move(thr));
     }
+    LOG_INFO(fmt::format("BottomExecutor is started with {} workers.", executor_size));
 }
-
-BottomExecutor::~BottomExecutor() {
-    Wait();
-    running_.store(false);
+void BottomExecutor::Stop() {
     SizeT num_workers = executors_.size();
+    for (SizeT i = 0; i < num_workers; ++i) {
+        txn_queues_[i]->Enqueue(nullptr);
+    }
     for (SizeT i = 0; i < num_workers; ++i) {
         executors_[i].join();
     }
+    LOG_INFO("BottomExecutor is stopped.");
 }
 
 void BottomExecutor::Submit(NewTxn *txn) {
@@ -70,13 +76,6 @@ void BottomExecutor::Submit(NewTxn *txn) {
     u32 checksum = CRC32IEEE::makeCRC((const unsigned char *)table_id_str.data(), table_id_str.size());
     SizeT idx = checksum % txn_queues_.size();
     txn_queues_[idx]->Enqueue(txn);
-    std::unique_lock<std::mutex> lock(mutex_);
-    cnt_++;
-}
-
-void BottomExecutor::Wait() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    cv_.wait(lock, [this] { return cnt_ == 0; });
 }
 
 } // namespace infinity
