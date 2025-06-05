@@ -350,31 +350,31 @@ TEST_P(TestTxnCleanup, test_cleanup_index) {
 
     new_txn_mgr_->PrintAllKeyValue();
 
-    // {
-    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-    //     Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths_);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr_->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        Status status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
 
-    // {
-    //     auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-    //     Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr_->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
-    //
-    // {
-    //     Status status = new_txn_mgr_->Cleanup();
-    //     EXPECT_TRUE(status.ok());
-    // }
-    // this->CheckFilePaths();
+        status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths_);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        Status status = new_txn_mgr_->Cleanup();
+        EXPECT_TRUE(status.ok());
+    }
+    this->CheckFilePaths();
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
