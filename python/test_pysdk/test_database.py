@@ -1,4 +1,3 @@
-import importlib
 import sys
 import os
 import threading
@@ -516,7 +515,7 @@ class TestInfinity:
     #     db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Error)
 
     @pytest.mark.slow
-    def test_create_drop_show_1W_databases(self, suffix):
+    def test_create_drop_show_10K_databases(self, suffix):
 
         """
         create 1M dbs, show these dbs, drop these dbs
