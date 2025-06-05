@@ -4071,8 +4071,13 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            append_cmd->db_id_ = db_meta->db_id_str();
-            append_cmd->table_id_ = table_meta->table_id_str();
+            if (append_cmd->db_id_ != db_meta->db_id_str() || append_cmd->table_id_ != table_meta->table_id_str()) {
+                return Status::CatalogError(fmt::format("WalCmdAppendV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                                                        append_cmd->db_id_,
+                                                        append_cmd->table_id_,
+                                                        db_meta->db_id_str(),
+                                                        table_meta->table_id_str()));
+            }
             break;
         }
         case WalCommandType::DELETE_V2: {
@@ -4084,8 +4089,13 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            delete_cmd->db_id_ = db_meta->db_id_str();
-            delete_cmd->table_id_ = table_meta->table_id_str();
+            if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
+                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                                                        delete_cmd->db_id_,
+                                                        delete_cmd->table_id_,
+                                                        db_meta->db_id_str(),
+                                                        table_meta->table_id_str()));
+            }
             break;
         }
         case WalCommandType::IMPORT_V2: {
