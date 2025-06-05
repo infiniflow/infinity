@@ -3686,6 +3686,7 @@ void NewTxn::CancelCommitBottom() {
 }
 
 Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
+    bool need_set_clean_flag = false;
     TransactionType txn_type = TransactionType::kInvalid;
     if (base_txn_store_ != nullptr) {
         txn_type = base_txn_store_->type_;
@@ -3711,17 +3712,39 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
             }
 
-            if (import_txn_store->index_names_.size() > 0) {
-                // Restore memory index here
-                UnrecoverableError("Not implemented");
+            auto index_names_size = import_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
+                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[i];
+                auto db_id_str = import_txn_store->db_id_str_;
+                auto table_id_str = import_txn_store->table_id_str_;
+                auto index_id_str = import_txn_store->index_ids_str_[i];
+                kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), std::to_string(BeginTS()));
+            }
+
+            if (index_names_size) {
+                need_set_clean_flag = true;
             }
             break;
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            if (compact_txn_store->index_names_.size() > 0) {
-                // Restore memory index here
-                UnrecoverableError("Not implemented");
+
+            auto index_names_size = compact_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
+                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
+                auto db_id_str = compact_txn_store->db_id_str_;
+                auto table_id_str = compact_txn_store->table_id_str_;
+                auto index_id_str = compact_txn_store->index_ids_str_[0];
+                const Vector<SegmentID> &deprecated_ids = compact_txn_store->deprecated_segment_ids_;
+                auto ts_str = std::to_string(BeginTS());
+                for (SegmentID segment_id : deprecated_ids) {
+                    kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
+                }
+                kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
+            }
+
+            if (index_names_size) {
+                need_set_clean_flag = true;
             }
             break;
         }
@@ -3805,6 +3828,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case MetaType::kBlockColumn: {
+                if (need_set_clean_flag) {
+                    break;
+                }
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
                 TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
@@ -3828,6 +3854,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case MetaType::kChunkIndex: {
+                if (need_set_clean_flag) {
+                    break;
+                }
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
@@ -3850,17 +3879,21 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
     }
 
-    Status status = kv_instance_->Rollback();
-    if (!status.ok()) {
-        return status;
-    }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
 
     if (conflicted_txn_ != nullptr) {
         // Wait for dependent transaction finished
         conflicted_txn_->WaitForCompletion();
     }
-
+    Status status;
+    if (need_set_clean_flag) {
+        status = kv_instance_->Commit();
+    } else {
+        status = kv_instance_->Rollback();
+    }
+    if (!status.ok()) {
+        return status;
+    }
     SetCompletion();
 
     return Status::OK();
@@ -3981,7 +4014,11 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
+                                      segment_index_meta_key->table_id_str_,
+                                      *kv_instance,
+                                      begin_ts,
+                                      MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);

@@ -1105,16 +1105,16 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
 
 SharedPtr<MemIndex> NewCatalog::GetMemIndex(const String &mem_index_key) {
     std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
-    if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
-        return iter->second;
+    if (mem_index_map_.contains(mem_index_key)) {
+        return mem_index_map_[mem_index_key];
     }
     return nullptr;
 }
 
 bool NewCatalog::GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
-    if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
-        mem_index = iter->second;
+    if (mem_index_map_.contains(mem_index_key)) {
+        mem_index = mem_index_map_[mem_index_key];
         return false;
     }
     mem_index_map_.emplace(mem_index_key, mem_index);
@@ -1172,8 +1172,7 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
 Status NewCatalog::SetMemIndexDump(const String &table_key) {
     LOG_INFO(fmt::format("SetMemIndexDump {}", table_key));
     std::unique_lock lock(mem_index_mtx_);
-    auto iter = table_lock_for_mem_index_.find(table_key);
-    if (iter == table_lock_for_mem_index_.end()) {
+    if (!table_lock_for_mem_index_.contains(table_key)) {
         table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
     }
     TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
@@ -1191,8 +1190,7 @@ Status NewCatalog::SetMemIndexDump(const String &table_key) {
 Status NewCatalog::UnsetMemIndexDump(const String &table_key) {
     LOG_INFO(fmt::format("UnsetMemIndexDump {}", table_key));
     std::unique_lock lock(mem_index_mtx_);
-    auto iter = table_lock_for_mem_index_.find(table_key);
-    if (iter == table_lock_for_mem_index_.end()) {
+    if (!table_lock_for_mem_index_.contains(table_key)) {
         UnrecoverableError(fmt::format("Table key: {} isn't found in mem index dump", table_key));
     }
     TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
@@ -1212,12 +1210,11 @@ Status NewCatalog::UnsetMemIndexDump(const String &table_key) {
 
 bool NewCatalog::IsMemIndexDump(const String &table_key) {
     std::unique_lock lock(mem_index_mtx_);
-    auto iter = table_lock_for_mem_index_.find(table_key);
-    if (iter == table_lock_for_mem_index_.end()) {
+    if (!table_lock_for_mem_index_.contains(table_key)) {
         return false;
     }
 
-    return iter->second->dumping_mem_index_;
+    return table_lock_for_mem_index_[table_key]->dumping_mem_index_;
 }
 
 Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache) {
