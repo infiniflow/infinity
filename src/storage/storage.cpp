@@ -337,7 +337,6 @@ Status Storage::AdminToWriter() {
 
     // recover index after start compact process
     catalog_->StartMemoryIndexCommit();
-    catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     this->RecoverMemIndex();
 
