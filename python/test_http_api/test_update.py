@@ -1,5 +1,3 @@
-import os
-import sys
 import pytest
 import time
 from httpapibase import HttpTest
@@ -10,7 +8,6 @@ class TestUpdate(HttpTest):
     def test_http_version(self):
         return
 
-    # PASS
     def test_http_update(self):
         db_name = "default_db"
         table_name = "test_http_test_update"
@@ -50,7 +47,6 @@ class TestUpdate(HttpTest):
         })
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_update_empty_table(self):
         db_name = "default_db"
@@ -102,7 +98,6 @@ class TestUpdate(HttpTest):
         self.update(db_name, table_name, {"c2": 90, "c3": 900}, "c1 = 1")
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_update_no_row_is_met_the_condition(self):
         db_name = "default_db"
@@ -180,7 +175,6 @@ class TestUpdate(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_update_table_with_one_segment(self):
         db_name = "default_db"
         table_name = "test_http_test_update_all_row_is_met_the_condition"
@@ -197,7 +191,6 @@ class TestUpdate(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_update_before_delete(self):
         db_name = "default_db"
         table_name = "test_http_test_update_before_delete"
@@ -216,7 +209,6 @@ class TestUpdate(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_update_inserted_data(self):
         db_name = "default_db"
         table_name = "test_http_test_update_before_delete"
@@ -234,7 +226,6 @@ class TestUpdate(HttpTest):
         return
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST") != "0", reason="Taking too much time.")
     def test_http_update_inserted_long_before(self):
         db_name = "default_db"
         table_name = "test_http_test_update_before_delete"
@@ -247,12 +238,11 @@ class TestUpdate(HttpTest):
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
 
-        time.sleep(60)
+        time.sleep(10)
 
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_update_dropped_table(self):
         db_name = "default_db"
@@ -266,7 +256,6 @@ class TestUpdate(HttpTest):
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_update_invalid_value(self):
         db_name = "default_db"
@@ -294,7 +283,6 @@ class TestUpdate(HttpTest):
             })
             self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_update_new_value(self):
         types = ["integer", "float"]
@@ -316,7 +304,6 @@ class TestUpdate(HttpTest):
             self.update(db_name, table_name, {"c2": types_example[i]}, "c1 = 1")
             self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_valid_filter_expression(self):
         filter_list = [

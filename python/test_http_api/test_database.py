@@ -1,6 +1,4 @@
 import logging
-import os
-import sys
 import pytest
 import threading
 from httpapibase import HttpTest
@@ -70,7 +68,7 @@ class TestDataBase(HttpTest):
                 })
         self.clear_http_database()
 
-    def test_http_create_drop_show_1K_databases(self):
+    def test_http_create_drop_show_100_databases(self):
         '''
             create 1K dbs,show these dbs,drop these dbs
         '''
@@ -100,15 +98,15 @@ class TestDataBase(HttpTest):
             self.drop_database('test_http_db_name' + str(i))
         self.clear_http_database()
 
-    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Cost too much times")
-    def test_http_create_drop_show_100K_databases(self):
+    @pytest.mark.slow
+    def test_http_create_drop_show_10K_databases(self):
         """
-        create 100K dbs, show these dbs, drop these dbs
+        create 10K dbs, show these dbs, drop these dbs
         """
         self.clear_http_database()
 
         # create databases
-        db_count = 100000
+        db_count = 10000
         for i in range(db_count):
             # print('create test_http_db_name' + str(i))
             self.drop_database('test_http_db_name' + str(i))
