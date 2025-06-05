@@ -25,6 +25,8 @@ import new_txn;
 import new_txn_manager;
 import infinity_exception;
 import txn_state;
+import column_vector;
+import mem_index;
 
 namespace infinity {
 
@@ -61,6 +63,12 @@ NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_nam
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn)
     : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_(new_txn) {}
+
+AppendMemIndexTask::AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index,
+                                       const SharedPtr<ColumnVector> &input_column,
+                                       BlockOffset offset,
+                                       BlockOffset row_cnt)
+    : BGTask(BGTaskType::kAppendMemIndex, false), mem_index_(mem_index), input_column_(input_column), offset_(offset), row_cnt_(row_cnt) {}
 
 TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 

@@ -32,6 +32,9 @@ import global_resource_usage;
 
 import new_txn_manager;
 import new_txn;
+import column_vector;
+import mem_index;
+import memory_indexer;
 
 namespace infinity {
 
@@ -113,6 +116,15 @@ void MemIndexProcessor::Process() {
                         DoDump(dump_task);
                         LOG_DEBUG("Dump index done.");
                     }
+                    break;
+                }
+                case BGTaskType::kAppendMemIndex: {
+                    auto append_task = static_cast<AppendMemIndexTask *>(bg_task.get());
+                    LOG_DEBUG(append_task->ToString());
+                    auto &col_ptr = append_task->input_column_;
+                    BlockOffset offset = append_task->offset_;
+                    BlockOffset row_cnt = append_task->row_cnt_;
+                    append_task->mem_index_->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                     break;
                 }
                 default: {

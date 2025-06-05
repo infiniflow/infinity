@@ -33,7 +33,7 @@ import meta_tree;
 namespace infinity {
 
 class NewTxn;
-class MemIndex;
+struct MemIndex;
 class TableIndexReaderCache;
 class DBMeeta;
 class TableMeeta;

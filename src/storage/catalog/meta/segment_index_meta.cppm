@@ -26,7 +26,7 @@ namespace infinity {
 
 class KVInstance;
 class TableIndexMeeta;
-class MemIndex;
+struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
