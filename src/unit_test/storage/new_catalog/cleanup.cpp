@@ -142,7 +142,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCleanup,
-                         ::testing::Values(/*BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH,*/ BaseTestParamStr::NEW_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH, BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, test_cleanup_db) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
