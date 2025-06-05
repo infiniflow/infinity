@@ -117,7 +117,7 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     return Status::OK();
 }
 
-Status DBMeeta::GetTableName(const String &table_id_str, String &table_key, String &table_name) {
+Status DBMeeta::GetTableName(const String &table_id_str, String &table_key, String &table_name) const {
     String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);
 
     size_t start, end;
@@ -134,7 +134,23 @@ Status DBMeeta::GetTableName(const String &table_id_str, String &table_key, Stri
         iter->Next();
     }
     table_key = "";
-    return Status::TableNotExist(table_name);
+    return Status::TableNotExist(table_id_str);
+}
+
+Status DBMeeta::GetDBName(const String &db_id_str, String &db_name) const {
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(KeyEncode::kCatalogDbHeader);
+    while (iter->Valid() && iter->Key().starts_with(KeyEncode::kCatalogDbHeader)) {
+        String key_str = iter->Key().ToString();
+        size_t start = KeyEncode::kCatalogDbHeader.size();
+        size_t end = key_str.find('|', start);
+        if (db_id_str == iter->Value().ToString()) {
+            db_name = key_str.substr(start, end - start);
+            return Status::OK();
+        }
+        iter->Next();
+    }
+    return Status::DBNotExist(db_id_str);
 }
 
 Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {

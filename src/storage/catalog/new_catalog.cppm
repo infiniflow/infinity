@@ -204,7 +204,7 @@ public:
     SharedPtr<SystemCache> GetSystemCache() const;
     SystemCache *GetSystemCachePtr() const;
 
-    KVStore* kv_store() const;
+    KVStore *kv_store() const;
 
 private:
     KVStore *kv_store_{};
@@ -230,14 +230,9 @@ public:
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
-    Status SetMemIndexDump(const String &table_key);
-    Status UnsetMemIndexDump(const String &table_key);
-    bool IsMemIndexDump(const String &table_key);
-
 private:
     mutable std::shared_mutex mem_index_mtx_{};
     HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
-    HashMap<String, SharedPtr<TableLockForMemIndex>> table_lock_for_mem_index_{};
 
 public:
     Status AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache);
@@ -298,8 +293,7 @@ public:
 
     static Status MemIndexCommit(NewTxn *txn);
 
-    static Status
-    GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
+    static Status GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
