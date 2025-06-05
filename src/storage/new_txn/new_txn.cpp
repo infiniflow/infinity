@@ -3259,9 +3259,7 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_mem_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_mem_index_txn_store->db_name_ == db_name && dump_mem_index_txn_store->table_name_ == table_name &&
-                dump_mem_index_txn_store->index_name_ == index_name) {
-                retry_query = false;
+            if (dump_mem_index_txn_store->db_name_ == db_name && dump_mem_index_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
             break;
@@ -3647,14 +3645,7 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
-                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
-                    if (!mem_index_status.ok()) {
-                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
-                    }
-                    break;
-                }
+                break;
             }
             case WalCommandType::COMPACT_V2: {
                 // auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
@@ -3732,12 +3723,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kDumpMemIndex: {
-            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-            Status mem_index_status = new_catalog_->UnsetMemIndexDump(dump_index_txn_store->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_txn_store->table_name_, mem_index_status.message()));
-            }
             break;
         }
         case TransactionType::kOptimizeIndex: {
@@ -3981,7 +3966,11 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
+                                      segment_index_meta_key->table_id_str_,
+                                      *kv_instance,
+                                      begin_ts,
+                                      MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
