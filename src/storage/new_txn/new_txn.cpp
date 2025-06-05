@@ -3703,45 +3703,13 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             if (index_names_size) {
-                const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
-                for (auto &meta : metas) {
-                    switch (meta->type_) {
-                        case MetaType::kBlock: {
-                            auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                            TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
-                            SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
-                            BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-
-                            auto [version_buffer, status1] = block_meta.GetVersionBuffer();
-                            if (!status1.ok()) {
-                                return status1;
-                            }
-                            Vector<String> object_paths{version_buffer->GetFilename()};
-                            buffer_mgr_->RemoveBufferObjects(object_paths);
-
-                            String block_lock_key = block_meta.GetBlockTag("lock");
-                            Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
-                            if (!status.ok()) {
-                                return status;
-                            }
-                            break;
-                        }
-                        default: {
-                            break;
-                        }
-                    }
-                }
                 need_set_clean_flag = true;
-                return kv_instance_->Commit();
             }
             break;
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            // if (compact_txn_store->index_names_.size() > 0) {
-            //     // Restore memory index here
-            //     UnrecoverableError("Not implemented");
-            // }
+
             auto index_names_size = compact_txn_store->index_names_.size();
             for (SizeT i = 0; i < index_names_size; ++i) {
                 auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
@@ -3757,36 +3725,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
 
             if (index_names_size) {
-                const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
-                for (auto &meta : metas) {
-                    switch (meta->type_) {
-                        case MetaType::kBlock: {
-                            auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                            TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
-                            SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
-                            BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-
-                            auto [version_buffer, status1] = block_meta.GetVersionBuffer();
-                            if (!status1.ok()) {
-                                return status1;
-                            }
-                            Vector<String> object_paths{version_buffer->GetFilename()};
-                            buffer_mgr_->RemoveBufferObjects(object_paths);
-
-                            String block_lock_key = block_meta.GetBlockTag("lock");
-                            Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
-                            if (!status.ok()) {
-                                return status;
-                            }
-                            break;
-                        }
-                        default: {
-                            break;
-                        }
-                    }
-                }
                 need_set_clean_flag = true;
-                return kv_instance_->Commit();
             }
             break;
         }
@@ -3864,6 +3803,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case MetaType::kBlockColumn: {
+                if (need_set_clean_flag) {
+                    break;
+                }
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
                 TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
@@ -3887,6 +3829,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case MetaType::kChunkIndex: {
+                if (need_set_clean_flag) {
+                    break;
+                }
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
@@ -3908,6 +3853,13 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
         }
     }
+
+    txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
+
+    if (conflicted_txn_ != nullptr) {
+        // Wait for dependent transaction finished
+        conflicted_txn_->WaitForCompletion();
+    }
     Status status;
     if (need_set_clean_flag) {
         status = kv_instance_->Commit();
@@ -3917,13 +3869,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     if (!status.ok()) {
         return status;
     }
-    txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
-
-    if (conflicted_txn_ != nullptr) {
-        // Wait for dependent transaction finished
-        conflicted_txn_->WaitForCompletion();
-    }
-
     SetCompletion();
 
     return Status::OK();
