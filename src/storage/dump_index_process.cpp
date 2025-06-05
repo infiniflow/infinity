@@ -16,7 +16,7 @@ module;
 
 #include <thread>
 
-module mem_index_process;
+module dump_index_process;
 
 import stl;
 import bg_task;
@@ -38,24 +38,24 @@ import memory_indexer;
 
 namespace infinity {
 
-MemIndexProcessor::MemIndexProcessor() {
+DumpIndexProcessor::DumpIndexProcessor() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("MemIndexProcessor");
+    GlobalResourceUsage::IncrObjectCount("DumpIndexProcessor");
 #endif
 }
 
-MemIndexProcessor::~MemIndexProcessor() {
+DumpIndexProcessor::~DumpIndexProcessor() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("MemIndexProcessor");
+    GlobalResourceUsage::DecrObjectCount("DumpIndexProcessor");
 #endif
 }
 
-void MemIndexProcessor::Start() {
+void DumpIndexProcessor::Start() {
     LOG_INFO("Compaction processor is started.");
     processor_thread_ = Thread([this] { Process(); });
 }
 
-void MemIndexProcessor::Stop() {
+void DumpIndexProcessor::Stop() {
     LOG_INFO("Compaction processor is stopping.");
     SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
     this->Submit(stop_task);
@@ -64,12 +64,12 @@ void MemIndexProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void MemIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
+void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
     task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
 
-void MemIndexProcessor::DoDump(DumpIndexTask *dump_task) {
+void DumpIndexProcessor::DoDump(DumpIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     NewTxn *new_txn = dump_task->new_txn_;
@@ -92,7 +92,7 @@ void MemIndexProcessor::DoDump(DumpIndexTask *dump_task) {
     return;
 }
 
-void MemIndexProcessor::Process() {
+void DumpIndexProcessor::Process() {
     bool running = true;
     while (running) {
         Deque<SharedPtr<BGTask>> tasks;
@@ -116,15 +116,6 @@ void MemIndexProcessor::Process() {
                         DoDump(dump_task);
                         LOG_DEBUG("Dump index done.");
                     }
-                    break;
-                }
-                case BGTaskType::kAppendMemIndex: {
-                    auto append_task = static_cast<AppendMemIndexTask *>(bg_task.get());
-                    LOG_DEBUG(append_task->ToString());
-                    auto &col_ptr = append_task->input_column_;
-                    BlockOffset offset = append_task->offset_;
-                    BlockOffset row_cnt = append_task->row_cnt_;
-                    append_task->mem_index_->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                     break;
                 }
                 default: {

@@ -40,7 +40,7 @@ import new_txn;
 import infinity_exception;
 import status;
 import background_process;
-import mem_index_process;
+import dump_index_process;
 import compaction_process;
 import object_storage_process;
 import status;
@@ -336,11 +336,11 @@ Status Storage::AdminToWriter() {
     compact_processor_ = MakeUnique<CompactionProcessor>();
     compact_processor_->Start();
 
-    if (mem_index_processor_ != nullptr) {
+    if (dump_index_processor_ != nullptr) {
         UnrecoverableError("mem index processor was initialized before.");
     }
-    mem_index_processor_ = MakeUnique<MemIndexProcessor>();
-    mem_index_processor_->Start();
+    dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
+    dump_index_processor_->Start();
 
     // recover index after start compact process
     catalog_->StartMemoryIndexCommit();
@@ -506,11 +506,11 @@ Status Storage::ReaderToWriter() {
     compact_processor_ = MakeUnique<CompactionProcessor>();
     compact_processor_->Start();
 
-    if (mem_index_processor_ != nullptr) {
+    if (dump_index_processor_ != nullptr) {
         UnrecoverableError("mem index processor was initialized before.");
     }
-    mem_index_processor_ = MakeUnique<MemIndexProcessor>();
-    mem_index_processor_->Start();
+    dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
+    dump_index_processor_->Start();
 
     periodic_trigger_thread_->Stop();
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -538,9 +538,9 @@ Status Storage::WriterToAdmin() {
         compact_processor_.reset(); // Different from Readable
     }
 
-    if (mem_index_processor_ != nullptr) {
-        mem_index_processor_->Stop();
-        mem_index_processor_.reset();
+    if (dump_index_processor_ != nullptr) {
+        dump_index_processor_->Stop();
+        dump_index_processor_.reset();
     }
 
     if (bg_processor_ != nullptr) {
@@ -605,9 +605,9 @@ Status Storage::WriterToReader() {
         compact_processor_.reset(); // Different from Readable
     }
 
-    if (mem_index_processor_ != nullptr) {
-        mem_index_processor_->Stop();
-        mem_index_processor_.reset();
+    if (dump_index_processor_ != nullptr) {
+        dump_index_processor_->Stop();
+        dump_index_processor_.reset();
     }
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
@@ -633,9 +633,9 @@ Status Storage::UnInitFromWriter() {
         compact_processor_.reset(); // Different from Readable
     }
 
-    if (mem_index_processor_ != nullptr) {
-        mem_index_processor_->Stop();
-        mem_index_processor_.reset();
+    if (dump_index_processor_ != nullptr) {
+        dump_index_processor_->Stop();
+        dump_index_processor_.reset();
     }
 
     if (bg_processor_ != nullptr) {
