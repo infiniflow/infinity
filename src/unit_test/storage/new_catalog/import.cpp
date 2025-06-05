@@ -4763,7 +4763,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
     //    t1      import                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  create index         commit (success)
+    //                    t2                  create index         commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -4816,7 +4816,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      import                                   commit (success)
+    //    t1      import                                   commit (fail)
     //    |----------|-----------------------------------------------|
     //                    |-------------|-----------------------|
     //                    t2        create index (success)    commit (success)
@@ -4871,7 +4871,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      import                                    commit (success)
+    //    t1                                      import                                    commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|------------------------------|
     //                    t2                create index                 commit (success)
@@ -4929,7 +4929,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                                   import                                   commit (success)
+    //    t1                                                   import                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|------------|
     //                    t2                  create index  commit (success)
@@ -4985,7 +4985,7 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                                                  t1                  import                                   commit (success)
+    //                                                  t1                  import                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|---------------|
     //                    t2                  create index   commit (success)
