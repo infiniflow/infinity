@@ -504,6 +504,11 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
     return Status::OK();
 }
 
+Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info) {
+    chunk_info_ = chunk_info;
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
     Status status;
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();

@@ -50,6 +50,7 @@ import segment_meta;
 import new_txn;
 import buffer_obj;
 import kv_store;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -216,4 +217,5 @@ std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWit
     return std::make_pair(begin_row_id_.segment_offset_, row_count_);
 }
 
+const ChunkIndexMetaInfo EMVBIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0}; }
 } // namespace infinity

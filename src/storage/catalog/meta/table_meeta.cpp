@@ -308,6 +308,8 @@ Status TableMeeta::LoadSet() {
             if (!status.ok()) {
                 return status;
             }
+
+            table_index_meta.UpdateFulltextSegmentTS(commit_ts_);
             break;
         }
     }

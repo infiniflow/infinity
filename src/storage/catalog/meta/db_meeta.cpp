@@ -117,6 +117,26 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     return Status::OK();
 }
 
+Status DBMeeta::GetTableName(const String &table_id_str, String &table_key, String &table_name) {
+    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);
+
+    size_t start, end;
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(db_table_prefix);
+    while (iter->Valid() && iter->Key().starts_with(db_table_prefix)) {
+        table_key = iter->Key().ToString();
+        start = db_table_prefix.size();
+        end = table_key.find('|', start);
+        if (table_id_str == iter->Value().ToString()) {
+            table_name = table_key.substr(start, end - start);
+            return Status::OK();
+        }
+        iter->Next();
+    }
+    table_key = "";
+    return Status::TableNotExist(table_name);
+}
+
 Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
     Status status;
 

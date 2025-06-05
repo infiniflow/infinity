@@ -148,8 +148,8 @@ std::string ShowStatement::ToString() const {
             ss << "Show config";
             break;
         }
-        case ShowStmtType::kDeltaLogs: {
-            ss << "Show config";
+        case ShowStmtType::kTasks: {
+            ss << "Show tasks";
             break;
         }
         case ShowStmtType::kCatalogs: {

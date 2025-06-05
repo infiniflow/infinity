@@ -17,15 +17,16 @@ module;
 export module compaction_process;
 
 import stl;
-import bg_task;
+import bg_task_type;
 import blocking_queue;
 import status;
 
 namespace infinity {
 
 class TxnManager;
-class SessionManager;
 class NewTxn;
+class BGTask;
+class DumpIndexTask;
 
 class TestCommander {
 public:
@@ -80,8 +81,6 @@ private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};
 
     Thread processor_thread_{};
-
-    SessionManager *session_mgr_{};
 
     Atomic<u64> task_count_{};
 

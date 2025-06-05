@@ -52,6 +52,7 @@ import result_cache_manager;
 import snapshot;
 import periodic_trigger_thread;
 import new_txn;
+import bg_task_type;
 
 namespace infinity {
 
@@ -286,7 +287,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->periodic_trigger_thread()->full_checkpoint_trigger_->UpdateInternal(interval);
+                            query_context->storage()->periodic_trigger_thread()->checkpoint_trigger_->UpdateInternal(interval);
                             config->SetFullCheckpointInterval(interval);
                             break;
                         }

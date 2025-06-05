@@ -14,37 +14,28 @@
 
 module;
 
-export module periodic_trigger_thread;
+export module bg_task_type;
 
 import stl;
-import periodic_trigger;
+import third_party;
+import global_resource_usage;
+import status;
 
 namespace infinity {
 
-export class PeriodicTriggerThread {
-public:
-    PeriodicTriggerThread() : running_(false) {}
-
-    ~PeriodicTriggerThread();
-
-    void Start();
-
-    void Stop();
-
-    void Run();
-
-public:
-    SharedPtr<NewCleanupPeriodicTrigger> new_cleanup_trigger_;
-
-    SharedPtr<CheckpointPeriodicTrigger> checkpoint_trigger_;
-    SharedPtr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
-    SharedPtr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
-
-private:
-    Thread thread_{};
-    std::mutex mtx_{};
-    std::condition_variable cv_{};
-    bool running_{false};
+export enum class BGTaskType {
+    kStopProcessor,
+    kNewCheckpoint,
+    kNotifyCompact,
+    kNewCompact,
+    kNotifyOptimize,
+    kNewCleanup,
+    kUpdateSegmentBloomFilterData, // Not used
+    kDumpIndex,
+    kTestCommand,
+    kInvalid
 };
 
-} // namespace infinity
+String ToString(BGTaskType type);
+
+}

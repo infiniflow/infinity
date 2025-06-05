@@ -18,6 +18,7 @@ export module update_segment_bloom_filter_task;
 
 import stl;
 import bg_task;
+import bg_task_type;
 import segment_entry;
 import table_entry;
 import txn;

@@ -23,6 +23,7 @@ import column_def;
 import table_index_entry;
 import base_memindex;
 import memindex_tracer;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -51,6 +52,8 @@ public:
     MemIndexTracerInfo GetInfo() const override;
 
     TableIndexEntry *table_index_entry() const override;
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
     virtual RowID GetBeginRowID() const = 0;
 

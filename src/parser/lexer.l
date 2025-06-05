@@ -80,7 +80,6 @@ DECIMAL         { return DECIMAL; }
 DEFAULT         { return DEFAULT; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
-DELTA           { return DELTA; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }
@@ -192,6 +191,7 @@ STANDALONE      { return STANDALONE; }
 SYSTEM          { return SYSTEM; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
+TASKS          { return TASKS; }
 TENSOR          { return TENSOR; }
 TENSORARRAY     { return TENSORARRAY; }
 TEXT            { return TEXT; }

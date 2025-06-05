@@ -18,5 +18,5 @@ def test_0(infinity_runner: InfinityRunner):
         assert res.error_code == ErrorCode.OK
 
     for i in range(2):
-        print(f"i: {i}")
+        print(f"start step: {i}")
         part()

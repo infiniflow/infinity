@@ -1792,7 +1792,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
 
-        Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }

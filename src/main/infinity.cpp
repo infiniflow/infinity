@@ -815,16 +815,7 @@ QueryResult Infinity::ShowLogs() {
     return result;
 }
 
-QueryResult Infinity::ShowDeltaCheckpoint() {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
-    show_statement->show_type_ = ShowStmtType::kDeltaLogs;
-    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
-    return result;
-}
-
-QueryResult Infinity::ShowFullCheckpoint() {
+QueryResult Infinity::ShowCheckpoint() {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();

@@ -168,6 +168,27 @@ statement ok
 SHOW CATALOG;
 
 statement ok
+SHOW LOGS;
+
+statement ok
+SHOW PERSISTENCE FILES;
+
+statement ok
+SHOW PERSISTENCE OBJECTS;
+
+statement ok
+SHOW MEMORY;
+
+statement ok
+SHOW MEMORY OBJECTS;
+
+statement ok
+SHOW MEMORY ALLOCATION;
+
+statement ok
+SHOW MEMORY ALLOCATION;
+
+statement ok
 CHECK SYSTEM;
 
 statement ok

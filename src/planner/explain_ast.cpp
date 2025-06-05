@@ -726,8 +726,8 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW LOGS"));
             break;
         }
-        case ShowStmtType::kDeltaLogs: {
-            result->emplace_back(MakeShared<String>("SHOW DELTA LOGS"));
+        case ShowStmtType::kTasks: {
+            result->emplace_back(MakeShared<String>("SHOW TASKS"));
             break;
         }
         case ShowStmtType::kCatalogs: {

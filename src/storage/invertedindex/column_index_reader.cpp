@@ -305,7 +305,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
             }
             auto column_index_map = (*index_reader->column_index_readers_)[column_id];
 
-            // assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
+            // assert(table_index_entry->GetFulltextSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
                 target_ts = begin_ts;
