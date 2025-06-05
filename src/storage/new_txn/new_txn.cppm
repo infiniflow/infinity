@@ -527,15 +527,6 @@ private:
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
-    Status AddChunkWal(const String &db_name,
-                       const String &table_name,
-                       const String &index_name,
-                       const String &table_key,
-                       const SegmentIndexMeta &segment_index_meta,
-                       const Vector<WalChunkIndexInfo> &chunk_infos,
-                       const Vector<ChunkID> &deprecate_ids,
-                       DumpIndexCause dump_index_cause);
-
     Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option);
 
     Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option);

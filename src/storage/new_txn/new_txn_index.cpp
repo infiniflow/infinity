@@ -143,11 +143,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         chunk_infos.emplace_back(chunk_index_meta);
 
         txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
-
-        status = this->AddChunkWal(db_name, table_name, index_name, table_key, segment_index_meta, chunk_infos, {}, DumpIndexCause::kDumpMemIndex);
-        if (!status.ok()) {
-            return status;
-        }
     }
 
     return Status::OK();
@@ -219,11 +214,6 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
         txn_store->segment_ids_.emplace_back(segment_id);
         txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
-    }
-
-    status = this->AddChunkWal(db_name, table_name, index_name, table_key, segment_index_meta, chunk_infos, {}, DumpIndexCause::kDumpMemIndex);
-    if (!status.ok()) {
-        return status;
     }
 
     return Status::OK();
@@ -574,21 +564,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
     }
 
-    auto dump_cmd = MakeShared<WalCmdDumpIndexV2>(db_name,
-                                                  segment_index_meta.table_index_meta().table_meta().db_id_str(),
-                                                  table_name,
-                                                  segment_index_meta.table_index_meta().table_meta().table_id_str(),
-                                                  index_name,
-                                                  segment_index_meta.table_index_meta().index_id_str(),
-                                                  segment_id,
-                                                  chunk_infos,
-                                                  deprecate_ids,
-                                                  table_key);
-
-    dump_cmd->dump_cause_ = DumpIndexCause::kOptimizeIndex;
-
-    wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
-    txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
     return Status::OK();
 }
 
@@ -1024,13 +999,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
     if (create_index_cmd_ptr) {
         WalCmdCreateIndexV2 &create_index_cmd = *create_index_cmd_ptr;
         create_index_cmd.segment_index_infos_.emplace_back(segment_meta.segment_id(), std::move(chunk_infos));
-    } else {
-        Status status =
-            this->AddChunkWal(db_name, table_name, index_name, table_key, *segment_index_meta, chunk_infos, old_chunk_ids, dump_index_cause);
-        if (!status.ok()) {
-            return status;
-        }
     }
+
     return Status::OK();
 }
 
@@ -1753,36 +1723,6 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
     mem_index->ClearMemIndex();
-    return Status::OK();
-}
-
-Status NewTxn::AddChunkWal(const String &db_name,
-                           const String &table_name,
-                           const String &index_name,
-                           const String &table_key,
-                           const SegmentIndexMeta &segment_index_meta,
-                           const Vector<WalChunkIndexInfo> &chunk_infos,
-                           const Vector<ChunkID> &deprecate_ids,
-                           DumpIndexCause dump_index_cause) {
-    SegmentID segment_id = segment_index_meta.segment_id();
-    auto dump_cmd = MakeShared<WalCmdDumpIndexV2>(db_name,
-                                                  segment_index_meta.table_index_meta().table_meta().db_id_str(),
-                                                  table_name,
-                                                  segment_index_meta.table_index_meta().table_meta().table_id_str(),
-                                                  index_name,
-                                                  segment_index_meta.table_index_meta().index_id_str(),
-                                                  segment_id,
-                                                  chunk_infos,
-                                                  deprecate_ids,
-                                                  table_key);
-    if (dump_index_cause == DumpIndexCause::kDumpMemIndex) {
-        dump_cmd->clear_mem_index_ = true;
-    }
-    dump_cmd->dump_cause_ = dump_index_cause;
-
-    wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
-    txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
-
     return Status::OK();
 }
 
