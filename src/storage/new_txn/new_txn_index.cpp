@@ -1233,8 +1233,8 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         }
 
         auto col_ptr = MakeShared<ColumnVector>(std::move(col));
-        memory_indexer->Insert(col_ptr, 0, row_cnt, true);
-        memory_indexer->Commit(true);
+        memory_indexer->Insert(col_ptr, 0, row_cnt, false /*offline*/);
+        memory_indexer->Commit(false /*offline*/);
     }
     return Status::OK();
 }
