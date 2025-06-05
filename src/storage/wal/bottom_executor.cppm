@@ -26,11 +26,13 @@ class NewTxn;
 // BottomExecutor has a pool of threads, and executes transactions of a same table with the same thread orderly.
 export class BottomExecutor {
 public:
-    explicit BottomExecutor(SizeT pool_size);
+    BottomExecutor();
     virtual ~BottomExecutor();
 
+    void Start(SizeT executor_size);
+    void Stop();
+
     void Submit(NewTxn *txn);
-    void Wait();
 
 private:
     void Process();
