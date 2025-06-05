@@ -835,6 +835,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kFullText: {
             const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
             SharedPtr<MemoryIndexer> memory_indexer;
+            bool need_to_update_ft_segment_ts = false;
             {
                 std::unique_lock<std::mutex> lock(mem_index->mtx_);
                 if (mem_index->memory_indexer_.get() == nullptr) {
@@ -848,7 +849,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                     mem_index->memory_indexer_ =
                         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
-                    segment_index_meta.table_index_meta().UpdateFulltextSegmentTS(commit_ts);
+                    need_to_update_ft_segment_ts = true;
                 } else {
                     RowID exp_begin_row_id = mem_index->memory_indexer_->GetBaseRowId() + mem_index->memory_indexer_->GetDocCount();
                     assert(base_row_id >= exp_begin_row_id);
@@ -867,6 +868,12 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 } else {
                     mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                 }
+            }
+            if (need_to_update_ft_segment_ts) {
+                // To avoid deadlock of mem index mutex and table index reader cache mutex, update the ts here.
+                // query will lock table index reader cache mutex first, then mem index mutex.
+                // append will lock mem index mutex first, then table index reader cache mutex.
+                segment_index_meta.table_index_meta().UpdateFulltextSegmentTS(commit_ts);
             }
             break;
         }
