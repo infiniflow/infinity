@@ -531,7 +531,8 @@ private:
                        const String &table_name,
                        const String &index_name,
                        const String &table_key,
-                       ChunkIndexMeta &chunk_index_meta,
+                       const SegmentIndexMeta &segment_index_meta,
+                       const Vector<WalChunkIndexInfo> &chunk_infos,
                        const Vector<ChunkID> &deprecate_ids,
                        DumpIndexCause dump_index_cause);
 

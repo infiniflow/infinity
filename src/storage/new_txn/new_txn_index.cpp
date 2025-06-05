@@ -93,6 +93,22 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         return status;
     }
 
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
+    DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = table_index_meta->table_meta().db_id_str();
+    txn_store->table_name_ = table_name;
+    txn_store->table_id_str_ = table_index_meta->table_meta().table_id_str();
+    txn_store->index_name_ = index_name;
+    txn_store->index_id_str_ = table_index_meta->index_id_str();
+    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
+    txn_store->segment_ids_ = *segment_ids_ptr;
+    txn_store->table_key_ = table_key;
+
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
@@ -123,37 +139,16 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         }
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         chunk_index_meta.SetChunkInfoNoPutKV(chunk_index_meta_info);
+        Vector<WalChunkIndexInfo> chunk_infos;
+        chunk_infos.emplace_back(chunk_index_meta);
 
-        status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
+        txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
+
+        status = this->AddChunkWal(db_name, table_name, index_name, table_key, segment_index_meta, chunk_infos, {}, DumpIndexCause::kDumpMemIndex);
         if (!status.ok()) {
             return status;
         }
     }
-
-    Map<SegmentID, Vector<WalChunkIndexInfo>> segment_chunk_infos;
-    for (const auto &cmd : wal_entry_->cmds_) {
-        if (cmd->type_ == WalCommandType::DUMP_INDEX_V2) {
-            auto dump_cmd = static_cast<WalCmdDumpIndexV2 *>(cmd.get());
-            segment_chunk_infos.emplace(dump_cmd->segment_id_, dump_cmd->chunk_infos_);
-        }
-    }
-
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-    base_txn_store_ = MakeShared<DumpMemIndexTxnStore>();
-    DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-    txn_store->db_name_ = db_name;
-    txn_store->db_id_str_ = table_index_meta->table_meta().db_id_str();
-    txn_store->table_name_ = table_name;
-    txn_store->table_id_str_ = table_index_meta->table_meta().table_id_str();
-    txn_store->index_name_ = index_name;
-    txn_store->index_id_str_ = table_index_meta->index_id_str();
-    txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
-    txn_store->segment_ids_ = *segment_ids_ptr;
-    txn_store->table_key_ = table_key;
-    txn_store->chunk_infos_in_segments_ = segment_chunk_infos;
 
     return Status::OK();
 }
@@ -203,14 +198,8 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
     chunk_index_meta.SetChunkInfoNoPutKV(chunk_index_meta_info);
-
-    status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
-    if (!status.ok()) {
-        return status;
-    }
-
-    SharedPtr<WalCmd> &cmd = wal_entry_->cmds_.back();
-    auto dump_cmd = static_cast<WalCmdDumpIndexV2 *>(cmd.get());
+    Vector<WalChunkIndexInfo> chunk_infos;
+    chunk_infos.emplace_back(chunk_index_meta);
 
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
@@ -225,12 +214,18 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
         txn_store->table_key_ = table_key;
         txn_store->segment_ids_ = {segment_id};
-        txn_store->chunk_infos_in_segments_.emplace(segment_id, dump_cmd->chunk_infos_);
+        txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
     } else {
         DumpMemIndexTxnStore *txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
         txn_store->segment_ids_.emplace_back(segment_id);
-        txn_store->chunk_infos_in_segments_.emplace(segment_id, dump_cmd->chunk_infos_);
+        txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
     }
+
+    status = this->AddChunkWal(db_name, table_name, index_name, table_key, segment_index_meta, chunk_infos, {}, DumpIndexCause::kDumpMemIndex);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -1013,22 +1008,14 @@ Status NewTxn::PopulateIndex(const String &db_name,
     switch (dump_index_cause) {
         case DumpIndexCause::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            compact_txn_store->index_names_.emplace_back(index_name);
-            compact_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-            compact_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-            compact_txn_store->segment_ids_.emplace_back(segment_meta.segment_id());
-            compact_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-            compact_txn_store->deprecate_ids_in_segments_.emplace_back(old_chunk_ids);
+            compact_txn_store->chunk_infos_in_segments_.emplace(segment_meta.segment_id(), chunk_infos);
+            compact_txn_store->deprecate_ids_in_segments_.emplace(segment_meta.segment_id(), old_chunk_ids);
             break;
         }
         case DumpIndexCause::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-            import_txn_store->index_names_.emplace_back(index_name);
-            import_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-            import_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-            import_txn_store->segment_ids_.emplace_back(segment_meta.segment_id());
-            import_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-            import_txn_store->deprecate_ids_in_segments_.emplace_back(old_chunk_ids);
+            import_txn_store->chunk_infos_in_segments_.emplace(segment_meta.segment_id(), chunk_infos);
+            import_txn_store->deprecate_ids_in_segments_.emplace(segment_meta.segment_id(), old_chunk_ids);
         }
         default: {
         }
@@ -1036,12 +1023,10 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
     if (create_index_cmd_ptr) {
         WalCmdCreateIndexV2 &create_index_cmd = *create_index_cmd_ptr;
-        Vector<WalChunkIndexInfo> chunk_infos;
-        chunk_infos.emplace_back(chunk_index_meta);
-
         create_index_cmd.segment_index_infos_.emplace_back(segment_meta.segment_id(), std::move(chunk_infos));
     } else {
-        Status status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, old_chunk_ids, dump_index_cause);
+        Status status =
+            this->AddChunkWal(db_name, table_name, index_name, table_key, *segment_index_meta, chunk_infos, old_chunk_ids, dump_index_cause);
         if (!status.ok()) {
             return status;
         }
@@ -1775,12 +1760,10 @@ Status NewTxn::AddChunkWal(const String &db_name,
                            const String &table_name,
                            const String &index_name,
                            const String &table_key,
-                           ChunkIndexMeta &chunk_index_meta,
+                           const SegmentIndexMeta &segment_index_meta,
+                           const Vector<WalChunkIndexInfo> &chunk_infos,
                            const Vector<ChunkID> &deprecate_ids,
                            DumpIndexCause dump_index_cause) {
-    SegmentIndexMeta &segment_index_meta = chunk_index_meta.segment_index_meta();
-    Vector<WalChunkIndexInfo> chunk_infos;
-    chunk_infos.emplace_back(chunk_index_meta);
     SegmentID segment_id = segment_index_meta.segment_id();
     auto dump_cmd = MakeShared<WalCmdDumpIndexV2>(db_name,
                                                   segment_index_meta.table_index_meta().table_meta().db_id_str(),
