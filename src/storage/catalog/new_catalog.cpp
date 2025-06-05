@@ -1320,7 +1320,7 @@ Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, Share
         }
     }
     if (segment_update_ts == nullptr) {
-        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} not found", segment_update_ts_key));
+        return Status::CatalogError(fmt::format("Get SegmentUpdateTS key: {} not found", segment_update_ts_key));
     }
     return Status::OK();
 }
@@ -1332,7 +1332,7 @@ Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key)
         delete_success = segment_update_ts_map_.erase(segment_update_ts_key) > 0;
     }
     if (!delete_success) {
-        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} not found", segment_update_ts_key));
+        return Status::CatalogError(fmt::format("Drop SegmentUpdateTS key: {} not found", segment_update_ts_key));
     }
     return Status::OK();
 }

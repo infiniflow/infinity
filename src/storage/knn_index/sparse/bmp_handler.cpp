@@ -402,4 +402,8 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
 
 TableIndexEntry *BMPIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
+const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const {
+    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};
+}
+
 } // namespace infinity

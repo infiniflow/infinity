@@ -300,10 +300,10 @@ struct SQL_LTYPE {
     PROFILES = 426,                /* PROFILES  */
     VARIABLES = 427,               /* VARIABLES  */
     VARIABLE = 428,                /* VARIABLE  */
-    DELTA = 429,                   /* DELTA  */
-    LOGS = 430,                    /* LOGS  */
-    CATALOGS = 431,                /* CATALOGS  */
-    CATALOG = 432,                 /* CATALOG  */
+    LOGS = 429,                    /* LOGS  */
+    CATALOGS = 430,                /* CATALOGS  */
+    CATALOG = 431,                 /* CATALOG  */
+    TASKS = 432,                   /* TASKS  */
     SEARCH = 433,                  /* SEARCH  */
     MATCH = 434,                   /* MATCH  */
     MAXSIM = 435,                  /* MAXSIM  */

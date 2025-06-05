@@ -64,6 +64,8 @@ public:
 
     Status GetTableID(const String &table_name, String &table_key, String &table_id_str);
 
+    Status GetTableName(const String &table_id_str, String &table_key, String &table_name);
+
     Status GetDatabaseInfo(DatabaseInfo &db_info);
 
     Tuple<String, Status> GetNextTableID();

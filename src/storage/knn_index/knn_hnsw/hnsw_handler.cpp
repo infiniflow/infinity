@@ -681,4 +681,8 @@ void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
     begin_row_id_ = RowID(segment_index_entry->segment_id(), 0);
 }
 
+const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
+    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};
+}
+
 } // namespace infinity

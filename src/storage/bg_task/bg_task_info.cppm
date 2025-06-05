@@ -14,37 +14,18 @@
 
 module;
 
-export module bottom_executor;
+export module bg_task_info;
 
 import stl;
-import blocking_queue;
+import third_party;
+//import global_resource_usage;
+import status;
 
 namespace infinity {
 
-class NewTxn;
+struct BGTaskInfo {
 
-// BottomExecutor has a pool of threads, and executes transactions of a same table with the same thread orderly.
-export class BottomExecutor {
-public:
-    BottomExecutor();
-    virtual ~BottomExecutor();
-
-    void Start(SizeT executor_size);
-    void Stop();
-
-    void Submit(NewTxn *txn);
-
-private:
-    void Process();
-
-private:
-    Atomic<bool> running_{true};
-    Vector<SharedPtr<BlockingQueue<NewTxn *>>> txn_queues_{};
-    Vector<Thread> executors_{};
-
-    SizeT cnt_{0};
-    std::mutex mutex_{};
-    std::condition_variable cv_{};
 };
 
-} // namespace infinity
+}
+

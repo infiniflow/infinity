@@ -52,7 +52,7 @@ enum class ShowStmtType {
     kIndexSegment,
     kIndexChunk,
     kLogs,
-    kDeltaLogs,
+    kTasks,
     kCatalogs,
     kCatalog,
     kCatalogToFile,

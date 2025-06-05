@@ -932,7 +932,8 @@ Value ColumnVector::GetValue(SizeT index) const {
         UnrecoverableError(error_message);
     }
     if (index >= tail_index_) {
-        String error_message = fmt::format("Attempt to access an invalid index of column vector: {}", std::to_string(index));
+        String error_message =
+            fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index_);
         UnrecoverableError(error_message);
     }
 

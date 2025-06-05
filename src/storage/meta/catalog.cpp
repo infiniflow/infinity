@@ -1274,26 +1274,16 @@ void Catalog::InitCompactionAlg(TxnTimeStamp system_start_ts) {
 
 void Catalog::MemIndexCommit() {
     NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    if (!new_txn_mgr) {
-        auto db_meta_map_guard = db_meta_map_.GetMetaMap();
-        for (auto &[_, db_meta] : *db_meta_map_guard) {
-            auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
-            if (status.ok()) {
-                db_entry->MemIndexCommit();
-            }
-        }
-    } else {
-        NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("mem index commit"), TransactionType::kNormal);
+    NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("mem index commit"), TransactionType::kNormal);
 
-        Status status = NewCatalog::MemIndexCommit(new_txn);
-        if (status.ok()) {
-            status = new_txn_mgr->CommitTxn(new_txn);
-        }
-        if (!status.ok()) {
-            Status status1 = new_txn_mgr->RollBackTxn(new_txn);
-            if (!status1.ok()) {
-                UnrecoverableError(fmt::format("Rollback mem index commit failed: {}", status1.message()));
-            }
+    Status status = NewCatalog::MemIndexCommit(new_txn);
+    if (status.ok()) {
+        status = new_txn_mgr->CommitTxn(new_txn);
+    }
+    if (!status.ok()) {
+        Status status1 = new_txn_mgr->RollBackTxn(new_txn);
+        if (!status1.ok()) {
+            UnrecoverableError(fmt::format("Rollback mem index commit failed: {}", status1.message()));
         }
     }
 }
