@@ -67,6 +67,7 @@ import persist_result_handler;
 import virtual_store;
 import local_file_handle;
 import mem_usage_change;
+import kv_store;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -315,7 +316,7 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
     return num_generated;
 }
 
-void MemoryIndexer::Dump(bool offline, bool spill) {
+void MemoryIndexer::Dump(KVInstance *kv_instance, bool offline, bool spill) {
     if (offline) {
         assert(!spill);
         while (GetInflightTasks() > 0) {
@@ -399,9 +400,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     file_handle->Sync();
     if (use_object_cache) {
         PersistResultHandler handler(pm);
-        PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
-        PersistWriteResult result2 = pm->Persist(dict_file, tmp_dict_file, false);
-        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
+        PersistWriteResult result1 = pm->Persist(kv_instance, posting_file, tmp_posting_file, false);
+        PersistWriteResult result2 = pm->Persist(kv_instance, dict_file, tmp_dict_file, false);
+        PersistWriteResult result3 = pm->Persist(kv_instance, column_length_file, tmp_column_length_file, false);
         handler.HandleWriteResult(result1);
         handler.HandleWriteResult(result2);
         handler.HandleWriteResult(result3);
@@ -629,9 +630,9 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     file_handle->Append(&unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     if (use_object_cache) {
         PersistResultHandler handler(pm);
-        PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
-        PersistWriteResult result2 = pm->Persist(dict_file, tmp_dict_file, false);
-        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
+        PersistWriteResult result1 = pm->Persist(nullptr, posting_file, tmp_posting_file, false);
+        PersistWriteResult result2 = pm->Persist(nullptr, dict_file, tmp_dict_file, false);
+        PersistWriteResult result3 = pm->Persist(nullptr, column_length_file, tmp_column_length_file, false);
         handler.HandleWriteResult(result1);
         handler.HandleWriteResult(result2);
         handler.HandleWriteResult(result3);

@@ -62,7 +62,7 @@ FileWorker::~FileWorker() {
 #endif
 }
 
-bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
+bool FileWorker::WriteToFile(KVInstance *kv_instance, bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         String error_message = "No data will be written.";
         UnrecoverableError(error_message);
@@ -90,7 +90,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         file_handle_->Sync();
 
         PersistResultHandler handler(persistence_manager_);
-        PersistWriteResult persist_result = persistence_manager_->Persist(write_path, tmp_write_path);
+        PersistWriteResult persist_result = persistence_manager_->Persist(kv_instance, write_path, tmp_write_path);
         handler.HandleWriteResult(persist_result);
 
         obj_addr_ = persist_result.obj_addr_;
@@ -145,7 +145,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     ReadFromFileImpl(file_size, from_spill);
 }
 
-void FileWorker::MoveFile() {
+void FileWorker::MoveFile(KVInstance *kv_instance) {
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
@@ -163,7 +163,7 @@ void FileWorker::MoveFile() {
         VirtualStore::Rename(src_path, dest_path);
     } else {
         PersistResultHandler handler(persistence_manager_);
-        PersistWriteResult persist_result = persistence_manager_->Persist(dest_path, src_path);
+        PersistWriteResult persist_result = persistence_manager_->Persist(kv_instance, dest_path, src_path);
         handler.HandleWriteResult(persist_result);
 
         obj_addr_ = persist_result.obj_addr_;
@@ -213,7 +213,7 @@ Status FileWorker::CleanupFile(KVInstance *kv_instance) const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-        PersistWriteResult result = persistence_manager_->Cleanup(path);
+        PersistWriteResult result = persistence_manager_->Cleanup(kv_instance, path);
         handler.HandleWriteResult(result);
         // Delete from RocksDB
         if (kv_instance != nullptr) {

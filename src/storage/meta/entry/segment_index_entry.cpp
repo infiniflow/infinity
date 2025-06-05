@@ -74,6 +74,7 @@ import infinity_context;
 import defer_op;
 import memory_indexer;
 import hnsw_lsg_builder;
+import kv_store;
 
 namespace infinity {
 
@@ -348,7 +349,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_indexer_.get() == nullptr) {
                 break;
             }
-            memory_indexer_->Dump(false, spill);
+            memory_indexer_->Dump(nullptr, false, spill);
             if (!spill) {
                 chunk_index_entry =
                     AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
@@ -496,7 +497,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                 memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), true);
                 memory_indexer_->Commit(true);
             }
-            memory_indexer_->Dump(true);
+            memory_indexer_->Dump(nullptr, true);
             dumped_memindex_entry =
                 AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
             this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());

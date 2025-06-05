@@ -6,6 +6,7 @@ import virtual_store;
 import third_party;
 import persist_result_handler;
 import local_file_handle;
+import kv_store;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -61,12 +62,12 @@ TEST_F(PersistenceManagerTest, PersistFileBasic) {
     String persist_str = "Persistence Manager Test";
     out_file << persist_str;
     out_file.close();
-    PersistWriteResult result = pm_->Persist(file_path, file_path);
+    PersistWriteResult result = pm_->Persist(nullptr, file_path, file_path);
     handler_->HandleWriteResult(result);
     const ObjAddr &obj_addr = result.obj_addr_;
     ASSERT_TRUE(obj_addr.Valid());
     ASSERT_EQ(obj_addr.part_size_, persist_str.size());
-    PersistWriteResult result2 = pm_->CurrentObjFinalize();
+    PersistWriteResult result2 = pm_->CurrentObjFinalize(nullptr);
     handler_->HandleWriteResult(result2);
 
     CheckObjData(file_path, persist_str);
@@ -86,7 +87,7 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
         file_paths.push_back(file_path);
         persist_strs.push_back(persist_str);
 
-        PersistWriteResult result = pm_->Persist(file_path, file_path);
+        PersistWriteResult result = pm_->Persist(nullptr, file_path, file_path);
         handler_->HandleWriteResult(result);
         const ObjAddr &obj_addr = result.obj_addr_;
         ASSERT_TRUE(obj_addr.Valid());
@@ -95,7 +96,7 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
     }
     ASSERT_EQ(file_paths.size(), persist_strs.size());
     ASSERT_EQ(file_paths.size(), obj_addrs.size());
-    PersistWriteResult result = pm_->CurrentObjFinalize();
+    PersistWriteResult result = pm_->CurrentObjFinalize(nullptr);
     handler_->HandleWriteResult(result);
 
     for (SizeT i = 0; i < file_paths.size(); ++i) {
@@ -121,7 +122,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
         persist_strs.push_back(persist_str);
 
         threads.emplace_back([this, file_path, persist_str, &obj_addrs, &obj_mutex]() {
-            PersistWriteResult result = pm_->Persist(file_path, file_path);
+            PersistWriteResult result = pm_->Persist(nullptr, file_path, file_path);
             handler_->HandleWriteResult(result);
             const ObjAddr &obj_addr = result.obj_addr_;
             ASSERT_TRUE(obj_addr.Valid());
@@ -135,7 +136,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
     }
     ASSERT_EQ(file_paths.size(), persist_strs.size());
     ASSERT_EQ(file_paths.size(), obj_addrs.size());
-    PersistWriteResult result = pm_->CurrentObjFinalize();
+    PersistWriteResult result = pm_->CurrentObjFinalize(nullptr);
     handler_->HandleWriteResult(result);
 
     for (SizeT i = 0; i < file_paths.size(); ++i) {
@@ -159,7 +160,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
         file_paths.push_back(file_path);
         persist_strs.push_back(persist_str);
 
-        PersistWriteResult result = pm_->Persist(file_path, file_path);
+        PersistWriteResult result = pm_->Persist(nullptr, file_path, file_path);
         handler_->HandleWriteResult(result);
         const ObjAddr &obj_addr = result.obj_addr_;
         ASSERT_TRUE(obj_addr.Valid());
@@ -169,7 +170,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
     }
     ASSERT_EQ(file_paths.size(), persist_strs.size());
     ASSERT_EQ(file_paths.size(), obj_addrs.size());
-    PersistWriteResult result = pm_->CurrentObjFinalize();
+    PersistWriteResult result = pm_->CurrentObjFinalize(nullptr);
     handler_->HandleWriteResult(result);
 
     for (SizeT i = 0; i < file_paths.size(); ++i) {
@@ -185,7 +186,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
     std::shuffle(file_paths.begin(), file_paths.end(), g);
 
     for (auto &file_path : file_paths) {
-        PersistWriteResult result = pm_->Cleanup(file_path);
+        PersistWriteResult result = pm_->Cleanup(nullptr, file_path);
         handler_->HandleWriteResult(result);
     }
     for (const auto &obj_path : obj_paths) {

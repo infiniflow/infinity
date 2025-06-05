@@ -126,7 +126,7 @@ struct NewTxnCompactState {
         return status;
     }
 
-    Status FinalizeBlock() {
+    Status FinalizeBlock(KVInstance *kv_instance) {
         if (block_meta_) {
             // Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
             // if (!status.ok()) {
@@ -143,9 +143,9 @@ struct NewTxnCompactState {
                 if (!status.ok()) {
                     return status;
                 }
-                buffer_obj->Save();
+                buffer_obj->Save(kv_instance);
                 if (outline_buffer_obj) {
-                    outline_buffer_obj->Save();
+                    outline_buffer_obj->Save(kv_instance);
                 }
             }
         }
@@ -154,8 +154,8 @@ struct NewTxnCompactState {
         return Status::OK();
     }
 
-    Status Finalize() {
-        Status status = FinalizeBlock();
+    Status Finalize(KVInstance *kv_instance) {
+        Status status = FinalizeBlock(kv_instance);
         if (!status.ok()) {
             return status;
         }
@@ -283,9 +283,9 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             //     }
             // }
 
-            buffer_obj->Save();
+            buffer_obj->Save(kv_instance_.get());
             if (outline_buffer_obj) {
-                outline_buffer_obj->Save();
+                outline_buffer_obj->Save(kv_instance_.get());
             }
         }
 
@@ -637,7 +637,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         }
         //        LOG_TRACE(fmt::format("Compact blocks of segment id: {}", segment_id));
     }
-    status = compact_state.Finalize();
+    status = compact_state.Finalize(kv_instance_.get());
     if (!status.ok()) {
         return status;
     }
@@ -1070,7 +1070,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
             }
             append_size = std::min(SizeT(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
-                status = compact_state.FinalizeBlock();
+                status = compact_state.FinalizeBlock(kv_instance_.get());
                 if (!status.ok()) {
                     return status;
                 }
@@ -1740,7 +1740,7 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
 
         block_version->CommitAppend(save_ts, commit_ts);
-        version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
+        version_buffer->Save(kv_instance_.get(), VersionFileWorkerSaveCtx(commit_ts));
 
         SharedPtr<BlockLock> block_lock;
         status = block_meta.GetBlockLock(block_lock);
@@ -1775,7 +1775,7 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         }
     }
 
-    version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
+    version_buffer->Save(kv_instance_.get(), VersionFileWorkerSaveCtx(save_ts));
     return Status::OK();
 }
 
@@ -1796,9 +1796,9 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         if (!status.ok()) {
             return status;
         }
-        buffer_obj->Save();
+        buffer_obj->Save(kv_instance_.get());
         if (outline_buffer_obj) {
-            outline_buffer_obj->Save();
+            outline_buffer_obj->Save(kv_instance_.get());
         }
     }
     return Status::OK();

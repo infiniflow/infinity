@@ -23,6 +23,7 @@ import global_resource_usage;
 import infinity_context;
 import persistence_manager;
 import default_values;
+import kv_store;
 
 using namespace infinity;
 
@@ -107,7 +108,7 @@ TEST_P(BufferHandleTest, test1) {
             EXPECT_EQ(data[i], (int)i);
         }
 
-        buf1->Save();
+        buf1->Save(nullptr);
     }
     {
         auto buf_handle2 = buf2->Load();

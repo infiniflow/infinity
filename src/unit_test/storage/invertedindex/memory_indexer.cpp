@@ -42,6 +42,7 @@ import segment_posting;
 import global_resource_usage;
 import infinity_context;
 import third_party;
+import kv_store;
 
 using namespace infinity;
 
@@ -130,7 +131,7 @@ TEST_P(MemoryIndexerTest, Insert) {
     MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(column_, 0, 1);
     indexer1.Insert(column_, 1, 3);
-    indexer1.Dump();
+    indexer1.Dump(nullptr);
 
     auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 4U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer2->Insert(column_, 4, 1);
@@ -153,7 +154,7 @@ TEST_P(MemoryIndexerTest, test2) {
     indexer1.Insert(column_, 0, 2, true);
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
-    indexer1.Dump(true);
+    indexer1.Dump(nullptr, true);
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
@@ -167,7 +168,7 @@ TEST_P(MemoryIndexerTest, test3) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
     MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(empty_column_, 0, 10, true);
-    indexer1.Dump(true);
+    indexer1.Dump(nullptr, true);
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
     fake_segment_index_entry_1->UpdateFulltextColumnLenInfo(indexer1.GetColumnLengthSum(), indexer1.GetDocCount());
 
@@ -185,7 +186,7 @@ TEST_P(MemoryIndexerTest, test4) {
     MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(empty_column_, 0, 5, true);
     indexer1.Insert(column_, 0, 5, true);
-    indexer1.Dump(true);
+    indexer1.Dump(nullptr, true);
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
     fake_segment_index_entry_1->UpdateFulltextColumnLenInfo(indexer1.GetColumnLengthSum(), indexer1.GetDocCount());
 
@@ -210,7 +211,7 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
         indexer1->CommitSync();
     }
 
-    indexer1->Dump(false, true);
+    indexer1->Dump(nullptr, false, true);
     UniquePtr<MemoryIndexer> loaded_indexer =
         MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
 

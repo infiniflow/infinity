@@ -67,6 +67,7 @@ import segment_meta;
 import block_meta;
 import column_meta;
 import new_catalog;
+import kv_store;
 
 using namespace infinity;
 
@@ -76,7 +77,7 @@ class BufferObjTest : public BaseTest {
     void TearDown() override { BaseTest::TearDown(); }
 
 public:
-    void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
+    void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(nullptr); };
 
     void WaitCleanup(Storage *storage) {
         auto cleanup_task = MakeShared<NewCleanupTask>();

@@ -207,8 +207,10 @@ TEST_P(TestTxnCleanup, test_cleanup_db) {
     }
     sleep(1); // Fix can't clean up issue
     {
+        new_txn_mgr_->PrintAllKeyValue();
         Status status = new_txn_mgr_->Cleanup();
         EXPECT_TRUE(status.ok());
+        new_txn_mgr_->PrintAllKeyValue();
     }
     this->CheckFilePaths();
 }

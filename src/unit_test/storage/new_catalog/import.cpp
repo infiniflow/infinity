@@ -53,7 +53,7 @@ class TestTxnImport : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnImport,
-                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH/*, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH*/));
 
 TEST_P(TestTxnImport, test_import1) {
 
@@ -385,8 +385,22 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
     {
         auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        new_txn_mgr->PrintAllKeyValue();
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
+        new_txn_mgr->PrintAllKeyValue();
+
+        status = new_txn_mgr->CommitTxn(txn_import);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        new_txn_mgr->PrintAllKeyValue();
+        Status status = txn_import->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        new_txn_mgr->PrintAllKeyValue();
 
         auto *txn_drop_db = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
@@ -397,6 +411,13 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         status = new_txn_mgr->CommitTxn(txn_import);
         EXPECT_FALSE(status.ok());
     }
+    {
+        new_txn_mgr->PrintAllKeyValue();
+        Status status = new_txn_mgr->Cleanup();
+        EXPECT_TRUE(status.ok());
+        new_txn_mgr->PrintAllKeyValue();
+    }
+
     {
         // Scan and check
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);

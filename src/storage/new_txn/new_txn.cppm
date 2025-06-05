@@ -115,6 +115,7 @@ struct SegmentInfo;
 struct BlockInfo;
 struct BlockColumnInfo;
 struct TableDetail;
+struct MetaKey;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -340,6 +341,8 @@ public:
     Status Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
+
+    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
 
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);

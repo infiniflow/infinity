@@ -461,8 +461,8 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 LOG_INFO(fmt::format("Cleaned chunk index entry, posting: {}, dictionary file: {}", posting_file, dict_file));
 
                 PersistResultHandler handler(pm);
-                PersistWriteResult result1 = pm->Cleanup(posting_file);
-                PersistWriteResult result2 = pm->Cleanup(dict_file);
+                PersistWriteResult result1 = pm->Cleanup(&kv_instance_, posting_file);
+                PersistWriteResult result2 = pm->Cleanup(&kv_instance_, dict_file);
 
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);

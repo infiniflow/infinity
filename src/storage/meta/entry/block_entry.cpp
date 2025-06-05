@@ -41,6 +41,7 @@ import infinity_context;
 import virtual_store;
 import snapshot_info;
 import wal_entry;
+import kv_store;
 
 namespace infinity {
 
@@ -575,7 +576,7 @@ bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts, bool check_commi
     bool flush_version = false;
     CheckFlush(checkpoint_ts, flush_column, flush_version, check_commit, false);
     if (flush_version) {
-        version_buffer_object_->Save(VersionFileWorkerSaveCtx(checkpoint_ts));
+        version_buffer_object_->Save(nullptr, VersionFileWorkerSaveCtx(checkpoint_ts));
     }
     return flush_column;
 }

@@ -158,7 +158,7 @@ bool BufferObj::Free() {
         }
         case BufferType::kEphemeral: {
             type_ = BufferType::kTemp;
-            bool all_save = file_worker_->WriteToFile(true);
+            bool all_save = file_worker_->WriteToFile(nullptr, true);
             if (!all_save) {
                 String error_message = fmt::format("Spill to file failed: {}", GetFilename());
                 UnrecoverableError(error_message);
@@ -176,7 +176,7 @@ bool BufferObj::Free() {
     return true;
 }
 
-bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
+bool BufferObj::Save(KVInstance *kv_instance, const FileWorkerSaveCtx &ctx) {
     bool write = false;
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kEphemeral) {
@@ -187,7 +187,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
-                bool all_save = file_worker_->WriteToFile(false, ctx);
+                bool all_save = file_worker_->WriteToFile(kv_instance, false, ctx);
                 if (all_save) {
                     type_ = BufferType::kPersistent;
                 }
@@ -196,7 +196,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
             }
             case BufferStatus::kFreed: {
                 LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
-                file_worker_->MoveFile();
+                file_worker_->MoveFile(kv_instance);
                 break;
             }
             default: {
@@ -207,7 +207,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     } else if (type_ == BufferType::kTemp) {
         LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
         buffer_mgr_->MoveTemp(this);
-        file_worker_->MoveFile();
+        file_worker_->MoveFile(kv_instance);
         type_ = BufferType::kPersistent;
     }
     return write;

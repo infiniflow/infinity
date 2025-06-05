@@ -32,6 +32,7 @@ import logical_type;
 import persistence_manager;
 import default_values;
 import local_file_handle;
+import kv_store;
 
 using namespace infinity;
 
@@ -91,7 +92,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            buffer_obj->Save(VersionFileWorkerSaveCtx(15));
+            buffer_obj->Save(nullptr, VersionFileWorkerSaveCtx(15));
         }
     }
     {
@@ -120,7 +121,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            buffer_obj->Save(VersionFileWorkerSaveCtx(35));
+            buffer_obj->Save(nullptr, VersionFileWorkerSaveCtx(35));
         }
     }
     {

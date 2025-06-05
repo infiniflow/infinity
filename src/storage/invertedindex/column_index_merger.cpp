@@ -32,6 +32,7 @@ import infinity_context;
 import defer_op;
 import utility;
 import persist_result_handler;
+import kv_store;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
@@ -158,9 +159,9 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     VirtualStore::DeleteFile(tmp_fst_file);
     if (use_object_cache) {
         PersistResultHandler handler(pm);
-        PersistWriteResult result1 = pm->Persist(dict_file, tmp_dict_file, false);
-        PersistWriteResult result2 = pm->Persist(posting_file, tmp_posting_file, false);
-        PersistWriteResult result3 = pm->Persist(column_length_file, tmp_column_length_file, false);
+        PersistWriteResult result1 = pm->Persist(nullptr, dict_file, tmp_dict_file, false);
+        PersistWriteResult result2 = pm->Persist(nullptr, posting_file, tmp_posting_file, false);
+        PersistWriteResult result3 = pm->Persist(nullptr, column_length_file, tmp_column_length_file, false);
         handler.HandleWriteResult(result1);
         handler.HandleWriteResult(result2);
         handler.HandleWriteResult(result3);

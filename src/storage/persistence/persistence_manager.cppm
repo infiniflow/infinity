@@ -75,10 +75,10 @@ public:
     // Create new object or append to current object, and returns the location.
     // file_path is the key of local_path_obj_ and may not exist. tmp_file_path is the file which contains the data to be persisted.
     // tmp_file_path will be deleted after its data be persisted.
-    [[nodiscard]] PersistWriteResult Persist(const String &file_path, const String &tmp_file_path, bool try_compose = true);
+    [[nodiscard]] PersistWriteResult Persist(KVInstance *kv_instance, const String &file_path, const String &tmp_file_path, bool try_compose = true);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
-    [[nodiscard]] PersistWriteResult CurrentObjFinalize(bool validate = false);
+    [[nodiscard]] PersistWriteResult CurrentObjFinalize(KVInstance *kv_instance, bool validate = false);
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     [[nodiscard]] PersistReadResult GetObjCache(const String &local_path);
@@ -91,7 +91,7 @@ public:
 
     [[nodiscard]] PersistWriteResult PutObjCache(const String &file_path);
 
-    [[nodiscard]] PersistWriteResult Cleanup(const String &file_path);
+    [[nodiscard]] PersistWriteResult Cleanup(KVInstance *kv_instance, const String &file_path);
 
     /**
      * Utils
@@ -117,10 +117,11 @@ private:
     void CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size);
 
     // Finalize current object.
-    void CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys);
+    void CurrentObjFinalizeNoLock(KVInstance *kv_instance, Vector<String> &persist_keys, Vector<String> &drop_keys);
 
     // Cleanup
-    void CleanupNoLock(const ObjAddr &object_addr,
+    void CleanupNoLock(KVInstance *kv_instance,
+                       const ObjAddr &object_addr,
                        Vector<String> &persist_keys,
                        Vector<String> &drop_keys,
                        Vector<String> &drop_from_remote_keys,
@@ -139,6 +140,8 @@ private:
     void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
 
     void AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr);
+
+    void AddObjAddrToKVInstance(KVInstance *kv_instance, const String &path, const ObjAddr &obj_addr);
 
     String workspace_;
     String local_data_dir_;

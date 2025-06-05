@@ -43,11 +43,11 @@ public:
     virtual ~FileWorker();
 
 public:
-    [[nodiscard]] bool WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx = {});
+    [[nodiscard]] bool WriteToFile(KVInstance *kv_instance , bool to_spill, const FileWorkerSaveCtx &ctx = {});
 
     void ReadFromFile(bool from_spill);
 
-    void MoveFile();
+    void MoveFile(KVInstance *kv_instance);
 
     virtual void AllocateInMemory() = 0;
 

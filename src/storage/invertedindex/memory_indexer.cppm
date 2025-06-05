@@ -41,6 +41,7 @@ import table_index_entry;
 import mem_usage_change;
 
 namespace infinity {
+class KVInstance;
 
 export class MemoryIndexer final : public BaseMemIndex {
 public:
@@ -85,7 +86,7 @@ public:
 
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
-    void Dump(bool offline = false, bool spill = false);
+    void Dump(KVInstance *kv_instance, bool offline = false, bool spill = false);
 
     // A MemoryIndexer is allow to load iff it's empty or spilled.
     void Load();

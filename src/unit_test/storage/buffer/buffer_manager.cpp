@@ -132,7 +132,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
         {
             SizeT write_n = 0;
             for (auto *buffer_obj : buffer_objs) {
-                if (buffer_obj->Save()) {
+                if (buffer_obj->Save(nullptr)) {
                     ++write_n;
                 }
             }
@@ -160,7 +160,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
             SizeT write_n = 0;
             for (SizeT i = 0; i < file_num1; ++i) {
                 auto *buffer_obj = buffer_objs[i];
-                bool write = buffer_obj->Save();
+                bool write = buffer_obj->Save(nullptr);
                 if (write) {
                     ++write_n;
                 }
@@ -180,7 +180,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
                     data[j] = 'A' + (i + j) % 26;
                 }
             }
-            buffer_obj->Save();
+            buffer_obj->Save(nullptr);
         }
         CheckFileNum(file_num, file_num - file_num1);
         buffer_mgr.RemoveClean(nullptr);
@@ -334,7 +334,7 @@ protected:
                 }
                 test_obj->Write(file_info);
                 if (op == 1) {
-                    buffer_obj->Save();
+                    buffer_obj->Save(nullptr);
                 }
                 ++visit_cnt;
                 if (visit_cnt == (test_i + 1) * loop_n) {

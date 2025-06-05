@@ -102,7 +102,7 @@ public:
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
-    bool Save(const FileWorkerSaveCtx &ctx = {});
+    bool Save(KVInstance *kv_instance, const FileWorkerSaveCtx &ctx = {});
 
     void PickForCleanup();
 

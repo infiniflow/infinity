@@ -759,7 +759,7 @@ void NewTxnStore::PrepareCommit1() {
         PersistenceManager *pm = InfinityContext::instance().persistence_manager();
         if (pm != nullptr) {
             PersistResultHandler handler(pm);
-            PersistWriteResult result = pm->CurrentObjFinalize(true);
+            PersistWriteResult result = pm->CurrentObjFinalize(nullptr, true);
             handler.HandleWriteResult(result);
         }
         LOG_TRACE("Finalize current object to ensure PersistenceManager be in a consistent state");

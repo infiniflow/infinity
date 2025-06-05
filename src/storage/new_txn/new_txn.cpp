@@ -1004,7 +1004,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize(true);
+        PersistWriteResult result = pm->CurrentObjFinalize(kv_instance_.get(), true);
         handler.HandleWriteResult(result);
     }
 
@@ -3691,60 +3691,68 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
                 import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
             }
-
-            if (import_txn_store->index_names_.size() > 0) {
+            Vector<UniquePtr<MetaKey>> metas;
+            auto index_names_size = import_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
-
-                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
-
+                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[i];
                 auto db_id_str = import_txn_store->db_id_str_;
                 auto table_id_str = import_txn_store->table_id_str_;
-                auto index_id_str = import_txn_store->index_ids_str_[0];
+                auto index_id_str = import_txn_store->index_ids_str_[i];
 
-                TableMeeta table_meta{db_id_str, table_id_str, *kv_instance_, BeginTS(), CommitTS()};
-                TableIndexMeeta table_index_meta{index_id_str, table_meta};
-                SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
-                ChunkIndexMeta chunk_index_meta{chunk_id, segment_index_meta};
+                const Vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
+                for (SegmentID segment_id : segment_ids) {
+                    metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                }
 
-                BufferObj *buffer_obj;
-                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-                status = buffer_obj->CleanupFile(kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
+                auto key = KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id);
+                metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
             }
-            break;
+
+            CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            return Status::OK();
         }
         case TransactionType::kCompact: {
+            // CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+            //
+            // if (compact_txn_store->index_names_.size() > 0) {
+            //     // Restore memory index here
+            //     auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
+            //     auto db_id_str = compact_txn_store->db_id_str_;
+            //     auto table_id_str = compact_txn_store->table_id_str_;
+            //     auto index_id_str = compact_txn_store->index_ids_str_[0];
+            //
+            //     // for (SegmentID segment_id : deprecated_ids) {
+            //     auto ts_str = std::to_string(CommitTS());
+            //     kv_instance_->Put(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), ts_str);
+            //     // }
+            //
+            //     kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
+            // }
+            // break;
+
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
 
-            if (compact_txn_store->index_names_.size() > 0) {
+            Vector<UniquePtr<MetaKey>> metas;
+            auto index_names_size = compact_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
-                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[0];
-
+                auto &[db_id, table_id, segment_id, chunk_id] = chunk_infos_[i];
                 auto db_id_str = compact_txn_store->db_id_str_;
                 auto table_id_str = compact_txn_store->table_id_str_;
-                auto index_id_str = compact_txn_store->index_ids_str_[0];
+                auto index_id_str = compact_txn_store->index_ids_str_[i];
 
-                TableMeeta table_meta{db_id_str, table_id_str, *kv_instance_, BeginTS(), CommitTS()};
-                TableIndexMeeta table_index_meta{index_id_str, table_meta};
-                SegmentIndexMeta segment_index_meta{segment_id, table_index_meta};
-                ChunkIndexMeta chunk_index_meta{chunk_id, segment_index_meta};
+                const Vector<SegmentID> &segment_ids = compact_txn_store->segment_ids_;
+                for (SegmentID segment_id : segment_ids) {
+                    metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                }
 
-                BufferObj *buffer_obj;
-                Status status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-                status = buffer_obj->CleanupFile(kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
-                }
+                auto key = KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id);
+                metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
             }
-            break;
+
+            CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            return Status::OK();
         }
         case TransactionType::kCreateIndex: {
             break;
@@ -3924,13 +3932,17 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
 }
 
 Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
-    TxnTimeStamp begin_ts = ts;
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<UniquePtr<MetaKey>> metas;
     new_catalog->GetCleanedMeta(ts, metas, kv_instance);
 
+    return CleanupImpl(ts, kv_instance, std::move(metas));
+}
+
+Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas) {
+    TxnTimeStamp begin_ts = ts;
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {

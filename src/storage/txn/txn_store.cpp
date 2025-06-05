@@ -43,6 +43,7 @@ import create_index_info;
 import persistence_manager;
 import infinity_context;
 import persist_result_handler;
+import kv_store;
 
 namespace infinity {
 
@@ -758,7 +759,7 @@ void TxnStore::PrepareCommit1() {
         PersistenceManager *pm = InfinityContext::instance().persistence_manager();
         if (pm != nullptr) {
             PersistResultHandler handler(pm);
-            PersistWriteResult result = pm->CurrentObjFinalize(true);
+            PersistWriteResult result = pm->CurrentObjFinalize(nullptr, true);
             handler.HandleWriteResult(result);
         }
         LOG_TRACE("Finalize current object to ensure PersistenceManager be in a consistent state");

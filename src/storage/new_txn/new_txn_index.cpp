@@ -488,7 +488,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    buffer_obj->Save();
+    buffer_obj->Save(kv_instance_.get());
     if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP) {
         if (buffer_obj->type() != BufferType::kMmap) {
             buffer_obj->ToMmap();
@@ -1193,7 +1193,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
     }
-    buffer_obj->Save();
+    buffer_obj->Save(kv_instance_.get());
     return Status::OK();
 }
 
@@ -1244,7 +1244,7 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
         auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
     }
-    buffer_obj->Save();
+    buffer_obj->Save(kv_instance_.get());
     return Status::OK();
 }
 
@@ -1676,11 +1676,11 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             memory_secondary_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(kv_instance_.get());
             break;
         }
         case IndexType::kFullText: {
-            memory_indexer->Dump(false /*offline*/, false /*spill*/);
+            memory_indexer->Dump(kv_instance_.get(), false /*offline*/, false /*spill*/);
             u64 len_sum = mem_index->memory_indexer_->GetColumnLengthSum();
             u32 len_cnt = mem_index->memory_indexer_->GetDocCount();
             Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
@@ -1691,12 +1691,12 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
         }
         case IndexType::kIVF: {
             memory_ivf_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(kv_instance_.get());
             break;
         }
         case IndexType::kHnsw: {
             memory_hnsw_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(kv_instance_.get());
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
             }
@@ -1704,7 +1704,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
         }
         case IndexType::kBMP: {
             memory_bmp_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(kv_instance_.get());
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
             }
@@ -1712,7 +1712,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID
         }
         case IndexType::kEMVB: {
             memory_emvb_index->Dump(buffer_obj);
-            buffer_obj->Save();
+            buffer_obj->Save(kv_instance_.get());
             break;
         }
         default: {

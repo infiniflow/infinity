@@ -38,6 +38,7 @@ import data_type;
 import logical_type;
 import infinity_context;
 import meta_info;
+import kv_store;
 
 namespace infinity {
 
@@ -283,7 +284,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case LogicalType::kRowID: {
             //            SizeT buffer_size = row_count * column_type->Size();
             LOG_TRACE(fmt::format("Saving {}", block_column_entry->column_id()));
-            block_column_entry->buffer_->Save();
+            block_column_entry->buffer_->Save(nullptr);
             LOG_TRACE(fmt::format("Saved {}", block_column_entry->column_id()));
 
             break;
@@ -296,13 +297,13 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case LogicalType::kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
             LOG_TRACE(fmt::format("Saving column {}", block_column_entry->column_id()));
-            block_column_entry->buffer_->Save();
+            block_column_entry->buffer_->Save(nullptr);
             LOG_TRACE(fmt::format("Saved column {}", block_column_entry->column_id()));
 
             std::shared_lock lock(block_column_entry->mutex_);
             for (auto &outline_buffer : block_column_entry->outline_buffers_) {
                 if (outline_buffer != nullptr) {
-                    outline_buffer->Save();
+                    outline_buffer->Save(nullptr);
                 }
             }
             break;

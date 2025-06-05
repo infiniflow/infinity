@@ -48,6 +48,7 @@ import infinity_context;
 import persistence_manager;
 import persist_result_handler;
 import snapshot_info;
+import kv_store;
 
 namespace infinity {
 
@@ -422,8 +423,8 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
             LOG_INFO(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
 
             PersistResultHandler handler(pm);
-            PersistWriteResult result1 = pm->Cleanup(posting_file);
-            PersistWriteResult result2 = pm->Cleanup(dict_file);
+            PersistWriteResult result1 = pm->Cleanup(nullptr, posting_file);
+            PersistWriteResult result2 = pm->Cleanup(nullptr, dict_file);
             handler.HandleWriteResult(result1);
             handler.HandleWriteResult(result2);
 
@@ -461,7 +462,7 @@ void ChunkIndexEntry::SaveIndexFile() {
     if (buffer_obj_->type() == BufferType::kMmap) {
         return;
     }
-    buffer_obj_->Save();
+    buffer_obj_->Save(nullptr);
     switch (segment_index_entry_->table_index_entry()->index_base()->index_type_) {
         case IndexType::kHnsw:
         case IndexType::kBMP: {

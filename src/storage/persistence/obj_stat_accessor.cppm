@@ -87,11 +87,11 @@ public:
 
     virtual ObjStat *Release(const String &key, Vector<String> &drop_keys) = 0;
 
-    virtual void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) = 0;
+    virtual void PutNew(KVInstance *kv_instance, const String &key, ObjStat obj_stat, Vector<String> &drop_keys) = 0;
 
-    virtual void PutNoCount(const String &key, ObjStat obj_stat) = 0;
+    virtual void PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) = 0;
 
-    virtual Optional<ObjStat> Invalidate(const String &key) = 0;
+    virtual Optional<ObjStat> Invalidate(KVInstance *kv_instance, const String &key) = 0;
 
     virtual void CheckValid(SizeT current_object_size) = 0;
 
@@ -106,7 +106,11 @@ public:
 protected:
     void AddObjStatToKVStore(const String &key, const ObjStat &obj_stat);
 
+    void AddObjStatToKVInstance(KVInstance *kv_instance, const String &key, const ObjStat &obj_stat);
+
     void RemoveObjStatFromKVStore(const String &key);
+
+    void RemoveObjStatFromKVInstance(KVInstance *kv_instance, const String &key);
 };
 
 export class ObjectStatAccessor_LocalStorage : public ObjectStatAccessorBase {
@@ -119,11 +123,11 @@ public:
 
     ObjStat *Release(const String &key, Vector<String> &drop_keys) override;
 
-    void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
+    void PutNew(KVInstance *kv_instance, const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
 
-    void PutNoCount(const String &key, ObjStat obj_stat) override;
+    void PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) override;
 
-    Optional<ObjStat> Invalidate(const String &key) override;
+    Optional<ObjStat> Invalidate(KVInstance *kv_instance, const String &key) override;
 
     void CheckValid(SizeT current_object_size) override;
 
@@ -152,11 +156,11 @@ public:
 
     ObjStat *Release(const String &key, Vector<String> &drop_keys) override;
 
-    void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
+    void PutNew(KVInstance *kv_instance, const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
 
-    void PutNoCount(const String &key, ObjStat obj_stat) override;
+    void PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) override;
 
-    Optional<ObjStat> Invalidate(const String &key) override;
+    Optional<ObjStat> Invalidate(KVInstance *kv_instance, const String &key) override;
 
     void CheckValid(SizeT current_object_size) override;
 

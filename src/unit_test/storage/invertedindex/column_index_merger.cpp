@@ -28,6 +28,7 @@ import third_party;
 import random;
 import global_resource_usage;
 import infinity_context;
+import kv_store;
 
 using namespace infinity;
 class ColumnIndexMergerTest : public BaseTestParamStr {
@@ -95,7 +96,7 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String> &paragraphs,
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
         MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard", nullptr);
         indexer.Insert(column, row_offsets[i], row_counts[i]);
-        indexer.Dump();
+        indexer.Dump(nullptr);
     }
 }
 

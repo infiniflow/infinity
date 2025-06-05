@@ -104,7 +104,7 @@ PersistenceManager::~PersistenceManager() {
 #endif
 }
 
-PersistWriteResult PersistenceManager::Persist(const String &file_path, const String &tmp_file_path, bool try_compose) {
+PersistWriteResult PersistenceManager::Persist(KVInstance *kv_instance, const String &file_path, const String &tmp_file_path, bool try_compose) {
     PersistWriteResult result;
 
     std::error_code ec;
@@ -118,14 +118,13 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     {
         // Cleanup the file if it already exists in the local_path_obj_
         std::lock_guard<std::mutex> lock(mtx_);
-        auto it = local_path_obj_.find(local_path);
-        if (it != local_path_obj_.end()) {
-            CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_);
+        if (local_path_obj_.contains(local_path)) {
+            CleanupNoLock(kv_instance, local_path_obj_[local_path], result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_);
             LOG_TRACE(fmt::format("Persist deleted mapping from local path {} to ObjAddr({}, {}, {})",
                                   local_path,
-                                  it->second.obj_key_,
-                                  it->second.part_offset_,
-                                  it->second.part_size_));
+                                  local_path_obj_[local_path].obj_key_,
+                                  local_path_obj_[local_path].part_offset_,
+                                  local_path_obj_[local_path].part_size_));
         }
     }
 
@@ -159,12 +158,15 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_->PutNew(obj_key, ObjStat(src_size, 1, 0), result.drop_keys_);
+        objects_->PutNew(kv_instance, obj_key, ObjStat(src_size, 1, 0), result.drop_keys_);
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         local_path_obj_[local_path] = obj_addr;
-        AddObjAddrToKVStore(file_path, obj_addr);
-
+        if (kv_instance) {
+            AddObjAddrToKVInstance(kv_instance, file_path, obj_addr);
+        } else {
+            AddObjAddrToKVStore(file_path, obj_addr);
+        }
         LOG_TRACE(fmt::format("Persist local path {} to dedicated ObjAddr ({}, {}, {})",
                               local_path,
                               obj_addr.obj_key_,
@@ -176,7 +178,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     }
     std::lock_guard<std::mutex> lock(mtx_);
     if (int(src_size) >= CurrentObjRoomNoLock()) {
-        CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
+        CurrentObjFinalizeNoLock(kv_instance, result.persist_keys_, result.drop_keys_);
     }
     current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
     ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
@@ -188,8 +190,11 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
     }
 
     local_path_obj_[local_path] = obj_addr;
-    AddObjAddrToKVStore(file_path, obj_addr);
-
+    if (kv_instance) {
+        AddObjAddrToKVInstance(kv_instance, file_path, obj_addr);
+    } else {
+        AddObjAddrToKVStore(file_path, obj_addr);
+    }
     LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
                           local_path,
                           obj_addr.obj_key_,
@@ -201,10 +206,10 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
 
 // TODO:
 // - Upload the finalized object to object store in background.
-PersistWriteResult PersistenceManager::CurrentObjFinalize(bool validate) {
+PersistWriteResult PersistenceManager::CurrentObjFinalize(KVInstance *kv_instance, bool validate) {
     PersistWriteResult result;
     std::lock_guard<std::mutex> lock(mtx_);
-    CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
+    CurrentObjFinalizeNoLock(kv_instance, result.persist_keys_, result.drop_keys_);
 
     if (validate) {
         CheckValid();
@@ -227,7 +232,7 @@ void PersistenceManager::CheckValid() {
     objects_->CheckValid(current_object_size_);
 }
 
-void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, Vector<String> &drop_keys) {
+void PersistenceManager::CurrentObjFinalizeNoLock(KVInstance *kv_instance, Vector<String> &persist_keys, Vector<String> &drop_keys) {
     if (current_object_size_ > 0) {
         persist_keys.push_back(current_object_key_);
         if (current_object_parts_ > 1) {
@@ -244,12 +249,15 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, 
             outFile.close();
         }
 
-        objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_), drop_keys);
+        objects_->PutNew(kv_instance,
+                         current_object_key_,
+                         ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_),
+                         drop_keys);
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
-        current_object_size_ = 0;
-        current_object_parts_ = 0;
-        current_object_ref_count_ = 0;
+        // current_object_size_ = 0;
+        // current_object_parts_ = 0;
+        // current_object_ref_count_ = 0;
     } else {
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
     }
@@ -423,7 +431,8 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     dstFile.close();
 }
 
-void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
+void PersistenceManager::CleanupNoLock(KVInstance *kv_instance,
+                                       const ObjAddr &object_addr,
                                        Vector<String> &persist_keys,
                                        Vector<String> &drop_keys,
                                        Vector<String> &drop_from_remote_keys,
@@ -434,7 +443,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             assert(object_addr.part_size_ == 0);
             return;
         } else if (object_addr.obj_key_ == current_object_key_) {
-            CurrentObjFinalizeNoLock(persist_keys, drop_keys);
+            CurrentObjFinalizeNoLock(kv_instance, persist_keys, drop_keys);
             obj_stat = objects_->GetNoCount(object_addr.obj_key_);
             assert(obj_stat != nullptr);
         } else {
@@ -514,10 +523,10 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             }
         }
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
-        objects_->Invalidate(object_addr.obj_key_);
+        objects_->Invalidate(kv_instance, object_addr.obj_key_);
         LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     } else {
-        objects_->PutNoCount(object_addr.obj_key_, *obj_stat);
+        objects_->PutNoCount(kv_instance, object_addr.obj_key_, *obj_stat);
     }
 }
 
@@ -558,7 +567,7 @@ void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &o
 
 void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat) {
     std::lock_guard<std::mutex> lock(mtx_);
-    objects_->PutNoCount(obj_addr.obj_key_, obj_stat);
+    objects_->PutNoCount(nullptr, obj_addr.obj_key_, obj_stat);
 }
 
 void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr) {
@@ -578,6 +587,18 @@ void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &
     }
 }
 
+void PersistenceManager::AddObjAddrToKVInstance(KVInstance *kv_instance, const String &path, const ObjAddr &obj_addr) {
+    if (!kv_instance) {
+        return;
+    }
+    String key = KeyEncode::PMObjectKey(RemovePrefix(path));
+    String value = obj_addr.Serialize().dump();
+    Status status = kv_instance->Put(key, value);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
 String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
@@ -588,7 +609,7 @@ String PersistenceManager::RemovePrefix(const String &path) {
     return "";
 }
 
-PersistWriteResult PersistenceManager::Cleanup(const String &file_path) {
+PersistWriteResult PersistenceManager::Cleanup(KVInstance *kv_instance, const String &file_path) {
     PersistWriteResult result;
 
     String local_path = RemovePrefix(file_path);
@@ -604,7 +625,7 @@ PersistWriteResult PersistenceManager::Cleanup(const String &file_path) {
         LOG_WARN(error_message);
         return result;
     }
-    CleanupNoLock(it->second, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_, true);
+    CleanupNoLock(kv_instance, it->second, result.persist_keys_, result.drop_keys_, result.drop_from_remote_keys_, true);
     LOG_TRACE(fmt::format("Deleted mapping from local path {} to ObjAddr({}, {}, {})",
                           local_path,
                           it->second.obj_key_,

@@ -47,6 +47,16 @@ void ObjectStatAccessorBase::AddObjStatToKVStore(const String &key, const ObjSta
     }
 }
 
+void ObjectStatAccessorBase::AddObjStatToKVInstance(KVInstance *kv_instance, const String &key, const ObjStat &obj_stat) {
+    if (!kv_instance) {
+        return;
+    }
+    Status status = kv_instance->Put(KeyEncode::PMObjectStatKey(key), obj_stat.ToString());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
 void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const String &key) {
     Storage *storage = InfinityContext::instance().storage();
     if (!storage) {
@@ -61,7 +71,15 @@ void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const String &key) {
         UnrecoverableError(status.message());
     }
 }
-
+void ObjectStatAccessorBase::RemoveObjStatFromKVInstance(KVInstance *kv_instance, const String &key) {
+    if (!kv_instance) {
+        return;
+    }
+    Status status = kv_instance->Delete(KeyEncode::PMObjectStatKey(key));
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
 // ObjectStatMap
 
 ObjectStatMap::~ObjectStatMap() {
@@ -207,20 +225,18 @@ ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
 }
 
 ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
+    if (!obj_map_.contains(key)) {
         return nullptr;
     }
-    ObjStat *obj_stat = &map_iter->second;
+    ObjStat *obj_stat = &obj_map_[key];
     return obj_stat;
 }
 
 ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<String> &) {
-    auto map_iter = obj_map_.find(key);
-    if (map_iter == obj_map_.end()) {
+    if (!obj_map_.contains(key)) {
         return nullptr;
     }
-    ObjStat *obj_stat = &map_iter->second;
+    ObjStat *obj_stat = &obj_map_[key];
     if (obj_stat->ref_count_ <= 0) {
         UnrecoverableError(fmt::format("Release object {} ref count is {}", key, obj_stat->ref_count_));
     }
@@ -228,9 +244,12 @@ ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<Stri
     return obj_stat;
 }
 
-void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &) {
-    this->AddObjStatToKVStore(key, obj_stat);
-
+void ObjectStatAccessor_LocalStorage::PutNew(KVInstance *kv_instance, const String &key, ObjStat obj_stat, Vector<String> &) {
+    if (kv_instance) {
+        this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
+    } else {
+        this->AddObjStatToKVStore(key, obj_stat);
+    }
     auto map_iter = obj_map_.find(key);
     if (map_iter != obj_map_.end()) {
         UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
@@ -239,18 +258,21 @@ void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat
     obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
 }
 
-void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_stat) {
+void ObjectStatAccessor_LocalStorage::PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) {
     obj_stat.cached_ = ObjCached::kCached;
 
-    this->AddObjStatToKVStore(key, obj_stat);
-
+    if (kv_instance) {
+        this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
+    } else {
+        this->AddObjStatToKVStore(key, obj_stat);
+    }
     auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
     if (!insert_ok) {
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
     }
 }
 
-Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key) {
+Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(KVInstance *kv_instance, const String &key) {
     auto iter = obj_map_.find(key);
     if (iter == obj_map_.end()) {
         return None;
@@ -258,7 +280,11 @@ Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key)
     ObjStat obj_stat = std::move(iter->second);
     obj_map_.erase(iter);
 
-    this->RemoveObjStatFromKVStore(key);
+    if (kv_instance) {
+        this->RemoveObjStatFromKVInstance(kv_instance, key);
+    } else {
+        this->RemoveObjStatFromKVStore(key);
+    }
     return obj_stat;
 }
 
@@ -348,9 +374,12 @@ ObjStat *ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<Str
     return obj_stat;
 }
 
-void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
-    this->AddObjStatToKVStore(key, obj_stat);
-
+void ObjectStatAccessor_ObjectStorage::PutNew(KVInstance *kv_instance, const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
+    if (kv_instance) {
+        this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
+    } else {
+        this->AddObjStatToKVStore(key, obj_stat);
+    }
     obj_map_.PutNew(key, std::move(obj_stat));
     disk_used_ += obj_stat.obj_size_;
     if (disk_used_ > disk_capacity_limit_) {
@@ -358,20 +387,27 @@ void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_sta
     }
 }
 
-void ObjectStatAccessor_ObjectStorage::PutNoCount(const String &key, ObjStat obj_stat) {
-    this->AddObjStatToKVStore(key, obj_stat);
-
+void ObjectStatAccessor_ObjectStorage::PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) {
+    if (kv_instance) {
+        this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
+    } else {
+        this->AddObjStatToKVStore(key, obj_stat);
+    }
     obj_map_.PutNew(key, std::move(obj_stat));
 }
 
-Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const String &key) {
+Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(KVInstance *kv_instance, const String &key) {
     Optional<ObjStat> obj_stat = obj_map_.Invalidate(key);
     if (!obj_stat.has_value()) {
         return None;
     }
     disk_used_ -= obj_stat->obj_size_;
 
-    this->RemoveObjStatFromKVStore(key);
+    if (kv_instance) {
+        this->RemoveObjStatFromKVInstance(kv_instance, key);
+    } else {
+        this->RemoveObjStatFromKVStore(key);
+    }
     return obj_stat;
 }
 
