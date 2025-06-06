@@ -14,7 +14,7 @@
 
 module;
 
-export module mem_index_process;
+export module dump_index_process;
 
 import stl;
 import bg_task_type;
@@ -28,10 +28,10 @@ class NewTxn;
 class BGTask;
 class DumpIndexTask;
 
-export class MemIndexProcessor {
+export class DumpIndexProcessor {
 public:
-    MemIndexProcessor();
-    ~MemIndexProcessor();
+    DumpIndexProcessor();
+    ~DumpIndexProcessor();
 
     void Start();
 
@@ -49,7 +49,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_{"MemIndexProcessor"};
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"DumpIndexProcessor"};
 
     Thread processor_thread_{};
 

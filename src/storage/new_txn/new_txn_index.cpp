@@ -70,6 +70,8 @@ import base_txn_store;
 import kv_code;
 import buffer_handle;
 import segment_entry;
+import bg_task;
+import dump_index_process;
 
 namespace infinity {
 
@@ -834,6 +836,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     txn_store()->AddSemaphore(std::move(sema));
                 } else {
                     mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
+                    // auto *mem_index_processor = InfinityContext::instance().storage()->mem_index_processor();
+                    // SharedPtr<AppendMemIndexTask> append_mem_index_task = MakeShared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
+                    // mem_index_processor->Submit(append_mem_index_task);
                 }
             }
             if (need_to_update_ft_segment_ts) {

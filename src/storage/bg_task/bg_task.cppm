@@ -24,6 +24,8 @@ import bg_task_type;
 
 namespace infinity {
 
+struct MemIndex;
+struct ColumnVector;
 class BaseMemIndex;
 struct ChunkIndexEntry;
 class NewTxn;
@@ -148,6 +150,21 @@ public:
 public:
     BaseMemIndex *mem_index_{};
     NewTxn *new_txn_{};
+};
+
+export class AppendMemIndexTask final : public BGTask {
+public:
+    AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index, const SharedPtr<ColumnVector> &input_column, BlockOffset offset, BlockOffset row_cnt);
+
+    ~AppendMemIndexTask() override = default;
+
+    String ToString() const override { return "AppendMemIndexTask"; }
+
+public:
+    SharedPtr<MemIndex> mem_index_{};
+    SharedPtr<ColumnVector> input_column_{};
+    BlockOffset offset_{};
+    BlockOffset row_cnt_{};
 };
 
 export class TestCommandTask final : public BGTask {

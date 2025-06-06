@@ -16,7 +16,7 @@ module;
 
 #include <thread>
 
-module mem_index_process;
+module dump_index_process;
 
 import stl;
 import bg_task;
@@ -32,27 +32,30 @@ import global_resource_usage;
 
 import new_txn_manager;
 import new_txn;
+import column_vector;
+import mem_index;
+import memory_indexer;
 
 namespace infinity {
 
-MemIndexProcessor::MemIndexProcessor() {
+DumpIndexProcessor::DumpIndexProcessor() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("MemIndexProcessor");
+    GlobalResourceUsage::IncrObjectCount("DumpIndexProcessor");
 #endif
 }
 
-MemIndexProcessor::~MemIndexProcessor() {
+DumpIndexProcessor::~DumpIndexProcessor() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("MemIndexProcessor");
+    GlobalResourceUsage::DecrObjectCount("DumpIndexProcessor");
 #endif
 }
 
-void MemIndexProcessor::Start() {
+void DumpIndexProcessor::Start() {
     LOG_INFO("Compaction processor is started.");
     processor_thread_ = Thread([this] { Process(); });
 }
 
-void MemIndexProcessor::Stop() {
+void DumpIndexProcessor::Stop() {
     LOG_INFO("Compaction processor is stopping.");
     SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
     this->Submit(stop_task);
@@ -61,12 +64,12 @@ void MemIndexProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void MemIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
+void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
     task_queue_.Enqueue(std::move(bg_task));
     ++task_count_;
 }
 
-void MemIndexProcessor::DoDump(DumpIndexTask *dump_task) {
+void DumpIndexProcessor::DoDump(DumpIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     NewTxn *new_txn = dump_task->new_txn_;
@@ -89,7 +92,7 @@ void MemIndexProcessor::DoDump(DumpIndexTask *dump_task) {
     return;
 }
 
-void MemIndexProcessor::Process() {
+void DumpIndexProcessor::Process() {
     bool running = true;
     while (running) {
         Deque<SharedPtr<BGTask>> tasks;

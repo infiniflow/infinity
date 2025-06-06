@@ -59,6 +59,10 @@ String ToString(BGTaskType type) {
             return "DumpIndex";
             break;
         }
+        case BGTaskType::kAppendMemIndex: {
+            return "AppendMemIndex";
+            break;
+        }
         case BGTaskType::kTestCommand: {
             return "TestCommand";
             break;
