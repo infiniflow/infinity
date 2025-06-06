@@ -43,6 +43,8 @@ import chunk_index_meta;
 
 namespace infinity {
 
+struct AppendMemIndexBatch;
+
 export class MemoryIndexer final : public BaseMemIndex {
 public:
     void ApplyMemUseChange(MemUsageChange mem_change);
@@ -71,6 +73,8 @@ public:
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
+
+    void AsyncInsert(const SharedPtr<ColumnVector> &column_vector, u32 row_offset, u32 row_count, AppendMemIndexBatch *append_batch);
 
     UniquePtr<std::binary_semaphore> AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count);
 

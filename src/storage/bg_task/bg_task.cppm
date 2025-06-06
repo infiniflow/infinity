@@ -167,6 +167,16 @@ public:
     BlockOffset row_cnt_{};
 };
 
+export struct AppendMemIndexBatch {
+    void InsertTask(AppendMemIndexTask *);
+    void WaitForCompletion();
+
+    Vector<AppendMemIndexTask *> append_tasks_{};
+    u64 task_count_{};
+    mutable std::mutex mtx_{};
+    std::condition_variable cv_{};
+};
+
 export class TestCommandTask final : public BGTask {
 public:
     TestCommandTask(String command_content);
