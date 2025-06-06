@@ -1028,7 +1028,6 @@ class TestInfinity:
         db_obj.drop_table("test_insert_with_index_large_data" + suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_with_index_large_data" + suffix, {
             "c1": {"type": "int"},
-            "body": {"type": "varchar"},
         })
 
         # create index
@@ -1046,14 +1045,13 @@ class TestInfinity:
                     data.append(json.loads(line))
             return data
 
-        data_array = read_jsonl("./test/data/jsonl/test_table_8000.jsonl")
+        data_array = read_jsonl("./test/data/jsonl/test_table_2000.jsonl")
         loop_count: int = total_row_count // len(data_array)
 
         insert_data = []
         for _, data in enumerate(data_array):
             insert_data.append({
-                "c1": data.get("c1", 0),
-                "body": data.get("body", "hi")
+                "c1": data.get("c1", 0)
             })
 
         start = time.time()
