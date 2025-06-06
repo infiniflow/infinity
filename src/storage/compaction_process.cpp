@@ -120,14 +120,15 @@ void CompactionProcessor::NewDoCompact() {
         Status status = Status::OK();
         DeferFn defer_fn([&] {
             if (status.ok()) {
-                status = new_txn_mgr->CommitTxn(new_txn);
+                Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+                if (!commit_status.ok()) {
+                    LOG_ERROR(fmt::format("Commit Compaction failed: {}", commit_status.message()));
+                }
             } else {
                 LOG_ERROR(fmt::format("Compaction failed: {}", status.message()));
-            }
-            if (!status.ok()) {
                 Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
                 if (!rollback_status.ok()) {
-                    UnrecoverableError(status.message());
+                    UnrecoverableError(rollback_status.message());
                 }
             }
         });
@@ -225,12 +226,15 @@ void CompactionProcessor::NewScanAndOptimize() {
 
     Status status = new_txn->OptimizeAllIndexes();
     if (status.ok()) {
-        status = new_txn_mgr->CommitTxn(new_txn);
-    }
-    if (!status.ok()) {
-        status = new_txn_mgr->RollBackTxn(new_txn);
-        if (!status.ok()) {
-            RecoverableError(status);
+        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+        if (!commit_status.ok()) {
+            LOG_ERROR(fmt::format("Commit ScanAndOptimize opt failed: {}", commit_status.message()));
+        }
+    } else {
+        LOG_ERROR(fmt::format("ScanAndOptimize opt failed: {}", status.message()));
+        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+        if (!rollback_status.ok()) {
+            UnrecoverableError(rollback_status.message());
         }
     }
 }
@@ -246,16 +250,17 @@ void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
 
     Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
     if (status.ok()) {
-        status = new_txn_mgr->CommitTxn(new_txn);
-    }
-    if (!status.ok()) {
+        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+        if (!commit_status.ok()) {
+            LOG_ERROR(fmt::format("Commit Dump mem index failed: {}", commit_status.message()));
+        }
+    } else {
+        LOG_ERROR(fmt::format("Dump mem index failed: {}", status.message()));
         Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
         if (!rollback_status.ok()) {
             UnrecoverableError(rollback_status.message());
         }
     }
-
-    return;
 }
 
 void CompactionProcessor::Process() {
