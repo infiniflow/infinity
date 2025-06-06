@@ -32,10 +32,11 @@ export enum class BGTaskType {
     kNewCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
+    kAppendMemIndex,
     kTestCommand,
     kInvalid
 };
 
 String ToString(BGTaskType type);
 
-}
+} // namespace infinity

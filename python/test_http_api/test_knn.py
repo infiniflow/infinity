@@ -7,7 +7,6 @@ import httputils
 
 
 class TestKnn(HttpTest):
-    # PASS
     def test_http_knn(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
@@ -69,7 +68,6 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_knn_on_vector_column(self):
         db_name = "default_db"
         table_name = "test_http_test_knn_on_vector_column"
@@ -122,7 +120,6 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_knn_on_non_vector_column(self):
         db_name = "default_db"
         table_name = "test_http_test_knn_on_vector_column"
@@ -176,7 +173,6 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_valid_embedding_data(self):
         db_name = "default_db"
         table_name = "test_http_test_valid_embedding_data"
@@ -229,7 +225,6 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_invalid_embedding_data(self):
         embedding_data = [
             pytest.param("variant_id"),
@@ -291,7 +286,6 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_valid_embedding_data_type(self):
         db_name = "default_db"
         table_name = "test_http_test_valid_embedding_data_type"
@@ -403,7 +397,6 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_various_distance_type(self):
         distance_type = [
             "l2", "cosine", "hamming"
