@@ -1019,3 +1019,48 @@ class TestInfinity:
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == total_row_count
 
         db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Error)
+
+    @pytest.mark.slow
+    def test_insert_with_index_large_data(self, suffix):
+        total_row_count = 9000000
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_with_index_large_data" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_with_index_large_data" + suffix, {
+            "c1": {"type": "int"},
+        })
+
+        # create index
+        table_obj.create_index("my_index",
+                               index.IndexInfo("c1",
+                                               index.IndexType.Secondary),
+                               ConflictType.Error)
+
+        import json
+        import time
+        def read_jsonl(file_path):
+            data = []
+            with open(file_path, 'r') as file:
+                for line in file:
+                    data.append(json.loads(line))
+            return data
+
+        data_array = read_jsonl("./test/data/jsonl/test_table_2000.jsonl")
+        loop_count: int = total_row_count // len(data_array)
+
+        insert_data = []
+        for _, data in enumerate(data_array):
+            insert_data.append({
+                "c1": data.get("c1", 0)
+            })
+
+        start = time.time()
+        for loop_idx in range(loop_count):
+            if loop_idx % 1000 == 0 and loop_idx != 0:
+                elapsed = time.time() - start
+                print(f"Insert {loop_idx} times, cost: {elapsed:.2f}s")
+            table_obj.insert(insert_data)
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == total_row_count
+
+        db_obj.drop_table("test_insert_with_index_large_data" + suffix, ConflictType.Error)
