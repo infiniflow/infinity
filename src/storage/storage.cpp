@@ -59,6 +59,7 @@ import virtual_store;
 import result_cache_manager;
 import global_resource_usage;
 import txn_state;
+import mem_index_appender;
 
 import wal_entry;
 
@@ -337,14 +338,18 @@ Status Storage::AdminToWriter() {
     compact_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
-        UnrecoverableError("mem index processor was initialized before.");
+        UnrecoverableError("dump index processor was initialized before.");
     }
     dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
     dump_index_processor_->Start();
 
-    // recover index after start compact process
-    catalog_->StartMemoryIndexCommit();
+    if (mem_index_appender_ != nullptr) {
+        UnrecoverableError("mem index appender was initialized before.");
+    }
+    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_->Start();
 
+    // catalog_->StartMemoryIndexCommit();
     this->RecoverMemIndex();
 
     auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
@@ -507,10 +512,16 @@ Status Storage::ReaderToWriter() {
     compact_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
-        UnrecoverableError("mem index processor was initialized before.");
+        UnrecoverableError("dump index processor was initialized before.");
     }
     dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
     dump_index_processor_->Start();
+
+    if (mem_index_appender_ != nullptr) {
+        UnrecoverableError("mem index appender was initialized before.");
+    }
+    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_->Start();
 
     periodic_trigger_thread_->Stop();
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -541,6 +552,11 @@ Status Storage::WriterToAdmin() {
     if (dump_index_processor_ != nullptr) {
         dump_index_processor_->Stop();
         dump_index_processor_.reset();
+    }
+
+    if (mem_index_appender_ != nullptr) {
+        mem_index_appender_->Stop();
+        mem_index_appender_.reset();
     }
 
     if (bg_processor_ != nullptr) {
@@ -610,6 +626,11 @@ Status Storage::WriterToReader() {
         dump_index_processor_.reset();
     }
 
+    if (mem_index_appender_ != nullptr) {
+        mem_index_appender_->Stop();
+        mem_index_appender_.reset();
+    }
+
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
     periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
@@ -636,6 +657,11 @@ Status Storage::UnInitFromWriter() {
     if (dump_index_processor_ != nullptr) {
         dump_index_processor_->Stop();
         dump_index_processor_.reset();
+    }
+
+    if (mem_index_appender_ != nullptr) {
+        mem_index_appender_->Stop();
+        mem_index_appender_.reset();
     }
 
     if (bg_processor_ != nullptr) {
@@ -831,7 +857,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
-    catalog_->StartMemoryIndexCommit();
+    // catalog_->StartMemoryIndexCommit();
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     bg_processor_->Start();

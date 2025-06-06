@@ -70,6 +70,17 @@ AppendMemIndexTask::AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index,
                                        BlockOffset row_cnt)
     : BGTask(BGTaskType::kAppendMemIndex, false), mem_index_(mem_index), input_column_(input_column), offset_(offset), row_cnt_(row_cnt) {}
 
+void AppendMemIndexBatch::InsertTask(AppendMemIndexTask *task) {
+    append_tasks_.emplace_back(task);
+    std::unique_lock lock(mtx_);
+    ++task_count_;
+}
+
+void AppendMemIndexBatch::WaitForCompletion() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    cv_.wait(lock, [this] { return task_count_ == 0; });
+}
+
 TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
 } // namespace infinity
