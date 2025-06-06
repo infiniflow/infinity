@@ -67,7 +67,7 @@ BaseMemIndex *MemIndex::GetBaseMemIndex(const MemIndexID &mem_index_id) {
     return res;
 }
 
-const BaseMemIndex *MemIndex::GetBaseMemIndex() const{
+const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
     std::unique_lock<std::mutex> lock(mtx_);
     BaseMemIndex *res = nullptr;
     if (memory_hnsw_index_.get() != nullptr) {
@@ -85,6 +85,27 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const{
     }
 
     return res;
+}
+
+void MemIndex::SetBaseMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id) {
+    BaseMemIndex *res = nullptr;
+    if (memory_hnsw_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
+    } else if (memory_ivf_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_ivf_index_.get());
+    } else if (memory_indexer_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_indexer_.get());
+    } else if (memory_secondary_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
+    } else if (memory_bmp_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else {
+        return;
+    }
+    res->db_name_ = db_name;
+    res->table_name_ = table_name;
+    res->index_name_ = index_name;
+    res->segment_id_ = segment_id;
 }
 
 } // namespace infinity
