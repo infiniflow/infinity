@@ -26,7 +26,7 @@ namespace infinity {
 
 class KVInstance;
 class TableIndexMeeta;
-class MemIndex;
+struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
@@ -100,7 +100,8 @@ private:
     String GetSegmentIndexTag(const String &tag);
 
 private:
-    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp begin_ts_;
+    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     TableIndexMeeta &table_index_meta_;
     SegmentID segment_id_{};

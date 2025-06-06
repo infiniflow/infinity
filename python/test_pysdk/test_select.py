@@ -1,6 +1,4 @@
-import importlib
 import sys
-import os
 import os
 import pandas as pd
 import pytest
@@ -17,7 +15,6 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 from common.utils import copy_data
-from datetime import date, time, datetime
 
 @pytest.fixture(scope="class")
 def http(request):
@@ -565,7 +562,6 @@ class TestInfinity:
             "test_select_embedding_float" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason = "import conflict with compact")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_select_big_embedding(self, check_data, suffix):
@@ -573,8 +569,7 @@ class TestInfinity:
         Method: test_select_big_embedding
 
         Description:
-        This method performs a series of operations to test the selection of a large embedding from a table. It imports
-        data from a CSV file, creates a table, imports the data into the table,
+        This method performs a series of operations to test the selection of a large embedding from a table. It creates a table, imports the data into the table,
         and then searches for and retrieves a specific column from the table.
 
         Parameters:

@@ -525,15 +525,7 @@ private:
 
     Status ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd);
 
-    Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
-
-    Status AddChunkWal(const String &db_name,
-                       const String &table_name,
-                       const String &index_name,
-                       const String &table_key,
-                       ChunkIndexMeta &chunk_index_meta,
-                       const Vector<ChunkID> &deprecate_ids,
-                       DumpIndexCause dump_index_cause);
+    Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
     Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option);
 
@@ -546,7 +538,7 @@ private:
 public:
     Status RecoverMemIndex(TableIndexMeeta &table_index_meta);
 
-    static Status CommitMemIndex(TableIndexMeeta &table_index_meta);
+    Status CommitMemIndex(TableIndexMeeta &table_index_meta);
 
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
@@ -562,6 +554,7 @@ private:
     Status CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
     Status CommitImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
+    Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
     Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
     Status RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance);
     Status CommitCompact(WalCmdCompactV2 *compact_cmd);

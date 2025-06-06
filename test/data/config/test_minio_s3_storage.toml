@@ -52,8 +52,6 @@ memindex_memory_quota   = "1GB"
 [wal]
 wal_dir                       = "/var/infinity/wal"
 full_checkpoint_interval      = "86400s"
-delta_checkpoint_interval     = "60s"
-# delta_checkpoint_threshold  = 1000000000
 wal_compact_threshold         = "1GB"
 
 # flush_at_once: write and flush log each commit

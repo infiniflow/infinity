@@ -131,10 +131,13 @@ class TestDDLParallel:
             return
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
-            db_obj.drop_table(table_name, ConflictType.Ignore)
-            res = db_obj.list_tables()
-            print(res)
-            self.logger.info(f"drop table {table_name} in database {db_name}")
+            try:
+                db_obj.drop_table(table_name, ConflictType.Ignore)
+                res = db_obj.list_tables()
+                print(res)
+                self.logger.info(f"drop table {table_name} in database {db_name}")
+            except Exception as e:
+                self.logger.info(f"drop table {table_name} in database {db_name} failed")
 
     def create_index(self, infinity_obj: RemoteThriftInfinityConnection):
         db_name = db_names[random.randint(0, len(db_names) - 1)]
@@ -147,6 +150,7 @@ class TestDDLParallel:
         if (len(exist_tables) > 0):
             table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
             try:
+                index_on = "untitled_index_name"
                 table_obj = db_obj.get_table(table_name)
                 if table_name[0:3] == "vec":
                     index_on = vec_indexes_on[random.randint(0, len(vec_indexes_on) - 1)]

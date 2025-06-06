@@ -233,8 +233,7 @@ Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(Txn *scan_txn) {
 Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
     Vector<SharedPtr<MemIndex>> mem_indexes;
     Vector<MemIndexID> mem_index_ids;
-    TxnTimeStamp begin_ts = new_txn->BeginTS();
-    Status status = NewCatalog::GetAllMemIndexes(new_txn->kv_instance(), begin_ts, mem_indexes, mem_index_ids);
+    Status status = NewCatalog::GetAllMemIndexes(new_txn, mem_indexes, mem_index_ids);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

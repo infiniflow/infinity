@@ -1,4 +1,3 @@
-import sys
 import os
 import pytest
 from httpapibase import HttpTest
@@ -71,7 +70,6 @@ class TestSelect(HttpTest):
         })
         self.drop_table(db_name, table_name)
 
-    # PASS
     def test_http_select_aggregate(self):
         db_name = "default_db"
         table_name = "test_http_test_select"

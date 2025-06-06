@@ -117,6 +117,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     }
 
     TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
+    TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
 
 #ifdef INFINITY_DEBUG
     // This part has performance issue
@@ -141,7 +142,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         if (!range_state) {
             // TODO
             range_state = NewTxnGetVisibleRangeState();
-            Status status = NewCatalog::GetBlockVisibleRange(*current_block_meta, begin_ts, *range_state);
+            Status status = NewCatalog::GetBlockVisibleRange(*current_block_meta, begin_ts, commit_ts, *range_state);
             if (!status.ok()) {
                 RecoverableError(status);
             }

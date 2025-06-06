@@ -16,7 +16,6 @@ compact_interval = "0s"
 [buffer]
 memindex_memory_quota   = "10MB" # big enough to hold test data
 [wal]
-#delta_checkpoint_interval = "0s"
 full_checkpoint_interval = "0s"
 
 [resource]

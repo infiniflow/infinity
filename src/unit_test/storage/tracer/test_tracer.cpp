@@ -27,6 +27,7 @@ import table_index_entry;
 import new_txn;
 import compilation_config;
 import infinity_context;
+import chunk_index_meta;
 
 using namespace infinity;
 
@@ -55,6 +56,8 @@ public:
         row_count_ = 0;
         trace_ = false;
     }
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override {return ChunkIndexMetaInfo{"", {}, row_count_, 0};}
 
 public:
     SharedPtr<String> db_name_;

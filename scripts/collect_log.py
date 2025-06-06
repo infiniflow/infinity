@@ -30,7 +30,7 @@ def collect_log(
         if failure:
             shutil.copy(stdout_path, f"{output_dir}/{random_name}_stdout.log")
         print(f"Last {show_lines} lines from {stdout_path}:")
-        with open(stdout_path, "r") as f:
+        with open(stdout_path, "r", errors="ignore") as f:
             lines = f.readlines()
             for line in lines[-show_lines:]:
                 print(line.strip())
@@ -41,7 +41,7 @@ def collect_log(
         if failure:
             shutil.copy(stderror_path, f"{output_dir}/{random_name}_stderror.log")
         print(f"Last {show_lines} lines from {stderror_path}:")
-        with open(stderror_path, "r") as f:
+        with open(stderror_path, "r", errors="ignore") as f:
             lines = f.readlines()
             for line in lines[-show_lines:]:
                 print(line.strip())
@@ -52,7 +52,7 @@ def collect_log(
         if failure:
             shutil.copy(log_path, f"{output_dir}/{random_name}.log")
         print(f"Last {show_lines} lines from {log_path}:")
-        with open(log_path, "r") as f:
+        with open(log_path, "r", errors="ignore") as f:
             lines = f.readlines()
             for line in lines[-show_lines:]:
                 print(line.strip())

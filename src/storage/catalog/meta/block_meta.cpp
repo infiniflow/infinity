@@ -37,11 +37,13 @@ import column_meta;
 import fast_rough_filter;
 import kv_code;
 import kv_utility;
+import logger;
 
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
-    : begin_ts_(segment_meta.begin_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta), block_id_(block_id) {}
+    : begin_ts_(segment_meta.begin_ts()), commit_ts_(segment_meta.commit_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta),
+      block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -137,6 +139,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {
             String block_lock_key = GetBlockTag("lock");
+            LOG_TRACE(fmt::format("UninitSet: dropping block lock for block key: {}", block_lock_key));
             Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
             if (!status.ok()) {
                 return status;
@@ -145,6 +148,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     }
     {
         String filter_key = GetBlockTag("fast_rough_filter");
+        LOG_TRACE(fmt::format("UninitSet: fast rough filter key: {}", filter_key));
         Status status = kv_instance_.Delete(filter_key);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
@@ -224,7 +228,8 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
                                           table_meta.table_id_str(),
                                           segment_meta_.segment_id(),
                                           block_id_,
-                                          begin_ts_);
+                                          begin_ts_,
+                                          commit_ts_);
     return {*row_cnt_, Status::OK()};
 #else
     Status status;

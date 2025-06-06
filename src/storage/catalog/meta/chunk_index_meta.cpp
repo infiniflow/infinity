@@ -482,7 +482,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
-        Status status = kv_instance_.Delete(chunk_info_key);
+        status = kv_instance_.Delete(chunk_info_key);
         if (!status.ok()) {
             return status;
         }
@@ -501,6 +501,11 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info) {
+    chunk_info_ = chunk_info;
     return Status::OK();
 }
 

@@ -347,6 +347,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         return status;
     }
 
+    // Get the latest table id
     std::tie(table_id_str, status) = db_meta->GetNextTableID();
     if (!status.ok()) {
         return status;
@@ -637,13 +638,6 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
-    // Get latest index id and lock the id
-    String index_id_str;
-    status = IncrLatestID(index_id_str, NEXT_INDEX_ID);
-    if (!status.ok()) {
-        return status;
-    }
-
     String index_key;
     String index_id;
     status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
@@ -651,8 +645,16 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
+        LOG_ERROR(fmt::format("CreateIndex: index {} already exists, index_key: {}, index_id: {}", *index_base->index_name_, index_key, index_id));
         return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     } else if (status.code() != ErrorCode::kIndexNotExist) {
+        return status;
+    }
+
+    // Get the latest index id and lock the id
+    String index_id_str;
+    std::tie(index_id_str, status) = table_meta->GetNextIndexID();
+    if (!status.ok()) {
         return status;
     }
 
@@ -1024,6 +1026,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
     TxnTimeStamp begin_ts = this->BeginTS();
+    TxnTimeStamp commit_ts = this->CommitTS();
 
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
@@ -1031,7 +1034,7 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
         Status status = this->CheckpointTable(table_meta, option);
         if (!status.ok()) {
             return status;
@@ -1398,11 +1401,14 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                // TODO: move follow to post commit
+                // Commit of dump mem index command is handled in CommitBottom().
+                // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
-                if (!status.ok()) {
-                    return status;
+                if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
+                    Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                    if (!status.ok()) {
+                        return status;
+                    }
                 }
                 break;
             }
@@ -1489,13 +1495,14 @@ Status NewTxn::GetTableMeta(const String &db_name,
 
 Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key_ptr) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     String table_key;
     String table_id_str;
     Status status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts);
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
     }
@@ -1735,13 +1742,14 @@ Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
         Status status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -3251,9 +3259,7 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_mem_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_mem_index_txn_store->db_name_ == db_name && dump_mem_index_txn_store->table_name_ == table_name &&
-                dump_mem_index_txn_store->index_name_ == index_name) {
-                retry_query = false;
+            if (dump_mem_index_txn_store->db_name_ == db_name && dump_mem_index_txn_store->table_name_ == table_name) {
                 conflict = true;
             }
             break;
@@ -3534,7 +3540,7 @@ void NewTxn::CommitBottom() {
     if (txn_state != TxnState::kCommitting) {
         UnrecoverableError(fmt::format("Unexpected transaction state: {}", TxnState2Str(txn_state)));
     }
-    // TODO: DumpMemoryIndex
+
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
@@ -3542,7 +3548,17 @@ void NewTxn::CommitBottom() {
                 auto *append_cmd = static_cast<WalCmdAppendV2 *>(command.get());
                 Status status = CommitBottomAppend(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError(fmt::format("CommitBottomAppend faield: {}", status.message()));
+                    UnrecoverableError(fmt::format("CommitBottomAppend failed: {}", status.message()));
+                }
+                break;
+            }
+            case WalCommandType::DUMP_INDEX_V2: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
+                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                    Status status = CommitBottomDumpMemIndex(dump_index_cmd);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
+                    }
                 }
                 break;
             }
@@ -3629,7 +3645,6 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX_V2: {
-                // auto *cmd = static_cast<WalCmdDumpIndexV2 *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::COMPACT_V2: {
@@ -3756,7 +3771,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         switch (meta->type_) {
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
 
@@ -3776,7 +3791,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -3799,7 +3814,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -3899,7 +3914,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -3908,7 +3923,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
                 Status status = NewCatalog::CleanSegment(segment_meta, ts, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -3918,7 +3933,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
                 Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
@@ -3929,7 +3944,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -3941,7 +3956,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kTableIndex: {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
                 Status status = NewCatalog::CleanTableIndex(table_index_meta, table_index_meta_key->index_name_, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -3951,7 +3966,11 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kSegmentIndex: {
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
+                                      segment_index_meta_key->table_id_str_,
+                                      *kv_instance,
+                                      begin_ts,
+                                      MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
                 Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
@@ -3962,7 +3981,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -4001,6 +4020,26 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
             break;
         }
+        case WalCommandType::CREATE_TABLE_V2: {
+            auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
+
+            Optional<DBMeeta> db_meta;
+            String table_key;
+            Status status = GetDBMeta(create_table_cmd->db_name_, db_meta);
+            if (!status.ok()) {
+                return status;
+            }
+
+            u64 next_table_id = std::stoull(create_table_cmd->table_id_);
+            ++next_table_id;
+            String next_table_id_str = std::to_string(next_table_id);
+
+            status = db_meta->SetNextTableID(next_table_id_str);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
@@ -4011,9 +4050,15 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            create_index_cmd->db_id_ = db_meta->db_id_str();
-            create_index_cmd->table_id_ = table_meta->table_id_str();
-            create_index_cmd->table_key_ = std::move(table_key);
+
+            u64 next_index_id = std::stoull(create_index_cmd->index_id_);
+            ++next_index_id;
+            String next_index_id_str = std::to_string(next_index_id);
+
+            status = table_meta->SetNextIndexID(next_index_id_str);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::APPEND_V2: {
@@ -4026,8 +4071,13 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            append_cmd->db_id_ = db_meta->db_id_str();
-            append_cmd->table_id_ = table_meta->table_id_str();
+            if (append_cmd->db_id_ != db_meta->db_id_str() || append_cmd->table_id_ != table_meta->table_id_str()) {
+                return Status::CatalogError(fmt::format("WalCmdAppendV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                                                        append_cmd->db_id_,
+                                                        append_cmd->table_id_,
+                                                        db_meta->db_id_str(),
+                                                        table_meta->table_id_str()));
+            }
             break;
         }
         case WalCommandType::DELETE_V2: {
@@ -4039,8 +4089,13 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             if (!status.ok()) {
                 return status;
             }
-            delete_cmd->db_id_ = db_meta->db_id_str();
-            delete_cmd->table_id_ = table_meta->table_id_str();
+            if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
+                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                                                        delete_cmd->db_id_,
+                                                        delete_cmd->table_id_,
+                                                        db_meta->db_id_str(),
+                                                        table_meta->table_id_str()));
+            }
             break;
         }
         case WalCommandType::IMPORT_V2: {
@@ -4094,7 +4149,8 @@ Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths)
         return status;
     }
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    return NewCatalog::GetDBFilePaths(begin_ts, *db_meta, file_paths);
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    return NewCatalog::GetDBFilePaths(begin_ts, commit_ts, *db_meta, file_paths);
 }
 
 Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths) {

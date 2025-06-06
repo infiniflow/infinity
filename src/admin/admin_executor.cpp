@@ -3677,48 +3677,6 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
     {
         {
             // option name
-            Value value = Value::MakeVarchar(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // option name type
-            Value value = Value::MakeVarchar(std::to_string(global_config->DeltaCheckpointInterval()));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        {
-            // option name type
-            Value value = Value::MakeVarchar("Delta checkpoint period interval");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-    }
-
-    {
-        {
-            // option name
-            Value value = Value::MakeVarchar(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // option name type
-            Value value = Value::MakeVarchar(std::to_string(global_config->DeltaCheckpointThreshold()));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        {
-            // option name type
-            Value value = Value::MakeVarchar("Delta checkpoint triggering threshold");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-    }
-
-    {
-        {
-            // option name
             Value value = Value::MakeVarchar(WAL_FLUSH_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);

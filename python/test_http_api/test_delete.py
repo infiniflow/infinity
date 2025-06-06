@@ -1,4 +1,3 @@
-import sys
 import pytest
 import time
 from httpapibase import HttpTest
@@ -7,9 +6,7 @@ from common.common_values import *
 
 class TestDelete(HttpTest):
     def test_http_version(self):
-
         return
-        # pass
 
     def test_http_delete(self):
         db_name = "default_db"
@@ -49,8 +46,6 @@ class TestDelete(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-        # PASS
-
     def test_http_delete_empty_table(self):
         db_name = "default_db"
         table_name = "test_http_test_delete_empty_table"
@@ -72,7 +67,6 @@ class TestDelete(HttpTest):
         })
         self.drop_table(db_name, table_name)
         return
-        # pass
 
     def test_http_delete_non_existent_table(self):
         db_name = "default_db"
@@ -84,7 +78,6 @@ class TestDelete(HttpTest):
             "error_code": 3063,
         })
         return
-        # PASS
 
     def test_http_delete_table_all_row_met_the_condition(self):
         db_name = "default_db"
@@ -115,7 +108,6 @@ class TestDelete(HttpTest):
             i += 1
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_delete_table_no_rows_met_condition(self):
         db_name = "default_db"
@@ -146,7 +138,6 @@ class TestDelete(HttpTest):
             self.drop_table(db_name, table_name + str(i))
         return
 
-    # PASS
     def test_http_delete_table_with_one_block(self):
         db_name = "default_db"
         table_name = "test_http_test_delete_table_with_one_block"
@@ -158,7 +149,6 @@ class TestDelete(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_delete_table_with_one_segment(self):
         db_name = "default_db"
         table_name = "test_http_test_delete_table_with_one_segment"
@@ -171,7 +161,6 @@ class TestDelete(HttpTest):
             self.delete(db_name, table_name, "c1 = " + str(i))
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_select_before_after_delete(self):
         db_name = "default_db"
@@ -185,7 +174,6 @@ class TestDelete(HttpTest):
         self.delete(db_name, table_name, "c1=1")
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_delete_insert_data(self):
         db_name = "default_db"

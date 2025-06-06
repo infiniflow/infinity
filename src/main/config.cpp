@@ -623,29 +623,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
-        // Delta Checkpoint Interval
-        i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-        UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                              delta_checkpoint_interval,
-                                                                                              MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
-                                                                                              MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
-        status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
-        if (!status.ok()) {
-            fmt::print("Fatal: {}", status.message());
-            UnrecoverableError(status.message());
-        }
-
-        // Delta Checkpoint Threshold
-        i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-        UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
-                                                                                               delta_checkpoint_threshold,
-                                                                                               MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
-                                                                                               MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
-        status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-
         // Flush Method At Commit
         FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
         UniquePtr<FlushOption> wal_flush_option = MakeUnique<FlushOption>(WAL_FLUSH_OPTION_NAME, flush_option_type);
@@ -2380,62 +2357,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
-                        case GlobalOptionIndex::kDeltaCheckpointInterval: {
-                            // Delta Checkpoint Interval
-                            i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-                            if (elem.second.is_string()) {
-                                String delta_checkpoint_interval_str = elem.second.value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR.data());
-                                auto res = ParseTimeInfo(delta_checkpoint_interval_str, delta_checkpoint_interval);
-                                if (!res.ok()) {
-                                    return res;
-                                }
-                            } else {
-                                return Status::InvalidConfig("'delta_checkpoint_interval' field isn't string, such as \"30s\".");
-                            }
-
-                            UniquePtr<IntegerOption> delta_checkpoint_interval_option =
-                                MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                          delta_checkpoint_interval,
-                                                          MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
-                                                          MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
-                            if (!delta_checkpoint_interval_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid delta checkpoint interval: {}", delta_checkpoint_interval));
-                            }
-
-                            Status status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
-                            if (!status.ok()) {
-                                return status;
-                            }
-                            break;
-                        }
-                        case GlobalOptionIndex::kDeltaCheckpointThreshold: {
-                            // Delta Checkpoint Threshold
-                            i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-                            if (elem.second.is_string()) {
-                                String delta_checkpoint_threshold_str = elem.second.value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR.data());
-                                auto res = ParseByteSize(delta_checkpoint_threshold_str, delta_checkpoint_threshold);
-                                if (!res.ok()) {
-                                    return res;
-                                }
-                            } else {
-                                return Status::InvalidConfig("'delta_checkpoint_threshold' field isn't integer.");
-                            }
-
-                            UniquePtr<IntegerOption> delta_checkpoint_threshold_option =
-                                MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
-                                                          delta_checkpoint_threshold,
-                                                          MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
-                                                          MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
-                            if (!delta_checkpoint_threshold_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid delta checkpoint interval: {}", delta_checkpoint_threshold));
-                            }
-
-                            Status status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
-                            if (!status.ok()) {
-                                return status;
-                            }
-                            break;
-                        }
                         case GlobalOptionIndex::kFlushMethodAtCommit: {
                             // Flush Method At Commit
                             FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
@@ -2499,32 +2420,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                                                                                          MAX_FULL_CHECKPOINT_INTERVAL_SEC,
                                                                                                          MIN_FULL_CHECKPOINT_INTERVAL_SEC);
                     Status status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval) == nullptr) {
-                    // Delta Checkpoint Interval
-                    i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-                    UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                                          delta_checkpoint_interval,
-                                                                                                          MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
-                                                                                                          MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
-                    Status status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointThreshold) == nullptr) {
-                    // Delta Checkpoint Threshold
-                    i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-                    UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
-                                                                                                           delta_checkpoint_threshold,
-                                                                                                           MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
-                                                                                                           MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
-                    Status status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2985,28 +2880,6 @@ void Config::SetFullCheckpointInterval(i64 interval) {
     return;
 }
 
-i64 Config::DeltaCheckpointInterval() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval);
-}
-
-void Config::SetDeltaCheckpointInterval(i64 interval) {
-    std::lock_guard<std::mutex> guard(mutex_);
-    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval);
-    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to delta checkpoint interval";
-        UnrecoverableError(error_message);
-    }
-    IntegerOption *delta_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
-    delta_checkpoint_interval_option->value_ = interval;
-    return;
-}
-
-i64 Config::DeltaCheckpointThreshold() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointThreshold);
-}
-
 FlushOptionType Config::FlushMethodAtCommit() {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
@@ -3132,8 +3005,6 @@ void Config::PrintAll() {
     fmt::print(" - wal_dir: {}\n", WALDir());
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(WALCompactThreshold()));
     fmt::print(" - full_checkpoint_interval: {}\n", Utility::FormatTimeInfo(FullCheckpointInterval()));
-    fmt::print(" - delta_checkpoint_interval: {}\n", Utility::FormatTimeInfo(DeltaCheckpointInterval()));
-    fmt::print(" - delta_checkpoint_threshold: {}\n", Utility::FormatByteSize(DeltaCheckpointThreshold()));
     fmt::print(" - flush_method_at_commit: {}\n", FlushOptionTypeToString(FlushMethodAtCommit()));
 
     // Resource dir

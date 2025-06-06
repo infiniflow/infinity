@@ -33,6 +33,7 @@ class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
 class CompactionProcessor;
+class DumpIndexProcessor;
 class BGTaskProcessor;
 class BGMemIndexTracer;
 class ObjectStorageProcess;
@@ -75,6 +76,8 @@ public:
     [[nodiscard]] inline PeriodicTriggerThread *periodic_trigger_thread() const noexcept { return periodic_trigger_thread_.get(); }
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
+
+    [[nodiscard]] inline DumpIndexProcessor *dump_index_processor() const noexcept { return dump_index_processor_.get(); }
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
@@ -132,6 +135,7 @@ private:
     UniquePtr<NewTxnManager> new_txn_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
+    UniquePtr<DumpIndexProcessor> dump_index_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<KVStore> kv_store_{};
 

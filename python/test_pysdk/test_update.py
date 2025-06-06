@@ -1,6 +1,4 @@
-import importlib
 import sys
-import os
 import os
 import time
 import pandas as pd
@@ -348,7 +346,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def test_update_inserted_long_before(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")

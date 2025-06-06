@@ -1,19 +1,13 @@
-import os
-import sys
-import pytest
 import time
 import random
 from httpapibase import HttpTest
 from threading import Thread
 from common.common_values import *
-import infinity.index as index
-import httputils
-from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
 
 class TestIndexParallel(HttpTest):
-    @pytest.mark.skip(reason="segfault")
+    # @pytest.mark.skip(reason="segfault")
     def test_http_fulltext_index_rw_parallel(self):
         def write_worker(data, file_path, end_time, thread_id):
             db_name = "default_db"
