@@ -15,15 +15,8 @@
 module;
 
 import stl;
-import config;
-import catalog;
-import txn_manager;
-import buffer_manager;
 import wal_manager;
-import object_storage_process;
 import log_file;
-import persistence_manager;
-import virtual_store;
 import status;
 
 export module storage;
@@ -33,7 +26,9 @@ namespace infinity {
 class CleanupInfoTracer;
 class ResultCacheManager;
 class NewCatalog;
+class Catalog;
 class NewTxnManager;
+class TxnManager;
 class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
@@ -42,6 +37,10 @@ class DumpIndexProcessor;
 class MemIndexAppender;
 class BGTaskProcessor;
 class BGMemIndexTracer;
+class ObjectStorageProcess;
+class Config;
+class BufferManager;
+class PersistenceManager;
 
 export enum class ReaderInitPhase {
     kInvalid,

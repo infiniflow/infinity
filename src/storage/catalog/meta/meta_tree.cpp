@@ -149,7 +149,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", segment_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -179,7 +179,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_tag_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -202,7 +202,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_index_meta_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -227,7 +227,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_column_meta_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -260,7 +260,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -294,7 +294,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", segment_tag->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -336,7 +336,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", block_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -369,7 +369,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", block_tag->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -401,7 +401,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
         }
     }
 
-    // Get all segment index and attach to table index
+    // Get all segment indexes and attach to table index
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
         switch (meta_key->type_) {
@@ -420,7 +420,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", segment_index_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -454,7 +454,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", table_index_tag_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -478,7 +478,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
         }
     }
 
-    // Get all chunk index and attach to segment index
+    // Get all chunk indexes and attach to segment index
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
         switch (meta_key->type_) {
@@ -497,7 +497,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}, idx: {}", chunk_index_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
@@ -507,7 +507,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 if (table_index_iter == index_map.end()) {
                     String error_message = fmt::format("Table index not found: {}, idx: {}", chunk_index_key->ToString(), idx);
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     continue;
                 }
 
