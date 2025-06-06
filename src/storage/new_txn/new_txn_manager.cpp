@@ -302,7 +302,6 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
 }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
-    // std::lock_guard guard(locker1_);
     Status status = txn->Commit();
 
     if (commit_ts_ptr != nullptr) {
@@ -312,6 +311,7 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
         if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
+            kv_store_->Flush();
         }
     }
     CleanupTxn(txn);

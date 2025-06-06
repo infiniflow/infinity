@@ -184,7 +184,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
             Vector<String> db_names;
             Status status = txn->ListDatabase(db_names);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(db_names, Vector<String>({"default_db"}));
+            EXPECT_EQ(db_names, Vector<String>({"db1", "default_db"}));
 
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
@@ -317,7 +317,7 @@ TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
             Vector<String> table_names;
             status = txn->ListTable(*db_name, table_names);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(table_names, Vector<String>({}));
+            EXPECT_EQ(table_names, Vector<String>({"tb1"}));
 
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());

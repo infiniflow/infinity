@@ -235,7 +235,7 @@ TEST_P(RepeatReplayTest, append) {
 }
 
 TEST_P(RepeatReplayTest, import) {
-    std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();
+    std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config(); //
 
     auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());

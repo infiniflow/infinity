@@ -125,7 +125,7 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
 }
 
 UniquePtr<NewTxn>
-NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance) {
+NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance>&& kv_instance) {
     auto txn = MakeUnique<NewTxn>(txn_mgr, txn_id, begin_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
     txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;
@@ -1004,14 +1004,14 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize(nullptr, true);
+        PersistWriteResult result = pm->CurrentObjFinalize(kv_instance_.get(), true);
         handler.HandleWriteResult(result);
     }
 
-    status = txn_mgr_->kv_store()->Flush();
-    if (!status.ok()) {
-        return status;
-    }
+    // status = txn_mgr_->kv_store()->Flush();
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
@@ -3742,8 +3742,8 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto table_id_str = compact_txn_store->table_id_str_;
                 auto index_id_str = compact_txn_store->index_ids_str_[i];
 
-                const Vector<SegmentID> &segment_ids = compact_txn_store->segment_ids_;
-                for (SegmentID segment_id : segment_ids) {
+                const Vector<SegmentID> & deprecated_ids = compact_txn_store->deprecated_segment_ids_;
+                for (SegmentID segment_id :  deprecated_ids) {
                     metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
                 }
 

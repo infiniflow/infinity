@@ -633,6 +633,15 @@ TEST_P(WalReplayTest, wal_replay_import) {
             EXPECT_TRUE(status.ok());
         }
 
+        {
+            auto wal_manager = infinity::InfinityContext::instance().storage()->wal_manager();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            Status status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -798,7 +807,15 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         }
 
         txn_mgr->PrintAllKeyValue();
+        {
+            auto wal_manager = infinity::InfinityContext::instance().storage()->wal_manager();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            Status status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
 
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();

@@ -830,7 +830,10 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
 
 void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     auto kv_instance = this->KVInstance();
-
+    auto vecs = kv_store_->GetAllKeyValue();
+    for (auto &[k, v] : vecs) {
+        std::cout << "key: " << k << "val:" << v << std::endl;
+    }
     Status status = NewCatalog::InitCatalog(kv_instance.get(), checkpoint_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Init catalog failed: {}", status.message()));

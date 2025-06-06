@@ -262,15 +262,16 @@ void ObjectStatAccessor_LocalStorage::PutNew(KVInstance *kv_instance, const Stri
 
 void ObjectStatAccessor_LocalStorage::PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) {
     obj_stat.cached_ = ObjCached::kCached;
-
-    if (kv_instance) {
-        this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
-    } else {
-        this->AddObjStatToKVStore(key, obj_stat);
-    }
     auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
     if (!insert_ok) {
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
+        return;
+    }
+    if (kv_instance) {
+        this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
+    } else
+        {
+        this->AddObjStatToKVStore(key, obj_stat);
     }
 }
 
@@ -390,9 +391,13 @@ void ObjectStatAccessor_ObjectStorage::PutNew(KVInstance *kv_instance, const Str
 }
 
 void ObjectStatAccessor_ObjectStorage::PutNoCount(KVInstance *kv_instance, const String &key, ObjStat obj_stat) {
+    if (obj_map_.Get(key) == nullptr) {
+        return;
+    }
     if (kv_instance) {
         this->AddObjStatToKVInstance(kv_instance, key, obj_stat);
-    } else {
+    } else
+        {
         this->AddObjStatToKVStore(key, obj_stat);
     }
     obj_map_.PutNew(key, std::move(obj_stat));

@@ -313,6 +313,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    checkpoint();
     RestartTxnMgr();
     checkpoint();
     RestartTxnMgr();
@@ -344,6 +345,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         EXPECT_TRUE(status.ok());
     }
 
+    checkpoint();
     RestartTxnMgr();
     checkpoint();
     RestartTxnMgr();
@@ -554,6 +556,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
+    checkpoint();
 
     RestartTxnMgr();
     checkpoint();
@@ -578,6 +581,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    checkpoint();
 
     RestartTxnMgr();
     checkpoint();
@@ -608,6 +612,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    checkpoint();
 
     RestartTxnMgr();
     checkpoint();
@@ -632,6 +637,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    checkpoint();
 
     RestartTxnMgr();
     checkpoint();
@@ -668,6 +674,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint3) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    checkpoint();
 
     RestartTxnMgr();
     checkpoint();
