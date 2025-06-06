@@ -58,6 +58,10 @@ import expression_evaluator;
 import base_txn_store;
 import catalog_cache;
 import kv_code;
+import bg_task;
+import dump_index_process;
+import mem_index;
+import base_memindex;
 
 namespace infinity {
 
@@ -1412,6 +1416,8 @@ Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
 
 Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     Status status;
+    const String &db_name = append_cmd->db_name_;
+    const String &table_name = append_cmd->table_name_;
     const String &db_id_str = append_cmd->db_id_;
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp begin_ts = BeginTS();
@@ -1426,10 +1432,11 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         return status;
     }
     Vector<TableIndexMeeta> table_index_metas;
+    Vector<String> *index_name_strs = nullptr;
     if (!this->IsReplay()) {
         Vector<String> *index_id_strs = nullptr;
         {
-            status = table_meta.GetIndexIDs(index_id_strs, nullptr);
+            status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
             if (!status.ok()) {
                 return status;
             }
@@ -1522,6 +1529,29 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         if (range.first.segment_offset_ + range.second == DEFAULT_SEGMENT_CAPACITY) {
             table_meta.DelUnsealedSegmentID();
             BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta.value());
+
+            for (SizeT i = 0; i < table_index_metas.size(); ++i) {
+                const String &index_name = (*index_name_strs)[i];
+                SegmentIndexMeta segment_index_meta(segment_id, table_index_metas[i]);
+                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+
+                if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+                    return Status::UnexpectedError(
+                        fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
+                }
+
+                if (mem_index->GetEMVBIndex() != nullptr) {
+                    return Status::UnexpectedError("Not implemented EMVB index");
+                }
+
+                // Trigger dump mem processor to dump mem index for new sealed segment
+                mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
+                const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
+                NewTxn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("dump mem index aync"), TransactionType::kNormal);
+                auto dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn);
+                auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
+                dump_index_processor->Submit(dump_index_task);
+            }
         }
         copied_row_cnt += range.second;
     }

@@ -42,6 +42,8 @@ export struct MemIndex {
 
     BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
     const BaseMemIndex *GetBaseMemIndex() const;
+    void SetBaseMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
+
     SharedPtr<HnswIndexInMem> GetHnswIndex() {
         std::unique_lock<std::mutex> lock(mtx_);
         return memory_hnsw_index_;
