@@ -165,6 +165,8 @@ public:
     SharedPtr<ColumnVector> input_column_{};
     BlockOffset offset_{};
     BlockOffset row_cnt_{};
+    u64 seq_inserted_{};
+    u32 doc_count_{};
 };
 
 export struct AppendMemIndexBatch {

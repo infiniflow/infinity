@@ -167,7 +167,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     }
 }
 
-void MemoryIndexer::AsyncInsert(const SharedPtr<ColumnVector> &column_vector, u32 row_offset, u32 row_count, AppendMemIndexBatch *append_batch) {
+void MemoryIndexer::AsyncInsertTop(AppendMemIndexTask *append_mem_index_task) {
     if (is_spilled_) {
         Load();
     }
@@ -178,8 +178,31 @@ void MemoryIndexer::AsyncInsert(const SharedPtr<ColumnVector> &column_vector, u3
         std::unique_lock<std::mutex> lock(mutex_);
         seq_inserted = seq_inserted_++;
         doc_count = doc_count_;
-        doc_count_ += row_count;
+        doc_count_ += append_mem_index_task->row_cnt_;
+        ++inflight_tasks_;
     }
+    append_mem_index_task->seq_inserted_ = seq_inserted;
+    append_mem_index_task->doc_count_ = doc_count;
+}
+
+void MemoryIndexer::AsyncInsertBottom(const SharedPtr<ColumnVector> &column_vector,
+                                      u32 row_offset,
+                                      u32 row_count,
+                                      u64 seq_inserted,
+                                      u32 doc_count,
+                                      AppendMemIndexBatch *append_batch) {
+    if (is_spilled_) {
+        Load();
+    }
+
+    //    u64 seq_inserted(0);
+    //    u32 doc_count(0);
+    //    {
+    //        std::unique_lock<std::mutex> lock(mutex_);
+    //        seq_inserted = seq_inserted_++;
+    //        doc_count = doc_count_;
+    //        doc_count_ += row_count;
+    //    }
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
 
     IncreaseMemoryUsage(sizeof(u32) * row_count);
@@ -200,10 +223,10 @@ void MemoryIndexer::AsyncInsert(const SharedPtr<ColumnVector> &column_vector, u3
             }
         }
     };
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_++;
-    }
+    //    {
+    //        std::unique_lock<std::mutex> lock(mutex_);
+    //        inflight_tasks_++;
+    //    }
     inverting_thread_pool_.push(std::move(func));
 }
 

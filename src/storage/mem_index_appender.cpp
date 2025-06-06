@@ -101,10 +101,12 @@ void MemIndexAppender::Process() {
                         }
                         AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
                         append_mem_index_batch->InsertTask(append_mem_index_task);
-                        memory_indexer->AsyncInsert(append_mem_index_task->input_column_,
-                                                    append_mem_index_task->offset_,
-                                                    append_mem_index_task->row_cnt_,
-                                                    append_mem_index_batch);
+                        memory_indexer->AsyncInsertBottom(append_mem_index_task->input_column_,
+                                                          append_mem_index_task->offset_,
+                                                          append_mem_index_task->row_cnt_,
+                                                          append_mem_index_task->seq_inserted_,
+                                                          append_mem_index_task->doc_count_,
+                                                          append_mem_index_batch);
                     }
                     break;
                 }
