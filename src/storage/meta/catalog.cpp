@@ -1278,12 +1278,15 @@ void Catalog::MemIndexCommit() {
 
     Status status = NewCatalog::MemIndexCommit(new_txn);
     if (status.ok()) {
-        status = new_txn_mgr->CommitTxn(new_txn);
-    }
-    if (!status.ok()) {
-        Status status1 = new_txn_mgr->RollBackTxn(new_txn);
-        if (!status1.ok()) {
-            UnrecoverableError(fmt::format("Rollback mem index commit failed: {}", status1.message()));
+        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+        if (!commit_status.ok()) {
+            LOG_ERROR(fmt::format("Commit MemIndex commit failed: {}", commit_status.message()));
+        }
+    } else {
+        LOG_ERROR(fmt::format("MemIndex commit failed: {}", status.message()));
+        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+        if (!rollback_status.ok()) {
+            UnrecoverableError(rollback_status.message());
         }
     }
 }
