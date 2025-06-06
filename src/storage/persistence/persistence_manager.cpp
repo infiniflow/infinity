@@ -255,9 +255,9 @@ void PersistenceManager::CurrentObjFinalizeNoLock(KVInstance *kv_instance, Vecto
                          drop_keys);
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
-        // current_object_size_ = 0;
-        // current_object_parts_ = 0;
-        // current_object_ref_count_ = 0;
+        current_object_size_ = 0;
+        current_object_parts_ = 0;
+        current_object_ref_count_ = 0;
     } else {
         LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added empty object {}", current_object_key_));
     }

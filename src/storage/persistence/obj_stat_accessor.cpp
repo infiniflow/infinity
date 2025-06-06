@@ -71,6 +71,7 @@ void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const String &key) {
         UnrecoverableError(status.message());
     }
 }
+
 void ObjectStatAccessorBase::RemoveObjStatFromKVInstance(KVInstance *kv_instance, const String &key) {
     if (!kv_instance) {
         return;
@@ -80,6 +81,7 @@ void ObjectStatAccessorBase::RemoveObjStatFromKVInstance(KVInstance *kv_instance
         UnrecoverableError(status.message());
     }
 }
+
 // ObjectStatMap
 
 ObjectStatMap::~ObjectStatMap() {
