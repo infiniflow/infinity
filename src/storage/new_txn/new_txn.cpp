@@ -1004,7 +1004,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize(kv_instance_.get(), true);
+        PersistWriteResult result = pm->CurrentObjFinalize(nullptr, true);
         handler.HandleWriteResult(result);
     }
 
