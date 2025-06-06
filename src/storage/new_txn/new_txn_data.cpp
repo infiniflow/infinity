@@ -311,6 +311,14 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
+    // index
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = MakeShared<ImportTxnStore>();
@@ -321,20 +329,25 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         import_txn_store->table_id_str_ = table_meta.table_id_str();
         import_txn_store->table_key_ = table_key;
         import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-        import_txn_store->input_blocks_in_imports_.emplace_back(input_blocks);
+
+        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const String &index_id_str = (*index_id_strs_ptr)[i];
+            const String &index_name = (*index_names_ptr)[i];
+            import_txn_store->index_names_.emplace_back(index_name);
+            import_txn_store->index_ids_str_.emplace_back(index_id_str);
+            import_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
+        }
+
+        import_txn_store->input_blocks_in_imports_.emplace(segment_ids[0], input_blocks);
         import_txn_store->segment_infos_.emplace_back(segment_info);
+        import_txn_store->segment_ids_.emplace_back(segment_ids[0]);
     } else {
         ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        import_txn_store->input_blocks_in_imports_.emplace(segment_ids[0], input_blocks);
         import_txn_store->segment_infos_.emplace_back(segment_info);
+        import_txn_store->segment_ids_.emplace_back(segment_ids[0]);
     }
 
-    // index
-    Vector<String> *index_id_strs_ptr = nullptr;
-    Vector<String> *index_names_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_names_ptr)[i];
@@ -666,6 +679,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         compact_txn_store->segment_infos_ = segment_infos;
         compact_txn_store->deprecated_segment_ids_ = segment_ids;
         compact_txn_store->new_segment_id_ = new_segment_ids[0];
+        compact_txn_store->segment_ids_.emplace_back(new_segment_ids[0]);
 
         Vector<SegmentID> deprecated_segment_ids = segment_ids;
         {
@@ -701,6 +715,15 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
     if (!status.ok()) {
         return status;
+    }
+
+    CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+    for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const String &index_id_str = (*index_id_strs_ptr)[i];
+        const String &index_name = (*index_name_ptr)[i];
+        compact_txn_store->index_names_.emplace_back(index_name);
+        compact_txn_store->index_ids_str_.emplace_back(index_id_str);
+        compact_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
     }
 
     //    LOG_TRACE(fmt::format("To populate index: {}", index_id_strs_ptr->size()));
