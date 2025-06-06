@@ -39,6 +39,7 @@ class KVInstance;
 class PeriodicTriggerThread;
 class CompactionProcessor;
 class DumpIndexProcessor;
+class MemIndexAppender;
 class BGTaskProcessor;
 class BGMemIndexTracer;
 
@@ -79,6 +80,8 @@ public:
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
     [[nodiscard]] inline DumpIndexProcessor *dump_index_processor() const noexcept { return dump_index_processor_.get(); }
+
+    [[nodiscard]] inline MemIndexAppender *mem_index_appender() const noexcept { return mem_index_appender_.get(); }
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
@@ -137,6 +140,7 @@ private:
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<DumpIndexProcessor> dump_index_processor_{};
+    UniquePtr<MemIndexAppender> mem_index_appender_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<KVStore> kv_store_{};
 

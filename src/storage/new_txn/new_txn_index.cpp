@@ -71,7 +71,7 @@ import kv_code;
 import buffer_handle;
 import segment_entry;
 import bg_task;
-import dump_index_process;
+import mem_index_appender;
 
 namespace infinity {
 
@@ -790,6 +790,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
                     need_to_update_ft_segment_ts = true;
                 } else {
+                    LOG_TRACE(fmt::format("AppendMemIndex: memory_indexer_ is not null, base_row_id: {}, doc_count: {}",
+                                          base_row_id.ToUint64(),
+                                          mem_index->memory_indexer_->GetDocCount()));
                     RowID exp_begin_row_id = mem_index->memory_indexer_->GetBaseRowId() + mem_index->memory_indexer_->GetDocCount();
                     assert(base_row_id >= exp_begin_row_id);
                     if (base_row_id > exp_begin_row_id) {
@@ -805,10 +808,11 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     UniquePtr<std::binary_semaphore> sema = mem_index->memory_indexer_->AsyncInsert(col_ptr, offset, row_cnt);
                     txn_store()->AddSemaphore(std::move(sema));
                 } else {
-                    mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
-                    // auto *mem_index_processor = InfinityContext::instance().storage()->mem_index_processor();
-                    // SharedPtr<AppendMemIndexTask> append_mem_index_task = MakeShared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
-                    // mem_index_processor->Submit(append_mem_index_task);
+                    // mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
+                    SharedPtr<AppendMemIndexTask> append_mem_index_task = MakeShared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
+                    mem_index->memory_indexer_->AsyncInsertTop(append_mem_index_task.get());
+                    auto *mem_index_appender = InfinityContext::instance().storage()->mem_index_appender();
+                    mem_index_appender->Submit(append_mem_index_task);
                 }
             }
             if (need_to_update_ft_segment_ts) {
