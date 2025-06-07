@@ -1691,15 +1691,6 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           bind_context_ptr->GenerateTableIndex());
             break;
         }
-        case ShowStmtType::kTasks: {
-            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kTasks,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
-
-            break;
-        }
         case ShowStmtType::kCatalogs: {
             this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                           ShowStmtType::kCatalogs,

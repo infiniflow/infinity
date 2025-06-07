@@ -53,6 +53,7 @@ import snapshot;
 import periodic_trigger_thread;
 import new_txn;
 import bg_task_type;
+import new_catalog;
 
 namespace infinity {
 
@@ -91,7 +92,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
                                 RecoverableError(status);
                             }
-                            InfinityContext::instance().storage()->catalog()->SetProfile(set_command->value_bool());
+                            InfinityContext::instance().storage()->new_catalog()->SetProfile(set_command->value_bool());
                             return true;
                         }
                         case GlobalVariable::kProfileRecordCapacity: {
@@ -105,7 +106,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                     Status::InvalidCommand(fmt::format("Try to set profile record capacity with invalid value {}", value_int));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->catalog()->ResizeProfileHistory(value_int);
+                            query_context->storage()->new_catalog()->ResizeProfileHistory(value_int);
                             return true;
                         }
                         case GlobalVariable::kInvalid: {
@@ -374,7 +375,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
 
-            auto profiler_record = InfinityContext::instance().storage()->catalog()->GetProfileRecord(export_command->file_no());
+            auto profiler_record = InfinityContext::instance().storage()->new_catalog()->GetProfileRecord(export_command->file_no());
             if (profiler_record == nullptr) {
                 Status status = Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no()));
                 RecoverableError(status);

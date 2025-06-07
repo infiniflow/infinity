@@ -191,7 +191,6 @@ STANDALONE      { return STANDALONE; }
 SYSTEM          { return SYSTEM; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
-TASKS          { return TASKS; }
 TENSOR          { return TENSOR; }
 TENSORARRAY     { return TENSORARRAY; }
 TEXT            { return TEXT; }
