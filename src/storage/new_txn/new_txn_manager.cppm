@@ -89,6 +89,8 @@ public:
 
     void SetCurrentTransactionID(TransactionID latest_transaction_id);
 
+    TransactionID current_transaction_id() const { return current_transaction_id_; }
+
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
@@ -155,7 +157,7 @@ private:
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
     TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
-    TxnTimeStamp current_ts_{};              // The next txn ts
+    TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 

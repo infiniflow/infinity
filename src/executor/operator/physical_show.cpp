@@ -485,21 +485,6 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowStmtType::kTasks: {
-            output_names_->reserve(5);
-            output_types_->reserve(5);
-            output_names_->emplace_back("begin_ts");
-            output_names_->emplace_back("commit_ts");
-            output_names_->emplace_back("transaction_id");
-            output_names_->emplace_back("command");
-            output_names_->emplace_back("text");
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
-            break;
-        }
         case ShowStmtType::kCatalogs: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -748,10 +733,6 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kLogs: {
             ExecuteShowLogs(query_context, show_operator_state);
-            break;
-        }
-        case ShowStmtType::kTasks: {
-            ExecuteShowTasks(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kCatalogs: {
@@ -1715,7 +1696,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto catalog = query_context->storage()->catalog();
+    auto catalog = query_context->storage()->new_catalog();
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -3990,27 +3971,6 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case GlobalVariable::kDeltaLogCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
-            };
-
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-            Vector<SharedPtr<DataType>> output_column_types{
-                integer_type,
-            };
-
-            output_block_ptr->Init(output_column_types);
-
-            Catalog *catalog_ptr = query_context->storage()->catalog();
-            Value value = Value::MakeBigInt(catalog_ptr->GetDeltaLogCount());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            break;
-        }
         case GlobalVariable::kNextTxnID: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
@@ -4026,9 +3986,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            Catalog *catalog_ptr = query_context->storage()->catalog();
-
-            Value value = Value::MakeBigInt(catalog_ptr->next_txn_id());
+            auto *new_txn_mgr = query_context->storage()->new_txn_manager();
+            Value value = Value::MakeBigInt(new_txn_mgr->current_transaction_id());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4209,7 +4168,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            Catalog *catalog_ptr = query_context->storage()->catalog();
+            auto *catalog_ptr = query_context->storage()->new_catalog();
             Value value = Value::MakeBigInt(catalog_ptr->ProfileHistorySize());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -4401,7 +4360,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            Value value = Value::MakeBool(InfinityContext::instance().storage()->catalog()->GetProfile());
+            Value value = Value::MakeBool(InfinityContext::instance().storage()->new_catalog()->GetProfile());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4652,28 +4611,6 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
-            case GlobalVariable::kDeltaLogCount: {
-                {
-                    // option name
-                    Value value = Value::MakeVarchar(var_name);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                }
-                {
-                    // option value
-                    Catalog *catalog_ptr = query_context->storage()->catalog();
-                    Value value = Value::MakeVarchar(std::to_string(catalog_ptr->GetDeltaLogCount()));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                }
-                {
-                    // option description
-                    Value value = Value::MakeVarchar("Catalog delta log count");
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-                }
-                break;
-            }
             case GlobalVariable::kNextTxnID: {
                 {
                     // option name
@@ -4683,8 +4620,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    Catalog *catalog_ptr = query_context->storage()->catalog();
-                    Value value = Value::MakeVarchar(std::to_string(catalog_ptr->next_txn_id()));
+                    auto *new_txn_mgr = query_context->storage()->new_txn_manager();
+                    Value value = Value::MakeVarchar(std::to_string(new_txn_mgr->current_transaction_id()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
@@ -4873,7 +4810,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    Catalog *catalog_ptr = query_context->storage()->catalog();
+                    auto *catalog_ptr = query_context->storage()->new_catalog();
                     Value value = Value::MakeVarchar(std::to_string(catalog_ptr->ProfileHistorySize()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -5084,7 +5021,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    bool enable_profile = InfinityContext::instance().storage()->catalog()->GetProfile();
+                    bool enable_profile = query_context->storage()->new_catalog()->GetProfile();
                     String enable_profile_condition = enable_profile ? "true" : "false";
                     Value value = Value::MakeVarchar(enable_profile_condition);
                     ValueExpression value_expr(value);
@@ -5856,78 +5793,6 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
                 output_block_ptr = nullptr;
                 row_count = 0;
             }
-        }
-    }
-
-    output_block_ptr->Finalize();
-    operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return;
-}
-
-void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorState *operator_state) {
-
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        varchar_type,
-        varchar_type,
-    };
-
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
-
-    auto catalog = query_context->storage()->catalog();
-    Vector<CatalogDeltaOpBrief> delta_log_brief_array = catalog->GetDeltaLogBriefs();
-
-    for (const auto &delta_op_brief : delta_log_brief_array) {
-        if (output_block_ptr.get() == nullptr) {
-            output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(*output_types_);
-        }
-
-        {
-            // begin_ts
-            Value value = Value::MakeBigInt(delta_op_brief.begin_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // commit_ts_
-            Value value = Value::MakeBigInt(delta_op_brief.commit_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        {
-            // txn_id_
-            Value value = Value::MakeBigInt(delta_op_brief.txn_id_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-        {
-            // delta op type
-            Value value = Value::MakeVarchar(CatalogDeltaOpTypeToString(delta_op_brief.type_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
-        }
-        {
-            // delta op text
-            Value value = Value::MakeVarchar(*delta_op_brief.text_ptr);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
-        }
-
-        ++row_count;
-        if (row_count == output_block_ptr->capacity()) {
-            output_block_ptr->Finalize();
-            operator_state->output_.emplace_back(std::move(output_block_ptr));
-            output_block_ptr = nullptr;
-            row_count = 0;
         }
     }
 
