@@ -35,6 +35,10 @@ import default_values;
 import data_block;
 import internal_types;
 import logical_type;
+import config;
+import status;
+import kv_store;
+
 #if 0
 using namespace infinity;
 class FirstFunctionTest : public BaseTestParamStr {};
@@ -44,15 +48,21 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
 
-TEST_P(FirstFunctionTest, first_func) {
+TEST_F(FirstFunctionTest, first_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(nullptr, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    RegisterFirstFunction(catalog_ptr);
+    RegisterFirstFunction(catalog_ptr.get());
 
     String op = "first";
-    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
     {

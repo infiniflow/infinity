@@ -16,31 +16,18 @@ module;
 
 export module background_process;
 
-import wal_manager;
 import blocking_queue;
-import bg_task;
 import stl;
-import global_resource_usage;
 
 namespace infinity {
 
-class Catalog;
 class CleanupPeriodicTrigger;
+class BGTask;
 
 export class BGTaskProcessor {
 public:
-    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wal_manager_(wal_manager), catalog_(catalog) {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("BGTaskProcessor");
-#endif
-    }
-    ~BGTaskProcessor() {
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("BGTaskProcessor");
-#endif
-    }
-    // cleanup is used before full checkpoint
-    void SetCleanupTrigger(SharedPtr<CleanupPeriodicTrigger> cleanup_trigger);
+    BGTaskProcessor();
+    virtual ~BGTaskProcessor();
 
     void Start();
     void Stop();
@@ -53,8 +40,6 @@ public:
         return task_text_;
     }
 
-    CleanupPeriodicTrigger *cleanup_trigger() const { return cleanup_trigger_.get(); }
-
 private:
     void Process();
 
@@ -62,10 +47,6 @@ private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_{"BGTaskProcessor"};
 
     Thread processor_thread_{};
-
-    WalManager *wal_manager_{};
-    Catalog *catalog_{};
-    SharedPtr<CleanupPeriodicTrigger> cleanup_trigger_;
 
     Atomic<u64> task_count_{};
 

@@ -115,8 +115,6 @@ public:
 
     String GetWalFilename() const;
 
-    i64 ReplayWalFile(StorageMode targe_storage_mode);
-
     Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
 
     Tuple<TransactionID, TxnTimeStamp> ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);

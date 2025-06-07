@@ -6,8 +6,8 @@ export module ltrim;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterLtrimFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterLtrimFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

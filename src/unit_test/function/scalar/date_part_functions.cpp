@@ -20,7 +20,7 @@ import base_test;
 import infinity_exception;
 import infinity_context;
 
-import catalog;
+import new_catalog;
 import logger;
 
 import default_values;
@@ -45,23 +45,30 @@ import scalar_function_set;
 
 import date_part;
 import third_party;
+import config;
+import status;
+import kv_store;
 
 using namespace infinity;
 
-class DatePartFunctionsTest : public BaseTestParamStr {};
+class DatePartFunctionsTest : public BaseTest {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, DatePartFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
-
-TEST_P(DatePartFunctionsTest, datepart_func) {
+TEST_F(DatePartFunctionsTest, datepart_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(nullptr, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    RegisterDatePartFunction(catalog_ptr);
+    RegisterDatePartFunction(catalog_ptr.get());
 
     String op = "datepart";
 
-    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -207,4 +214,5 @@ TEST_P(DatePartFunctionsTest, datepart_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
+    kv_store_ptr->Uninit();
 }

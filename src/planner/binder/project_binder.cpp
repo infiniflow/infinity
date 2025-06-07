@@ -36,6 +36,7 @@ import status;
 import logical_type;
 import array_info;
 import data_type;
+import new_catalog;
 
 namespace {
 
@@ -74,7 +75,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
         if (special_function.has_value()) {
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
         }
-        auto function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), function_expression);
+        auto function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), function_expression);
 
         if (IsEqual(function_set_ptr->name(), String("AVG")) && function_expression.arguments_->size() == 1 &&
             (*function_expression.arguments_)[0]->type_ == ParsedExprType::kColumn) {
@@ -144,7 +145,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
         return special_function.value();
     }
 
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
             String error_message = fmt::format("Aggregate function {} is called in another aggregate function.", function_set_ptr->name());
