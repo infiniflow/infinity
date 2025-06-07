@@ -47,7 +47,7 @@ import kv_store;
 using namespace infinity;
 class SubtractFunctionsTest : public BaseTest {};
 
-TEST_F(SubtractFunctionsTest, add_func) {
+TEST_F(SubtractFunctionsTest, sub_func) {
     using namespace infinity;
 
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
