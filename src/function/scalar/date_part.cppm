@@ -18,8 +18,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterDatePartFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterDatePartFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

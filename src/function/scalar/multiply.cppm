@@ -20,8 +20,8 @@ export module multiply;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterMulFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterMulFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -63,7 +63,7 @@ inline bool PowFunction::Run(MixedT, DoubleT, DoubleT &) {
     return false;
 }
 
-void RegisterPowFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterPowFunction(NewCatalog *catalog_ptr) {
     String func_name = "POW";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -98,7 +98,7 @@ void RegisterPowFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                              &ScalarFunction::BinaryFunctionWithFailure<MixedT, DoubleT, DoubleT, PowFunction>);
     function_set_ptr->AddFunction(pow_function_mixed_double);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

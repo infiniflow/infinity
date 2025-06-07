@@ -16,7 +16,7 @@ module;
 #include <cstdio>
 module trunc;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -88,7 +88,7 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
 }
 
 
-void RegisterTruncFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterTruncFunction(NewCatalog *catalog_ptr) {
     String func_name = "trunc";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -106,7 +106,7 @@ void RegisterTruncFunction(const UniquePtr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(truncate_float_bigint);
 
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

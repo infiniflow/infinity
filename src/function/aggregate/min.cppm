@@ -20,8 +20,8 @@ export module min;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterMinFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterMinFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

@@ -74,6 +74,8 @@ public:
     bool InfinityContextStarted() const { return infinity_context_started_; }
     bool InfinityContextInited() const { return infinity_context_inited_; }
 
+    // Only used by UT
+    void SetConfig(UniquePtr<Config> &&config);
 private:
     friend class Singleton;
 
@@ -95,8 +97,6 @@ private:
 
     // For hnsw index
     ThreadPool hnsw_build_thread_pool_{2};
-
-    mutable std::mutex mutex_;
 
     std::function<void()> start_servers_func_{};
     std::function<void()> stop_servers_func_{};

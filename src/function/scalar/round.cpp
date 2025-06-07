@@ -5,7 +5,7 @@ module;
 module round;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -35,7 +35,7 @@ struct RoundFunctionFloat {
     }
 };
 
-void RegisterRoundFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterRoundFunction(NewCatalog *catalog_ptr) {
     String func_name = "round";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -88,7 +88,7 @@ void RegisterRoundFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, RoundFunctionFloat>);
     function_set_ptr->AddFunction(round_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

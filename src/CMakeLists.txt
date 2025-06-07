@@ -517,7 +517,7 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        ut_function_cpp
+        ut_parallel_cpp
         CONFIGURE_DEPENDS
         unit_test/parallel/*.cpp
 )
@@ -548,6 +548,7 @@ add_executable(unit_test
         ${ut_test_helper_cpp}
         ${ut_planner_cpp}
         ${ut_function_cpp}
+        ${ut_parallel_cpp}
 
         ${infinity_cpp}
         ${planner_cpp}

@@ -6,8 +6,8 @@ export module lower;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterLowerFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterLowerFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

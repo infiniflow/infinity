@@ -20,8 +20,8 @@ export module extract;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterExtractFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

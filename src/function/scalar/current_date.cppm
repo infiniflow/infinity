@@ -20,8 +20,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterCurrentDateFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

@@ -36,7 +36,7 @@ import column_expression;
 import binding;
 import base_table_ref;
 
-import catalog;
+import new_catalog;
 import function_set;
 import scalar_function;
 import scalar_function_set;
@@ -156,8 +156,8 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
             auto right_pushed_plan = PushDependentJoinInternal(subquery_plan->right_node());
             auto right_correlated_binding = this->base_binding_;
 
-            Catalog *catalog = query_context_->storage()->catalog();
-            SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, "=");
+            NewCatalog *catalog = query_context_->storage()->new_catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
             Vector<SharedPtr<BaseExpression>> join_conditions;
 
             SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();

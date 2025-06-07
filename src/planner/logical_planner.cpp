@@ -15,11 +15,11 @@
 module;
 
 #include <cassert>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
-#include <optional>
 module logical_planner;
 
 import stl;
@@ -1118,7 +1118,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 case ParsedExprType::kFunction: {
                     FunctionExpr *function_expr = static_cast<FunctionExpr *>(expr);
                     auto [special_function_ptr, status] =
-                        Catalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->catalog(), function_expr->func_name_);
+                        NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->new_catalog(), function_expr->func_name_);
                     if (status.ok()) {
                         switch (special_function_ptr->special_type()) {
                             case SpecialType::kRowID: {

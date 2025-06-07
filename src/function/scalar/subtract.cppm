@@ -20,8 +20,8 @@ export module substract;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

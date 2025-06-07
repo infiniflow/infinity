@@ -19,7 +19,7 @@ module;
 module abs;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -49,7 +49,7 @@ struct AbsFunctionFloat {
     }
 };
 
-void RegisterAbsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterAbsFunction(NewCatalog *catalog_ptr) {
     String func_name = "ABS";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -102,7 +102,7 @@ void RegisterAbsFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                 &ScalarFunction::UnaryFunction<BFloat16T, BFloat16T, AbsFunctionFloat>);
     function_set_ptr->AddFunction(abs_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

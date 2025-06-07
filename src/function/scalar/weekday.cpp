@@ -15,7 +15,7 @@ module;
 #include <chrono>
 module weekday;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -64,7 +64,7 @@ inline bool WeekdayFunction::Run(TimestampT left, BigIntT &result) {
     return true;
 }
 
-void RegisterWeekdayFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterWeekdayFunction(NewCatalog *catalog_ptr) {
     String func_name = "weekday";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -87,7 +87,7 @@ void RegisterWeekdayFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, WeekdayFunction>);
     function_set_ptr->AddFunction(weekday_timestamp_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

@@ -18,8 +18,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterEraFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterEraFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

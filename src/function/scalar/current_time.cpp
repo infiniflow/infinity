@@ -16,7 +16,7 @@ module;
 module current_time;
 import stl;
 import config;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_context;
@@ -49,7 +49,7 @@ inline void CurrentTimeFunction::Run(TimeT &result) {
     result.value = static_cast<i32>(sys_secs.time_since_epoch().count() - (seconds_per_day * sys_days.time_since_epoch().count()));
 }
 
-void RegisterCurrentTimeFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterCurrentTimeFunction(NewCatalog *catalog_ptr) {
     String func_name = "current_time";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -60,7 +60,7 @@ void RegisterCurrentTimeFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::NullaryFunction<TimeT, CurrentTimeFunction>);
     function_set_ptr->AddFunction(current_time_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

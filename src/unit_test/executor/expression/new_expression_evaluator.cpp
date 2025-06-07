@@ -23,7 +23,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+import new_catalog;
 import scalar_function;
 import add;
 import substract;
@@ -46,19 +46,27 @@ import logical_type;
 import internal_types;
 import column_def;
 import data_type;
+import config;
+import status;
+import kv_store;
 
 using namespace infinity;
-class ExpressionEvaluatorTest : public BaseTestParamStr {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, ExpressionEvaluatorTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+class ExpressionEvaluatorTest : public BaseTest {};
 
-TEST_P(ExpressionEvaluatorTest, add_bigint_constant_1) {
+TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
-    RegisterAddFunction(catalog_ptr);
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(nullptr, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    RegisterAddFunction(catalog_ptr.get());
 
     String op = "+";
-    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -150,15 +158,22 @@ TEST_P(ExpressionEvaluatorTest, add_bigint_constant_1) {
             EXPECT_EQ(value.value_.big_int, (i64)(row_id + 1));
         }
     }
+    kv_store_ptr->Uninit();
 }
 
-TEST_P(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
+TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
-    RegisterSubtractFunction(catalog_ptr);
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(nullptr, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+    RegisterSubtractFunction(catalog_ptr.get());
 
     String op = "-";
-    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -250,4 +265,5 @@ TEST_P(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
             EXPECT_EQ((u64)value.value_.big_int, row_count - row_id);
         }
     }
+    kv_store_ptr->Uninit();
 }

@@ -23,7 +23,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+import new_catalog;
 import min;
 import function_set;
 import aggregate_function_set;
@@ -36,21 +36,28 @@ import data_block;
 import internal_types;
 import logical_type;
 import data_type;
+import config;
+import status;
+import kv_store;
 
 using namespace infinity;
-class MinFunctionTest : public BaseTestParamStr {};
+class MinFunctionTest : public BaseTest {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, MinFunctionTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
-
-TEST_P(MinFunctionTest, min_func) {
+TEST_F(MinFunctionTest, min_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(nullptr, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    RegisterMinFunction(catalog_ptr);
+    RegisterMinFunction(catalog_ptr.get());
 
     String op = "min";
-    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     SharedPtr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
     {
@@ -293,4 +300,6 @@ TEST_P(MinFunctionTest, min_func) {
 
         EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
     }
+
+    kv_store_ptr->Uninit();
 }

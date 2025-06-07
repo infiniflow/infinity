@@ -20,8 +20,8 @@ export module less;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterLessFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterLessFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

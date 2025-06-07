@@ -3,7 +3,7 @@ module;
 module upper;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -36,7 +36,7 @@ inline void UpperFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
     result_ptr->AppendVarcharInner(upper_str, result);
 }
 
-void RegisterUpperFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterUpperFunction(NewCatalog *catalog_ptr) {
     String func_name = "upper";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -47,7 +47,7 @@ void RegisterUpperFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, UpperFunction>);
     function_set_ptr->AddFunction(upper_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

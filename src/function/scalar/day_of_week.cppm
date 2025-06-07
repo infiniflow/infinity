@@ -19,8 +19,8 @@ export module day_of_week;
 import stl;
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterDayOfWeekFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterDayOfWeekFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

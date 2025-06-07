@@ -17,7 +17,7 @@ module;
 module builtin_functions;
 
 import stl;
-import catalog;
+import new_catalog;
 import avg;
 import count;
 import first;
@@ -92,7 +92,8 @@ import logical_type;
 
 namespace infinity {
 
-BuiltinFunctions::BuiltinFunctions(UniquePtr<Catalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
+
+BuiltinFunctions::BuiltinFunctions(NewCatalog *catalog_ptr) : catalog_ptr_(catalog_ptr) {}
 
 void BuiltinFunctions::Init() {
     RegisterAggregateFunction();
@@ -195,43 +196,43 @@ void BuiltinFunctions::RegisterTableFunction() {}
 void BuiltinFunctions::RegisterSpecialFunction() {
 
     SharedPtr<SpecialFunction> row_function = MakeShared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1, SpecialType::kRowID);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), row_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, row_function);
 
     SharedPtr<SpecialFunction> distance_function = MakeShared<SpecialFunction>("DISTANCE", DataType(LogicalType::kFloat), 2, SpecialType::kDistance);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), distance_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, distance_function);
 
     SharedPtr<SpecialFunction> similarity_function =
         MakeShared<SpecialFunction>("SIMILARITY", DataType(LogicalType::kFloat), 3, SpecialType::kSimilarity);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), similarity_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, similarity_function);
 
     SharedPtr<SpecialFunction> score_function = MakeShared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 4, SpecialType::kScore);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), score_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, score_function);
 
     SharedPtr<SpecialFunction> distance_factors_function =
         MakeShared<SpecialFunction>("DISTANCE_FACTORS", DataType(LogicalType::kVarchar), 5, SpecialType::kDistanceFactors);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), distance_factors_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, distance_factors_function);
 
     SharedPtr<SpecialFunction> similarity_factors_function =
         MakeShared<SpecialFunction>("SIMILARITY_FACTORS", DataType(LogicalType::kVarchar), 6, SpecialType::kSimilarityFactors);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), similarity_factors_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, similarity_factors_function);
 
     SharedPtr<SpecialFunction> score_factors_function =
         MakeShared<SpecialFunction>("SCORE_FACTORS", DataType(LogicalType::kVarchar), 7, SpecialType::kScoreFactors);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), score_factors_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, score_factors_function);
 
     auto createts_function =
         MakeShared<SpecialFunction>("CREATE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_CREATE, SpecialType::kCreateTs);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), createts_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, createts_function);
 
     auto deletets_function =
         MakeShared<SpecialFunction>("DELETE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_DELETE, SpecialType::kDeleteTs);
-    Catalog::AddSpecialFunction(catalog_ptr_.get(), deletets_function);
+    NewCatalog::AddSpecialFunction(catalog_ptr_, deletets_function);
 
-    Catalog::AddSpecialFunction(catalog_ptr_.get(),
-                                MakeShared<SpecialFunction>("FILTER_FULLTEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
+    NewCatalog::AddSpecialFunction(catalog_ptr_,
+                                   MakeShared<SpecialFunction>("FILTER_FULLTEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
 
-    Catalog::AddSpecialFunction(catalog_ptr_.get(),
-                                MakeShared<SpecialFunction>("FILTER_TEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
+    NewCatalog::AddSpecialFunction(catalog_ptr_,
+                                   MakeShared<SpecialFunction>("FILTER_TEXT", DataType(LogicalType::kBoolean), 0, SpecialType::kFilterFullText));
 }
 
 } // namespace infinity

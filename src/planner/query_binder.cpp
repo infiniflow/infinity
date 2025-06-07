@@ -85,6 +85,7 @@ import meta_info;
 import new_txn;
 import db_meeta;
 import table_meeta;
+import new_catalog;
 
 namespace infinity {
 
@@ -475,7 +476,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         columns.emplace_back(idx);
     }
     if (!update) {
-        const auto *catalog = query_context_ptr_->storage()->catalog();
+        NewCatalog *catalog = query_context_ptr_->storage()->new_catalog();
         for (const auto &[name, column_def] : catalog->special_columns_) {
             types_ptr->emplace_back(column_def->column_type_);
             names_ptr->emplace_back(name);

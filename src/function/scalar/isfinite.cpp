@@ -5,7 +5,7 @@ module;
 module isfinite;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -47,7 +47,7 @@ inline void IsfiniteFunction::Run(BFloat16T &left, BooleanT &result) {
     result = !std::isinf(static_cast<float>(left));
 }
 
-void RegisterIsfiniteFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterIsfiniteFunction(NewCatalog *catalog_ptr) {
     String func_name = "isfinite";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -76,7 +76,7 @@ void RegisterIsfiniteFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                               &ScalarFunction::UnaryFunction<BFloat16T, BooleanT, IsfiniteFunction>);
     function_set_ptr->AddFunction(isfinite_function_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

@@ -28,6 +28,7 @@ import third_party;
 import function_set;
 import bind_alias_proxy;
 import logger;
+import new_catalog;
 
 namespace infinity {
 
@@ -102,7 +103,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildColExpr(const ColumnExpr &expr, Bin
 
 SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
 
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
             Status status = Status::SyntaxError("Aggregate function is called in another aggregate function.");

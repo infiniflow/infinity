@@ -5,7 +5,7 @@ module;
 module ceil;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -35,7 +35,7 @@ struct CeilFunctionFloat {
     }
 };
 
-void RegisterCeilFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterCeilFunction(NewCatalog *catalog_ptr) {
     String func_name = "ceil";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -88,7 +88,7 @@ void RegisterCeilFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                  &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, CeilFunctionFloat>);
     function_set_ptr->AddFunction(Ceil_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

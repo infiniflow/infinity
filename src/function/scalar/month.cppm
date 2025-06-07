@@ -20,8 +20,8 @@ export module month;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterMonthFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterMonthFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

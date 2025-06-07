@@ -20,8 +20,8 @@ export module sum;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterSumFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

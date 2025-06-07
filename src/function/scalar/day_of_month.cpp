@@ -14,7 +14,7 @@
 module;
 module day_of_month;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -73,7 +73,7 @@ inline bool DayOfMonthFunction::Run(TimestampT left, BigIntT &result) {
     return true;
 }
 
-void RegisterDayOfMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterDayOfMonthFunction(NewCatalog *catalog_ptr) {
     String func_name = "dayofmonth";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -96,7 +96,7 @@ void RegisterDayOfMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayOfMonthFunction>);
     function_set_ptr->AddFunction(day_of_month_timestamp_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

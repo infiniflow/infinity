@@ -6,7 +6,7 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
-export void RegisterReverseFunction(const UniquePtr<Catalog> &catalog_ptr);
+class NewCatalog;
+export void RegisterReverseFunction(NewCatalog *catalog_ptr);
 
 }

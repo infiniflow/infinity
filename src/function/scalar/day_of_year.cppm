@@ -19,8 +19,8 @@ export module day_of_year;
 import stl;
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterDayOfYearFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterDayOfYearFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

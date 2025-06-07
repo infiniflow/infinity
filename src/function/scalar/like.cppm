@@ -20,10 +20,10 @@ export module like;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterLikeFunction(NewCatalog *catalog_ptr);
 
-export void RegisterNotLikeFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterNotLikeFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

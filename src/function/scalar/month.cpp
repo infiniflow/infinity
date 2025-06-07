@@ -14,7 +14,7 @@
 module;
 module month;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -56,7 +56,7 @@ inline bool MonthFunction::Run(TimestampT left, BigIntT &result) {
     return true;
 }
 
-void RegisterMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterMonthFunction(NewCatalog *catalog_ptr) {
     String func_name = "month";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -80,7 +80,7 @@ void RegisterMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(month_timestamp_function);
 
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

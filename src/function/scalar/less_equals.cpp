@@ -19,7 +19,7 @@ module;
 module less_equals;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -96,7 +96,7 @@ static void GenerateLessEqualsFunction(SharedPtr<ScalarFunctionSet> &function_se
     function_set_ptr->AddFunction(less_function);
 }
 
-void RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterLessEqualsFunction(NewCatalog *catalog_ptr) {
     String func_name = "<=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -163,7 +163,7 @@ void RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                              &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessEqualsFunction>);
     function_set_ptr->AddFunction(varchar_less_equals_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

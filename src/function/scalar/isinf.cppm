@@ -6,8 +6,8 @@ export module isinf;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterIsinfFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterIsinfFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

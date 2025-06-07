@@ -6,8 +6,8 @@ export module char_length;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterCharLengthFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterCharLengthFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

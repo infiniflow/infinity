@@ -17,7 +17,7 @@ module;
 module add;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -214,7 +214,7 @@ inline bool AddFunction::Run(MixedT, MixedT, MixedT &) {
     return false;
 }
 
-void RegisterAddFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterAddFunction(NewCatalog *catalog_ptr) {
     String func_name = "+";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -358,7 +358,7 @@ void RegisterAddFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                             &ScalarFunction::BinaryFunctionWithFailure<MixedT, MixedT, MixedT, AddFunction>);
     function_set_ptr->AddFunction(add_function_mixed_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

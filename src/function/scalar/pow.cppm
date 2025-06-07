@@ -20,8 +20,8 @@ export module pow;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterPowFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterPowFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

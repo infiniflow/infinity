@@ -27,6 +27,7 @@ import logger;
 import wal_manager;
 import wal_entry;
 import infinity_exception;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -300,9 +301,9 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
     }
 
     LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
-    storage_ptr->catalog()->next_txn_id_ = last_txn_id;
+    storage_ptr->new_txn_manager()->SetCurrentTransactionID(last_txn_id);
     storage_ptr->wal_manager()->UpdateCommitState(last_commit_ts, 0);
-    storage_ptr->txn_manager()->SetStartTS(last_commit_ts);
+    storage_ptr->new_txn_manager()->SetStartTS(last_commit_ts);
     return Status::OK();
 }
 

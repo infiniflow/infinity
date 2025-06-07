@@ -40,7 +40,7 @@ import scalar_function;
 import scalar_function_set;
 import index_base;
 import table_index_entry;
-import catalog;
+import new_catalog;
 import value;
 import table_index_meta;
 import meta_info;
@@ -301,7 +301,7 @@ public:
         : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {}
 
     void Init() {
-        const auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
+        const auto and_function_set_ptr = NewCatalog::GetFunctionSetByName(query_context_->storage()->new_catalog(), "AND");
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
         if (base_table_ref_ptr_) {

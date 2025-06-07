@@ -17,7 +17,7 @@ module;
 module divide;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -85,7 +85,7 @@ inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
     return false;
 }
 
-void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterDivFunction(NewCatalog *catalog_ptr) {
     String func_name = "/";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -144,7 +144,7 @@ void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_double);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

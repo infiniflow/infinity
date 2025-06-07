@@ -3,7 +3,7 @@ module;
 module lower;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -36,7 +36,7 @@ inline void LowerFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
     result_ptr->AppendVarcharInner(lower_str, result);
 }
 
-void RegisterLowerFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterLowerFunction(NewCatalog *catalog_ptr) {
     String func_name = "lower";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -47,7 +47,7 @@ void RegisterLowerFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, LowerFunction>);
     function_set_ptr->AddFunction(lower_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

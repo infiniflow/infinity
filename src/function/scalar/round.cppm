@@ -6,8 +6,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterRoundFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterRoundFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

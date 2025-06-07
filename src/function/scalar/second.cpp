@@ -14,7 +14,7 @@
 module;
 module second;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -55,7 +55,7 @@ inline bool SecondFunction::Run(TimestampT left, BigIntT &result) {
     return true;
 }
 
-void RegisterSecondFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterSecondFunction(NewCatalog *catalog_ptr) {
     String func_name = "second";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -80,7 +80,7 @@ void RegisterSecondFunction(const UniquePtr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(second_timestamp_function);
 
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

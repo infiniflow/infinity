@@ -16,7 +16,7 @@ module;
 module current_date;
 import stl;
 import config;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_context;
@@ -49,7 +49,7 @@ inline void CurrentDateFunction::Run(DateT &result) {
     result.value = sys_days.time_since_epoch().count();
 }
 
-void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterCurrentDateFunction(NewCatalog *catalog_ptr) {
     String func_name = "current_date";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -57,7 +57,7 @@ void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {
     ScalarFunction current_date_function(func_name, {}, DataType(LogicalType::kDate), &ScalarFunction::NullaryFunction<DateT, CurrentDateFunction>);
     function_set_ptr->AddFunction(current_date_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

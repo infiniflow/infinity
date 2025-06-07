@@ -20,8 +20,8 @@ export module count;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterCountFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

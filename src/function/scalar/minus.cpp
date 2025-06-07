@@ -17,7 +17,7 @@ module;
 module minus;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -185,14 +185,14 @@ SharedPtr<ScalarFunctionSet> GetMinusFunctionSet() {
     return function_set_ptr;
 }
 
-void RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterMinusFunction(NewCatalog *catalog_ptr) {
     auto function_set_ptr = GetMinusFunctionSet();
-    Catalog::AddFunctionSet(catalog_ptr.get(), std::move(function_set_ptr));
+    NewCatalog::AddFunctionSet(catalog_ptr, std::move(function_set_ptr));
 }
 
-void AppendRegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void AppendRegisterMinusFunction(NewCatalog *catalog_ptr) {
     auto function_set_ptr = GetMinusFunctionSet();
-    Catalog::AppendToScalarFunctionSet(catalog_ptr.get(), std::move(function_set_ptr));
+    NewCatalog::AppendToScalarFunctionSet(catalog_ptr, std::move(function_set_ptr));
 }
 
 } // namespace infinity

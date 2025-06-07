@@ -112,11 +112,8 @@ public:
     Status WriterToReader();
     Status UnInitFromWriter();
 
-    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void AttachCatalog(TxnTimeStamp checkpoint_ts);
     void RecoverMemIndex();
-    void LoadFullCheckpoint(const String &checkpoint_path);
-    void AttachDeltaCheckpoint(const String &checkpoint_path);
 
     Config *config() const { return config_ptr_; }
     ReaderInitPhase reader_init_phase() const { return reader_init_phase_; }

@@ -50,7 +50,7 @@ import cast_function;
 import bound_cast_func;
 import cast_table;
 
-import catalog;
+import new_catalog;
 import third_party;
 import subquery_expr;
 import infinity_exception;
@@ -106,8 +106,8 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
 
             limit_node->set_left_node(subquery_plan);
             // Step2 Generate aggregate first operator on the limit operator
-            Catalog *catalog = query_context->storage()->catalog();
-            SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, "first");
+            NewCatalog *catalog = query_context->storage()->new_catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "first");
             ColumnBinding limit_column_binding = limit_node->GetColumnBindings()[0];
 
             SharedPtr<ColumnExpression> argument = ColumnExpression::Make(expr_ptr->Type(),
@@ -180,13 +180,13 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             SharedPtr<BaseExpression> right_expr = CastExpression::AddCastToType(right_column, expr_ptr->left_->Type());
             function_arguments.emplace_back(right_expr);
 
-            Catalog *catalog = query_context->storage()->catalog();
-            SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, "first");
+            NewCatalog *catalog = query_context->storage()->new_catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "first");
 
             if (expr_ptr->subquery_type_ == SubqueryType::kIn) {
-                function_set_ptr = Catalog::GetFunctionSetByName(catalog, "=");
+                function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
             } else {
-                function_set_ptr = Catalog::GetFunctionSetByName(catalog, "<>");
+                function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "<>");
             }
             auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
@@ -303,8 +303,8 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
                 ColumnExpression::Make(expr_ptr->Type(), alias, logical_join->mark_index_, right_names->at(0), 0, 0);
 
             // Add NOT function on the mark column
-            Catalog *catalog = query_context->storage()->catalog();
-            SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, "not");
+            NewCatalog *catalog = query_context->storage()->new_catalog();
+            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "not");
             Vector<SharedPtr<BaseExpression>> function_arguments;
             function_arguments.reserve(1);
             function_arguments.emplace_back(mark_column);
@@ -415,8 +415,8 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
                                             const Vector<ColumnBinding> &subplan_column_bindings,
                                             SizeT correlated_base_index) {
 
-    Catalog *catalog = query_context->storage()->catalog();
-    SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, "=");
+    NewCatalog *catalog = query_context->storage()->new_catalog();
+    SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
     SizeT column_count = correlated_columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         auto &left_column_expr = correlated_columns[idx];

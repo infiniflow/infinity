@@ -6,8 +6,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterSqrtFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterSqrtFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

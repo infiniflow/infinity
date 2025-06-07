@@ -15,7 +15,7 @@
 module;
 module reverse;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -47,7 +47,7 @@ inline void ReverseFunction::Run(VarcharT &left, VarcharT &result, ColumnVector 
     result_ptr->AppendVarcharInner(reversed_str, result);
 }
 
-void RegisterReverseFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterReverseFunction(NewCatalog *catalog_ptr) {
     String func_name = "reverse";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -59,7 +59,7 @@ void RegisterReverseFunction(const UniquePtr<Catalog> &catalog_ptr) {
     function_set_ptr->AddFunction(resverse_function);
 
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

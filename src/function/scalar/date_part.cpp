@@ -16,7 +16,7 @@ module;
 module date_part;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -185,7 +185,7 @@ inline bool DatePartFunction::Run(VarcharT &left, TimestampT right, BigIntT &res
     return true;
 }
 
-void RegisterDatePartFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterDatePartFunction(NewCatalog *catalog_ptr) {
     String func_name = "datepart";
     DatePartFunction::InitDatePartFunction();
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -208,7 +208,7 @@ void RegisterDatePartFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::BinaryFunctionWithFailure<VarcharT, TimestampT, BigIntT, DatePartFunction>);
     function_set_ptr->AddFunction(date_part_timestamp_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

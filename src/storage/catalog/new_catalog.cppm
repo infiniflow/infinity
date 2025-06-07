@@ -59,6 +59,8 @@ struct MemIndexID;
 class TableCache;
 class DbCache;
 class SystemCache;
+class FunctionSet;
+class SpecialFunction;
 
 enum class ColumnVectorTipe;
 
@@ -144,7 +146,7 @@ export enum class UsageFlag {
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
-    ~NewCatalog();
+    virtual ~NewCatalog();
 
 public:
     Status TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_paths);
@@ -260,6 +262,12 @@ public:
 private:
     std::shared_mutex segment_update_ts_mtx_{};
     HashMap<String, SharedPtr<SegmentUpdateTS>> segment_update_ts_map_{};
+
+public:
+    // Currently, these function or function set can't be changed and also will not be persistent.
+    HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
+    HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
+    HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
 public:
     void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
@@ -419,5 +427,17 @@ public:
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
     static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
+
+public:
+    // Function related methods
+    static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
+
+    static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
+    static void AppendToScalarFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
+    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
+
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
 };
 } // namespace infinity

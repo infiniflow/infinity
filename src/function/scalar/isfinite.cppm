@@ -6,8 +6,8 @@ export module isfinite;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterIsfiniteFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterIsfiniteFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

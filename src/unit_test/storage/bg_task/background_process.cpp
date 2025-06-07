@@ -42,7 +42,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, BGProcessTest, ::testing::Valu
 TEST_P(BGProcessTest, test1) {
     using namespace infinity;
 
-    BGTaskProcessor processor(infinity::InfinityContext::instance().storage()->wal_manager(), nullptr);
+    BGTaskProcessor processor;
 
     processor.Start();
 

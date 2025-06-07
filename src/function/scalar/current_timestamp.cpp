@@ -16,7 +16,7 @@ module;
 module current_timestamp;
 import stl;
 import config;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_context;
@@ -51,7 +51,7 @@ inline void CurrentTimestampFunction::Run(TimestampT &result) {
     result.date.value = static_cast<i32>(sys_days.time_since_epoch().count());
 }
 
-void RegisterCurrentTimestampFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterCurrentTimestampFunction(NewCatalog *catalog_ptr) {
     String func_name = "current_timestamp";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -62,7 +62,7 @@ void RegisterCurrentTimestampFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::NullaryFunction<TimestampT, CurrentTimestampFunction>);
     function_set_ptr->AddFunction(current_timestamp_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

@@ -17,7 +17,7 @@ module;
 module sum;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import aggregate_function;
@@ -188,7 +188,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
-void RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterSumFunction(NewCatalog *catalog_ptr) {
     String func_name = "SUM";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -288,7 +288,7 @@ void RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(sum_function);
     }
 #endif
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

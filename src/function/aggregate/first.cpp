@@ -17,7 +17,7 @@ module;
 module first;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import aggregate_function;
@@ -120,7 +120,7 @@ public:
 //    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<PathT, PathT>); }
 //};
 
-void RegisterFirstFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterFirstFunction(NewCatalog *catalog_ptr) {
     String func_name = "FIRST";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -271,7 +271,7 @@ void RegisterFirstFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(first_function);
     }
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

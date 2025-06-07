@@ -20,16 +20,16 @@ export module builtin_functions;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
 export class BuiltinFunctions : public EnableSharedFromThis<BuiltinFunctions> {
 public:
-    explicit BuiltinFunctions(UniquePtr<Catalog> &catalog_ptr);
+    explicit BuiltinFunctions(NewCatalog *catalog_ptr);
 
     void Init();
 
 private:
-    UniquePtr<Catalog> &catalog_ptr_;
+    NewCatalog *catalog_ptr_{};
 
 private:
     void RegisterAggregateFunction();

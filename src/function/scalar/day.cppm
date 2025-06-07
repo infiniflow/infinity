@@ -20,8 +20,8 @@ export module day;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterDayFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterDayFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

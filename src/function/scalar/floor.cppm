@@ -6,8 +6,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterFloorFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterFloorFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

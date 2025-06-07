@@ -45,6 +45,8 @@ import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
 import mem_index;
+import scalar_function_set;
+import special_function;
 
 import logical_type;
 import data_type;
@@ -56,6 +58,7 @@ namespace infinity {
 // String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
 // } // namespace
+
 
 void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock,
                                       BufferHandle version_buffer_handle,
@@ -126,9 +129,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return status;
     }
 
-    auto InitBlockColumn = [&](ColumnMeta &column_meta) {
-        return column_meta.LoadSet();
-    };
+    auto InitBlockColumn = [&](ColumnMeta &column_meta) { return column_meta.LoadSet(); };
     auto InitBlock = [&](BlockMeta &block_meta) {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
         std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
@@ -1604,6 +1605,88 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
         }
     }
     return Status::OK();
+}
+
+SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
+    // Transfer the function to upper case.
+    StringToLower(function_name);
+
+    if (!catalog->function_sets_.contains(function_name)) {
+        Status status = Status::FunctionNotFound(function_name);
+        RecoverableError(status);
+    }
+    return catalog->function_sets_[function_name];
+}
+
+void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if (catalog->function_sets_.contains(name)) {
+        String error_message = fmt::format("Trying to add duplicated function {} into catalog", name);
+        UnrecoverableError(error_message);
+    }
+    catalog->function_sets_.emplace(name, function_set);
+}
+
+void NewCatalog::AppendToScalarFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if (!catalog->function_sets_.contains(name)) {
+        String error_message = fmt::format("Trying to append to non-existent function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto target_scalar_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(catalog->function_sets_[name]);
+    if (!target_scalar_function_set) {
+        String error_message = fmt::format("Trying to append to non-scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto source_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(function_set);
+    if (!source_function_set) {
+        String error_message = fmt::format("Trying to append non-scalar function to scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    for (const auto &function : source_function_set->GetAllScalarFunctions()) {
+        target_scalar_function_set->AddFunction(function);
+    }
+}
+
+void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
+    String name = special_function->name();
+    StringToLower(name);
+    if (catalog->special_functions_.contains(name)) {
+        String error_message = fmt::format("Trying to add duplicated special function into catalog: {}", name);
+        UnrecoverableError(error_message);
+    }
+    catalog->special_functions_.emplace(name, special_function);
+    switch (special_function->special_type()) {
+        case SpecialType::kRowID:
+        case SpecialType::kDistance:
+        case SpecialType::kDistanceFactors:
+        case SpecialType::kSimilarity:
+        case SpecialType::kSimilarityFactors:
+        case SpecialType::kScore:
+        case SpecialType::kScoreFactors:
+        case SpecialType::kFilterFullText: {
+            return;
+        }
+        case SpecialType::kCreateTs:
+        case SpecialType::kDeleteTs: {
+            break;
+        }
+    }
+    auto special_column_def = MakeUnique<ColumnDef>(special_function->extra_idx(),
+                                                    MakeShared<DataType>(special_function->data_type()),
+                                                    special_function->name(),
+                                                    std::set<ConstraintType>());
+    catalog->special_columns_.emplace(name, std::move(special_column_def));
+}
+
+Tuple<SpecialFunction *, Status> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
+    StringToLower(function_name);
+    if (!catalog->special_functions_.contains(function_name)) {
+        return {nullptr, Status::SpecialFunctionNotFound()};
+    }
+    return {catalog->special_functions_[function_name].get(), Status::OK()};
 }
 
 } // namespace infinity

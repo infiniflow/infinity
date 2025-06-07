@@ -21,15 +21,14 @@ import stl;
 import function;
 import base_expression;
 import function_expr;
-//
 
 namespace infinity {
 
-struct Catalog;
+struct NewCatalog;
 
 export class FunctionSet {
 public:
-    static SharedPtr<FunctionSet> GetFunctionSet(Catalog *catalog, const FunctionExpr &expr);
+    static SharedPtr<FunctionSet> GetFunctionSet(NewCatalog *catalog, const FunctionExpr &expr);
 
     static String ToString(const String &name, const Vector<SharedPtr<BaseExpression>> &arguments);
 

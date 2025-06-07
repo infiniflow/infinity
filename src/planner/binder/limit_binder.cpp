@@ -25,6 +25,7 @@ import function;
 import status;
 import infinity_exception;
 import logger;
+import new_catalog;
 
 namespace infinity {
 
@@ -45,7 +46,7 @@ SharedPtr<BaseExpression> LimitBinder::BuildExpression(const ParsedExpr &expr, B
 }
 
 SharedPtr<BaseExpression> LimitBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
         Status status = Status::SyntaxError("Only scalar function is supported in limit clause.");
         RecoverableError(status);
