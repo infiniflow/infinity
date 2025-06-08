@@ -60,7 +60,6 @@ import segment_iter;
 import segment_entry;
 import variables;
 import default_values;
-import catalog;
 import txn_manager;
 import wal_manager;
 import logger;

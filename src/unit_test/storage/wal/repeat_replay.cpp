@@ -39,7 +39,6 @@ import table_def;
 import data_block;
 import block_entry;
 import txn;
-import catalog;
 import segment_entry;
 import value;
 import internal_types;

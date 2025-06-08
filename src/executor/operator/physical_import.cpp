@@ -60,8 +60,6 @@ import constant_expr;
 import wal_entry;
 import knn_expr;
 import value;
-import catalog;
-import catalog_delta_entry;
 import build_fast_rough_filter_task;
 import stream_reader;
 import parser_assert;

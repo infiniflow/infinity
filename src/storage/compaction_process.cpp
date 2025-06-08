@@ -20,7 +20,6 @@ module compaction_process;
 
 import stl;
 import bg_task;
-import catalog;
 import logger;
 import infinity_exception;
 import third_party;

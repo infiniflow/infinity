@@ -26,7 +26,6 @@ import stl;
 import buffer_manager;
 import default_values;
 import wal_manager;
-import catalog;
 import new_catalog;
 import txn_manager;
 import new_txn_manager;

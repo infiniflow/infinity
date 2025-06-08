@@ -102,7 +102,6 @@ import block_index;
 import column_expr;
 import function_expr;
 import insert_row_expr;
-import catalog;
 import special_function;
 import utility;
 import wal_manager;

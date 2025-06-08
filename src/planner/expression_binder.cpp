@@ -83,7 +83,6 @@ import match_sparse_expr;
 import fusion_expr;
 import data_type;
 import expression_type;
-import catalog;
 import meta_info;
 import column_vector;
 import new_catalog;

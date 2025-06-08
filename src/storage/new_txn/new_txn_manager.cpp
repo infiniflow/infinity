@@ -27,8 +27,6 @@ import wal_entry;
 import infinity_exception;
 import logger;
 import buffer_manager;
-import catalog_delta_entry;
-import catalog;
 import default_values;
 import wal_manager;
 import defer_op;
