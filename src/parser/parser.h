@@ -165,7 +165,7 @@ struct SQL_LTYPE {
     VALUES = 291,                  /* VALUES  */
     VIEW = 292,                    /* VIEW  */
     INDEX = 293,                   /* INDEX  */
-    VIEWS = 294,                   /* VIEWS  */
+    TASKS = 294,                   /* TASKS  */
     DATABASES = 295,               /* DATABASES  */
     SEGMENT = 296,                 /* SEGMENT  */
     SEGMENTS = 297,                /* SEGMENTS  */

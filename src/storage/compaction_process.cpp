@@ -41,6 +41,8 @@ import new_compaction_alg;
 import table_meeta;
 import db_meeta;
 import segment_meta;
+import bg_task;
+import base_txn_store;
 
 namespace infinity {
 
@@ -103,21 +105,32 @@ void CompactionProcessor::NewDoCompact() {
         }
     }
 
-    auto compact_table = [&](const String &db_name, const String &table_name) {
+    auto compact_table = [&](const String &db_name, const String &table_name, SharedPtr<BGTaskInfo> &bg_task_info) {
         auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
         Status status = Status::OK();
         DeferFn defer_fn([&] {
             if (status.ok()) {
                 Status commit_status = new_txn_mgr->CommitTxn(new_txn);
                 if (!commit_status.ok()) {
-                    LOG_ERROR(fmt::format("Commit Compaction failed: {}", commit_status.message()));
+                    LOG_ERROR(fmt::format("Commit compaction failed: {}", commit_status.message()));
                 }
+                CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(new_txn->GetTxnStore());
+                bg_task_info->task_info_list_.emplace_back(fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
+                                                                       new_txn->TxnID(),
+                                                                       new_txn->CommitTS(),
+                                                                       db_name,
+                                                                       table_name,
+                                                                       fmt::join(compact_txn_store->segment_ids_, ","),
+                                                                       compact_txn_store->new_segment_id_));
+                bg_task_info->status_list_.emplace_back(commit_status);
             } else {
                 LOG_ERROR(fmt::format("Compaction failed: {}", status.message()));
                 Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
                 if (!rollback_status.ok()) {
                     UnrecoverableError(rollback_status.message());
                 }
+                bg_task_info->task_info_list_.emplace_back(fmt::format("Compact table: {}.{}", db_name, table_name));
+                bg_task_info->status_list_.emplace_back(status);
             }
         });
 
@@ -159,9 +172,9 @@ void CompactionProcessor::NewDoCompact() {
 
         for (SegmentID segment_id : segment_ids) {
             SegmentMeta segment_meta(segment_id, *table_meta);
-            auto [segment_row_cnt, status] = segment_meta.GetRowCnt1();
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
+            auto [segment_row_cnt, segment_status] = segment_meta.GetRowCnt1();
+            if (!segment_status.ok()) {
+                UnrecoverableError(segment_status.message());
             }
 
             compaction_alg->AddSegment(segment_id, segment_row_cnt);
@@ -174,8 +187,12 @@ void CompactionProcessor::NewDoCompact() {
     if (db_table_names.empty()) {
         LOG_TRACE("No table to compact.");
     } else {
+        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCompact);
         for (const auto &[db_name, table_name] : db_table_names) {
-            compact_table(db_name, table_name);
+            compact_table(db_name, table_name, bg_task_info);
+        }
+        if (!bg_task_info->task_info_list_.empty()) {
+            new_txn_mgr->AddTaskInfo(bg_task_info);
         }
     }
 }

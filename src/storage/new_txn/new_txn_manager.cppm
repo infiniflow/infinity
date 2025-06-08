@@ -34,6 +34,7 @@ class KVStore;
 struct WalEntry;
 class SystemCache;
 struct TxnContext;
+struct BGTaskInfo;
 
 export class NewTxnManager {
 public:
@@ -173,6 +174,15 @@ private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
     SharedPtr<TxnAllocator> txn_allocator_{};
+
+public:
+    // Background task info list
+    void AddTaskInfo(SharedPtr<BGTaskInfo> task_info);
+    Vector<SharedPtr<BGTaskInfo>> GetTaskInfoList() const;
+
+private:
+    mutable std::mutex task_lock_{};
+    Deque<SharedPtr<BGTaskInfo>> task_info_list_{};
 };
 
 } // namespace infinity

@@ -191,4 +191,11 @@ public:
     String command_content_{};
 };
 
+export struct BGTaskInfo {
+    explicit BGTaskInfo(BGTaskType type);
+    Vector<String> task_info_list_{};
+    Vector<Status> status_list_{};
+    BGTaskType type_{BGTaskType::kInvalid};
+};
+
 } // namespace infinity

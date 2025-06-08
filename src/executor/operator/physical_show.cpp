@@ -593,6 +593,15 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kTasks: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("description");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -669,8 +678,8 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowBlockColumn(query_context, show_operator_state);
             break;
         }
-        case ShowStmtType::kViews: {
-            ExecuteShowViews(query_context, show_operator_state);
+        case ShowStmtType::kTasks: {
+            ExecuteShowTasks(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kSessionVariable: {
@@ -1676,8 +1685,34 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     }
 }
 
-void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    RecoverableError(Status::NotSupport("SHOW VIEW isn't implemented"));
+void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    NewTxnManager *txn_mgr = query_context->storage()->new_txn_manager();
+    Vector<SharedPtr<BGTaskInfo>> bg_task_info_list = txn_mgr->GetTaskInfoList();
+    // create data block for output state
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(*output_types_);
+    //    SizeT row_count = 0;
+
+    //    for (SizeT i = 0; i < bg_task_info_list.size(); ++i) {
+    //        if (!output_block_ptr) {
+    //            output_block_ptr = DataBlock::MakeUniquePtr();
+    //            output_block_ptr->Init(*output_types_);
+    //        }
+    //
+    //
+    //
+    //        if (++row_count == output_block_ptr->capacity()) {
+    //            output_block_ptr->Finalize();
+    //            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    //            output_block_ptr = nullptr;
+    //            row_count = 0;
+    //        }
+    //    }
+
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {

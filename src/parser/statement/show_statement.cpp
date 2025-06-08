@@ -60,7 +60,7 @@ std::string ShowStatement::ToString() const {
             ss << "Show collections, database: " << schema_name_;
             break;
         }
-        case ShowStmtType::kViews: {
+        case ShowStmtType::kTasks: {
             ss << "Show views, database: " << schema_name_;
             break;
         }

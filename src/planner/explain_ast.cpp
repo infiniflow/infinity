@@ -583,7 +583,7 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             Status::NotSupport("Show collections");
             break;
         }
-        case ShowStmtType::kViews: {
+        case ShowStmtType::kTasks: {
             Status::NotSupport("Show views");
             break;
         }

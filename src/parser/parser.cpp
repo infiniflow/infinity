@@ -150,7 +150,7 @@ enum yysymbol_kind_t
   YYSYMBOL_VALUES = 36,                    /* VALUES  */
   YYSYMBOL_VIEW = 37,                      /* VIEW  */
   YYSYMBOL_INDEX = 38,                     /* INDEX  */
-  YYSYMBOL_VIEWS = 39,                     /* VIEWS  */
+  YYSYMBOL_TASKS = 39,                     /* TASKS  */
   YYSYMBOL_DATABASES = 40,                 /* DATABASES  */
   YYSYMBOL_SEGMENT = 41,                   /* SEGMENT  */
   YYSYMBOL_SEGMENTS = 42,                  /* SEGMENTS  */
@@ -948,7 +948,7 @@ static const char *const yytname[] =
   "UPDATE", "DELETE", "COPY", "SET", "EXPLAIN", "SHOW", "ALTER", "EXECUTE",
   "PREPARE", "UNION", "ALL", "INTERSECT", "COMPACT", "ADD", "RENAME",
   "EXCEPT", "FLUSH", "USE", "OPTIMIZE", "PROPERTIES", "DATABASE", "TABLE",
-  "COLLECTION", "TABLES", "INTO", "VALUES", "VIEW", "INDEX", "VIEWS",
+  "COLLECTION", "TABLES", "INTO", "VALUES", "VIEW", "INDEX", "TASKS",
   "DATABASES", "SEGMENT", "SEGMENTS", "BLOCK", "BLOCKS", "COLUMN",
   "COLUMNS", "INDEXES", "CHUNK", "SYSTEM", "GROUP", "BY", "HAVING", "AS",
   "NATURAL", "JOIN", "LEFT", "RIGHT", "OUTER", "FULL", "ON", "INNER",
@@ -6041,11 +6041,11 @@ yyreduce:
 #line 6042 "parser.cpp"
     break;
 
-  case 251: /* show_statement: SHOW VIEWS  */
+  case 251: /* show_statement: SHOW TASKS  */
 #line 1860 "parser.y"
              {
     (yyval.show_stmt) = new infinity::ShowStatement();
-    (yyval.show_stmt)->show_type_ = infinity::ShowStmtType::kViews;
+    (yyval.show_stmt)->show_type_ = infinity::ShowStmtType::kTasks;
 }
 #line 6051 "parser.cpp"
     break;

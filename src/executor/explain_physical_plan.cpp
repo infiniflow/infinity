@@ -1302,12 +1302,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowStmtType::kViews: {
+        case ShowStmtType::kTasks: {
             String show_str;
             if (intent_size != 0) {
-                show_str = String(intent_size - 2, ' ') + "-> SHOW VIEWS ";
+                show_str = String(intent_size - 2, ' ') + "-> SHOW TASKS ";
             } else {
-                show_str = "SHOW VIEWS ";
+                show_str = "SHOW TASKS ";
             }
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
