@@ -1,5 +1,4 @@
 import os
-from shutil import copyfile
 import sys
 
 current_path = os.path.abspath(os.path.dirname(__file__))
@@ -23,11 +22,8 @@ from httpapibase import HttpTest
 from common.common_values import *
 from infinity.errors import ErrorCode
 import infinity.index as index
-import pandas
 import os
-import time
 import httputils
-
 
 class TestIndex(HttpTest):
     def test_http_create_index_IVF(self):
@@ -53,7 +49,6 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_create_index_HNSW(self):
         db_name = "default_db"
         table_name = "test_http_test_create_index_HMSW"
@@ -76,7 +71,6 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_create_index_fulltext(self):
         db_name = "default_db"
         table_name = "test_http_test_create_index_fulltext"
@@ -108,7 +102,6 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_drop_non_existent_index(self):
         db_name = "default_db"
         table_name = "test_http_test_drop_non_existent_index"
@@ -131,7 +124,6 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_create_created_index(self):
         db_name = "default_db"
         table_name = "test_http_test_create_index_fulltext"
@@ -271,7 +263,6 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_create_index_on_dropped_table(self):
         db_name = "default_db"
         table_name = "test_http_test_create_index_on_dropped_table"
@@ -299,7 +290,6 @@ class TestIndex(HttpTest):
                           })
         return
 
-    # PASS
     def test_http_create_index_show_index(self):
         db_name = "default_db"
         table_name = "test_http_test_create_index_show_index"
@@ -666,7 +656,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_create_index_with_valid_options(self):
         db_name = "default_db"
         table_name = "test_http_test_create_index_with_valid_options"
@@ -698,7 +687,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_create_index_with_invalid_options(self):
         db_name = "default_db"
         table_name = "test_http_test_http_create_index_with_invalid_options"
@@ -728,7 +716,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_create_duplicated_index_with_valid_options(self):
         db_name = "default_db"
         table_name = "test_http_test_create_duplicated_index_with_valid_options"
@@ -755,8 +742,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
-    # PASS
     def test_http_create_duplicated_index_with_valid_error_options(self):
         db_name = "default_db"
         table_name = "test_http_test_create_duplicated_index_with_valid_error_options"
@@ -794,7 +779,6 @@ class TestIndex(HttpTest):
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
 
     def test_http_show_index(self):
@@ -826,7 +810,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_show_valid_name_index(self):
         db_name = "default_db"
         table_name = "test_http_test_show_various_name_index"
@@ -855,7 +838,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_show_invalid_name_index(self):
         db_name = "default_db"
         table_name = "test_http_test_show_various_name_index"
@@ -889,8 +871,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
-    # PASS
     def test_http_list_index(self):
         db_name = "default_db"
         table_name = "test_http_test_list_index"
@@ -986,7 +966,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_supported_vector_index(self):
         db_name = "default_db"
         table_name = "test_http_test_drop_index_with_invalid_options"
@@ -1020,7 +999,6 @@ class TestIndex(HttpTest):
         return
 
 
-    # PASS
     def test_http_unsupported_vector_index(self):
         db_name = "default_db"
         table_name = "test_http_test_http_unsupported_vector_index"

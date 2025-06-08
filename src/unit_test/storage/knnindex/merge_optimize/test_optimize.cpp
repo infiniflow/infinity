@@ -36,7 +36,6 @@ import index_secondary;
 import statement_common;
 import embedding_info;
 import knn_expr;
-import catalog;
 import infinity_exception;
 import bg_task;
 import txn_store;
@@ -58,7 +57,11 @@ import catalog_meta;
 import mem_index;
 import status;
 import new_txn;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+#else
 import abstract_hnsw;
+#endif
 import buffer_obj;
 
 using namespace infinity;
@@ -199,9 +202,8 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         EXPECT_EQ(mem_index->memory_hnsw_index_, nullptr);
         txn_mgr->PrintAllKeyValue();
         {
@@ -319,9 +321,8 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         EXPECT_EQ(mem_index->memory_secondary_index_, nullptr);
         txn_mgr->PrintAllKeyValue();
         {

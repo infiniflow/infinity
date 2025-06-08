@@ -26,7 +26,7 @@ namespace infinity {
 
 class KVInstance;
 class TableIndexMeeta;
-class MemIndex;
+struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
@@ -78,20 +78,17 @@ public:
 
     Status UninitSet1(UsageFlag usage_flag);
 
-    Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
-
-    Status GetMemIndexRaw(SharedPtr<MemIndex> &mem_index);
+    // read mem index should use this function
+    SharedPtr<MemIndex> GetMemIndex();
 
     // write mem index should use this function
-    Status GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index);
+    bool GetOrSetMemIndex(SharedPtr<MemIndex> &mem_index);
 
     SharedPtr<String> GetSegmentIndexDir() const;
 
     SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
 
 private:
-    Status GetHasMemIndex(bool &has_mem_index);
-
     Status LoadChunkIDs();
 
     Status LoadChunkIDs1();
@@ -103,14 +100,14 @@ private:
     String GetSegmentIndexTag(const String &tag);
 
 private:
-    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp begin_ts_;
+    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     TableIndexMeeta &table_index_meta_;
     SegmentID segment_id_{};
 
     Optional<Vector<ChunkID>> chunk_ids_{};
     Optional<ChunkID> next_chunk_id_{};
-    Optional<bool> has_mem_index_{};
 
     SharedPtr<SegmentIndexFtInfo> ft_info_{};
 };

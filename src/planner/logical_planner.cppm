@@ -31,6 +31,7 @@ import insert_statement;
 import create_statement;
 import drop_statement;
 import show_statement;
+import check_statement;
 import flush_statement;
 import optimize_statement;
 import update_statement;
@@ -145,6 +146,9 @@ public:
 
     // Explain
     Status BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    // Check
+    Status BuildCheck(const CheckStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     [[nodiscard]] Vector<SharedPtr<LogicalNode>> LogicalPlans() const {
         if (logical_plans_.empty()) {

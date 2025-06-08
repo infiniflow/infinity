@@ -18,7 +18,6 @@ import stl;
 import file_worker;
 // import specific_concurrent_queue;
 import default_values;
-import persistence_manager;
 
 export module buffer_manager;
 
@@ -26,6 +25,10 @@ namespace infinity {
 
 class BufferObj;
 class BufferObjectInfo;
+class KVInstance;
+class PersistenceManager;
+class ObjAddr;
+class Status;
 
 class LRUCache {
 public:
@@ -83,7 +86,7 @@ public:
 
     SizeT BufferedObjectCount();
 
-    void RemoveClean();
+    Status RemoveClean(KVInstance *kv_instance);
 
     void RemoveBufferObjects(const Vector<String> &object_paths);
 

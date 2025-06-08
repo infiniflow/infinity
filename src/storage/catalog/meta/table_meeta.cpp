@@ -39,8 +39,8 @@ import kv_utility;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts)
-    : begin_ts_(begin_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
+    : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
 Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
     if (!index_id_strs_ || !index_names_) {
@@ -217,6 +217,12 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
     return {segment_id, Status::OK()};
 }
 
+Status TableMeeta::AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id) {
+    String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    return kv_instance_.Put(segment_id_key, commit_ts_str);
+}
+
 Status TableMeeta::CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts) {
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
@@ -241,16 +247,22 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     }
 
     // Create table column id;
-
     SizeT column_size = table_def->column_count();
     status = SetNextColumnID(column_size);
     if (!status.ok()) {
         return status;
     }
 
-    // Create table segment id;
+    // Create the next segment id;
     String table_latest_segment_id_key = GetTableTag("next_segment_id");
     status = kv_instance_.Put(table_latest_segment_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Create next index id;
+    String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
+    status = kv_instance_.Put(next_index_id_key, "0");
     if (!status.ok()) {
         return status;
     }
@@ -296,6 +308,8 @@ Status TableMeeta::LoadSet() {
             if (!status.ok()) {
                 return status;
             }
+
+            table_index_meta.UpdateFulltextSegmentTS(commit_ts_);
             break;
         }
     }
@@ -305,6 +319,13 @@ Status TableMeeta::LoadSet() {
 Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     Status status;
 
+    // Create next index id;
+    String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
+    status = kv_instance_.Delete(next_index_id_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     // delete table segment id;
     String table_latest_segment_id_key = GetTableTag("next_segment_id");
     status = kv_instance_.Delete(table_latest_segment_id_key);
@@ -313,7 +334,7 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     // Delete table column id;
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     status = kv_instance_.Delete(table_latest_column_id_key);
     if (!status.ok()) {
         return status;
@@ -534,7 +555,7 @@ Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
 }
 
 Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str = fmt::format("{}", next_column_id);
     Status status = kv_instance_.Put(table_latest_column_id_key, next_column_id_str);
     if (!status.ok()) {
@@ -648,7 +669,7 @@ Status TableMeeta::LoadUnsealedSegmentID() {
 }
 
 Status TableMeeta::LoadNextColumnID() {
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str;
     Status status = kv_instance_.Get(table_latest_column_id_key, next_column_id_str);
     if (!status.ok()) {
@@ -683,6 +704,12 @@ Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
         return status;
     }
     return Status::OK();
+}
+
+Status TableMeeta::DelUnsealedSegmentID() {
+    String unsealed_id_key = GetTableTag("unsealed_segment_id");
+    Status status = kv_instance_.Delete(unsealed_id_key);
+    return status;
 }
 
 Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column_name) {
@@ -768,6 +795,35 @@ Status TableMeeta::GetNextRowID(RowID &next_row_id) {
         return status;
     }
     next_row_id = RowID(unsealed_segment_id, seg_row_cnt);
+    return Status::OK();
+}
+
+Tuple<String, Status> TableMeeta::GetNextIndexID() {
+    String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
+    String next_index_id_str;
+    Status status = kv_instance_.Get(next_index_id_key, next_index_id_str);
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get next index id from kv store, key: {}, cause: {}", next_index_id_key, status.message()));
+        return {"", status};
+    }
+    String next_index_id = fmt::format("{}", std::stoull(next_index_id_str) + 1);
+    status = kv_instance_.Put(next_index_id_key, next_index_id);
+    if (!status.ok()) {
+        LOG_ERROR(
+            fmt::format("Fail to set next index id to kv store, key: {}, value: {}, cause: {}", next_index_id_key, next_index_id, status.message()));
+        return {"", status};
+    }
+    return {next_index_id, Status::OK()};
+}
+
+Status TableMeeta::SetNextIndexID(const String &index_id_str) {
+    String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
+    Status status = kv_instance_.Put(next_index_id_key, index_id_str);
+    if (!status.ok()) {
+        LOG_ERROR(
+            fmt::format("Fail to set next index id to kv store, key: {}, value: {}, cause: {}", next_index_id_key, index_id_str, status.message()));
+        return status;
+    }
     return Status::OK();
 }
 

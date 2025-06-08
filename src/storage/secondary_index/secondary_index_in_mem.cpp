@@ -161,6 +161,8 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
 
 TableIndexEntry *SecondaryIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
+const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0}; }
+
 SharedPtr<SecondaryIndexInMem>
 SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, SegmentIndexEntry *segment_index_entry, RowID begin_row_id) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {

@@ -139,10 +139,6 @@ private:
 
     void ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state);
-
-    void ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state);
-
     void ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowCatalogToFile(QueryContext *query_context, ShowOperatorState *operator_state);

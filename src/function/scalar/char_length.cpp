@@ -3,7 +3,7 @@ module;
 module char_length;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -32,7 +32,7 @@ inline bool CharLengthFunction::Run(VarcharT &left, int &result) {
     return true;
 }
 
-void RegisterCharLengthFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterCharLengthFunction(NewCatalog *catalog_ptr) {
     String func_name = "char_length";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -43,7 +43,7 @@ void RegisterCharLengthFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                         &ScalarFunction::UnaryFunctionWithFailure<VarcharT, IntegerT, CharLengthFunction>);
     function_set_ptr->AddFunction(char_length_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

@@ -40,11 +40,10 @@ import scalar_function;
 import scalar_function_set;
 import index_base;
 import table_index_entry;
-import catalog;
+import new_catalog;
 import value;
 import table_index_meta;
 import meta_info;
-import txn;
 import roaring_bitmap;
 import query_node;
 import column_index_reader;
@@ -131,7 +130,7 @@ struct ExpressionIndexScanInfo {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
             base_table_ref->block_index_->table_meta_ =
-                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS());
+                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS(), new_txn->CommitTS());
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
 
@@ -302,19 +301,12 @@ public:
         : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {}
 
     void Init() {
-        const auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
+        const auto and_function_set_ptr = NewCatalog::GetFunctionSetByName(query_context_->storage()->new_catalog(), "AND");
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
-        if (query_context_->global_config()->UseNewCatalog()) {
-            if (base_table_ref_ptr_) {
-                table_info_ = base_table_ref_ptr_->table_info_.get();
-                tree_info_.NewInitColumnIndexEntries(table_info_, query_context_->GetNewTxn(), const_cast<BaseTableRef *>(base_table_ref_ptr_));
-            }
-        } else {
-            if (base_table_ref_ptr_) {
-                table_info_ = base_table_ref_ptr_->table_info_.get();
-                tree_info_.InitColumnIndexEntries(table_info_, query_context_->GetTxn());
-            }
+        if (base_table_ref_ptr_) {
+            table_info_ = base_table_ref_ptr_->table_info_.get();
+            tree_info_.NewInitColumnIndexEntries(table_info_, query_context_->GetNewTxn(), const_cast<BaseTableRef *>(base_table_ref_ptr_));
         }
     }
 
@@ -493,24 +485,13 @@ private:
                         case FilterCompareType::kEqual:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
-                            bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
-                            if (use_new_catalog) {
-                                SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
-                                return IndexFilterEvaluatorSecondary::Make(function_expression,
-                                                                           column_id,
-                                                                           nullptr,
-                                                                           secondary_index,
-                                                                           compare_type,
-                                                                           value);
-                            } else {
-                                const auto *secondary_index = tree_info_.candidate_column_index_map_.at(column_id);
-                                return IndexFilterEvaluatorSecondary::Make(function_expression,
-                                                                           column_id,
-                                                                           secondary_index,
-                                                                           nullptr,
-                                                                           compare_type,
-                                                                           value);
-                            }
+                            SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
+                            return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                       column_id,
+                                                                       nullptr,
+                                                                       secondary_index,
+                                                                       compare_type,
+                                                                       value);
                         }
                         case FilterCompareType::kAlwaysTrue: {
                             return MakeUnique<IndexFilterEvaluatorAllTrue>();
@@ -544,16 +525,11 @@ private:
             }
             case Enum::kFilterFulltextExpr: {
                 auto *filter_fulltext_expr = static_cast<const FilterFulltextExpression *>(index_filter_tree_node.src_ptr->get());
-                bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
                 SharedPtr<IndexReader> index_reader;
-                if (use_new_catalog) {
-                    NewTxn *new_txn = query_context_->GetNewTxn();
-                    Status status = new_txn->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_, index_reader);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
-                    }
-                } else {
-                    index_reader = query_context_->GetTxn()->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_);
+                NewTxn *new_txn = query_context_->GetNewTxn();
+                Status status = new_txn->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_, index_reader);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
                 }
 
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kAuto;

@@ -53,6 +53,7 @@ CASE            { return CASE; }
 CAST            { return CAST; }
 CATALOG         { return CATALOG; }
 CATALOGS        { return CATALOGS; }
+CHECK           { return CHECK; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
@@ -79,7 +80,6 @@ DECIMAL         { return DECIMAL; }
 DEFAULT         { return DEFAULT; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
-DELTA           { return DELTA; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }

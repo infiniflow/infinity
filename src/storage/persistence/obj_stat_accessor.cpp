@@ -68,7 +68,7 @@ ObjectStatMap::~ObjectStatMap() {
     [[maybe_unused]] SizeT sum_ref_count = 0;
     for (const auto &lru_iter : lru_list_) {
         if (lru_iter.obj_stat_.ref_count_ > 0) {
-            LOG_ERROR(fmt::format("Object {} still has ref count {}", lru_iter.key_, lru_iter.obj_stat_.ref_count_));
+            LOG_ERROR(fmt::format("ObjectStatMap {} still has ref count {}", lru_iter.key_, lru_iter.obj_stat_.ref_count_));
         }
         sum_ref_count += lru_iter.obj_stat_.ref_count_;
     }
@@ -189,7 +189,7 @@ ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
     [[maybe_unused]] SizeT sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
         if (obj_stat.ref_count_ > 0) {
-            LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
+            LOG_ERROR(fmt::format("ObjectStatAccessor {} still has ref count {}", key, obj_stat.ref_count_));
         }
         sum_ref_count += obj_stat.ref_count_;
     }

@@ -78,6 +78,7 @@ import physical_operator_type;
 import physical_read_cache;
 import physical_unnest;
 import physical_unnest_aggregate;
+import physical_check;
 
 import explain_logical_plan;
 import logical_show;
@@ -96,6 +97,7 @@ import common_query_filter;
 import table_entry;
 import logger;
 import show_statement;
+import check_statement;
 import base_table_ref;
 import meta_info;
 
@@ -326,6 +328,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kUnnestAggregate: {
             Explain(static_cast<const PhysicalUnnestAggregate *>(op), result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kCheck: {
+            Explain(static_cast<const PhysicalCheck *>(op), result, intent_size);
             break;
         }
         default: {
@@ -1699,42 +1705,6 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowStmtType::kDeltaLogs: {
-            String show_str;
-            if (intent_size != 0) {
-                show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW DELTA LOGS ";
-            } else {
-                show_str = "SHOW DELTA LOGS ";
-            }
-            show_str += "(";
-            show_str += std::to_string(show_node->node_id());
-            show_str += ")";
-            result->emplace_back(MakeShared<String>(show_str));
-
-            String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [begin_ts, commit_ts, transaction_id, command_type, text]";
-            result->emplace_back(MakeShared<String>(output_columns_str));
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            String show_str;
-            if (intent_size != 0) {
-                show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW CATALOGS ";
-            } else {
-                show_str = "SHOW CATALOGS ";
-            }
-            show_str += "(";
-            show_str += std::to_string(show_node->node_id());
-            show_str += ")";
-            result->emplace_back(MakeShared<String>(show_str));
-
-            String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [max_commit_timestamp, file_path]";
-            result->emplace_back(MakeShared<String>(output_columns_str));
-            break;
-        }
         case ShowStmtType::kCatalog: {
             String show_str;
             if (intent_size != 0) {
@@ -2005,8 +1975,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
     }
 
     {
-        SharedPtr<String> schema_name =
-            MakeShared<String>(String(intent_size, ' ') + " - database name: " + *(import_node->table_info()->db_name_));
+        SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + " - database name: " + *(import_node->table_info()->db_name_));
         result->emplace_back(schema_name);
     }
 
@@ -2986,6 +2955,51 @@ void ExplainPhysicalPlan::Explain(const PhysicalUnnestAggregate *unnest_aggregat
         }
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalCheck *check_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    switch (check_node->check_type()) {
+        case CheckStmtType::kSystem: {
+            String check_str;
+            if (intent_size != 0) {
+                check_str = String(intent_size - 2, ' ');
+                check_str += "-> CHECK SYSTEM ";
+            } else {
+                check_str = "CHECK SYSTEM ";
+            }
+            check_str += "(";
+            check_str += std::to_string(check_node->node_id());
+            check_str += ")";
+            result->emplace_back(MakeShared<String>(check_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case CheckStmtType::kTable: {
+            String check_str;
+            if (intent_size != 0) {
+                check_str = String(intent_size - 2, ' ');
+                check_str += "-> CHECK TABLE ";
+            } else {
+                check_str = "CHECK TABLE ";
+            }
+            check_str += "(";
+            check_str += std::to_string(check_node->node_id());
+            check_str += ")";
+            result->emplace_back(MakeShared<String>(check_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case CheckStmtType::kInvalid: {
+            String error_message = "Invalid check type";
+            UnrecoverableError(error_message);
+        }
     }
 }
 

@@ -25,10 +25,11 @@ import buffer_manager;
 import infinity_exception;
 import logger;
 import third_party;
-import logger;
 import file_worker_type;
 import var_file_worker;
 import global_resource_usage;
+import kv_store;
+import status;
 
 namespace infinity {
 
@@ -208,9 +209,6 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         buffer_mgr_->MoveTemp(this);
         file_worker_->MoveFile();
         type_ = BufferType::kPersistent;
-    } else if (type_ == BufferType::kMmap) {
-        String error_message = fmt::format("Invalid buffer type: mmap, {}", GetFilename());
-        UnrecoverableError(error_message);
     }
     return write;
 }
@@ -258,7 +256,7 @@ void BufferObj::PickForCleanup() {
     }
 }
 
-void BufferObj::CleanupFile() const {
+Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
     if (status_ != BufferStatus::kClean) {
         String error_message = "Invalid status";
         UnrecoverableError(error_message);
@@ -267,7 +265,7 @@ void BufferObj::CleanupFile() const {
         String error_message = "Buffer is not freed.";
         UnrecoverableError(error_message);
     }
-    file_worker_->CleanupFile();
+    return file_worker_->CleanupFile(kv_instance);
 }
 
 void BufferObj::CleanupTempFile() const {

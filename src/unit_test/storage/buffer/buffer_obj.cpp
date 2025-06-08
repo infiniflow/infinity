@@ -36,9 +36,6 @@ import table_def;
 import extra_ddl_info;
 import column_vector;
 import value;
-import catalog;
-import segment_entry;
-import block_entry;
 import status;
 import third_party;
 import base_table_ref;
@@ -49,7 +46,6 @@ import statement_common;
 import embedding_info;
 import bg_task;
 import physical_import;
-import chunk_index_entry;
 import memory_indexer;
 import wal_manager;
 import internal_types;
@@ -79,19 +75,18 @@ public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
     void WaitCleanup(Storage *storage) {
-        Catalog *catalog = storage->catalog();
-        BufferManager *buffer_mgr = storage->buffer_manager();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
-        TxnTimeStamp visible_ts = txn_mgr->GetCleanupScanTS1();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
-        cleanup_task->Execute();
+        auto cleanup_task = MakeShared<NewCleanupTask>();
+        TxnTimeStamp cur_cleanup_ts;
+        cleanup_task->Execute(0, cur_cleanup_ts);
     }
 
     void WaitFlushOp(Storage *storage) {
         NewTxnManager *txn_mgr = storage->new_txn_manager();
         WalManager *wal_manager = storage->wal_manager();
-        auto *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-
+        NewTxn *new_txn = nullptr;
+        do {
+            new_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        } while (new_txn == nullptr); // wait until we get a new transaction, which means no other checkpoint is running
         TxnTimeStamp max_commit_ts{};
         i64 wal_size{};
         std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
@@ -108,7 +103,8 @@ public:
 // Test status transfer of buffer handle.
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();
@@ -522,6 +518,8 @@ TEST_F(BufferObjTest, test1) {
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -645,9 +643,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             SegmentID segment_id = 0;
             SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta.GetMemIndex(mem_index);
-            EXPECT_TRUE(status.ok());
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             EXPECT_NE(mem_index, nullptr);
         }
 
@@ -668,6 +664,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
@@ -725,6 +723,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -749,7 +748,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             EXPECT_EQ(block_id, idx);
             BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             Pair<BlockOffset, BlockOffset> range;
@@ -797,6 +796,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
 TEST_F(BufferObjTest, test_multiple_threads_read) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     RemoveDbDirs();
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
@@ -854,6 +855,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
         std::thread th([&]() {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
             TxnTimeStamp begin_ts = txn->BeginTS();
+            TxnTimeStamp commit_ts = txn->CommitTS();
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
@@ -878,7 +880,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
                 EXPECT_EQ(block_id, idx);
                 BlockMeta block_meta(block_id, segment_meta);
                 NewTxnGetVisibleRangeState state;
-                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
                 EXPECT_TRUE(status.ok());
 
                 Pair<BlockOffset, BlockOffset> range;

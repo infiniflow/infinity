@@ -16,7 +16,6 @@
 This example is to connect local infinity instance, create table, insert data, delete and update data.
 '''
 
-# import infinity_embedded as infinity
 import infinity
 import sys
 

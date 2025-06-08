@@ -52,6 +52,7 @@ import logical_match_tensor_scan;
 import logical_fusion;
 import logical_unnest;
 import logical_unnest_aggregate;
+import logical_check;
 import base_expression;
 import status;
 
@@ -130,6 +131,8 @@ public:
     static Status Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static Status Explain(const BaseExpression *base_expression, String &expr_str, bool consider_add_parentheses = false);
+
+    static Status Explain(const LogicalCheck *check_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size);
 };
 
 } // namespace infinity

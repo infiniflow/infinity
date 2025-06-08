@@ -5,7 +5,6 @@ import os
 
 python_executable = sys.executable
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Python restart test for infinity")
     parser.add_argument(
@@ -23,6 +22,11 @@ if __name__ == "__main__":
         type=str,
         required=False,
     )
+    parser.add_argument(
+        "--loop",
+        type=int,
+        required=False,
+    )
 
     args = parser.parse_args()
     infinity_path = args.infinity_path
@@ -37,37 +41,45 @@ if __name__ == "__main__":
     else:
         test_case = f"{python_test_dir}/restart_test"
 
-    if not slow:
-        process = subprocess.Popen(
-            [
-                python_executable,
-                "-m",
-                "pytest",
-                "-v",
-                test_case,
-                f"--infinity_path={infinity_path}",
-                "-x",
-                "-s",
-                "-m",
-                "not slow",
-                # "-k",
-                # "test_optimize_from_different_database"
-            ]
-        )
-    else:
-        process = subprocess.Popen(
-            [
-                python_executable,
-                "-m",
-                "pytest",
-                "-v",
-                test_case,
-                f"--infinity_path={infinity_path}",
-                "-x",
-                "-s",
-            ]
-        )
-    process.wait()
-    if process.returncode != 0:
-        print(f"An error occurred: {process.stderr}")
-        sys.exit(-1)
+    loop = 1
+    if args.loop:
+        loop = args.loop
+
+    for idx in range(loop):
+        print(f"Running test case: {test_case}, loop: {idx + 1}/{loop}")
+        if not slow:
+            process = subprocess.Popen(
+                [
+                    python_executable,
+                    "-m",
+                    "pytest",
+                    "-v",
+                    test_case,
+                    f"--infinity_path={infinity_path}",
+                    "-x",
+                    "-s",
+                    "-m",
+                    "not slow",
+                    # "-W",
+                    # "error",
+                    # "-k",
+                    # "test_optimize_from_different_database"
+                ]
+            )
+        else:
+            process = subprocess.Popen(
+                [
+                    python_executable,
+                    "-m",
+                    "pytest",
+                    "-v",
+                    test_case,
+                    f"--infinity_path={infinity_path}",
+                    "-x",
+                    "-s",
+                ]
+            )
+        process.wait()
+        if process.returncode != 0:
+            print(f"An error occurred: {process.stderr}")
+            sys.exit(-1)

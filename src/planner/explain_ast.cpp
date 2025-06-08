@@ -31,6 +31,7 @@ import drop_statement;
 import show_statement;
 import flush_statement;
 import optimize_statement;
+import check_statement;
 import parsed_expr;
 import extra_ddl_info;
 import create_schema_info;
@@ -725,14 +726,6 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW LOGS"));
             break;
         }
-        case ShowStmtType::kDeltaLogs: {
-            result->emplace_back(MakeShared<String>("SHOW DELTA LOGS"));
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            result->emplace_back(MakeShared<String>("SHOW CATALOGS"));
-            break;
-        }
         case ShowStmtType::kCatalog: {
             result->emplace_back(MakeShared<String>("SHOW CATALOG"));
             break;
@@ -911,4 +904,23 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
     }
     return Status::OK();
 }
+
+Status ExplainAST::BuildCheck(const CheckStatement *check_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    switch (check_statement->check_type_) {
+        case CheckStmtType::kSystem: {
+            result->emplace_back(MakeShared<String>("CHECK SYSTEM"));
+            break;
+        }
+        case CheckStmtType::kTable: {
+            result->emplace_back(MakeShared<String>("CHECK TABLE"));
+            break;
+        }
+        case CheckStmtType::kInvalid: {
+            String error_message = "Invalid file type";
+            UnrecoverableError(error_message);
+        }
+    }
+    return Status::OK();
+}
+
 } // namespace infinity

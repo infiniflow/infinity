@@ -16,7 +16,6 @@
 This example is about connecting to the local infinity instance, creating table, inserting data, and searching data
 '''
 
-# import infinity_embedded as infinity
 import infinity
 from infinity.table import ExplainType
 import sys

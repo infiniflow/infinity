@@ -1,13 +1,10 @@
-import importlib
 import sys
-import os
 import os
 import pandas as pd
 import pytest
 from common import common_values
 import infinity
 import infinity.index as index
-import infinity_embedded
 from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, SortType
@@ -18,13 +15,6 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 from common.utils import copy_data
-from datetime import date, time, datetime
-
-
-@pytest.fixture(scope="class")
-def local_infinity(request):
-    return request.config.getoption("--local-infinity")
-
 
 @pytest.fixture(scope="class")
 def http(request):
@@ -32,18 +22,8 @@ def http(request):
 
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity, http):
-    if local_infinity:
-        module = importlib.import_module("infinity_embedded.index")
-        globals()["index"] = module
-        module = importlib.import_module("infinity_embedded.common")
-        func = getattr(module, 'ConflictType')
-        globals()['ConflictType'] = func
-        func = getattr(module, 'InfinityException')
-        globals()['InfinityException'] = func
-        uri = common_values.TEST_LOCAL_PATH
-        request.cls.infinity_obj = infinity_embedded.connect(uri)
-    elif http:
+def setup_class(request, http):
+    if http:
         uri = common_values.TEST_LOCAL_HOST
         request.cls.infinity_obj = infinity_http()
     else:
@@ -589,8 +569,7 @@ class TestInfinity:
         Method: test_select_big_embedding
 
         Description:
-        This method performs a series of operations to test the selection of a large embedding from a table. It imports
-        data from a CSV file, creates a table, imports the data into the table,
+        This method performs a series of operations to test the selection of a large embedding from a table. It creates a table, imports the data into the table,
         and then searches for and retrieves a specific column from the table.
 
         Parameters:

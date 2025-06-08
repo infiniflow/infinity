@@ -35,6 +35,7 @@ import column_expr;
 import function_expr;
 import subquery_expr;
 import knn_expr;
+import new_catalog;
 
 namespace infinity {
 
@@ -148,7 +149,7 @@ SharedPtr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, Bind
 }
 
 SharedPtr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
         Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
         RecoverableError(status);

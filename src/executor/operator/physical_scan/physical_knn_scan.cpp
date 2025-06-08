@@ -59,7 +59,11 @@ import create_index_info;
 import knn_expr;
 import block_entry;
 import segment_entry;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+#else
 import abstract_hnsw;
+#endif
 import physical_match_tensor_scan;
 import hnsw_alg;
 import ivf_index_data_in_mem;
@@ -384,66 +388,31 @@ SizeT PhysicalKnnScan::GetColumnID() const {
 
 void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
     InitBlockParallelOption();                                     // PlanWithIndex() will be called in physical planner
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
 
-    if (use_new_catalog) {
-        Status status;
-        SizeT knn_column_id = GetColumnID();
+    Status status;
+    SizeT knn_column_id = GetColumnID();
 
-        block_metas_ = MakeUnique<Vector<BlockMeta *>>();
-        segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
+    block_metas_ = MakeUnique<Vector<BlockMeta *>>();
+    segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
 
-        TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+    TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
-        Set<SegmentID> index_entry_map;
+    Set<SegmentID> index_entry_map;
 
-        if (knn_expression_->ignore_index_) {
-            LOG_TRACE("Not use index"); // No index need to check
-        } else {
-            Vector<String> *index_id_strs_ptr = nullptr;
-            Vector<String> *index_names_ptr = nullptr;
-            status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
+    if (knn_expression_->ignore_index_) {
+        LOG_TRACE("Not use index"); // No index need to check
+    } else {
+        Vector<String> *index_id_strs_ptr = nullptr;
+        Vector<String> *index_names_ptr = nullptr;
+        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
 
-            if (knn_expression_->using_index_.empty()) {
-                LOG_TRACE("Try to find a index to use");
-                for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-                    const String &index_id_str = (*index_id_strs_ptr)[i];
-                    auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
-
-                    SharedPtr<IndexBase> index_base;
-                    std::tie(index_base, status) = table_index_meta->GetIndexBase();
-                    if (!status.ok()) {
-                        RecoverableError(status);
-                    }
-
-                    ColumnID column_id = 0;
-                    std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                    if (!status.ok()) {
-                        RecoverableError(status);
-                    }
-                    if (column_id != knn_column_id) {
-                        // knn_column_id isn't in this table index
-                        continue;
-                    }
-                    // check index type
-                    if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
-                        LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                        continue;
-                    }
-                    table_index_meta_ = std::move(table_index_meta);
-                    break;
-                }
-            } else {
-                LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
-                auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), knn_expression_->using_index_);
-                if (iter == index_names_ptr->end()) {
-                    Status status = Status::IndexNotExist(knn_expression_->using_index_);
-                    RecoverableError(std::move(status));
-                }
-                const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
+        if (knn_expression_->using_index_.empty()) {
+            LOG_TRACE("Try to find a index to use");
+            for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+                const String &index_id_str = (*index_id_strs_ptr)[i];
                 auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
                 SharedPtr<IndexBase> index_base;
@@ -459,153 +428,79 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 }
                 if (column_id != knn_column_id) {
                     // knn_column_id isn't in this table index
-                    LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
-                    Status error_status = Status::ColumnNotExist(index_base->column_name());
-                    RecoverableError(std::move(error_status));
+                    continue;
                 }
                 // check index type
                 if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
-                    Status error_status = Status::InvalidIndexType("invalid index");
-                    RecoverableError(std::move(error_status));
-                }
-
-                table_index_meta_ = std::move(table_index_meta);
-            }
-            // Fill the segment with index
-            if (table_index_meta_) {
-                Vector<SegmentID> *segment_ids_ptr = nullptr;
-                std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                index_entry_map.insert(segment_ids_ptr->begin(), segment_ids_ptr->end());
-            }
-        }
-
-        // Generate task set: index segment and no index block
-        BlockIndex *block_index = base_table_ref_->block_index_.get();
-        for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
-            if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
-                segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
-            } else {
-                const auto &block_map = segment_info.block_map_;
-                for (const auto &block_meta : block_map) {
-                    block_metas_->emplace_back(block_meta.get());
-                }
-            }
-        }
-        block_column_entries_size_ = block_metas_->size();
-        index_entries_size_ = segment_index_metas_->size();
-        LOG_TRACE(fmt::format("KnnScan: brute force task: {}, index task: {}", block_column_entries_size_, index_entries_size_));
-
-        return;
-    }
-
-    Txn *txn = query_context->GetTxn();
-    TransactionID txn_id = txn->TxnID();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    SizeT knn_column_id = GetColumnID();
-
-    block_column_entries_ = MakeUnique<Vector<BlockColumnEntry *>>();
-    index_entries_ = MakeUnique<Vector<SegmentIndexEntry *>>();
-
-    auto *table_info = base_table_ref_->table_info_.get();
-    auto [table_entry, status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
-
-    if (knn_expression_->ignore_index_) {
-        LOG_TRACE("Not use index"); // No index need to check
-    } else {
-        auto map_guard = table_entry->IndexMetaMap();
-        if (knn_expression_->using_index_.empty()) {
-            LOG_TRACE("Try to find a index to use");
-            for (auto &[index_name, table_index_meta] : *map_guard) {
-                auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-                if (!status.ok()) {
-                    // already dropped
-                    LOG_WARN(status.message());
-                    continue;
-                }
-
-                const String column_name = table_index_entry->index_base()->column_name();
-                SizeT column_id = table_entry->GetColumnIdByName(column_name);
-                if (column_id != knn_column_id) {
-                    // knn_column_id isn't in this table index
-                    continue;
-                }
-                // check index type
-                if (auto index_type = table_index_entry->index_base()->index_type_;
-                    index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                     LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
-
-                // Fill the segment with index
-                {
-                    auto guard = table_index_entry->GetSegmentIndexesGuard();
-                    index_entry_map = guard.index_by_segment_;
-                }
+                table_index_meta_ = std::move(table_index_meta);
+                break;
             }
         } else {
             LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
-            auto iter = (*map_guard).find(knn_expression_->using_index_);
-            if (iter == (*map_guard).end()) {
+            auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), knn_expression_->using_index_);
+            if (iter == index_names_ptr->end()) {
                 Status status = Status::IndexNotExist(knn_expression_->using_index_);
                 RecoverableError(std::move(status));
             }
+            const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
+            auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
 
-            auto &table_index_meta = iter->second;
-
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+            SharedPtr<IndexBase> index_base;
+            std::tie(index_base, status) = table_index_meta->GetIndexBase();
             if (!status.ok()) {
-                // already dropped
-                RecoverableError(std::move(status));
+                RecoverableError(status);
             }
 
-            const String column_name = table_index_entry->index_base()->column_name();
-            SizeT column_id = table_entry->GetColumnIdByName(column_name);
+            ColumnID column_id = 0;
+            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
             if (column_id != knn_column_id) {
                 // knn_column_id isn't in this table index
-                LOG_ERROR(fmt::format("Column {} not found", column_name));
-                Status error_status = Status::ColumnNotExist(column_name);
+                LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
+                Status error_status = Status::ColumnNotExist(index_base->column_name());
                 RecoverableError(std::move(error_status));
             }
             // check index type
-            if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
-                LOG_ERROR("Invalid index type");
+            if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                 Status error_status = Status::InvalidIndexType("invalid index");
                 RecoverableError(std::move(error_status));
             }
 
-            // Fill the segment with index
-            {
-                auto guard = table_index_entry->GetSegmentIndexesGuard();
-                index_entry_map = guard.index_by_segment_;
+            table_index_meta_ = std::move(table_index_meta);
+        }
+        // Fill the segment with index
+        if (table_index_meta_) {
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            std::tie(segment_ids_ptr, status) = table_index_meta_->GetSegmentIndexIDs1();
+            if (!status.ok()) {
+                RecoverableError(status);
             }
+            index_entry_map.insert(segment_ids_ptr->begin(), segment_ids_ptr->end());
         }
     }
 
     // Generate task set: index segment and no index block
     BlockIndex *block_index = base_table_ref_->block_index_.get();
-    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+    for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
-            index_entries_->emplace_back(iter->second.get());
+            segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
         } else {
             const auto &block_map = segment_info.block_map_;
-            for (const auto *block_entry : block_map) {
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
-                block_column_entries_->emplace_back(block_column_entry);
+            for (const auto &block_meta : block_map) {
+                block_metas_->emplace_back(block_meta.get());
             }
         }
     }
-    block_column_entries_size_ = block_column_entries_->size();
-    index_entries_size_ = index_entries_->size();
+    block_column_entries_size_ = block_metas_->size();
+    index_entries_size_ = segment_index_metas_->size();
     LOG_TRACE(fmt::format("KnnScan: brute force task: {}, index task: {}", block_column_entries_size_, index_entries_size_));
+
+    return;
 }
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
@@ -656,25 +551,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         UnrecoverableError(err);
     }
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    SizeT index_task_n = 0;
-    SizeT brute_task_n = 0;
-    Txn *txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts;
-    if (!use_new_catalog) {
-        index_task_n = knn_scan_shared_data->index_entries_->size();
-        brute_task_n = knn_scan_shared_data->block_column_entries_->size();
+    SizeT index_task_n = knn_scan_shared_data->segment_index_metas_->size();
+    SizeT brute_task_n = knn_scan_shared_data->block_metas_->size();
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
-        begin_ts = txn->BeginTS();
-    } else {
-        index_task_n = knn_scan_shared_data->segment_index_metas_->size();
-        brute_task_n = knn_scan_shared_data->block_metas_->size();
-
-        NewTxn *new_txn = query_context->GetNewTxn();
-        begin_ts = new_txn->BeginTS();
-    }
     BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
-    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
     SizeT knn_column_id = GetColumnID();
 
     UniquePtr<QueryDataType[]> buffer_ptr_for_cast;
@@ -685,54 +568,25 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         // brute force
         // TODO: now will try to finish all block scan job in the task
         do {
-            if (use_new_catalog) {
-                BlockMeta *block_meta = knn_scan_shared_data->block_metas_->at(block_column_idx);
-                ColumnMeta column_meta(knn_column_id, *block_meta);
-                BlockID block_id = block_meta->block_id();
-                SegmentID segment_id = block_meta->segment_meta().segment_id();
-                auto [row_count, status] = block_meta->GetRowCnt1();
+            BlockMeta *block_meta = knn_scan_shared_data->block_metas_->at(block_column_idx);
+            ColumnMeta column_meta(knn_column_id, *block_meta);
+            BlockID block_id = block_meta->block_id();
+            SegmentID segment_id = block_meta->segment_meta().segment_id();
+            auto [row_count, status] = block_meta->GetRowCnt1();
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            Bitmask bitmask;
+            if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
+                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                Bitmask bitmask;
-                if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
-                    status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                    ColumnVector column_vector;
-                    status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, column_vector);
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                    BruteForceBlockScan<t, ColumnDataType, QueryDataType, C, DistanceDataType>::Execute(merge_heap,
-                                                                                                        dist_func,
-                                                                                                        knn_query_ptr,
-                                                                                                        embedding_dim,
-                                                                                                        buffer_ptr_for_cast,
-                                                                                                        column_vector,
-                                                                                                        segment_id,
-                                                                                                        block_id,
-                                                                                                        row_count,
-                                                                                                        bitmask);
+                ColumnVector column_vector;
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, column_vector);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
                 }
-                block_column_idx = knn_scan_shared_data->current_block_idx_++;
-                continue;
-            }
-
-            BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
-            const BlockEntry *block_entry = block_column_entry->block_entry();
-            const auto block_id = block_entry->block_id();
-            const SegmentID segment_id = block_entry->GetSegmentEntry()->segment_id();
-            const auto row_count = block_entry->row_count();
-            Bitmask bitmask;
-            if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
-                // LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after common_query_filter",
-                //                       knn_scan_function_data->task_id_,
-                //                       block_column_idx + 1,
-                //                       brute_task_n));
-                block_entry->SetDeleteBitmask(begin_ts, bitmask);
-                ColumnVector column_vector = block_entry->GetConstColumnVector(buffer_mgr, knn_column_id);
                 BruteForceBlockScan<t, ColumnDataType, QueryDataType, C, DistanceDataType>::Execute(merge_heap,
                                                                                                     dist_func,
                                                                                                     knn_query_ptr,
@@ -750,31 +604,16 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
 
-        SegmentIndexMeta *segment_index_meta = nullptr;
-        SegmentIndexEntry *segment_index_entry = nullptr;
-        SegmentID segment_id = 0;
         SegmentOffset segment_row_count = 0;
-        if (use_new_catalog) {
-            segment_index_meta = &knn_scan_shared_data->segment_index_metas_->at(index_idx);
-            segment_id = segment_index_meta->segment_id();
+        SegmentIndexMeta *segment_index_meta = &knn_scan_shared_data->segment_index_metas_->at(index_idx);
+        SegmentID segment_id = segment_index_meta->segment_id();
 
-            const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
-            if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-                UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
-            } else {
-                SegmentMeta *segment_meta = iter->second.segment_meta_.get();
-                std::tie(segment_row_count, std::ignore) = segment_meta->GetRowCnt1();
-            }
+        const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
+        if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
+            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
-            segment_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
-            segment_id = segment_index_entry->segment_id();
-
-            const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
-            if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-                UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
-            } else {
-                segment_row_count = iter->second.segment_offset_;
-            }
+            SegmentMeta *segment_meta = iter->second.segment_meta_.get();
+            std::tie(segment_row_count, std::ignore) = segment_meta->GetRowCnt1();
         }
 
         bool has_some_result = false;
@@ -802,26 +641,19 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta->GetMemIndex(mem_index);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
+            SharedPtr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
             return std::make_tuple(chunk_ids_ptr, mem_index);
         };
 
         if (has_some_result) {
             const IndexBase *index_base;
-            if (use_new_catalog) {
-                SharedPtr<IndexBase> index_base_ptr;
-                std::tie(index_base_ptr, status) = segment_index_meta->table_index_meta().GetIndexBase();
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-                index_base = index_base_ptr.get();
-            } else {
-                index_base = segment_index_entry->table_index_entry()->index_base();
+            SharedPtr<IndexBase> index_base_ptr;
+            std::tie(index_base_ptr, status) = segment_index_meta->table_index_meta().GetIndexBase();
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
             }
+            index_base = index_base_ptr.get();
+
             switch (index_base->index_type_) {
                 case IndexType::kIVF: {
                     const SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
@@ -829,34 +661,20 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     auto ivf_result_handler =
                         GetIVFSearchHandler<t, C, DistanceDataType>(ivf_search_params, use_bitmask, bitmask, max_segment_offset);
                     ivf_result_handler->Begin();
-                    if (!use_new_catalog) {
-                        const auto [chunk_index_entries, memory_ivf_index] = segment_index_entry->GetIVFIndexSnapshot();
-                        for (auto &chunk_index_entry : chunk_index_entries) {
-                            if (chunk_index_entry->CheckVisible(txn)) {
-                                BufferHandle index_handle = chunk_index_entry->GetIndex();
-                                const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
-                                ivf_result_handler->Search(ivf_chunk);
-                            }
+                    auto [chunk_ids_ptr, mem_index] = get_chunks();
+                    for (ChunkID chunk_id : *chunk_ids_ptr) {
+                        ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
+                        BufferObj *index_buffer = nullptr;
+                        status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
                         }
-                        if (memory_ivf_index) {
-                            ivf_result_handler->Search(memory_ivf_index.get());
-                        }
-                    } else {
-                        auto [chunk_ids_ptr, mem_index] = get_chunks();
-                        for (ChunkID chunk_id : *chunk_ids_ptr) {
-                            ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                            BufferObj *index_buffer = nullptr;
-                            status = chunk_index_meta.GetIndexBuffer(index_buffer);
-                            if (!status.ok()) {
-                                UnrecoverableError(status.message());
-                            }
-                            BufferHandle index_handle = index_buffer->Load();
-                            const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
-                            ivf_result_handler->Search(ivf_chunk);
-                        }
-                        if (mem_index && mem_index->memory_ivf_index_) {
-                            ivf_result_handler->Search(mem_index->memory_ivf_index_.get());
-                        }
+                        BufferHandle index_handle = index_buffer->Load();
+                        const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
+                        ivf_result_handler->Search(ivf_chunk);
+                    }
+                    if (mem_index && mem_index->memory_ivf_index_) {
+                        ivf_result_handler->Search(mem_index->memory_ivf_index_.get());
                     }
                     auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
                     auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
@@ -870,7 +688,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     if constexpr (!(IsAnyOf<ColumnDataType, u8, i8, f32> && std::is_same_v<ColumnDataType, QueryDataType>)) {
                         UnrecoverableError("Invalid data type");
                     } else {
+#ifdef INDEX_HANDLER
+                        auto hnsw_search = [&](const HnswHandlerPtr hnsw_handler, bool with_lock) {
+#else
                         auto hnsw_search = [&](auto *hnsw_index, bool with_lock) {
+#endif
                             bool rerank = false;
                             KnnSearchOption search_option;
                             search_option.column_logical_type_ = t;
@@ -891,6 +713,36 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 SizeT result_n1 = 0;
                                 UniquePtr<DistanceDataType[]> d_ptr = nullptr;
                                 UniquePtr<SegmentOffset[]> l_ptr = nullptr;
+#ifdef INDEX_HANDLER
+                                if (use_bitmask) {
+                                    BitmaskFilter<SegmentOffset> filter(bitmask);
+                                    if (with_lock) {
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_handler->template SearchIndex
+                                                <DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>
+                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                    } else {
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_handler->template SearchIndex
+                                                <DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>
+                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                    }
+                                } else {
+                                    SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
+                                    if (!with_lock) {
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_handler->template SearchIndex
+                                                <DistanceDataType, SegmentOffset, false>
+                                                    (query, knn_scan_shared_data->topk_, search_option);
+                                    } else {
+                                        AppendFilter filter(max_segment_offset);
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_handler->template SearchIndex
+                                                <DistanceDataType, SegmentOffset, AppendFilter, true>
+                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                    }
+                                }
+#else
                                 if (use_bitmask) {
                                     BitmaskFilter<SegmentOffset> filter(bitmask);
                                     if (with_lock) {
@@ -920,6 +772,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                                                                                search_option);
                                     }
                                 }
+#endif
 
                                 if (result_n < 0) {
                                     result_n = result_n1;
@@ -942,17 +795,12 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
                                         if (block_id != prev_block_id) {
                                             prev_block_id = block_id;
-                                            if (!use_new_catalog) {
-                                                BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-                                                column_vector = block_entry->GetConstColumnVector(buffer_mgr, knn_column_id);
-                                            } else {
-                                                BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
-                                                auto [block_row_cnt, status] = block_meta->GetRowCnt1();
-                                                ColumnMeta column_meta(knn_column_id, *block_meta);
-                                                status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
-                                                if (!status.ok()) {
-                                                    UnrecoverableError(status.message());
-                                                }
+                                            BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
+                                            auto [block_row_cnt, status] = block_meta->GetRowCnt1();
+                                            ColumnMeta column_meta(knn_column_id, *block_meta);
+                                            status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                                            if (!status.ok()) {
+                                                UnrecoverableError(status.message());
                                             }
                                         }
                                         if constexpr (t == LogicalType::kEmbedding) {
@@ -1007,6 +855,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 }
                             }
                         };
+#ifdef INDEX_HANDLER
+#else
                         auto abstract_hnsw_search = [&](const AbstractHnsw &abstract_hnsw, bool with_lock) {
                             std::visit(
                                 [&](auto &&arg) {
@@ -1021,37 +871,32 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                 },
                                 abstract_hnsw);
                         };
-
-                        if (!use_new_catalog) {
-                            auto [chunk_index_entries, memory_hnsw_index] = segment_index_entry->GetHnswIndexSnapshot();
-                            for (auto &chunk_index_entry : chunk_index_entries) {
-                                if (chunk_index_entry->CheckVisible(txn)) {
-                                    BufferHandle index_handle = chunk_index_entry->GetIndex();
-                                    const auto *abstract_hnsw = reinterpret_cast<const AbstractHnsw *>(index_handle.GetData());
-                                    abstract_hnsw_search(*abstract_hnsw, false);
-                                }
+#endif
+                        auto [chunk_ids_ptr, mem_index] = get_chunks();
+                        for (ChunkID chunk_id : *chunk_ids_ptr) {
+                            ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
+                            BufferObj *index_buffer = nullptr;
+                            status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
                             }
-                            if (memory_hnsw_index.get() != nullptr) {
-                                const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
-                                abstract_hnsw_search(abstract_hnsw, true);
-                            }
-                        } else {
-                            auto [chunk_ids_ptr, mem_index] = get_chunks();
-                            for (ChunkID chunk_id : *chunk_ids_ptr) {
-                                ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                                BufferObj *index_buffer = nullptr;
-                                status = chunk_index_meta.GetIndexBuffer(index_buffer);
-                                if (!status.ok()) {
-                                    UnrecoverableError(status.message());
-                                }
-                                BufferHandle index_handle = index_buffer->Load();
-                                const auto *abstract_hnsw = reinterpret_cast<const AbstractHnsw *>(index_handle.GetData());
-                                abstract_hnsw_search(*abstract_hnsw, false);
-                            }
-                            if (mem_index && mem_index->memory_hnsw_index_) {
-                                const AbstractHnsw &abstract_hnsw = mem_index->memory_hnsw_index_->get();
-                                abstract_hnsw_search(abstract_hnsw, true);
-                            }
+                            BufferHandle index_handle = index_buffer->Load();
+#ifdef INDEX_HANDLER
+                            const HnswHandlerPtr *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_handle.GetData());
+                            hnsw_search(*hnsw_handler, false);
+#else
+                            const auto *abstract_hnsw = reinterpret_cast<const AbstractHnsw *>(index_handle.GetData());
+                            abstract_hnsw_search(*abstract_hnsw, false);
+#endif
+                        }
+                        if (mem_index && mem_index->memory_hnsw_index_) {
+#ifdef INDEX_HANDLER
+                            const HnswHandlerPtr hnsw_handler = mem_index->memory_hnsw_index_->get();
+                            hnsw_search(hnsw_handler, true);
+#else
+                            const AbstractHnsw &abstract_hnsw = mem_index->memory_hnsw_index_->get();
+                            abstract_hnsw_search(abstract_hnsw, true);
+#endif
                         }
                     }
                     break;

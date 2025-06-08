@@ -18,31 +18,195 @@ export module base_txn_store;
 
 import stl;
 import internal_types;
+import txn_state;
+import column_def;
+import wal_entry;
 
 namespace infinity {
 
-class DataBlock;
+struct DataBlock;
+class IndexBase;
+class TableDef;
 
-enum class TxnStoreType {
-    kInvalid,
-    kAppend,
-    kImport,
-    kDelete,
-    kUpdate,
-    kCreateIndex,
-    kDumpMemIndex,
-    kOptimizeIndex,
-    kCompact,
+export struct MemIndexRange {
+    String index_id_{};
+    SegmentID segment_id_{};
+    ChunkID chunk_id_{};
+    SegmentOffset start_offset_{};
+    SizeT row_count_{};
 };
 
-export struct BaseTxnStore {
-    explicit BaseTxnStore(TxnStoreType type) : type_(type) {};
+// enum class TxnStoreType {
+//     kInvalid,
+//     kCreateDB,
+//     kCreateTable,
+//     kAppend,
+//     kImport,
+//     kDelete,
+//     kUpdate,
+//     kCreateIndex,
+//     kDumpMemIndex,
+//     kOptimizeIndex,
+//     kCompact,
+// };
+// kCheckpoint, // Develop know it's a checkpoint txn
+// kRead,       // Developer know it's a read txn
+// kNormal,     // Developer doesn't know what type is this txn
+// kReplay,
+// kRecovery,
+// kNewCheckpoint,
+// kAppend,
+// kUpdate,
+// kImport,
+// kDumpMemIndex,
+// kOptimizeIndex,
+// kCreateIndex,
+// kDelete,
+// kCompact,
 
-    TxnStoreType type_{TxnStoreType::kInvalid};
+export struct BaseTxnStore {
+    explicit BaseTxnStore(TransactionType type) : type_(type) {};
+
+    TransactionType type_{TransactionType::kInvalid};
+
+    virtual String ToString() const = 0;
+    virtual SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const = 0;
+    virtual ~BaseTxnStore() = default;
+};
+
+// DummyTxnStore is only used in test
+export struct DummyTxnStore : public BaseTxnStore {
+    DummyTxnStore() : BaseTxnStore(TransactionType::kNormal) {}
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct CreateDBTxnStore : public BaseTxnStore {
+    CreateDBTxnStore() : BaseTxnStore(TransactionType::kCreateDB) {}
+
+    String db_name_{};
+    u64 db_id_{};
+    String db_id_str_{};
+    SharedPtr<String> comment_ptr_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct DropDBTxnStore : public BaseTxnStore {
+    DropDBTxnStore() : BaseTxnStore(TransactionType::kDropDB) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct CreateTableTxnStore : public BaseTxnStore {
+    CreateTableTxnStore() : BaseTxnStore(TransactionType::kCreateTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    SharedPtr<TableDef> table_def_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct DropTableTxnStore : public BaseTxnStore {
+    DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    String table_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct RenameTableTxnStore : public BaseTxnStore {
+    RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String old_table_name_{};
+    String table_id_str_{};
+    String new_table_name_{};
+    String old_table_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct CreateIndexTxnStore : public BaseTxnStore {
+    CreateIndexTxnStore() : BaseTxnStore(TransactionType::kCreateIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    SharedPtr<IndexBase> index_base_{};
+    String index_id_str_{};
+    String table_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct DropIndexTxnStore : public BaseTxnStore {
+    DropIndexTxnStore() : BaseTxnStore(TransactionType::kDropIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    String index_name_{};
+    String index_id_str_{};
+    u64 index_id_{};
+    String index_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct OptimizeIndexTxnStore : public BaseTxnStore {
+    OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    String table_key_{};
+    Vector<String> index_names_{};
+    Vector<String> index_ids_str_{};
+    Vector<u64> index_ids_{};
+    Vector<SegmentID> segment_ids_{};
+    Vector<Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    Vector<Vector<ChunkID>> deprecate_ids_in_segments_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct AppendTxnStore : public BaseTxnStore {
-    explicit AppendTxnStore() : BaseTxnStore(TxnStoreType::kAppend) {}
+    AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
 
     String db_name_{};
     String db_id_str_{};
@@ -52,11 +216,147 @@ export struct AppendTxnStore : public BaseTxnStore {
     u64 table_id_{};
 
     SharedPtr<DataBlock> input_block_{};
+    Vector<String> index_ids_{}; // indexes will be appended
+
+    // For data append
     Vector<Pair<RowID, u64>> row_ranges_{};
+
+    // For mem index
+    Vector<MemIndexRange> mem_indexes_to_append_{};
+    Vector<MemIndexRange> mem_indexes_to_dump_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    SizeT RowCount() const;
 };
 
 export struct ImportTxnStore : public BaseTxnStore {
-    explicit ImportTxnStore() : BaseTxnStore(TxnStoreType::kImport) {}
+    ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+    String table_key_{};
+
+    Map<SegmentID, Vector<SharedPtr<DataBlock>>> input_blocks_in_imports_{};
+    Vector<WalSegmentInfo> segment_infos_{};
+
+    Vector<String> index_names_{};
+    Vector<String> index_ids_str_{};
+    Vector<u64> index_ids_{};
+    Vector<SegmentID> segment_ids_{};
+    Map<SegmentID, Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    Map<SegmentID, Vector<ChunkID>> deprecate_ids_in_segments_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    SizeT RowCount() const;
+    SizeT SegmentCount() const;
+};
+
+export struct DumpMemIndexTxnStore : public BaseTxnStore {
+    DumpMemIndexTxnStore() : BaseTxnStore(TransactionType::kDumpMemIndex) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+
+    String index_name_{};
+    String index_id_str_{};
+    u64 index_id_{};
+    Vector<SegmentID> segment_ids_{};
+    Map<SegmentID, Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    String table_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct AddColumnsTxnStore : public BaseTxnStore {
+    AddColumnsTxnStore() : BaseTxnStore(TransactionType::kAddColumn) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+
+    Vector<SharedPtr<ColumnDef>> column_defs_{};
+    String table_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct DropColumnsTxnStore : public BaseTxnStore {
+    DropColumnsTxnStore() : BaseTxnStore(TransactionType::kDropColumn) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+
+    Vector<String> column_names_{};
+    Vector<ColumnID> column_ids_{};
+    String table_key_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct CompactTxnStore : public BaseTxnStore {
+    CompactTxnStore() : BaseTxnStore(TransactionType::kCompact) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+    String table_key_{};
+
+    SegmentID new_segment_id_{};
+    Vector<WalSegmentInfo> segment_infos_{};
+    Vector<SegmentID> deprecated_segment_ids_{};
+
+    Vector<String> index_names_{};
+    Vector<String> index_ids_str_{};
+    Vector<u64> index_ids_{};
+    Vector<SegmentID> segment_ids_{};
+    Map<SegmentID, Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    Map<SegmentID, Vector<ChunkID>> deprecate_ids_in_segments_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct DeleteTxnStore : public BaseTxnStore {
+    DeleteTxnStore() : BaseTxnStore(TransactionType::kDelete) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 db_id_{};
+    u64 table_id_{};
+
+    Vector<RowID> row_ids_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
+export struct UpdateTxnStore : public BaseTxnStore {
+    UpdateTxnStore() : BaseTxnStore(TransactionType::kUpdate) {}
 
     String db_name_{};
     String db_id_str_{};
@@ -66,7 +366,30 @@ export struct ImportTxnStore : public BaseTxnStore {
     u64 table_id_{};
 
     Vector<SharedPtr<DataBlock>> input_blocks_{};
-    SegmentID segment_id_{};
+    Vector<String> index_ids_{}; // indexes will be appended
+
+    // For data append
+    Vector<Pair<RowID, u64>> row_ranges_{};
+
+    // For mem index
+    Vector<MemIndexRange> mem_indexes_to_append_{};
+    Vector<MemIndexRange> mem_indexes_to_dump_{};
+
+    // For delete
+    Vector<RowID> row_ids_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    SizeT RowCount() const;
+};
+
+export struct CheckpointTxnStore : public BaseTxnStore {
+    CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
+
+    i64 max_commit_ts_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 } // namespace infinity

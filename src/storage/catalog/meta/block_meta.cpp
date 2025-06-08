@@ -37,11 +37,13 @@ import column_meta;
 import fast_rough_filter;
 import kv_code;
 import kv_utility;
+import logger;
 
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
-    : begin_ts_(segment_meta.begin_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta), block_id_(block_id) {}
+    : begin_ts_(segment_meta.begin_ts()), commit_ts_(segment_meta.commit_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta),
+      block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -112,18 +114,32 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
     return Status::OK();
 }
 
+Status BlockMeta::RestoreSet() {
+    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             BlockVersion::FileName(),
+                                                             this->block_capacity(),
+                                                             buffer_mgr->persistence_manager());
+    auto *buffer_obj = buffer_mgr->GetBufferObject(version_file_worker->GetFilePath());
+    if (buffer_obj == nullptr) {
+        version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+        if (!version_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
+        }
+        version_buffer_->AddObjRc();
+    }
+    return Status::OK();
+}
+
 Status BlockMeta::UninitSet(UsageFlag usage_flag) {
-    // {
-    //     String block_row_cnt_key = GetBlockTag("row_cnt");
-    //     Status status = kv_instance_.Delete(block_row_cnt_key);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
     if (usage_flag == UsageFlag::kOther) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         {
             String block_lock_key = GetBlockTag("lock");
+            LOG_TRACE(fmt::format("UninitSet: dropping block lock for block key: {}", block_lock_key));
             Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
             if (!status.ok()) {
                 return status;
@@ -132,6 +148,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     }
     {
         String filter_key = GetBlockTag("fast_rough_filter");
+        LOG_TRACE(fmt::format("UninitSet: fast rough filter key: {}", filter_key));
         Status status = kv_instance_.Delete(filter_key);
         if (!status.ok()) {
             if (status.code() != ErrorCode::kNotFound) {
@@ -176,7 +193,7 @@ SharedPtr<String> BlockMeta::GetBlockDir() {
     if (block_dir_ == nullptr) {
         TableMeeta &table_meta = segment_meta_.table_meta();
         block_dir_ = MakeShared<String>(
-            fmt::format("db_{}/tbl_{}/seg_{}/block_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
+            fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
     }
 
     return block_dir_;
@@ -203,6 +220,18 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     if (row_cnt_) {
         return {*row_cnt_, Status::OK()};
     }
+
+#if 1
+    TableMeeta &table_meta = segment_meta_.table_meta();
+    row_cnt_ = infinity::GetBlockRowCount(&kv_instance_,
+                                          table_meta.db_id_str(),
+                                          table_meta.table_id_str(),
+                                          segment_meta_.segment_id(),
+                                          block_id_,
+                                          begin_ts_,
+                                          commit_ts_);
+    return {*row_cnt_, Status::OK()};
+#else
     Status status;
 
     SharedPtr<BlockLock> block_lock;
@@ -226,6 +255,7 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     }
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
+#endif
 }
 
 Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {

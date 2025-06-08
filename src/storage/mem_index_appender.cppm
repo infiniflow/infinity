@@ -14,39 +14,42 @@
 
 module;
 
-export module txn_committer;
+export module mem_index_appender;
 
 import stl;
+import bg_task_type;
 import blocking_queue;
+import status;
 
 namespace infinity {
 
-class Storage;
+class TxnManager;
 class NewTxn;
-struct TxnCommitterTask;
+class BGTask;
+class AppendMemIndexTask;
 
-export class TxnCommitter {
+export class MemIndexAppender {
 public:
-    explicit TxnCommitter(Storage *storage);
-    virtual ~TxnCommitter();
+    MemIndexAppender();
+    ~MemIndexAppender();
 
     void Start();
+
     void Stop();
-    void Submit(SharedPtr<TxnCommitterTask> task);
+
+    void Submit(SharedPtr<BGTask> bg_task);
+
+    u64 RunningTaskCount() const { return task_count_; }
 
 private:
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<TxnCommitterTask>> task_queue_{"TxnCommitterQueue"};
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"MemIndexAppender"};
 
     Thread processor_thread_{};
 
-    Storage *storage_{};
-
     Atomic<u64> task_count_{};
-
-    mutable std::mutex task_mutex_;
 };
 
 } // namespace infinity

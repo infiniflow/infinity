@@ -20,8 +20,8 @@ export module add;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterAddFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterAddFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

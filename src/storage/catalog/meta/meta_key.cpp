@@ -14,6 +14,7 @@
 
 module;
 
+#include "base64.hpp"
 #include <string>
 
 module meta_key;
@@ -35,6 +36,9 @@ ColumnMetaKey::ColumnMetaKey(String db_id_str, String table_id_str, SegmentID se
 ColumnMetaKey::~ColumnMetaKey() = default;
 
 String DBMetaKey::ToString() const { return fmt::format("db: {}:{}", KeyEncode::CatalogDbKey(db_name_, commit_ts_), db_id_str_); }
+
+String DBTagMetaKey::ToString() const { return fmt::format("db_tag: {}:{}", KeyEncode::CatalogDbTagKey(db_id_str_, tag_name_), value_); }
+
 String TableMetaKey::ToString() const {
     return fmt::format("table: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
@@ -50,6 +54,9 @@ String SegmentMetaKey::ToString() const {
 }
 
 String SegmentTagMetaKey::ToString() const {
+    if (tag_name_ == "fast_rough_filter") {
+        return fmt::format("segment_tag: {}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_));
+    }
     return fmt::format("segment_tag: {}:{}", KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag_name_), value_);
 }
 
@@ -101,6 +108,8 @@ String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", Ke
 
 String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
+String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
+
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["db_id"] = std::stoull(db_id_str_);
@@ -109,6 +118,12 @@ nlohmann::json DBMetaKey::ToJson() const {
         json_res["commit_ts"] = commit_ts_;
     }
 
+    return json_res;
+}
+
+nlohmann::json DBTagMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res[tag_name_] = value_;
     return json_res;
 }
 
@@ -163,7 +178,7 @@ nlohmann::json BlockMetaKey::ToJson() const {
 
 nlohmann::json BlockTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
+    json_res[tag_name_] = base64::to_base64(value_);
     return json_res;
 }
 
@@ -238,6 +253,14 @@ nlohmann::json PmObjectMetaKey::ToJson() const {
     return json_res;
 }
 
+nlohmann::json DropMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["scope"] = scope_;
+    json_res["key"] = object_key_;
+    json_res["value"] = nlohmann::json::parse(value_);
+    return json_res;
+}
+
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     Vector<String> fields = infinity::Partition(key, '|');
 
@@ -286,6 +309,20 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return segment_tag_meta_key;
     }
 
+    // construct blk tag meta key
+    if (fields[0] == "blk") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &segment_id_str = fields[3];
+        const String &block_id_str = fields[4];
+        const String &tag_name_str = fields[5];
+        SegmentID segment_id = std::stoul(segment_id_str);
+        BlockID block_id = std::stoul(block_id_str);
+        auto block_tag_meta_key = MakeShared<BlockTagMetaKey>(db_id_str, table_id_str, segment_id, block_id, tag_name_str);
+        block_tag_meta_key->value_ = value;
+        return block_tag_meta_key;
+    }
+
     if (fields[0] == "catalog" && fields[1] == "blk") {
         const String &db_id_str = fields[2];
         const String &table_id_str = fields[3];
@@ -299,6 +336,14 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return block_meta_key;
     }
 
+    if (fields[0] == "db") {
+        const String &db_id_str = fields[1];
+        const String &tag_name_str = fields[2];
+        SharedPtr<DBTagMetaKey> db_tag_meta_key = MakeShared<DBTagMetaKey>(db_id_str, tag_name_str);
+        db_tag_meta_key->value_ = value;
+        return db_tag_meta_key;
+    }
+
     if (fields[0] == "tbl") {
         if (fields[1] == "col") {
             const String &db_id_str = fields[2];
@@ -307,14 +352,13 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             SharedPtr<TableColumnMetaKey> table_column_meta_key = MakeShared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
             table_column_meta_key->value_ = value;
             return table_column_meta_key;
-        } else {
-            const String &db_id_str = fields[1];
-            const String &table_id_str = fields[2];
-            const String &tag_name_str = fields[3];
-            SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
-            table_tag_meta_key->value_ = value;
-            return table_tag_meta_key;
         }
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &tag_name_str = fields[3];
+        SharedPtr<TableTagMetaKey> table_tag_meta_key = MakeShared<TableTagMetaKey>(db_id_str, table_id_str, tag_name_str);
+        table_tag_meta_key->value_ = value;
+        return table_tag_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "idx") {
@@ -350,11 +394,10 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             auto segment_index_tag_meta_key = MakeShared<SegmentIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, tag_name_str);
             segment_index_tag_meta_key->value_ = value;
             return segment_index_tag_meta_key;
-        } else {
-            auto segment_index_meta_key = MakeShared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
-            segment_index_meta_key->commit_ts_ = std::stoull(value);
-            return segment_index_meta_key;
         }
+        auto segment_index_meta_key = MakeShared<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id);
+        segment_index_meta_key->commit_ts_ = std::stoull(value);
+        return segment_index_meta_key;
     }
 
     if (fields[0] == "idx_chunk") {
@@ -369,27 +412,34 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
                 MakeShared<ChunkIndexTagMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id, tag_name_str);
             chunk_index_tag_meta_key->value_ = value;
             return chunk_index_tag_meta_key;
-        } else {
-            auto chunk_index_meta_key = MakeShared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
-            chunk_index_meta_key->commit_ts_ = std::stoull(value);
-            return chunk_index_meta_key;
         }
+        auto chunk_index_meta_key = MakeShared<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
+        chunk_index_meta_key->commit_ts_ = std::stoull(value);
+        return chunk_index_meta_key;
     }
 
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
             const String &path_key = fields[2];
             SharedPtr<PmPathMetaKey> pm_path_meta_key = MakeShared<PmPathMetaKey>(path_key);
-            pm_path_meta_key->value_ = value;
+            pm_path_meta_key->value_ = value; //
             return pm_path_meta_key;
-        } else if (fields[1] == "object_stat") {
+        }
+        if (fields[1] == "object_stat") {
             const String &object_key = fields[2];
             SharedPtr<PmObjectMetaKey> pm_object_meta_key = MakeShared<PmObjectMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
-        } else {
-            UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
         }
+        UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
+    }
+
+    if (fields[0] == "drop") {
+        const String &scope = fields[1];
+        const String &object_key = fields[2];
+        SharedPtr<DropMetaKey> drop_meta_key = MakeShared<DropMetaKey>(scope, object_key);
+        drop_meta_key->value_ = value;
+        return drop_meta_key;
     }
 
     const String &tag_name_str = fields[0];

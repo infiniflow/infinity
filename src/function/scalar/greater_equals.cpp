@@ -19,7 +19,7 @@ module;
 module greater_equals;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -96,7 +96,7 @@ static void GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet> &function
     function_set_ptr->AddFunction(greater_equals_function);
 }
 
-void RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterGreaterEqualsFunction(NewCatalog *catalog_ptr) {
     String func_name = ">=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -163,7 +163,7 @@ void RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                                 &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(varchar_greater_equals_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

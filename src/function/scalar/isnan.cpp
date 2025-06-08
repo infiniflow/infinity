@@ -5,7 +5,7 @@ module;
 module isnan;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -47,7 +47,7 @@ inline void IsnanFunction::Run(BFloat16T &left, BooleanT &result) {
     result = std::isnan(static_cast<float>(left));
 }
 
-void RegisterIsnanFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterIsnanFunction(NewCatalog *catalog_ptr) {
     String func_name = "isnan";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -76,7 +76,7 @@ void RegisterIsnanFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                            &ScalarFunction::UnaryFunction<BFloat16T, BooleanT, IsnanFunction>);
     function_set_ptr->AddFunction(isnan_function_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

@@ -44,7 +44,6 @@ memindex_memory_quota   = "1GB"
 [wal]
 wal_dir                       = "/var/infinity/wal"
 full_checkpoint_interval      = "86400s"
-delta_checkpoint_interval     = "60s"
 wal_compact_threshold         = "1GB"
 
 wal_flush                     = "only_write"

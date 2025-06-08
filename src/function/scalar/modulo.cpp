@@ -17,7 +17,7 @@ module;
 module modulo;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -91,7 +91,7 @@ inline bool ModuloFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &resu
     return success;
 }
 
-void RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterModuloFunction(NewCatalog *catalog_ptr) {
     String func_name = "%";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -150,7 +150,7 @@ void RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                          &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

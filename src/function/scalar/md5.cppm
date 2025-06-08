@@ -6,8 +6,8 @@ export module md5;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterMd5Function(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterMd5Function(NewCatalog *catalog_ptr);
 
 } // namespace infinity

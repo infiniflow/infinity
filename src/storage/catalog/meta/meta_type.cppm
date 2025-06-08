@@ -21,6 +21,7 @@ namespace infinity {
 export enum class MetaType {
     kInvalid,
     kDB,
+    kDBTag,
     kTable,
     kTableTag,
     kTableColumn,
@@ -39,6 +40,7 @@ export enum class MetaType {
     kSystemTag,
     kPmPath,
     kPmObject,
+    kDrop,
 };
 
 }

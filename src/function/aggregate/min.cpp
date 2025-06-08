@@ -17,7 +17,7 @@ module;
 module min;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import aggregate_function;
@@ -225,7 +225,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
-void RegisterMinFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterMinFunction(NewCatalog *catalog_ptr) {
     String func_name = "MIN";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -303,7 +303,7 @@ void RegisterMinFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(max_function);
     }
 #endif
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

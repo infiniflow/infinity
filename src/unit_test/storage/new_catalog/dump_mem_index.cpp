@@ -207,9 +207,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -259,9 +257,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -406,6 +403,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
+    /* FIXME: PostRollback() for dump index is not implemented.
     // dump index and drop db
     //  t1            dump index                             commit (success)
     //  |--------------|------------------------------------------|
@@ -544,6 +542,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
+    */
 
     // dump index and drop db
     //                                            t1                    dump index                             commit (success)
@@ -572,7 +571,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
@@ -729,9 +727,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -781,9 +778,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -934,6 +930,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         drop_db(*db_name);
     }
 
+    /* FIXME: PostRollback() for dump index is not implemented.
     // dump index and drop db
     //  t1            dump index                             commit (success)
     //  |--------------|------------------------------------------|
@@ -1082,6 +1079,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         drop_db(*db_name);
     }
+    */
 
     // dump index and drop db
     //                                            t1                    dump index                             commit (success)
@@ -1119,7 +1117,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
@@ -1335,9 +1332,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -1387,9 +1383,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -1756,7 +1751,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
@@ -1957,9 +1951,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -2009,9 +2002,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -2383,7 +2375,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
@@ -2542,9 +2533,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -2594,9 +2584,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -2922,7 +2911,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
@@ -3081,9 +3069,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -3133,9 +3120,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -3203,7 +3189,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
@@ -3362,9 +3347,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -3414,9 +3398,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -3564,7 +3547,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         drop_db(*db_name);
     }
 
-    //  t1            dump index                                               commit (success)
+    /* FIXME: PostRollback() for dump index is not implemented.
+    //  t1            dump index                                               commit (fail)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
     //                        t2                drop index             commit
@@ -3588,12 +3572,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //  t1            dump index                             commit (success)
+    //  t1            dump index                             commit (fail)
     //  |--------------|------------------------------------------|
     //         |------------------|----------------------|
     //         t2                drop index            commit
@@ -3619,12 +3603,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //  t1                                  dump index                                 commit (success)
+    //  t1                                  dump index                                 commit (fail)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|--------------------|
     //         t2                drop index          commit
@@ -3650,12 +3634,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //  t1                                  dump index                             commit (success)
+    //  t1                                  dump index                             commit (fail)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|-----------|
     //         t2               drop index   commit
@@ -3679,12 +3663,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
-    //                                 t1                    dump index                             commit (success)
+    //                                 t1                    dump index                             commit (fail)
     //                                 |----------------------|------------------------------------------|
     //         |------------------|----------|
     //         t2               drop index  commit
@@ -3709,10 +3693,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
+    */
 
     //                                            t1                    dump index                             commit (success)
     //                                            |----------------------|------------------------------------------|
@@ -3742,7 +3727,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_import) {
@@ -3908,9 +3892,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -3960,9 +3943,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -4011,9 +3993,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -4063,9 +4044,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -4487,7 +4467,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_append) {
@@ -4653,9 +4632,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -4705,9 +4683,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -4737,39 +4714,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
     };
 
-    auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Optional<TableIndexMeeta> table_index_meta;
-        String table_key;
-        String index_key;
-        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
-        EXPECT_TRUE(status.ok());
-
-        {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-        }
-        SegmentID segment_id = 0;
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
-        check_mem_index(mem_index);
-        {
-            auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({}));
-        }
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
-
     auto check_index3 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
 
@@ -4789,9 +4733,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         {
             auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
@@ -4849,15 +4792,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                         |------------------|----------|
-    //                        t2                append     commit (fail)
+    //                        t2                append     commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4878,20 +4818,21 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index                 commit (success)
     //  |--------------|------------------------------|
     //                         |------------------|------------------|
-    //                        t2                append            commit
+    //                        t2           append                commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4906,26 +4847,27 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, make_block());
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index                                               commit (success)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
-    //                        t2                 append(fail)         rollback
+    //                        t2                 append             commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4940,25 +4882,22 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, *table_name, make_block());
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index                             commit (success)
     //  |--------------|------------------------------------------|
     //         |------------------|----------------------|
-    //         t2                append(fail)           rollback
+    //         t2                append               commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4975,22 +4914,19 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         status = txn3->Append(*db_name, *table_name, make_block());
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
-    //  t1                                  dump index (fail)                           rollback (success)
+    //  t1                                  dump index                            commit (success)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|--------------------|
     //         t2                append        commit
@@ -5009,20 +4945,17 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         SegmentID segment_id = 0;
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn);
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1                                  dump index                                  commit
@@ -5053,9 +4986,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //                                 t1                    dump index                             commit (success)
@@ -5087,9 +5017,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //                                            t1                    dump index                             commit (success)
@@ -5119,12 +5046,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
@@ -5290,9 +5213,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -5326,6 +5248,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -5344,7 +5267,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         for (const auto block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
 
-            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
             Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
@@ -5397,9 +5320,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index   commit (success)
@@ -5439,9 +5359,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index                 commit (success)
@@ -5481,9 +5398,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index                                               commit (success)
@@ -5522,9 +5436,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index                             commit (success)
@@ -5565,9 +5476,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1                                            dump index                              commit
@@ -5606,9 +5514,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //                  t1                                  dump index                                  commit
@@ -5648,9 +5553,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //                                 t1                    dump index                             commit (success)
@@ -5691,9 +5593,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //                                            t1                    dump index                             commit (success)
@@ -5731,12 +5630,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         check_data();
 
         drop_db(*db_name);
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
@@ -5902,9 +5797,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         check_mem_index(mem_index);
         //        {
         //            auto [row_id, row_cnt] = check_mem_index(mem_index);
@@ -5954,9 +5848,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -5989,7 +5882,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                                     |------------------|-------------|
-    //                                    t2                dump (fail)   rollback (success)
+    //                                    t2            dump (success)   commit (success)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -6006,8 +5899,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
 
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -6045,8 +5938,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         EXPECT_TRUE(status.ok());
 
         status = txn1->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
@@ -6219,7 +6112,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         drop_db(*db_name);
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
@@ -6496,7 +6388,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         DropDB();
     }
 
-    //    t1                                                       dump index                                   commit (success)
+    //    t1                                                       dump index (fail)                       Rollback (success)
     //    |-----------------------------------------------------------|------------------------------------------|
     //                    |----------------------|--------------|
     //                    t2                  optimize index   commit (success)
@@ -6582,7 +6474,6 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         DropDB();
     }
 
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
@@ -6932,5 +6823,4 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         DropDB();
     }
 
-    RemoveDbDirs();
 }

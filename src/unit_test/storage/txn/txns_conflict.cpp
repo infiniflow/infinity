@@ -52,6 +52,7 @@ public:
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -71,7 +72,7 @@ public:
         BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -200,7 +201,7 @@ TEST_P(TestTxnsConflictTest, add_column_append) {
         }
     };
 
-    auto thread_append = [this]() {
+    auto thread_append = [this](bool &ok) {
         {
             std::unique_lock<std::mutex> lock(mtx_);
             cv_.wait(lock, [this] { return ready_; });
@@ -211,13 +212,13 @@ TEST_P(TestTxnsConflictTest, add_column_append) {
             String append_req_sql = "insert into t1 values(3, 'abc'), (4, 'def')";
             UniquePtr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(append_req_sql);
-            bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
+            ok = HandleQueryResult(query_result);
         }
     };
 
+    bool append_ok = false;
     Thread worker(thread_add_column);
-    Thread waiter(thread_append);
+    Thread waiter(thread_append, std::ref(append_ok));
 
     if (worker.joinable()) {
         worker.join();
@@ -225,6 +226,11 @@ TEST_P(TestTxnsConflictTest, add_column_append) {
     if (waiter.joinable()) {
         waiter.join();
     }
+
+    SizeT row_count = GetRowCount();
+    LOG_INFO(fmt::format("row_count {}", row_count));
+    LOG_INFO(fmt::format("append ok {}", append_ok));
+    EXPECT_TRUE((append_ok && row_count == 4) || (!append_ok && row_count == 2));
 
     {
         String select_sql = "select * from t1";
@@ -264,7 +270,7 @@ TEST_P(TestTxnsConflictTest, add_column_import) {
         }
     };
 
-    auto thread_import = [this]() {
+    auto thread_import = [this](bool &ok) {
         {
             std::unique_lock<std::mutex> lock(mtx_);
             cv_.wait(lock, [this] { return ready_; });
@@ -276,13 +282,13 @@ TEST_P(TestTxnsConflictTest, add_column_import) {
                                 "',', FORMAT CSV );";
             UniquePtr<QueryContext> query_context = MakeQueryContext2();
             QueryResult query_result = query_context->Query(import_sql);
-            bool ok = HandleQueryResult(query_result);
-            EXPECT_TRUE(ok);
+            ok = HandleQueryResult(query_result);
         }
     };
 
+    bool import_ok = false;
     Thread worker(thread_add_column);
-    Thread waiter(thread_import);
+    Thread waiter(thread_import, std::ref(import_ok));
 
     if (worker.joinable()) {
         worker.join();
@@ -290,6 +296,14 @@ TEST_P(TestTxnsConflictTest, add_column_import) {
     if (waiter.joinable()) {
         waiter.join();
     }
+
+    SizeT row_count = 0;
+    if (import_ok) {
+        row_count = GetRowCount();
+        LOG_INFO(fmt::format("row_count {}", row_count));
+        LOG_INFO(fmt::format("import ok {}", import_ok));
+    }
+    EXPECT_TRUE((import_ok && row_count == 10) || (!import_ok && row_count == 0));
 
     {
         String select_sql = "select * from t1";
@@ -726,6 +740,77 @@ TEST_P(TestTxnsConflictTest, drop_column_create_index) {
     }
 
     EXPECT_TRUE(drop_column_pass || create_index_pass);
+
+    {
+        String select_sql = "select * from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+        LOG_INFO(query_result.ToString());
+    }
+}
+
+TEST_P(TestTxnsConflictTest, delete_append) {
+    LOG_INFO("--delete_append--");
+
+    auto thread_add_column = [this]() {
+        {
+            String create_table_sql = "create table t1(c1 int, c2 varchar)";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_table_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+
+        {
+            String append_req_sql = "insert into t1 values(1, 'abc'), (2, 'def')";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(append_req_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            ready_ = true;
+            cv_.notify_one();
+        }
+
+        {
+            String add_column_sql = "delete from t1 where c1 = 1";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(add_column_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+    };
+
+    auto thread_append = [this]() {
+        {
+            std::unique_lock<std::mutex> lock(mtx_);
+            cv_.wait(lock, [this] { return ready_; });
+            ready_ = false;
+        }
+
+        {
+            String append_req_sql = "insert into t1 values(1, 'hij'), (3, 'klm')";
+            UniquePtr<QueryContext> query_context = MakeQueryContext2();
+            QueryResult query_result = query_context->Query(append_req_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+    };
+
+    Thread worker(thread_add_column);
+    Thread waiter(thread_append);
+
+    if (worker.joinable()) {
+        worker.join();
+    }
+    if (waiter.joinable()) {
+        waiter.join();
+    }
 
     {
         String select_sql = "select * from t1";

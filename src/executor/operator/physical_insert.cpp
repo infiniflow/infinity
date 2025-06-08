@@ -19,7 +19,6 @@ module;
 module physical_insert;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;
@@ -97,17 +96,11 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     }
     output_block->Finalize();
 
-    bool use_new_meta = query_context->global_config()->UseNewCatalog();
-    if (use_new_meta) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        new_txn->SetTxnType(TransactionType::kAppend);
-        Status status = new_txn->Append(*table_info_, output_block);
-        if (!status.ok()) {
-            operator_state->status_ = status;
-        }
-    } else {
-        auto *txn = query_context->GetTxn();
-        txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_block);
+    NewTxn *new_txn = query_context->GetNewTxn();
+    new_txn->SetTxnType(TransactionType::kAppend);
+    Status status = new_txn->Append(*table_info_, output_block);
+    if (!status.ok()) {
+        operator_state->status_ = status;
     }
 
     UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));

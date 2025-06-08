@@ -479,8 +479,6 @@ Status Status::IndexOnColumn(const String &column_name) {
     return Status(ErrorCode::kIndexOnColumn, MakeUnique<String>(fmt::format("Index is created on column: {}", column_name)));
 }
 
-Status Status::DumpingMemIndex(const String &detail) { return Status(ErrorCode::kDumpingMemIndex, MakeUnique<String>(detail)); }
-
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));

@@ -76,6 +76,7 @@ extern int sqldebug;
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
 #include "statement/admin_statement.h"
+#include "statement/check_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -117,7 +118,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 121 "parser.h"
+#line 122 "parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -299,37 +300,37 @@ struct SQL_LTYPE {
     PROFILES = 426,                /* PROFILES  */
     VARIABLES = 427,               /* VARIABLES  */
     VARIABLE = 428,                /* VARIABLE  */
-    DELTA = 429,                   /* DELTA  */
-    LOGS = 430,                    /* LOGS  */
-    CATALOGS = 431,                /* CATALOGS  */
-    CATALOG = 432,                 /* CATALOG  */
-    SEARCH = 433,                  /* SEARCH  */
-    MATCH = 434,                   /* MATCH  */
-    MAXSIM = 435,                  /* MAXSIM  */
-    QUERY = 436,                   /* QUERY  */
-    QUERIES = 437,                 /* QUERIES  */
-    FUSION = 438,                  /* FUSION  */
-    ROWLIMIT = 439,                /* ROWLIMIT  */
-    ADMIN = 440,                   /* ADMIN  */
-    LEADER = 441,                  /* LEADER  */
-    FOLLOWER = 442,                /* FOLLOWER  */
-    LEARNER = 443,                 /* LEARNER  */
-    CONNECT = 444,                 /* CONNECT  */
-    STANDALONE = 445,              /* STANDALONE  */
-    NODES = 446,                   /* NODES  */
-    NODE = 447,                    /* NODE  */
-    REMOVE = 448,                  /* REMOVE  */
-    SNAPSHOT = 449,                /* SNAPSHOT  */
-    SNAPSHOTS = 450,               /* SNAPSHOTS  */
-    RECOVER = 451,                 /* RECOVER  */
-    RESTORE = 452,                 /* RESTORE  */
-    PERSISTENCE = 453,             /* PERSISTENCE  */
-    OBJECT = 454,                  /* OBJECT  */
-    OBJECTS = 455,                 /* OBJECTS  */
-    FILES = 456,                   /* FILES  */
-    MEMORY = 457,                  /* MEMORY  */
-    ALLOCATION = 458,              /* ALLOCATION  */
-    HISTORY = 459,                 /* HISTORY  */
+    LOGS = 429,                    /* LOGS  */
+    CATALOGS = 430,                /* CATALOGS  */
+    CATALOG = 431,                 /* CATALOG  */
+    SEARCH = 432,                  /* SEARCH  */
+    MATCH = 433,                   /* MATCH  */
+    MAXSIM = 434,                  /* MAXSIM  */
+    QUERY = 435,                   /* QUERY  */
+    QUERIES = 436,                 /* QUERIES  */
+    FUSION = 437,                  /* FUSION  */
+    ROWLIMIT = 438,                /* ROWLIMIT  */
+    ADMIN = 439,                   /* ADMIN  */
+    LEADER = 440,                  /* LEADER  */
+    FOLLOWER = 441,                /* FOLLOWER  */
+    LEARNER = 442,                 /* LEARNER  */
+    CONNECT = 443,                 /* CONNECT  */
+    STANDALONE = 444,              /* STANDALONE  */
+    NODES = 445,                   /* NODES  */
+    NODE = 446,                    /* NODE  */
+    REMOVE = 447,                  /* REMOVE  */
+    SNAPSHOT = 448,                /* SNAPSHOT  */
+    SNAPSHOTS = 449,               /* SNAPSHOTS  */
+    RECOVER = 450,                 /* RECOVER  */
+    RESTORE = 451,                 /* RESTORE  */
+    PERSISTENCE = 452,             /* PERSISTENCE  */
+    OBJECT = 453,                  /* OBJECT  */
+    OBJECTS = 454,                 /* OBJECTS  */
+    FILES = 455,                   /* FILES  */
+    MEMORY = 456,                  /* MEMORY  */
+    ALLOCATION = 457,              /* ALLOCATION  */
+    HISTORY = 458,                 /* HISTORY  */
+    CHECK = 459,                   /* CHECK  */
     NUMBER = 460                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
@@ -339,7 +340,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 104 "parser.y"
+#line 105 "parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -364,6 +365,7 @@ union SQLSTYPE
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
     infinity::AdminStatement* admin_stmt;
+    infinity::CheckStatement* check_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -419,7 +421,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 423 "parser.h"
+#line 425 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

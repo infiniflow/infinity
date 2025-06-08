@@ -39,7 +39,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 #include(GoogleTest)
 #get_rocksdb_version(rocksdb_VERSION)
 project(rocksdb
-  VERSION ${rocksdb_VERSION}
   DESCRIPTION "An embeddable persistent key-value store for fast storage"
   HOMEPAGE_URL https://rocksdb.org/
   LANGUAGES CXX C ASM)

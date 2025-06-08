@@ -83,6 +83,7 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kDenseIndexBuildingWorker;
     name2index_[String(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kSparseIndexBuildingWorker;
     name2index_[String(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kFulltextIndexBuildingWorker;
+    name2index_[String(BOTTOM_EXECUTOR_WORKER_OPTION_NAME)] = GlobalOptionIndex::kBottomExecutorWorker;
 
     name2index_[String(RESULT_CACHE_OPTION_NAME)] = GlobalOptionIndex::kResultCache;
     name2index_[String(CACHE_RESULT_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kCacheResultCapacity;
@@ -91,14 +92,11 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;
     name2index_[String(FULL_CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kFullCheckpointInterval;
 
-    name2index_[String(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kDeltaCheckpointInterval;
-    name2index_[String(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kDeltaCheckpointThreshold;
     name2index_[String(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
     name2index_[String(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;
     name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
 
     name2index_[String(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
-    name2index_[String(USE_NEW_CATALOG_OPTION_NAME)] = GlobalOptionIndex::kUseNewCatalog;
     name2index_[String(REPLAY_WAL_OPTION_NAME)] = GlobalOptionIndex::kReplayWal;
 }
 

@@ -140,21 +140,15 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                 ColumnReaderChunkInfo{index_buffer, chunk_info_ptr->base_row_id_, u32(chunk_info_ptr->row_cnt_), chunk_id, segment_id});
         }
 
-        SharedPtr<MemoryIndexer> memory_indexer;
         {
-            SharedPtr<MemIndex> mem_index;
-            Status status = segment_index_meta.GetMemIndex(mem_index);
-            if (!status.ok()) {
-                return status;
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            SharedPtr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->GetFulltextIndex();
+            if (memory_indexer && memory_indexer->GetDocCount() != 0) {
+                SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
+                segment_readers_.push_back(std::move(segment_reader));
+                // for loading column length file
+                memory_indexer_ = memory_indexer;
             }
-            memory_indexer = mem_index->memory_indexer_;
-        }
-        if (memory_indexer && memory_indexer->GetDocCount() != 0) {
-            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
-            segment_readers_.push_back(std::move(segment_reader));
-            // for loading column length file
-            assert(memory_indexer_.get() == nullptr);
-            memory_indexer_ = memory_indexer;
         }
 
         SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
@@ -269,6 +263,7 @@ void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mut
 
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
     // TransactionID txn_id = txn->TxnID();
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
@@ -283,7 +278,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
         // result.column2analyzer_ = MakeShared<Map<String, String>>();
 
-        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance(), begin_ts);
+        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance(), begin_ts, commit_ts);
         Vector<String> *index_id_strs = nullptr;
         {
             Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
@@ -310,7 +305,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
             }
             auto column_index_map = (*index_reader->column_index_readers_)[column_id];
 
-            // assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
+            // assert(table_index_entry->GetFulltextSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
                 target_ts = begin_ts;

@@ -42,6 +42,7 @@ import persistence_manager;
 import persist_result_handler;
 import virtual_store;
 import logger;
+import file_worker;
 
 namespace infinity {
 
@@ -318,6 +319,119 @@ Status ChunkIndexMeta::LoadSet() {
     return Status::OK();
 }
 
+Status ChunkIndexMeta::RestoreSet() {
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    SegmentID segment_id = segment_index_meta_.segment_id();
+
+    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+    Status status = this->GetChunkInfo(chunk_info_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    RowID base_row_id = chunk_info_ptr->base_row_id_;
+    SizeT row_count = chunk_info_ptr->row_cnt_;
+    const String &base_name = chunk_info_ptr->base_name_;
+    SizeT index_size = chunk_info_ptr->index_size_;
+
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+    auto [column_def, col_status] = table_index_meta.GetColumnDef();
+    if (!col_status.ok()) {
+        return status;
+    }
+    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    UniquePtr<FileWorker> index_file_worker;
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                     index_dir,
+                                                                     std::move(secondary_index_file_name),
+                                                                     index_base,
+                                                                     column_def,
+                                                                     row_count,
+                                                                     buffer_mgr->persistence_manager());
+            break;
+        }
+        case IndexType::kFullText: {
+            auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
+            index_file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                          index_dir,
+                                                          std::move(column_length_file_name),
+                                                          row_count * sizeof(u32),
+                                                          buffer_mgr->persistence_manager());
+            break;
+        }
+        case IndexType::kIVF: {
+            auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                               MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                               index_dir,
+                                                               std::move(ivf_index_file_name),
+                                                               index_base,
+                                                               column_def,
+                                                               buffer_mgr->persistence_manager());
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                           MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                           index_dir,
+                                                           std::move(hnsw_index_file_name),
+                                                           index_base,
+                                                           column_def,
+                                                           buffer_mgr->persistence_manager(),
+                                                           index_size);
+            break;
+        }
+        case IndexType::kBMP: {
+            auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            index_file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                               MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                               index_dir,
+                                                               std::move(bmp_index_file_name),
+                                                               index_base,
+                                                               column_def,
+                                                               buffer_mgr->persistence_manager(),
+                                                               index_size);
+            break;
+        }
+        case IndexType::kEMVB: {
+            auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            const auto segment_start_offset = base_row_id.segment_offset_;
+            index_file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                index_dir,
+                                                                std::move(emvb_index_file_name),
+                                                                index_base,
+                                                                column_def,
+                                                                segment_start_offset,
+                                                                buffer_mgr->persistence_manager());
+
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented yet");
+        }
+    }
+    auto *buffer_obj = buffer_mgr->GetBufferObject(index_file_worker->GetFilePath());
+    if (buffer_obj == nullptr) {
+        index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
+        index_buffer_->AddObjRc();
+    }
+    if (index_buffer_ == nullptr) {
+        return Status::BufferManagerError("GetBufferObject failed");
+    }
+
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     Status status = this->GetIndexBuffer(index_buffer_);
     if (!status.ok()) {
@@ -349,8 +463,12 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 PersistResultHandler handler(pm);
                 PersistWriteResult result1 = pm->Cleanup(posting_file);
                 PersistWriteResult result2 = pm->Cleanup(dict_file);
+
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);
+
+                kv_instance_.Delete(KeyEncode::PMObjectKey(posting_file));
+                kv_instance_.Delete(KeyEncode::PMObjectKey(dict_file));
 
             } else {
                 String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
@@ -364,7 +482,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     }
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
-        Status status = kv_instance_.Delete(chunk_info_key);
+        status = kv_instance_.Delete(chunk_info_key);
         if (!status.ok()) {
             return status;
         }
@@ -383,6 +501,11 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status ChunkIndexMeta::SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info) {
+    chunk_info_ = chunk_info;
     return Status::OK();
 }
 
