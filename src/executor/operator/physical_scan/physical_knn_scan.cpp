@@ -555,6 +555,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     SizeT brute_task_n = knn_scan_shared_data->block_metas_->size();
     NewTxn *new_txn = query_context->GetNewTxn();
     TxnTimeStamp begin_ts = new_txn->BeginTS();
+    TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
     SizeT knn_column_id = GetColumnID();
@@ -577,7 +578,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             }
             Bitmask bitmask;
             if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
-                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
@@ -640,11 +641,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            SharedPtr<MemIndex> mem_index;
-            status = segment_index_meta->GetMemIndex(mem_index);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
+            SharedPtr<MemIndex> mem_index = segment_index_meta->GetMemIndex();
             return std::make_tuple(chunk_ids_ptr, mem_index);
         };
 

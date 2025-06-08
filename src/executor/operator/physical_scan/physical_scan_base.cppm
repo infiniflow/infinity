@@ -30,7 +30,7 @@ import meta_info;
 namespace infinity {
 
 class ResultCacheManager;
-class DataBlock;
+struct DataBlock;
 struct BlockIndex;
 
 export class PhysicalScanBase : public PhysicalOperator {

@@ -251,18 +251,18 @@ class TestInsert:
 
             def checkpoint_func(infinity_obj):
                 nonlocal stop_insert
-
+                print("start checkpoint")
                 try:
                     time.sleep(0.2)
                     infinity_obj.flush_data()
-                    time.sleep(0.2)
-                    infinity_obj.flush_delta()
+                    print("full checkpoint")
                     time.sleep(0.2)
                 except Exception as e:
                     print(e)
                     stop_insert = True
                     raise e
                 stop_insert = True
+                print("end checkpoint")
 
             def insert_func(table_obj):
                 nonlocal stop_insert, line_num
@@ -283,9 +283,11 @@ class TestInsert:
             db_obj.drop_table("test_insert_checkpoint", ConflictType.Error)
 
         create_table()
+        print("create table done")
         for i in range(test_n):
             part1(i)
         drop_table()
+        print("drop table done")
 
     def test_insert_checkpoint(self, infinity_runner: InfinityRunner):
         self._test_insert_checkpoint_inner(infinity_runner, 10)

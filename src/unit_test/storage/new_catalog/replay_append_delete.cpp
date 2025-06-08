@@ -123,6 +123,7 @@ TEST_P(TestTxnReplayAppend, test_append0) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -150,7 +151,7 @@ TEST_P(TestTxnReplayAppend, test_append0) {
         BlockMeta block_meta(block_id, segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -228,6 +229,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -255,7 +257,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         BlockMeta block_meta(block_id, segment_meta);
 
         NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -352,9 +354,8 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
 
         auto [row_id, row_cnt] = check_mem_index(mem_index);
         EXPECT_EQ(row_id, RowID(0, 0));

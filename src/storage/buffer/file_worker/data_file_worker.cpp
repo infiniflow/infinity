@@ -25,6 +25,7 @@ import status;
 import logger;
 import persistence_manager;
 import serialize;
+import local_file_handle;
 
 namespace infinity {
 

@@ -147,7 +147,6 @@ export enum class ErrorCode : long {
     kDuplicateColumnIndex = 3097,
     kInvalidParameter = 3098,
     kIndexOnColumn = 3099,
-    kDumpingMemIndex = 3100,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -341,7 +340,6 @@ public:
     static Status DuplicateColumnIndex(const String &detail);
     static Status InvalidParameter(const String &detail);
     static Status IndexOnColumn(const String &column_name);
-    static Status DumpingMemIndex(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reason");

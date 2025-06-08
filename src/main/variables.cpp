@@ -26,7 +26,6 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[SESSION_COUNT_VAR_NAME.data()] = GlobalVariable::kSessionCount;
     global_name_map_[BUFFER_USAGE_VAR_NAME.data()] = GlobalVariable::kBufferPoolUsage;
     global_name_map_[SCHEDULE_POLICY_VAR_NAME.data()] = GlobalVariable::kSchedulePolicy;
-    global_name_map_[DELTA_LOG_COUNT_VAR_NAME.data()] = GlobalVariable::kDeltaLogCount;
     global_name_map_[NEXT_TXN_ID_VAR_NAME.data()] = GlobalVariable::kNextTxnID;
     global_name_map_[BUFFER_OBJECT_COUNT_VAR_NAME.data()] = GlobalVariable::kBufferedObjectCount;
     global_name_map_[UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME.data()] = GlobalVariable::kUnusedBufferObjectCount;

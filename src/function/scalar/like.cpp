@@ -17,7 +17,7 @@ module;
 module like;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -117,7 +117,7 @@ inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     //    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
-void RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterLikeFunction(NewCatalog *catalog_ptr) {
     String func_name = "like";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -128,10 +128,10 @@ void RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                          &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, LikeFunction>);
     function_set_ptr->AddFunction(varchar_like_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
-void RegisterNotLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterNotLikeFunction(NewCatalog *catalog_ptr) {
     String func_name = "not_like";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -142,7 +142,7 @@ void RegisterNotLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                              &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, NotLikeFunction>);
     function_set_ptr->AddFunction(varchar_not_like_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

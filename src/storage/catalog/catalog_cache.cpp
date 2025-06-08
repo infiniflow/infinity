@@ -30,7 +30,14 @@ namespace infinity {
 
 TableCache::TableCache(u64 table_id, SegmentID unsealed_segment_id, SegmentOffset unsealed_segment_offset, SegmentID next_segment_id)
     : prepare_segment_id_(unsealed_segment_id), prepare_segment_offset_(unsealed_segment_offset), commit_segment_id_(unsealed_segment_id),
-      commit_segment_offset_(unsealed_segment_offset), table_id_(table_id), next_segment_id_(next_segment_id) {}
+      commit_segment_offset_(unsealed_segment_offset), table_id_(table_id), next_segment_id_(next_segment_id) {
+    if (commit_segment_offset_ != 0) {
+        // Used when system is restarted and there's an unsealed segment.
+        unsealed_segment_cache_ = MakeShared<SegmentCache>(prepare_segment_id_, commit_segment_offset_);
+        unsealed_segment_cache_->sealed_ = false;
+        LOG_INFO(fmt::format("TableCache initialized with unsealed_segment_cache_({}, {})", prepare_segment_id_, commit_segment_offset_));
+    }
+}
 
 SharedPtr<AppendPrepareInfo> TableCache::PrepareAppendNolock(SizeT row_count, TransactionID txn_id) {
     if (row_count > MAX_BLOCK_CAPACITY or row_count == 0) {
@@ -40,46 +47,60 @@ SharedPtr<AppendPrepareInfo> TableCache::PrepareAppendNolock(SizeT row_count, Tr
     SharedPtr<AppendPrepareInfo> append_info = MakeShared<AppendPrepareInfo>();
     append_info->transaction_id_ = txn_id;
     if (unsealed_segment_cache_ == nullptr) {
+        // Used when system is restarted and all segments are sealed.
         unsealed_segment_cache_ = MakeShared<SegmentCache>(next_segment_id_, row_count);
         unsealed_segment_cache_->sealed_ = false;
-
         // Update prepare info
         prepare_segment_id_ = next_segment_id_;
         prepare_segment_offset_ = row_count;
 
         append_info->ranges_.emplace_back(RowID(next_segment_id_, 0), row_count);
+        LOG_DEBUG(fmt::format("TableCache.PrepareAppendNolock allocated range({}.{}, {})", next_segment_id_, 0, row_count));
         ++next_segment_id_;
     } else {
         if (unsealed_segment_cache_->row_count_ + row_count < DEFAULT_SEGMENT_CAPACITY) {
-            // Don't need to add new segment
+            // Don't need to add a new segment
             append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), row_count);
+            LOG_DEBUG(fmt::format("TableCache.PrepareAppendNolock allocated range({}.{}, {})",
+                                  unsealed_segment_cache_->segment_id_,
+                                  unsealed_segment_cache_->row_count_,
+                                  row_count));
             unsealed_segment_cache_->row_count_ += row_count;
 
             prepare_segment_offset_ += row_count;
         } else if (unsealed_segment_cache_->row_count_ + row_count == DEFAULT_SEGMENT_CAPACITY) {
-            // Need to add new segment
+            // Need to add a new segment
             append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), row_count);
             unsealed_segment_cache_->row_count_ += row_count;
             unsealed_segment_cache_->sealed_ = true;
-            sealed_segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+            segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+            LOG_DEBUG(fmt::format("TableCache.PrepareAppendNolock allocated range({}.{}, {})",
+                                  unsealed_segment_cache_->segment_id_,
+                                  unsealed_segment_cache_->row_count_,
+                                  row_count));
 
             prepare_segment_offset_ += row_count;
         } else {
             SizeT first_row_count = DEFAULT_SEGMENT_CAPACITY - unsealed_segment_cache_->row_count_;
             append_info->ranges_.emplace_back(RowID(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_->row_count_), first_row_count);
+            LOG_DEBUG(fmt::format("TableCache.PrepareAppendNolock allocated first range({}.{}, {})",
+                                  unsealed_segment_cache_->segment_id_,
+                                  unsealed_segment_cache_->row_count_,
+                                  first_row_count));
             unsealed_segment_cache_->row_count_ += first_row_count;
             unsealed_segment_cache_->sealed_ = true;
-            sealed_segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
+            segment_cache_map_.emplace(unsealed_segment_cache_->segment_id_, unsealed_segment_cache_);
 
             // Update prepare info
             SizeT second_row_count = row_count - first_row_count;
             prepare_segment_id_ = next_segment_id_;
             prepare_segment_offset_ = second_row_count;
 
-            // create new segment
+            // create a new segment
             unsealed_segment_cache_ = MakeShared<SegmentCache>(next_segment_id_, second_row_count);
             unsealed_segment_cache_->sealed_ = false;
             append_info->ranges_.emplace_back(RowID(next_segment_id_, 0), second_row_count);
+            LOG_DEBUG(fmt::format("TableCache.PrepareAppendNolock allocated second range({}.{}, {})", next_segment_id_, 0, first_row_count));
             ++next_segment_id_;
         }
     }

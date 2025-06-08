@@ -37,7 +37,8 @@ import kv_utility;
 namespace infinity {
 
 SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
-    : begin_ts_(table_meta.begin_ts()), kv_instance_(table_meta.kv_instance()), table_meta_(table_meta), segment_id_(segment_id) {}
+    : begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(table_meta.kv_instance()), table_meta_(table_meta),
+      segment_id_(segment_id) {}
 
 // Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
 //     block_ids_ = MakeShared<Vector<BlockID>>(block_ids);
@@ -208,7 +209,8 @@ Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
 // }
 
 Status SegmentMeta::LoadBlockIDs1() {
-    block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
+    block_ids1_ =
+        infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
     return Status::OK();
 }
 
@@ -312,13 +314,24 @@ Status SegmentMeta::Init() {
 //     return Status::OK();
 // }
 
+Status SegmentMeta::AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id) {
+    Status status;
+    String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    status = kv_instance_.Put(block_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
     Status status;
 
     BlockID block_id = 0;
     {
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = GetBlockIDs1();
+        std::tie(block_ids_ptr, status) = GetBlockIDs1(commit_ts);
         if (!status.ok()) {
             return {INVALID_BLOCK_ID, status};
         }
@@ -368,7 +381,16 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
 
 Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
     if (!block_ids1_) {
-        block_ids1_ = infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_);
+        block_ids1_ =
+            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
+    }
+    return {&*block_ids1_, Status::OK()};
+}
+
+Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp commit_ts) {
+    if (!block_ids1_) {
+        block_ids1_ =
+            infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts);
     }
     return {&*block_ids1_, Status::OK()};
 }
@@ -388,7 +410,10 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
         return {*row_cnt_, Status::OK()};
     }
     Status status;
-
+#if 1
+    row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
+    return {*row_cnt_, Status::OK()};
+#else
     SizeT row_cnt = 0;
     {
         Vector<BlockID> *block_ids_ptr = nullptr;
@@ -407,6 +432,7 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
     }
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
+#endif
 }
 
 Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {

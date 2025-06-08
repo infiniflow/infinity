@@ -35,9 +35,10 @@ struct TableDetail;
 export class TableMeeta {
 public:
     // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
-    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts);
+    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
+    TxnTimeStamp commit_ts() const { return commit_ts_; }
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
@@ -91,6 +92,8 @@ public:
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
+    Status DelUnsealedSegmentID();
+
     // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
@@ -135,6 +138,10 @@ public:
 
     Status GetNextRowID(RowID &next_row_id);
 
+    Tuple<String, Status> GetNextIndexID();
+
+    Status SetNextIndexID(const String &index_id_str);
+
 private:
     Status LoadComment();
 
@@ -158,6 +165,7 @@ private:
     std::mutex mtx_;
 
     TxnTimeStamp begin_ts_ = 0;
+    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     String db_id_str_;
     String table_id_str_;

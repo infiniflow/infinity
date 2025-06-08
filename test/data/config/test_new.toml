@@ -8,6 +8,7 @@ server_address           = "0.0.0.0"
 [log]
 log_filename             = "infinity.log"
 log_dir                  = "/var/infinity/log"
+log_level                = "info"
 
 [storage]
 optimize_interval        = "0s"

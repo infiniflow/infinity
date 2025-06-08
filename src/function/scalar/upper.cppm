@@ -6,8 +6,8 @@ export module upper;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterUpperFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterUpperFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

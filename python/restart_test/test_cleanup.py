@@ -137,11 +137,11 @@ class TestCleanup:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
         table_name = "test_cleanup_index"
-        index_name = "idx1"
-        index_name2 = "idx2"
+        index_name = "idx0"
+        index_name2 = "idx1"
         table_id = 0
-        index_id = 0
-        index2_id = 1
+        index_id = 1
+        index2_id = 2
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
         insert_n = 100
@@ -168,22 +168,33 @@ class TestCleanup:
                 table_obj.insert([data_line])
 
             res = table_obj.dump_index(index_name)
-            res = table_obj.dump_index(index_name2)
-
             assert res.error_code == infinity.ErrorCode.OK
+            res = table_obj.dump_index(index_name2)
+            assert res.error_code == infinity.ErrorCode.OK
+
             res = table_obj.drop_index(index_name)
             assert res.error_code == infinity.ErrorCode.OK
 
-            infinity_obj.cleanup()
+            res = infinity_obj.cleanup()
+            assert res.error_code == infinity.ErrorCode.OK
 
             # check
-            dropped_dirs = pathlib.Path(data_dir).rglob(f"*idx_{index_id}*")
-            assert self.files_num(list(dropped_dirs)) == 0
+            dropped_dirs = []
+            dropped_dirs_gen = pathlib.Path(data_dir).rglob(f"*idx_{index_id}*")
+            for dir in dropped_dirs_gen:
+                dropped_dirs.append(dir)
 
-            dropped_dirs = pathlib.Path(data_dir).rglob(f"*idx_{index2_id}*")
-            assert self.files_num(list(dropped_dirs)) > 0
+            assert self.files_num(dropped_dirs) == 0
+
+            dropped_dirs = []
+            dropped_dirs_gen = pathlib.Path(data_dir).rglob(f"*idx_{index2_id}*")
+            for dir in dropped_dirs_gen:
+                dropped_dirs.append(dir)
+
+            assert self.files_num(dropped_dirs) > 0
 
             res = table_obj.drop_index(index_name2)
+            assert res.error_code == infinity.ErrorCode.OK
 
         part1()
 
@@ -303,9 +314,13 @@ class TestCleanup:
             infinity_obj.cleanup()
             time.sleep(1)
 
-            index_id = 0
-            dropped_index_dirs = pathlib.Path(data_dir).rglob(f"*idx_{index_id}*")
-            assert self.files_num(list(dropped_index_dirs)) == 3
+            index_id = 1
+            dropped_index_dirs = []
+            dropped_index_dirs_gen = pathlib.Path(data_dir).rglob(f"*idx_{index_id}*")
+            for dir in dropped_index_dirs_gen:
+                dropped_index_dirs.append(dir)
+
+            assert self.files_num(dropped_index_dirs) == 3
 
             db_obj.drop_table(table_name)
 

@@ -3,7 +3,7 @@ module;
 module position;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -41,7 +41,7 @@ PositionFunction::Run(VarcharT &first, VarcharT &second, IntegerT &result, Colum
     }
 }
 
-void RegisterPositionFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterPositionFunction(NewCatalog *catalog_ptr) {
     String func_name = "char_position";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -52,7 +52,7 @@ void RegisterPositionFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                      &ScalarFunction::BinaryFunctionVarlenToVarlen<VarcharT, VarcharT, IntegerT, PositionFunction>);
     function_set_ptr->AddFunction(varchar_pos_int32);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

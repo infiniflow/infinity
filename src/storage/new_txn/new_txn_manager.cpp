@@ -27,8 +27,6 @@ import wal_entry;
 import infinity_exception;
 import logger;
 import buffer_manager;
-import catalog_delta_entry;
-import catalog;
 import default_values;
 import wal_manager;
 import defer_op;
@@ -51,27 +49,6 @@ NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp s
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
 #endif
-
-    // auto kv_instance = kv_store_->GetInstance();
-    // String db_string_id;
-    // Status status = kv_instance->Get(NEXT_DATABASE_ID.data(), db_string_id);
-    // if (!status.ok()) {
-    //     kv_instance->Put(NEXT_DATABASE_ID.data(), "0");
-    // }
-    // String table_string_id;
-    // status = kv_instance->Get(NEXT_TABLE_ID.data(), table_string_id);
-    // if (!status.ok()) {
-    //     kv_instance->Put(NEXT_TABLE_ID.data(), "0");
-    // }
-    // String index_string_id;
-    // status = kv_instance->Get(NEXT_INDEX_ID.data(), index_string_id);
-    // if (!status.ok()) {
-    //     kv_instance->Put(NEXT_INDEX_ID.data(), "0");
-    // }
-    // status = kv_instance->Commit();
-    // if (!status.ok()) {
-    //     UnrecoverableError("Can't initialize latest ID");
-    // }
     NewCatalog::Init(kv_store_);
 }
 
@@ -92,6 +69,7 @@ void NewTxnManager::Start() {
 void NewTxnManager::Stop() {
     if (!is_running_) {
         // FIXME: protect the double stop, the double stop need to be fixed.
+        LOG_INFO("WAL manager was stopped...");
         return;
     }
 
@@ -120,8 +98,6 @@ void NewTxnManager::Stop() {
     LOG_INFO("NewTxn manager is stopped");
 }
 
-bool NewTxnManager::Stopped() { return !is_running_.load(); }
-
 SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
@@ -129,12 +105,10 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
         UnrecoverableError(error_message);
     }
 
-    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
-
     std::lock_guard guard(locker_);
 
     // Assign a new txn id
-    u64 new_txn_id = ++catalog_ptr->next_txn_id_;
+    u64 new_txn_id = ++current_transaction_id_;
 
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
@@ -152,9 +126,9 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     }
 
     if (txn_text == nullptr) {
-        LOG_DEBUG(fmt::format("NewTxn: {} is Begin. begin ts: {}, No command text", new_txn_id, begin_ts));
+        LOG_DEBUG(fmt::format("Begin new txn: {}, begin ts: {}, No command text", new_txn_id, begin_ts));
     } else {
-        LOG_DEBUG(fmt::format("NewTxn: {} is Begin. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
+        LOG_DEBUG(fmt::format("Begin new txn: {}. begin ts: {}, Command: {}", new_txn_id, begin_ts, *txn_text));
     }
 
     // Create txn instance
@@ -195,7 +169,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
 
     //    current_ts_ += 2;
     prepare_commit_ts_ = current_ts_ + 2;
-    TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used, actually.
+    TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used
     TxnTimeStamp begin_ts = current_ts_ + 1;  // current_ts_ > 0
 
     // Create txn instance
@@ -238,14 +212,6 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     if (txn->NeedToAllocate()) {
         allocator_map_.emplace(commit_ts, nullptr);
     }
-    txn->SetTxnWrite();
-    return commit_ts;
-}
-
-TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
-    std::lock_guard guard(locker_);
-    prepare_commit_ts_ += 2;
-    TxnTimeStamp commit_ts = prepare_commit_ts_;
     txn->SetTxnWrite();
     return commit_ts;
 }
@@ -389,8 +355,14 @@ Vector<SharedPtr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
 }
 
 void NewTxnManager::SetNewSystemTS(TxnTimeStamp new_system_ts) {
+    std::lock_guard guard(locker_);
     current_ts_ = new_system_ts;
     prepare_commit_ts_ = new_system_ts;
+}
+
+void NewTxnManager::SetCurrentTransactionID(TransactionID current_transaction_id) {
+    std::lock_guard guard(locker_);
+    current_transaction_id_ = current_transaction_id;
 }
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
@@ -400,6 +372,12 @@ TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
 }
 
 void NewTxnManager::CommitBottom(NewTxn *txn) {
+    if (txn->IsReplay()) {
+        txn->SetTxnBottomDone();
+
+        // We do not update catalog cache during replay as system_cache_ is still nullptr right now.
+        return;
+    }
     TxnTimeStamp commit_ts = txn->CommitTS();
     TransactionID txn_id = txn->TxnID();
     std::lock_guard guard(locker_);
@@ -420,7 +398,7 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
 
     // ensure notify top half orderly per commit_ts
     while (!bottom_txns_.empty()) {
-        auto iter = bottom_txns_.begin();
+        iter = bottom_txns_.begin();
         TxnTimeStamp it_ts = iter->first;
         SharedPtr<NewTxn> it_txn = iter->second;
         if (current_ts_ > it_ts || it_ts > prepare_commit_ts_) {
@@ -481,7 +459,7 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             if (base_txn_store != nullptr) {
                 // base_txn_store means the creation with ignore if exists
                 CreateIndexTxnStore *txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store);
-                system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, *txn_store->index_base_->index_name_);
             }
             break;
         }
@@ -506,7 +484,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
     TransactionID txn_id = txn->TxnID();
     LOG_DEBUG(fmt::format("Cleanup txn, id: {}, begin_ts: {}", txn_id, begin_ts));
     if (is_write_transaction) {
-        // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
+        // For writing txn, we need to update the state: committing->committed, rollbacking->rollbacked
         TxnState txn_state = txn->GetTxnState();
         switch (txn_state) {
             case TxnState::kCommitting: {
@@ -575,16 +553,6 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
                               first_begin_ts));
         check_txn_map_.erase(check_txn_map_.begin());
     }
-}
-
-bool NewTxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
-    std::lock_guard guard(locker_);
-    if (commit_ts > ckp_begin_ts_) {
-        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
-        ckp_begin_ts_ = UNCOMMIT_TS;
-        return true;
-    }
-    return false;
 }
 
 void NewTxnManager::PrintAllKeyValue() const {

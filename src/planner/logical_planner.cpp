@@ -15,11 +15,11 @@
 module;
 
 #include <cassert>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
-#include <optional>
 module logical_planner;
 
 import stl;
@@ -102,7 +102,6 @@ import block_index;
 import column_expr;
 import function_expr;
 import insert_row_expr;
-import catalog;
 import special_function;
 import utility;
 import wal_manager;
@@ -1118,7 +1117,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 case ParsedExprType::kFunction: {
                     FunctionExpr *function_expr = static_cast<FunctionExpr *>(expr);
                     auto [special_function_ptr, status] =
-                        Catalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->catalog(), function_expr->func_name_);
+                        NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->new_catalog(), function_expr->func_name_);
                     if (status.ok()) {
                         switch (special_function_ptr->special_type()) {
                             case SpecialType::kRowID: {
@@ -1689,24 +1688,6 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->schema_name_,
                                                           statement->var_name_,
                                                           bind_context_ptr->GenerateTableIndex());
-            break;
-        }
-        case ShowStmtType::kDeltaLogs: {
-            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kDeltaLogs,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
-
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                          ShowStmtType::kCatalogs,
-                                                          statement->schema_name_,
-                                                          statement->var_name_,
-                                                          bind_context_ptr->GenerateTableIndex());
-
             break;
         }
         case ShowStmtType::kCatalog: {

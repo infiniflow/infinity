@@ -57,38 +57,68 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-Infinity supports two working modes, embedded mode and client-server mode. Infinity's embedded mode enables you to quickly embed Infinity into your Python applications, without the need to connect to a separate backend server. The following shows how to operate in embedded mode:
+This section provides guidance on deploying the Infinity database using Docker, with the client and server as separate processes. 
+
+### Prerequisites
+
+- CPU: x86_64 with AVX2 support.
+- OS:
+  - Linux with glibc 2.17+.
+  - Windows 10+ with WSL/WSL2.
+  - MacOS
+- Python: Python 3.10+.
+
+### Install Infinity server
+
+#### Linux x86_64 & MacOS x86_64
+
+```bash
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+docker pull infiniflow/infinity:nightly
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+```
+#### Windows
+
+If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using Docker. Suppose you've installed Ubuntu in WSL2:
+
+1. Follow [this](https://learn.microsoft.com/en-us/windows/wsl/systemd) to enable systemd inside WSL2.
+2. Install docker-ce according to the [instructions here](https://docs.docker.com/engine/install/ubuntu).
+3. If you have installed Docker Desktop version 4.29+ for Windows: **Settings** **>** **Features in development**, then select **Enable host networking**.
+4. Pull the Docker image and start Infinity: 
 
    ```bash
-   pip install infinity-embedded-sdk==0.6.0.dev3
-   ```
-   Use Infinity to conduct a dense vector search:
-   ```python
-   import infinity_embedded
-
-   # Connect to infinity
-   infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
-   # Retrieve a database object named default_db
-   db_object = infinity_object.get_database("default_db")
-   # Create a table with an integer column, a varchar column, and a dense vector column
-   table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
-   # Insert two rows into the table
-   table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-   table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-   # Conduct a dense vector search
-   res = table_object.output(["*"])
-                     .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
-                     .to_pl()
-   print(res)
+   sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+   docker pull infiniflow/infinity:nightly
+   docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
    ```
 
-> 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).
+### Install Infinity client
 
-#### 🔧 Deploy Infinity in client-server mode
+```
+pip install infinity-sdk==0.6.0.dev3
+```
 
-If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+### Run a vector search
 
-#### 🔧 Build from Source
+```python
+import infinity
+
+infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+db_object = infinity_object.get_database("default_db")
+table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+res = table_object.output(["*"])
+                  .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                  .to_pl()
+print(res)
+```
+
+## 🔧 Deploy Infinity using binary
+
+If you wish to deploy Infinity using binary with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+
+## 🔧 Build from Source
 
 See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
 

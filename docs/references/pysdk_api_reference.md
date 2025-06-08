@@ -15,18 +15,11 @@ A complete reference for Infinity's Python APIs.
 ### connect
 
 ```python
-# Connect to the local directory and get an Infinity object
-infinity_embedded.connect(uri)
-```
-
-Or
-
-```python
 # Connect to the Infinity server and get an Infinity object
 infinity.connect(uri)
 ```
 
-Connects to the local directory or the Infinity server, and gets an Infinity object.
+Connects to the Infinity server, and gets an Infinity object.
 
 :::tip NOTE
 You must have an Infinity object ready to perform database-specific operations.
@@ -36,20 +29,17 @@ You must have an Infinity object ready to perform database-specific operations.
 
 ##### uri: *Required*
 
-The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
+The `uri` here is a `NetworkAddress` object:  
 
-- `"/absolute/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as a Python module.
-- `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
-  - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
-  - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
+`NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
+
+- `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
+- `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
 
 :::tip IMPORTANT
-- When setting `uri` as `"/absolute/path/to/save/to"`, ensure you:
-  - Install the embedded SDK: `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`
-  - Import the `infinity_embedded` module: `import infinity_embedded`.
-- When setting `uri` as `NetworkAddress`, ensure you:
-  - Install the Infinity SDK: `pip install infinity==<VERSION>`
-  - Import the `infinity` module: `import infinity`.
+When setting `uri` as `NetworkAddress`, ensure you:
+- Install the Infinity SDK: `pip install infinity==<VERSION>`
+- Import the `infinity` module: `import infinity`.
 :::
 
 :::caution IMPORTANT
@@ -83,21 +73,12 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.infinity.LocalInfinityConnection` object in embedded mode or an `infinity.remote_thrift.infinity.RemoteThriftInfinityConnection` object in client-server mode.
+- Success: An `infinity.remote_thrift.infinity.RemoteThriftInfinityConnection` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
 
 #### Examples
-
-##### Connect to the local directory of Infinity
-
-From v0.4.0.dev4 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
-
-```python
-import infinity_embedded
-infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
-```
 
 ##### Connect to Infinity in client-server mode
 
@@ -182,7 +163,7 @@ Additional comment for the database to create.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
+- Success: An `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -345,7 +326,7 @@ A non-empty string indicating the name of the database to retrieve.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
+- Success: An `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -492,7 +473,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -769,7 +750,7 @@ A non-empty string indicating the name of the table to retrieve.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -792,7 +773,7 @@ Show the column definition of the current table.
 
 #### Returns
 
-An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 :::tip NOTE
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
@@ -1720,7 +1701,7 @@ The list must contain at least one element. Empty lists are not allowed.
   
 #### Returns
 
-An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 :::tip NOTE
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
@@ -1837,7 +1818,7 @@ A non-empty string representing the filter condition. It comprises one or multip
 
 ##### Returns
 
-An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 :::tip NOTE
 This method specifies a filtering condition for the rows in the current table but does not directly produce displayable data. To display the query results, use `filter()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
@@ -1879,7 +1860,7 @@ An expression list defining how to sort the results.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1909,7 +1890,7 @@ A list of strings specifying the expression to group by. Each string in the list
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1939,7 +1920,7 @@ A string specifying the having expression.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1968,7 +1949,7 @@ An integer specifying the maximum number of output rows.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -1998,7 +1979,7 @@ An integer specifying the offset position of the limit expression.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -2029,7 +2010,7 @@ A dictionary specifying the following search options:
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -2099,7 +2080,7 @@ A dictionary representing additional KNN or ANN search parameters.
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -2205,7 +2186,7 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -2328,7 +2309,7 @@ An optional dictionary specifying the following search options:
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
@@ -2376,7 +2357,7 @@ The columns must also be the `output` clause output and also be the match_text c
 
 #### Returns
 
-An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 :::tip NOTE
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
@@ -2460,7 +2441,7 @@ A dictionary representing additional options for the selected reranking method:
 
 #### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Success: An `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.

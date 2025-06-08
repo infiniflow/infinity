@@ -70,10 +70,14 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
             value = []
             for i in range(start_i, start_i + batch_size):
                 value.append({"id": i, "text": str(random.uniform(0, 10))})
-            table_obj.insert(value)
-            lock.acquire()
-            deleting_list.append(start_i)
-            lock.release()
+            try:
+                table_obj.insert(value)
+            except Exception as e:
+                print(f"Append into table {table_name} failed. {e}")
+            else:
+                lock.acquire()
+                deleting_list.append(start_i)
+                lock.release()
         else:
             if len(deleting_list) == 0:
                 lock.release()

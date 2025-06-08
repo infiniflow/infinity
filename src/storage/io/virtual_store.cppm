@@ -61,6 +61,7 @@ public:
     static Status MakeDirectory(const String &path);
     static Status RemoveDirectory(const String &path);
     static Status CleanupDirectory(const String &path);
+    static void RecursiveCleanupAllEmptyDir(const String &path);
     static Status Rename(const String &old_path, const String &new_path);
     static Status Truncate(const String &file_name, SizeT new_length);
     static Status Merge(const String &dst_file, const String &src_file);
@@ -80,6 +81,8 @@ public:
 
     static i32 MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr);
     static i32 MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length);
+
+    static void MunmapAllFiles();
 
     static Status InitRemoteStore(StorageType storage_type = StorageType::kMinio,
                                   const String &URL = "http://localhost:9000",

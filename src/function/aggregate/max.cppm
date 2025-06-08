@@ -20,8 +20,8 @@ export module max;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterMaxFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

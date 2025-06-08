@@ -33,6 +33,7 @@ import memindex_tracer;
 import table_index_entry;
 import buffer_handle;
 import third_party;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -342,6 +343,8 @@ public:
     SizeT GetRowCount() const;
     SizeT GetSizeInBytes() const;
     void SetSegmentEntry(SegmentIndexEntry *segment_index_entry);
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
 protected:
     MemIndexTracerInfo GetInfo() const override;

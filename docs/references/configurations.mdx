@@ -22,7 +22,6 @@ This document provides instructions for loading configuration file for Infinity 
   values={[
     {label: 'Docker', value: 'docker'},
     {label: 'DEB/RPM', value: 'binary'},
-    {label: 'Embedded Infinity', value: 'embedded'},
   ]}>
   <TabItem value="docker">
 
@@ -39,14 +38,6 @@ To load a configuration file when you start up Infinity using Docker:
   <TabItem value="binary">
 
 If you start up Infinity from DEB or RPM, the configuration file will be in the `/usr/etc` directory. When the Infinity service starts, it will load this configuration file.
-
-</TabItem>
-  <TabItem value="embedded">
-
-Infinity embedded does not have an *explicit* configuration file. Its configuration file should meet the following requirements:
-
-- It is in the local folder where Infinity embedded is opened (the path that you specify when calling `connect()`), for example `/var/infinity/`:
-- Its name must exactly match **infinity_conf.toml**.
 
 </TabItem>
 </Tabs>
@@ -208,9 +199,6 @@ wal_dir                       = "/var/infinity/wal"
 # Interval between full checkpoints
 # Range: ["0s", "720h"]
 full_checkpoint_interval      = "86400s"
-# The interval between delta (incremental) checkpoints
-# Range: ["0s", "720h"]
-delta_checkpoint_interval     = "60s"
 
 # Size threshold for triggering a compaction on a WAL file
 # When the size of a WAL file exceeds this threshold, the system will perform compaction.

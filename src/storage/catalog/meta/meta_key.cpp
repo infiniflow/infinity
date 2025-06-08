@@ -14,6 +14,7 @@
 
 module;
 
+#include "base64.hpp"
 #include <string>
 
 module meta_key;
@@ -107,6 +108,8 @@ String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", Ke
 
 String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
+String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
+
 nlohmann::json DBMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["db_id"] = std::stoull(db_id_str_);
@@ -175,7 +178,7 @@ nlohmann::json BlockMetaKey::ToJson() const {
 
 nlohmann::json BlockTagMetaKey::ToJson() const {
     nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
+    json_res[tag_name_] = base64::to_base64(value_);
     return json_res;
 }
 
@@ -250,6 +253,14 @@ nlohmann::json PmObjectMetaKey::ToJson() const {
     return json_res;
 }
 
+nlohmann::json DropMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["scope"] = scope_;
+    json_res["key"] = object_key_;
+    json_res["value"] = nlohmann::json::parse(value_);
+    return json_res;
+}
+
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     Vector<String> fields = infinity::Partition(key, '|');
 
@@ -296,6 +307,20 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         auto segment_tag_meta_key = MakeShared<SegmentTagMetaKey>(db_id_str, table_id_str, segment_id, tag_name_str);
         segment_tag_meta_key->value_ = value;
         return segment_tag_meta_key;
+    }
+
+    // construct blk tag meta key
+    if (fields[0] == "blk") {
+        const String &db_id_str = fields[1];
+        const String &table_id_str = fields[2];
+        const String &segment_id_str = fields[3];
+        const String &block_id_str = fields[4];
+        const String &tag_name_str = fields[5];
+        SegmentID segment_id = std::stoul(segment_id_str);
+        BlockID block_id = std::stoul(block_id_str);
+        auto block_tag_meta_key = MakeShared<BlockTagMetaKey>(db_id_str, table_id_str, segment_id, block_id, tag_name_str);
+        block_tag_meta_key->value_ = value;
+        return block_tag_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "blk") {
@@ -407,6 +432,14 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             return pm_object_meta_key;
         }
         UnrecoverableError(fmt::format("Unexpected key: {}:{}", key, value));
+    }
+
+    if (fields[0] == "drop") {
+        const String &scope = fields[1];
+        const String &object_key = fields[2];
+        SharedPtr<DropMetaKey> drop_meta_key = MakeShared<DropMetaKey>(scope, object_key);
+        drop_meta_key->value_ = value;
+        return drop_meta_key;
     }
 
     const String &tag_name_str = fields[0];

@@ -33,6 +33,7 @@ struct BlockIndex;
 class ColumnVector;
 class BufferObj;
 class KVInstance;
+struct ChunkIndexMetaInfo;
 
 using EMVBInMemQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
@@ -97,6 +98,8 @@ public:
                                                                              u32 n_doc_to_score,
                                                                              u32 out_second_stage,
                                                                              f32 threshold_final) const;
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const;
 };
 
 } // namespace infinity

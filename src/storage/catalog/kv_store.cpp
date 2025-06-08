@@ -14,10 +14,6 @@
 
 module;
 
-// #include "rocksdb/db.h"
-// #include "rocksdb/options.h"
-// #include "rocksdb/slice.h"
-// #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 
 module kv_store;
@@ -142,12 +138,11 @@ UniquePtr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const
 Vector<Pair<String, String>> KVInstance::GetAllKeyValue() {
     Vector<Pair<String, String>> result;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_->GetIterator(read_options_);
+    UniquePtr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});
     }
-    delete iter;
     return result;
 }
 
@@ -198,7 +193,7 @@ Status KVStore::Init(const String &db_path) {
 Status KVStore::Uninit() {
     delete transaction_db_;
     transaction_db_ = nullptr;
-
+    LOG_INFO("KV store is stopped.");
     return Status::OK();
 }
 
@@ -299,31 +294,35 @@ Status KVStore::Merge(const String &key, const String &value) {
 String KVStore::ToString() const {
     std::stringstream ss;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_db_->NewIterator(read_option);
+    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
-        ss << iter->key().ToString() << " : " << iter->value().ToString() << std::endl;
+        auto key = iter->key().ToString();
+        auto value = iter->value().ToString();
+        if (key.find("fast_rough_filter") == std::string::npos) {
+            ss << key << " : " << value << '\n';
+        } else {
+            ss << key << '\n';
+        }
     }
-    delete iter;
     return ss.str();
 }
 
 SizeT KVStore::KeyValueNum() const {
     SizeT cnt = 0;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_db_->NewIterator(read_option);
+    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         ++cnt;
     }
-    delete iter;
     return cnt;
 }
 
 Vector<Pair<String, String>> KVStore::GetAllKeyValue() {
     Vector<Pair<String, String>> result;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_db_->NewIterator(read_option);
+    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});

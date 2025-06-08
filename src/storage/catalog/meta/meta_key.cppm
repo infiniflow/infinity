@@ -284,6 +284,17 @@ export struct PmObjectMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
+export struct DropMetaKey final : public MetaKey {
+    DropMetaKey(String scope, String object_key) : MetaKey(MetaType::kDrop), scope_(std::move(scope)), object_key_(std::move(object_key)) {}
+
+    String scope_{};
+    String object_key_{};
+    String value_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
 export struct SystemTagMetaKey final : public MetaKey {
     SystemTagMetaKey(String tag_name) : MetaKey(MetaType::kSystemTag), tag_name_(std::move(tag_name)) {}
 

@@ -20,7 +20,6 @@ import stl;
 import buffer_manager;
 import txn_state;
 import default_values;
-import txn_context;
 import txn_manager;
 import status;
 
@@ -34,6 +33,7 @@ class NewTxn;
 class KVStore;
 struct WalEntry;
 class SystemCache;
+struct TxnContext;
 
 export class NewTxnManager {
 public:
@@ -44,8 +44,6 @@ public:
     void Start();
 
     void Stop();
-
-    bool Stopped();
 
     SharedPtr<NewTxn> BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type);
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
@@ -65,8 +63,6 @@ public:
     TxnTimeStamp GetReadCommitTS(NewTxn *txn);
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
-
-    TxnTimeStamp GetReplayWriteCommitTS(NewTxn *txn);
 
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
@@ -90,6 +86,10 @@ public:
 
     // This function is only used for unit test.
     void SetNewSystemTS(TxnTimeStamp new_system_ts);
+
+    void SetCurrentTransactionID(TransactionID latest_transaction_id);
+
+    TransactionID current_transaction_id() const { return current_transaction_id_; }
 
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
@@ -118,10 +118,6 @@ private:
     void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    u64 NextSequence() { return ++sequence_; }
-
-    bool InCheckpointProcess(TxnTimeStamp commit_ts);
-
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 
@@ -160,16 +156,13 @@ private:
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
+    TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
+    TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
-    Atomic<TxnTimeStamp> ckp_begin_ts_ =
-        UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
+    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
     atomic_bool is_running_{false};
-    bool enable_compaction_{};
-
-    u64 sequence_{};
 
     Atomic<u64> total_committed_txn_count_{0};
     Atomic<u64> total_rollbacked_txn_count_{0};

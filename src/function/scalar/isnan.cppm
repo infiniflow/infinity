@@ -6,8 +6,8 @@ export module isnan;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterIsnanFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterIsnanFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

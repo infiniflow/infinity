@@ -873,10 +873,11 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
                 TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
 
-                auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
-
-                compaction_process->Submit(
-                    MakeShared<DumpIndexBylineTask>(GetDBName(), GetTableName(), table_index_entry->GetIndexName(), seg_id, chunk_index_entry));
+                //                auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
+                //
+                //                compaction_process->Submit(
+                //                    MakeShared<DumpIndexBylineTask>(GetDBName(), GetTableName(), table_index_entry->GetIndexName(), seg_id,
+                //                    chunk_index_entry));
 
                 if (index_base->index_type_ == IndexType::kFullText) {
                     table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());

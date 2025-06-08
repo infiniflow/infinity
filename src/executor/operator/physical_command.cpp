@@ -52,6 +52,8 @@ import result_cache_manager;
 import snapshot;
 import periodic_trigger_thread;
 import new_txn;
+import bg_task_type;
+import new_catalog;
 
 namespace infinity {
 
@@ -90,7 +92,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
                                 RecoverableError(status);
                             }
-                            InfinityContext::instance().storage()->catalog()->SetProfile(set_command->value_bool());
+                            InfinityContext::instance().storage()->new_catalog()->SetProfile(set_command->value_bool());
                             return true;
                         }
                         case GlobalVariable::kProfileRecordCapacity: {
@@ -104,7 +106,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                     Status::InvalidCommand(fmt::format("Try to set profile record capacity with invalid value {}", value_int));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->catalog()->ResizeProfileHistory(value_int);
+                            query_context->storage()->new_catalog()->ResizeProfileHistory(value_int);
                             return true;
                         }
                         case GlobalVariable::kInvalid: {
@@ -272,7 +274,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set cleanup interval: {}", interval));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->periodic_trigger_thread()->cleanup_trigger_->UpdateInternal(interval);
+                            query_context->storage()->periodic_trigger_thread()->new_cleanup_trigger_->UpdateInternal(interval);
                             config->SetCleanupInterval(interval);
                             break;
                         }
@@ -286,22 +288,8 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
                                 RecoverableError(status);
                             }
-                            query_context->storage()->periodic_trigger_thread()->full_checkpoint_trigger_->UpdateInternal(interval);
+                            query_context->storage()->periodic_trigger_thread()->checkpoint_trigger_->UpdateInternal(interval);
                             config->SetFullCheckpointInterval(interval);
-                            break;
-                        }
-                        case GlobalOptionIndex::kDeltaCheckpointInterval: {
-                            if (set_command->value_type() != SetVarType::kInteger) {
-                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
-                                RecoverableError(status);
-                            }
-                            i64 interval = set_command->value_int();
-                            if (interval < 0) {
-                                Status status = Status::InvalidCommand(fmt::format("Attempt to set delta checkpoint interval: {}", interval));
-                                RecoverableError(status);
-                            }
-                            query_context->storage()->periodic_trigger_thread()->delta_checkpoint_trigger_->UpdateInternal(interval);
-                            config->SetDeltaCheckpointInterval(interval);
                             break;
                         }
                         case GlobalOptionIndex::kCompactInterval: {
@@ -387,7 +375,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
 
-            auto profiler_record = InfinityContext::instance().storage()->catalog()->GetProfileRecord(export_command->file_no());
+            auto profiler_record = InfinityContext::instance().storage()->new_catalog()->GetProfileRecord(export_command->file_no());
             if (profiler_record == nullptr) {
                 Status status = Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no()));
                 RecoverableError(status);
@@ -469,9 +457,23 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             {
                 // Full checkpoint
-                Txn *txn = query_context->GetTxn();
-                auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, true);
-                query_context->storage()->bg_processor()->Submit(checkpoint_task);
+                auto *wal_manager = query_context->storage()->wal_manager();
+                if (wal_manager->IsCheckpointing()) {
+                    LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
+                    Status status = Status::Checkpointing();
+                    RecoverableError(status);
+                }
+
+                TxnTimeStamp max_commit_ts{};
+                i64 wal_size{};
+                std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+                auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                NewTxn *new_txn = query_context->GetNewTxn();
+                checkpoint_task->new_txn_ = new_txn;
+
+                auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+                bg_processor->Submit(checkpoint_task);
                 checkpoint_task->Wait();
             }
 

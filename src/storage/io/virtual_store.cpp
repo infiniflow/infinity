@@ -19,7 +19,6 @@ module;
 #include <fcntl.h>
 #include <filesystem>
 #include <lz4.h>
-#include <lz4hc.h>
 #include <openssl/md5.h>
 #include <string>
 #include <sys/mman.h>
@@ -181,18 +180,22 @@ Status VirtualStore::DeleteFile(const String &file_name) {
     }
     std::error_code error_code;
     Path p{file_name};
+    if (!Exists(p)) {
+        LOG_WARN(fmt::format("The {} to be deleted does not exists ", file_name));
+        return Status::OK();
+    }
     bool is_deleted = std::filesystem::remove(p, error_code);
-    if (error_code.value() == 0) {
-        if (!is_deleted) {
-            String error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
-            LOG_WARN(error_message);
-            Status status = Status::IOError(error_message);
-            return status;
-        }
-    } else {
+    if (error_code.value() != 0) {
         String error_message = fmt::format("Delete file {} exception: {}", file_name, strerror(errno));
         UnrecoverableError(error_message);
     }
+    if (!is_deleted) {
+        String error_message = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
+        LOG_ERROR(error_message);
+        Status status = Status::IOError(error_message);
+        return status;
+    }
+    LOG_INFO(fmt::format("Clean file: {}", file_name));
     return Status::OK();
 }
 
@@ -273,6 +276,23 @@ Status VirtualStore::CleanupDirectory(const String &path) {
         UnrecoverableError(error_message);
     }
     return Status::OK();
+}
+
+void VirtualStore::RecursiveCleanupAllEmptyDir(const String &path) {
+    if (!VirtualStore::Exists(path) || !std::filesystem::is_directory(path)) {
+        return;
+    }
+
+    for (const auto &entry : std::filesystem::directory_iterator(path)) {
+        RecursiveCleanupAllEmptyDir(entry.path());
+    }
+
+    for (const auto &entry : std::filesystem::directory_iterator(path)) {
+        auto entry_path = entry.path();
+        if (std::filesystem::is_empty(entry_path)) {
+            std::filesystem::remove(entry_path);
+        }
+    }
 }
 
 Status VirtualStore::Rename(const String &old_path, const String &new_path) {
@@ -546,6 +566,15 @@ i32 VirtualStore::MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length) {
     u8 *aligned_ptr = data_ptr - offset + align_offset;
     SizeT align_length = length + data_ptr - aligned_ptr;
     return munmap(aligned_ptr, align_length);
+}
+
+void VirtualStore::MunmapAllFiles() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    for (auto it = mapped_files_.begin(); it != mapped_files_.end(); ++it) {
+        auto &mmap_info = it->second;
+        munmap(mmap_info.data_ptr_, mmap_info.data_len_);
+    }
+    mapped_files_.clear();
 }
 
 // Remote storage

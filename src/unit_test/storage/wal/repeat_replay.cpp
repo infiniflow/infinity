@@ -39,7 +39,6 @@ import table_def;
 import data_block;
 import block_entry;
 import txn;
-import catalog;
 import segment_entry;
 import value;
 import internal_types;
@@ -168,6 +167,9 @@ TEST_P(RepeatReplayTest, append) {
     };
 
     {
+        // Ealier test may leave dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
 
@@ -283,6 +285,9 @@ TEST_P(RepeatReplayTest, import) {
     };
 
     {
+        // Earlier cases may leave dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
