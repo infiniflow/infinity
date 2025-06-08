@@ -2078,10 +2078,6 @@ show_statement: SHOW DATABASES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kLogs;
 }
-| SHOW CATALOGS {
-      $$ = new infinity::ShowStatement();
-      $$->show_type_ = infinity::ShowStmtType::kCatalogs;
-}
 | SHOW CATALOG {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kCatalog;
