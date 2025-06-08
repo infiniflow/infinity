@@ -80,7 +80,7 @@ void CompactionProcessor::NewDoCompact() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     Vector<Pair<String, String>> db_table_names;
     {
-        auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan table"), TransactionType::kNormal);
+        auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("list table for compaction"), TransactionType::kNormal);
 
         Vector<String> db_names;
         Status status = new_txn->ListDatabase(db_names);
@@ -150,6 +150,11 @@ void CompactionProcessor::NewDoCompact() {
             }
         }
 
+        if (segment_ids.empty()) {
+            LOG_TRACE(fmt::format("No segment to compact for table: {}.{}", db_name, table_name));
+            return;
+        }
+
         auto compaction_alg = NewCompactionAlg::GetInstance();
 
         for (SegmentID segment_id : segment_ids) {
@@ -165,8 +170,13 @@ void CompactionProcessor::NewDoCompact() {
 
         status = new_txn->Compact(db_name, table_name, compactible_segment_ids);
     };
-    for (const auto &[db_name, table_name] : db_table_names) {
-        compact_table(db_name, table_name);
+
+    if (db_table_names.empty()) {
+        LOG_TRACE("No table to compact.");
+    } else {
+        for (const auto &[db_name, table_name] : db_table_names) {
+            compact_table(db_name, table_name);
+        }
     }
 }
 

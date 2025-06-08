@@ -134,11 +134,9 @@ void WalManager::Stop() {
 
     bottom_executor_->Stop();
 
-    LOG_TRACE("WalManager::Stop begin to stop txn manager.");
+    LOG_TRACE("Begin to stop txn manager.");
     // Notify txn manager to stop.
-    if (TxnManager *txn_mgr = storage_->txn_manager(); txn_mgr) {
-        txn_mgr->Stop();
-    } else if (NewTxnManager *new_txn_mgr = storage_->new_txn_manager(); new_txn_mgr) {
+    if (NewTxnManager *new_txn_mgr = storage_->new_txn_manager(); new_txn_mgr) {
         new_txn_mgr->Stop();
     } else {
         UnrecoverableError("WAL manager stop failed: txn manager is nullptr");
@@ -147,7 +145,7 @@ void WalManager::Stop() {
     // pop all the entries in the queue. and notify the condition variable.
     new_wait_flush_.Enqueue(nullptr);
 
-    LOG_TRACE("WalManager::Stop new flush thread join");
+    LOG_TRACE("Stop the new flush thread");
     new_flush_thread_.join();
 
     ofs_.close();
@@ -746,7 +744,7 @@ Tuple<TransactionID, TxnTimeStamp> WalManager::ReplayWalEntries(const Vector<Sha
 
         UniquePtr<NewTxn> replay_txn = txn_mgr->BeginReplayTxn(replay_entry);
         for (const auto &cmd : replay_entry->cmds_) {
-            LOG_INFO(fmt::format("Replay wal cmd: {}, commit ts: {}", cmd->ToString(), replay_entry->commit_ts_));
+            LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", cmd->ToString(), replay_entry->commit_ts_));
 
             Status status = replay_txn->ReplayWalCmd(cmd);
             if (!status.ok()) {
