@@ -20,7 +20,6 @@ import stl;
 import buffer_manager;
 import txn_state;
 import default_values;
-import txn_context;
 import txn_manager;
 import status;
 
@@ -34,6 +33,7 @@ class NewTxn;
 class KVStore;
 struct WalEntry;
 class SystemCache;
+struct TxnContext;
 
 export class NewTxnManager {
 public:

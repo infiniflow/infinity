@@ -27,8 +27,6 @@ import wal_entry;
 import infinity_exception;
 import logger;
 import buffer_manager;
-import catalog_delta_entry;
-import catalog;
 import default_values;
 import wal_manager;
 import defer_op;
@@ -51,27 +49,6 @@ NewTxnManager::NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp s
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
 #endif
-
-    // auto kv_instance = kv_store_->GetInstance();
-    // String db_string_id;
-    // Status status = kv_instance->Get(NEXT_DATABASE_ID.data(), db_string_id);
-    // if (!status.ok()) {
-    //     kv_instance->Put(NEXT_DATABASE_ID.data(), "0");
-    // }
-    // String table_string_id;
-    // status = kv_instance->Get(NEXT_TABLE_ID.data(), table_string_id);
-    // if (!status.ok()) {
-    //     kv_instance->Put(NEXT_TABLE_ID.data(), "0");
-    // }
-    // String index_string_id;
-    // status = kv_instance->Get(NEXT_INDEX_ID.data(), index_string_id);
-    // if (!status.ok()) {
-    //     kv_instance->Put(NEXT_INDEX_ID.data(), "0");
-    // }
-    // status = kv_instance->Commit();
-    // if (!status.ok()) {
-    //     UnrecoverableError("Can't initialize latest ID");
-    // }
     NewCatalog::Init(kv_store_);
 }
 

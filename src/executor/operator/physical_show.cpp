@@ -60,7 +60,6 @@ import segment_iter;
 import segment_entry;
 import variables;
 import default_values;
-import catalog;
 import txn_manager;
 import wal_manager;
 import logger;
@@ -485,15 +484,6 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowStmtType::kCatalogs: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
-            output_names_->emplace_back("max_commit_timestamp");
-            output_names_->emplace_back("file_path");
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
-            break;
-        }
         case ShowStmtType::kCatalog: {
             output_names_->reserve(1);
             output_types_->reserve(1);
@@ -733,10 +723,6 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kLogs: {
             ExecuteShowLogs(query_context, show_operator_state);
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            ExecuteShowCatalogs(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kCatalog: {
@@ -5799,79 +5785,6 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
     return;
-}
-
-void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state) {
-    Status status = Status::NotSupport("Show catalogs is not supported in new catalog since RocksDB has replaced catalog files.");
-    RecoverableError(status);
-
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
-        bigint_type,
-        varchar_type,
-    };
-
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(*output_types_);
-    SizeT row_count = 0;
-
-    WalManager *wal_manager = query_context->storage()->wal_manager();
-    auto catalog_fileinfo = wal_manager->GetCatalogFiles();
-    if (!catalog_fileinfo.has_value()) {
-        String error_message = fmt::format("Can't get catalog files");
-        UnrecoverableError(error_message);
-    }
-    auto &[full_catalog_file_info, delta_catalog_file_infos] = catalog_fileinfo.value();
-
-    {
-        {
-            // full_ckp_commit_ts
-            Value value = Value::MakeBigInt(full_catalog_file_info.max_commit_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // full_ckp_catalog_file_path
-            Value value = Value::MakeVarchar(full_catalog_file_info.path_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        ++row_count;
-    }
-
-    for (const auto &delta_catalog_file_info : delta_catalog_file_infos) {
-        if (output_block_ptr.get() == nullptr) {
-            output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(*output_types_);
-        }
-
-        {
-            // delta_ckp_commit_ts
-            Value value = Value::MakeBigInt(delta_catalog_file_info.max_commit_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // delta_ckp_catalog_file_path
-            Value value = Value::MakeVarchar(delta_catalog_file_info.path_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-
-        ++row_count;
-        if (row_count == output_block_ptr->capacity()) {
-            output_block_ptr->Finalize();
-            operator_state->output_.emplace_back(std::move(output_block_ptr));
-            output_block_ptr = nullptr;
-            row_count = 0;
-        }
-    }
-
-    output_block_ptr->Finalize();
-    operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state) {
