@@ -20,8 +20,8 @@ export module hour;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterHourFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterHourFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

@@ -19,7 +19,7 @@ module;
 module and_func;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -58,13 +58,13 @@ static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) 
     function_set_ptr->AddFunction(and_function);
 }
 
-void RegisterAndFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterAndFunction(NewCatalog *catalog_ptr) {
     String func_name = "AND";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateAndFunction(function_set_ptr);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

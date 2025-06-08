@@ -21,7 +21,7 @@ module inequals;
 
 import logical_type;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -116,7 +116,7 @@ static void GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_
     function_set_ptr->AddFunction(inequals_function);
 }
 
-void RegisterInEqualFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterInEqualFunction(NewCatalog *catalog_ptr) {
     String func_name = "<>";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -198,10 +198,10 @@ void RegisterInEqualFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                           &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(varchar_inequals_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
-void RegisterInEqualAliasFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterInEqualAliasFunction(NewCatalog *catalog_ptr) {
     String func_name = "!=";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -283,7 +283,7 @@ void RegisterInEqualAliasFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                           &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(varchar_inequals_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

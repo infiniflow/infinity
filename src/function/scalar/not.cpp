@@ -19,7 +19,7 @@ module;
 module not_func;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -56,14 +56,14 @@ static void GenerateNotFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) 
     function_set_ptr->AddFunction(not_function);
 }
 
-void RegisterNotFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterNotFunction(NewCatalog *catalog_ptr) {
     String func_name = "NOT";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateNotFunction(function_set_ptr);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

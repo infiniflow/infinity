@@ -19,7 +19,7 @@ module;
 module greater;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -97,7 +97,7 @@ static void GenerateGreaterFunction(SharedPtr<ScalarFunctionSet> &function_set_p
     function_set_ptr->AddFunction(greater_function);
 }
 
-void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterGreaterFunction(NewCatalog *catalog_ptr) {
     String func_name = ">";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
@@ -163,7 +163,7 @@ void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                          &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(varchar_greater_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

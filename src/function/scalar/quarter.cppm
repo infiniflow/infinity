@@ -20,8 +20,8 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterQuarterFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterQuarterFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

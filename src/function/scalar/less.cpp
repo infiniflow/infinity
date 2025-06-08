@@ -19,7 +19,7 @@ module;
 module less;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -98,7 +98,7 @@ static void GenerateLessFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr,
     function_set_ptr->AddFunction(less_function);
 }
 
-void RegisterLessFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterLessFunction(NewCatalog *catalog_ptr) {
     String func_name = "<";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -165,7 +165,7 @@ void RegisterLessFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                       &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, LessFunction>);
     function_set_ptr->AddFunction(varchar_less_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity
