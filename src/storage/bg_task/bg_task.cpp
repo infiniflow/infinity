@@ -83,4 +83,6 @@ void AppendMemIndexBatch::WaitForCompletion() {
 
 TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
+BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type) {}
+
 } // namespace infinity

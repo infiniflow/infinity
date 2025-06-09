@@ -93,7 +93,7 @@ private:
 
     void ExecuteShowTables(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowViews(QueryContext *query_context, ShowOperatorState *operator_state);
+    void ExecuteShowTasks(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *operator_state);
 

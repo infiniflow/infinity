@@ -28,7 +28,7 @@ enum class ShowStmtType {
     kColumns,
     kTables,
     kCollections,
-    kViews,
+    kTasks,
     kIndexes,
     kConfigs,
     kProfiles,

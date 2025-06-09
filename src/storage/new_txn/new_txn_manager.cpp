@@ -686,4 +686,22 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
     }
 }
 
+void NewTxnManager::AddTaskInfo(SharedPtr<BGTaskInfo> task_info) {
+    std::lock_guard<std::mutex> lock(task_lock_);
+    if (task_info_list_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        task_info_list_.pop_front(); // Remove the oldest task info if the list exceeds the size limit
+    }
+    task_info_list_.push_back(std::move(task_info));
+}
+
+Vector<SharedPtr<BGTaskInfo>> NewTxnManager::GetTaskInfoList() const {
+    std::lock_guard<std::mutex> lock(task_lock_);
+    Vector<SharedPtr<BGTaskInfo>> task_info_list;
+    task_info_list.reserve(task_info_list_.size());
+    for (const auto &task_info : task_info_list_) {
+        task_info_list.push_back(task_info);
+    }
+    return task_info_list;
+}
+
 } // namespace infinity

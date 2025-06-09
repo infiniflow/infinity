@@ -191,6 +191,7 @@ STANDALONE      { return STANDALONE; }
 SYSTEM          { return SYSTEM; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
+TASKS           { return TASKS; }
 TENSOR          { return TENSOR; }
 TENSORARRAY     { return TENSORARRAY; }
 TEXT            { return TEXT; }
@@ -216,7 +217,6 @@ VARIABLES       { return VARIABLES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }
-VIEWS           { return VIEWS; }
 WHEN            { return WHEN; }
 WHERE           { return WHERE; }
 WITH            { return WITH; }

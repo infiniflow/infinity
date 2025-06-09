@@ -40,7 +40,7 @@ String ToString(ShowStmtType type) {
             return "Show index chunk";
         case ShowStmtType::kTables:
             return "Show tables";
-        case ShowStmtType::kViews:
+        case ShowStmtType::kTasks:
             return "Show views";
         case ShowStmtType::kColumns:
             return "Show column";
