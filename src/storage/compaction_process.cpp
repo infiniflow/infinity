@@ -265,30 +265,6 @@ void CompactionProcessor::NewScanAndOptimize() {
     }
 }
 
-void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
-    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-
-    NewTxn *new_txn = dump_task->new_txn_;
-    const String &db_name = dump_task->mem_index_->db_name_;
-    const String &table_name = dump_task->mem_index_->table_name_;
-    const String &index_name = dump_task->mem_index_->index_name_;
-    SegmentID segment_id = dump_task->mem_index_->segment_id_;
-
-    Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
-    if (status.ok()) {
-        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
-        if (!commit_status.ok()) {
-            LOG_ERROR(fmt::format("Commit Dump mem index failed: {}", commit_status.message()));
-        }
-    } else {
-        LOG_ERROR(fmt::format("Dump mem index failed: {}", status.message()));
-        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
-        if (!rollback_status.ok()) {
-            UnrecoverableError(rollback_status.message());
-        }
-    }
-}
-
 void CompactionProcessor::Process() {
     bool running = true;
     while (running) {
@@ -346,20 +322,6 @@ void CompactionProcessor::Process() {
 
                         NewScanAndOptimize();
                         LOG_DEBUG("Optimize done.");
-                    }
-                    break;
-                }
-                case BGTaskType::kDumpIndex: {
-                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-                    if (storage_mode == StorageMode::kUnInitialized) {
-                        UnrecoverableError("Uninitialized storage mode");
-                    }
-                    if (storage_mode == StorageMode::kWritable) {
-                        auto dump_task = static_cast<DumpIndexTask *>(bg_task.get());
-                        LOG_DEBUG(dump_task->ToString());
-                        // Trigger transaction to save the mem index
-                        DoDump(dump_task);
-                        LOG_DEBUG("Dump index done.");
                     }
                     break;
                 }

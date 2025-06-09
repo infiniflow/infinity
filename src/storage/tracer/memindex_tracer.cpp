@@ -31,7 +31,7 @@ import table_entry;
 import table_index_entry;
 import txn_manager;
 import txn_state;
-import compaction_process;
+import dump_index_process;
 import storage;
 
 import kv_store;
@@ -138,13 +138,9 @@ Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(NewTxn *new_txn) {
 UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     std::lock_guard lck(mtx_);
 
-    Vector<BaseMemIndex *> mem_indexes;
-
-    NewTxn *new_txn = GetTxn();
-
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
-    mem_indexes = GetUndumpedMemIndexes(new_txn);
+    NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(new_txn);
 
     bool make_task = false;
     DeferFn defer_op([&] {
@@ -198,10 +194,10 @@ BGMemIndexTracer::~BGMemIndexTracer() {
 }
 
 void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
-    auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
+    auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
 
     LOG_INFO(fmt::format("Submit dump task: {}", dump_task->ToString()));
-    compaction_process->Submit(std::move(dump_task));
+    dump_index_processor->Submit(std::move(dump_task));
 }
 
 NewTxn *BGMemIndexTracer::GetTxn() {
