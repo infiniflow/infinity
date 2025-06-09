@@ -31,7 +31,7 @@ struct Catalog;
 class TxnManager;
 class NewTxnManager;
 class DumpIndexTask;
-class NewTxn;
+class EMVBIndexInMem;
 
 export struct MemIndexTracerInfo {
 public:
@@ -82,6 +82,8 @@ protected:
 
     virtual Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) = 0;
 
+    virtual Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) = 0;
+
     using MemIndexMapIter = HashSet<BaseMemIndex *>::iterator;
 
     UniquePtr<DumpIndexTask> MakeDumpTask();
@@ -126,6 +128,8 @@ protected:
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override;
 
     Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override;
+
+    Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) override;
 
 private:
     NewTxnManager *txn_mgr_;

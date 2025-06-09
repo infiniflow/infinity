@@ -62,6 +62,7 @@ import bg_task;
 import dump_index_process;
 import mem_index;
 import base_memindex;
+import emvb_index_in_mem;
 
 namespace infinity {
 
@@ -1540,15 +1541,20 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
                         fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
                 }
 
-                if (mem_index->GetEMVBIndex() != nullptr) {
-                    return Status::UnexpectedError("Not implemented EMVB index");
+                NewTxn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("dump mem index aync"), TransactionType::kNormal);
+                SharedPtr<DumpIndexTask> dump_index_task{};
+                if (mem_index->GetBaseMemIndex() != nullptr) {
+                    mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
+                    const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
+                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn);
+
+                } else if (mem_index->GetEMVBIndex() != nullptr) {
+                    mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
+                    EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
+                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn);
                 }
 
-                // Trigger dump mem processor to dump mem index for new sealed segment
-                mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
-                const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-                NewTxn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("dump mem index aync"), TransactionType::kNormal);
-                auto dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn);
+                // Trigger dump index processor to dump mem index for new sealed segment
                 auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
                 dump_index_processor->Submit(dump_index_task);
             }

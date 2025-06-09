@@ -17,6 +17,7 @@ module;
 module bg_task;
 
 import base_memindex;
+import emvb_index_in_mem;
 import chunk_index_entry;
 import cleanup_scanner;
 import infinity_context;
@@ -63,6 +64,9 @@ NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_nam
 
 DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn)
     : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_(new_txn) {}
+
+DumpIndexTask::DumpIndexTask(EMVBIndexInMem *emvb_mem_index, NewTxn *new_txn)
+    : BGTask(BGTaskType::kDumpIndex, true), emvb_mem_index_(emvb_mem_index), new_txn_(new_txn) {}
 
 AppendMemIndexTask::AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index,
                                        const SharedPtr<ColumnVector> &input_column,
