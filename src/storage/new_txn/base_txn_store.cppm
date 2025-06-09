@@ -184,6 +184,22 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct OptimizeIndexStoreEntry {
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    String table_key_{};
+    String index_name_{};
+    String index_id_str_{};
+    u64 index_id_{};
+    SegmentID segment_id_{};
+    WalChunkIndexInfo new_chunk_info_;
+    Vector<ChunkID> deprecate_chunks_;
+};
+
 export struct OptimizeIndexTxnStore : public BaseTxnStore {
     OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
 
@@ -200,6 +216,9 @@ export struct OptimizeIndexTxnStore : public BaseTxnStore {
     Vector<SegmentID> segment_ids_{};
     Vector<Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
     Vector<Vector<ChunkID>> deprecate_ids_in_segments_{};
+
+    // Above should be removed
+    Vector<OptimizeIndexStoreEntry> entries_;
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
