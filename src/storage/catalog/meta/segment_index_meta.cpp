@@ -35,6 +35,7 @@ import txn_state;
 import infinity_exception;
 import utility;
 import memory_indexer;
+import logger;
 
 namespace infinity {
 
@@ -174,18 +175,6 @@ Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::SetFtInfo(const SharedPtr<SegmentIndexFtInfo> &ft_info) {
-    ft_info_ = ft_info;
-    String ft_info_key = GetSegmentIndexTag("ft_info");
-
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->AddSegmentIndexFtInfo(ft_info_key, ft_info);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     if (!ft_info_) {
         Status status = LoadFtInfo();
@@ -195,7 +184,17 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     }
     ft_info_->ft_column_len_sum_ += column_len_sum;
     ft_info_->ft_column_len_cnt_ += column_len_cnt;
-    return Status::OK();
+
+    String ft_info_key = GetSegmentIndexTag("ft_info");
+    Vector<u64> sum_cnt = {ft_info_->ft_column_len_sum_, ft_info_->ft_column_len_cnt_};
+    String ft_info_str = nlohmann::json(sum_cnt).dump();
+    Status status = kv_instance_.Put(ft_info_key, ft_info_str);
+    LOG_INFO(fmt::format("UpdateFtInfo: column_len_sum={}, column_len_cnt={}, ft_info_key={}, ft_info_str={}",
+                         column_len_sum,
+                         column_len_cnt,
+                         ft_info_key,
+                         ft_info_str));
+    return status;
 }
 
 Status SegmentIndexMeta::SetNoMemIndex() {
@@ -231,25 +230,6 @@ Status SegmentIndexMeta::InitSet() {
             return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
         }
     }
-    // {
-    //     Status status = SetNoMemIndex();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
-    {
-        auto [index_base, status] = table_index_meta_.GetIndexBase();
-        if (!status.ok()) {
-            return status;
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            auto ft_info = MakeShared<SegmentIndexFtInfo>();
-            Status status = this->SetFtInfo(ft_info);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
     return Status::OK();
 }
 
@@ -265,25 +245,6 @@ Status SegmentIndexMeta::InitSet1() {
         bool setted = GetOrSetMemIndex(mem_index);
         if (!setted) {
             return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
-        }
-    }
-    // {
-    //     Status status = SetNoMemIndex();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    // }
-    {
-        auto [index_base, status] = table_index_meta_.GetIndexBase();
-        if (!status.ok()) {
-            return status;
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            auto ft_info = MakeShared<SegmentIndexFtInfo>();
-            Status status = this->SetFtInfo(ft_info);
-            if (!status.ok()) {
-                return status;
-            }
         }
     }
     return Status::OK();
@@ -308,13 +269,6 @@ Status SegmentIndexMeta::LoadSet() {
         auto [index_base, status] = table_index_meta_.GetIndexBase();
         if (!status.ok()) {
             return status;
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            auto ft_info = MakeShared<SegmentIndexFtInfo>();
-            Status status = this->SetFtInfo(ft_info);
-            if (!status.ok()) {
-                return status;
-            }
         }
     }
     return Status::OK();
@@ -485,24 +439,21 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 }
 
 Status SegmentIndexMeta::LoadFtInfo() {
-    String ft_info_key = GetSegmentIndexTag("ft_info");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->GetSegmentIndexFtInfo(ft_info_key, ft_info_);
-
-    if (ft_info_->ft_column_len_sum_ == 0) {
-        SharedPtr<MemIndex> mem_index = GetMemIndex();
-        if (mem_index) {
-            SharedPtr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
-            if (memory_indexer) {
-                ft_info_->ft_column_len_sum_ = memory_indexer->GetColumnLengthSum();
-                ft_info_->ft_column_len_cnt_ = memory_indexer->GetDocCount();
-            }
-        }
+    if (!ft_info_) {
+        ft_info_ = MakeShared<SegmentIndexFtInfo>(0, 0);
     }
-
+    String ft_info_key = GetSegmentIndexTag("ft_info");
+    String ft_info_str;
+    Status status = kv_instance_.Get(ft_info_key, ft_info_str);
     if (!status.ok()) {
+        if (status.code() == ErrorCode::kNotFound) {
+            return Status::OK();
+        }
         return status;
     }
+    Vector<u64> sum_cnt = nlohmann::json::parse(ft_info_str).get<Vector<u64>>();
+    ft_info_->ft_column_len_sum_ = sum_cnt[0];
+    ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();
 }
 

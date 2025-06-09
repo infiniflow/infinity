@@ -69,7 +69,7 @@ jobs:
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -v -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -v -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       - name: Build debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
