@@ -133,7 +133,11 @@ void CompactionProcessor::NewDoCompact() {
                                             compact_txn_store->new_segment_id_);
                 }
                 bg_task_info->task_info_list_.emplace_back(task_text);
-                bg_task_info->status_list_.emplace_back(commit_status);
+                if (commit_status.ok()) {
+                    bg_task_info->status_list_.emplace_back("OK");
+                } else {
+                    bg_task_info->status_list_.emplace_back(commit_status.message());
+                }
             } else {
                 LOG_ERROR(fmt::format("Compaction failed: {}", status.message()));
                 Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
@@ -141,7 +145,11 @@ void CompactionProcessor::NewDoCompact() {
                     UnrecoverableError(rollback_status.message());
                 }
                 bg_task_info->task_info_list_.emplace_back(fmt::format("Compact table: {}.{}", db_name, table_name));
-                bg_task_info->status_list_.emplace_back(status);
+                if (status.ok()) {
+                    bg_task_info->status_list_.emplace_back("OK");
+                } else {
+                    bg_task_info->status_list_.emplace_back(status.message());
+                }
             }
         });
 

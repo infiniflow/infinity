@@ -37,6 +37,6 @@ export enum class BGTaskType {
     kInvalid
 };
 
-String ToString(BGTaskType type);
+export String ToString(BGTaskType type);
 
 } // namespace infinity
