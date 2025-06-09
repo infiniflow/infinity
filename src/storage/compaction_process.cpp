@@ -106,26 +106,37 @@ void CompactionProcessor::NewDoCompact() {
     }
 
     auto compact_table = [&](const String &db_name, const String &table_name, SharedPtr<BGTaskInfo> &bg_task_info) {
-        auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+        auto new_txn_shared =
+            new_txn_mgr->BeginTxnShared(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
         Status status = Status::OK();
         DeferFn defer_fn([&] {
             if (status.ok()) {
-                Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+                Status commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
                 if (!commit_status.ok()) {
                     LOG_ERROR(fmt::format("Commit compaction failed: {}", commit_status.message()));
                 }
-                CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(new_txn->GetTxnStore());
-                bg_task_info->task_info_list_.emplace_back(fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
-                                                                       new_txn->TxnID(),
-                                                                       new_txn->CommitTS(),
-                                                                       db_name,
-                                                                       table_name,
-                                                                       fmt::join(compact_txn_store->segment_ids_, ","),
-                                                                       compact_txn_store->new_segment_id_));
+                CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(new_txn_shared->GetTxnStore());
+                String task_text;
+                if (compact_txn_store == nullptr) {
+                    task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{}",
+                                            new_txn_shared->TxnID(),
+                                            new_txn_shared->CommitTS(),
+                                            db_name,
+                                            table_name);
+                } else {
+                    task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
+                                            new_txn_shared->TxnID(),
+                                            new_txn_shared->CommitTS(),
+                                            db_name,
+                                            table_name,
+                                            fmt::join(compact_txn_store->segment_ids_, ","),
+                                            compact_txn_store->new_segment_id_);
+                }
+                bg_task_info->task_info_list_.emplace_back(task_text);
                 bg_task_info->status_list_.emplace_back(commit_status);
             } else {
                 LOG_ERROR(fmt::format("Compaction failed: {}", status.message()));
-                Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+                Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
                 if (!rollback_status.ok()) {
                     UnrecoverableError(rollback_status.message());
                 }
@@ -136,7 +147,7 @@ void CompactionProcessor::NewDoCompact() {
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+        status = new_txn_shared->GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
             return;
         }
@@ -148,8 +159,8 @@ void CompactionProcessor::NewDoCompact() {
                 UnrecoverableError(status.message());
             }
             segment_ids = *segment_ids_ptr;
-            //            LOG_TRACE(fmt::format("Collect segment ids: {}, txn_id: {}, begin_ts: {}", segment_ids.size(), new_txn->TxnID(),
-            //            new_txn->BeginTS())); for (const SegmentID segment_id : segment_ids) {
+            //            LOG_TRACE(fmt::format("Collect segment ids: {}, txn_id: {}, begin_ts: {}", segment_ids.size(), new_txn_shared->TxnID(),
+            //            new_txn_shared->BeginTS())); for (const SegmentID segment_id : segment_ids) {
             //                LOG_TRACE(fmt::format("Collect compact segment id: {}", segment_id));
             //            }
             SegmentID unsealed_id = 0;
@@ -181,7 +192,7 @@ void CompactionProcessor::NewDoCompact() {
         }
         Vector<SegmentID> compactible_segment_ids = compaction_alg->GetCompactiableSegments();
 
-        status = new_txn->Compact(db_name, table_name, compactible_segment_ids);
+        status = new_txn_shared->Compact(db_name, table_name, compactible_segment_ids);
     };
 
     if (db_table_names.empty()) {
