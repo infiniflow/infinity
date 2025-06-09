@@ -194,7 +194,7 @@ public:
 export struct BGTaskInfo {
     explicit BGTaskInfo(BGTaskType type);
     Vector<String> task_info_list_{};
-    Vector<Status> status_list_{};
+    Vector<String> status_list_{};
     BGTaskType type_{BGTaskType::kInvalid};
 };
 
