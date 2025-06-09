@@ -48,6 +48,19 @@ SegmentOffset NewSegmentSnapshot::segment_offset() const {
     return segment_offset_;
 }
 
+Vector<UniquePtr<BlockMeta>> NewSegmentSnapshot::block_map() const {
+    Vector<UniquePtr<BlockMeta>> block_map;
+    auto [block_ids_ptr, status] = segment_meta_->GetBlockIDs1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    for (BlockID block_id : *block_ids_ptr) {
+        auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_meta_);
+        block_map.emplace_back(std::move(block_meta));
+    }
+    return block_map;
+}
+
 BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
@@ -68,20 +81,6 @@ void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &t
     for (SegmentID segment_id : *segment_ids_ptr) {
         NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
         segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
-        std::tie(segment_snapshot.segment_offset_, status) = segment_snapshot.segment_meta_->GetRowCnt1();
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_snapshot.segment_meta_->GetBlockIDs1();
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        for (BlockID block_id : *block_ids_ptr) {
-            auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_snapshot.segment_meta_);
-            segment_snapshot.block_map_.emplace_back(std::move(block_meta));
-        }
     }
 }
 
@@ -113,7 +112,7 @@ SizeT BlockIndex::BlockCount() const {
         }
     else
         for (const auto &[_, segment_info] : new_segment_block_index_) {
-            count += segment_info.block_map_.size();
+            count += segment_info.block_map().size();
         }
     return count;
 }
@@ -173,10 +172,10 @@ BlockMeta *BlockIndex::GetBlockMeta(u32 segment_id, u16 block_id) const {
         return nullptr;
     }
     const auto &blocks_info = seg_it->second;
-    if (blocks_info.block_map_.size() <= block_id) {
+    if (blocks_info.block_map().size() <= block_id) {
         return nullptr;
     }
-    return blocks_info.block_map_[block_id].get();
+    return blocks_info.block_map()[block_id].get();
 }
 
 void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {

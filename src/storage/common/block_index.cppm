@@ -43,9 +43,10 @@ export struct SegmentSnapshot {
 };
 
 export struct NewSegmentSnapshot {
+public:
     SegmentOffset segment_offset() const;
+    Vector<UniquePtr<BlockMeta>> block_map() const;
     UniquePtr<SegmentMeta> segment_meta_;
-    Vector<UniquePtr<BlockMeta>> block_map_;
 };
 
 export struct BlockIndex {

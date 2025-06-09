@@ -282,12 +282,12 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
 
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-        SizeT block_count = segment_snapshot.block_map_.size();
+        SizeT block_count = segment_snapshot.block_map().size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
 
-            BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+            BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
             Vector<ColumnVector> column_vectors;
             column_vectors.resize(select_column_count);
             auto [block_row_count, status] = block_meta->GetRowCnt1();
@@ -437,11 +437,11 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     Map<SegmentID, NewSegmentSnapshot> &new_segment_block_index_ref = block_index_->new_segment_block_index_;
     LOG_DEBUG(fmt::format("Going to export segment count: {}", new_segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : new_segment_block_index_ref) {
-        SizeT block_count = segment_snapshot.block_map_.size();
+        SizeT block_count = segment_snapshot.block_map().size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-            BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+            BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
 
             auto [block_row_count, status] = block_meta->GetRowCnt1();
             if (!status.ok()) {
@@ -608,11 +608,11 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     TxnTimeStamp commit_ts = new_txn->CommitTS();
 
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
-        SizeT block_count = segment_snapshot.block_map_.size();
+        SizeT block_count = segment_snapshot.block_map().size();
         LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
-            BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+            BlockMeta *block_meta = segment_snapshot.block_map()[block_idx].get();
             auto [block_row_count, status] = block_meta->GetRowCnt1();
             if (!status.ok()) {
                 RecoverableError(status);

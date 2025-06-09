@@ -490,7 +490,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
             segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
         } else {
-            const auto &block_map = segment_info.block_map_;
+            const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
                 block_metas_->emplace_back(block_meta.get());
             }
