@@ -604,16 +604,12 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
 
-        SegmentOffset segment_row_count = 0;
         SegmentIndexMeta *segment_index_meta = &knn_scan_shared_data->segment_index_metas_->at(index_idx);
         SegmentID segment_id = segment_index_meta->segment_id();
 
         const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
-        } else {
-            SegmentMeta *segment_meta = iter->second.segment_meta_.get();
-            std::tie(segment_row_count, std::ignore) = segment_meta->GetRowCnt1();
         }
 
         bool has_some_result = false;
@@ -628,9 +624,6 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                       index_idx + 1,
                                       index_task_n));
                 bitmask = it->second;
-                if (segment_row_count != bitmask.count()) {
-                    UnrecoverableError(fmt::format("Segment row count mismatch with filter result: {} vs {}", segment_row_count, bitmask.count()));
-                }
                 has_some_result = true;
                 use_bitmask = !bitmask.IsAllTrue();
             }
@@ -728,13 +721,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                                     (query, knn_scan_shared_data->topk_, filter, search_option);
                                     }
                                 } else {
-                                    SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                     if (!with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
                                             hnsw_handler->template SearchIndex
                                                 <DistanceDataType, SegmentOffset, false>
                                                     (query, knn_scan_shared_data->topk_, search_option);
                                     } else {
+                                        SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                         AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) =
                                             hnsw_handler->template SearchIndex

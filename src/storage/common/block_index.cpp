@@ -40,6 +40,14 @@ import segment_index_meta;
 
 namespace infinity {
 
+SegmentOffset NewSegmentSnapshot::segment_offset() const {
+    auto [segment_offset_, status] = segment_meta_->GetRowCnt1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    return segment_offset_;
+}
+
 BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
@@ -127,7 +135,7 @@ SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
         auto seg_it = new_segment_block_index_.find(segment_id);
         if (seg_it != new_segment_block_index_.end()) {
             const auto &blocks_info = seg_it->second;
-            return blocks_info.segment_offset_;
+            return blocks_info.segment_offset();
         }
     }
     return 0;

@@ -288,7 +288,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         }
     }
 
-    SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
+    SizeT segment_row_count = segment_index.at(segment_id).segment_offset();
     Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
     if (result_elem.CountTrue() == 0) {
         // empty result
