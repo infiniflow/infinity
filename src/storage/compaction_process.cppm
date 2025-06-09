@@ -26,7 +26,6 @@ namespace infinity {
 class TxnManager;
 class NewTxn;
 class BGTask;
-class DumpIndexTask;
 
 class TestCommander {
 public:
@@ -72,8 +71,6 @@ public:
 
 private:
     void NewScanAndOptimize();
-
-    void DoDump(DumpIndexTask *dump_task);
 
     void Process();
 
