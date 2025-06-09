@@ -5,7 +5,7 @@ module;
 module sqrt;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -28,7 +28,7 @@ struct SqrtFunction {
     }
 };
 
-void RegisterSqrtFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterSqrtFunction(NewCatalog *catalog_ptr) {
     String func_name = "sqrt";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -81,7 +81,7 @@ void RegisterSqrtFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                  &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

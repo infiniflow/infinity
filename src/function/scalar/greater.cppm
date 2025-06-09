@@ -20,8 +20,8 @@ export module greater;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterGreaterFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

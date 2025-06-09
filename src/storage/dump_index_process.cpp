@@ -80,16 +80,17 @@ void DumpIndexProcessor::DoDump(DumpIndexTask *dump_task) {
 
     Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
     if (status.ok()) {
-        status = new_txn_mgr->CommitTxn(new_txn);
-    }
-    if (!status.ok()) {
+        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+        if (!commit_status.ok()) {
+            LOG_ERROR(fmt::format("Commit dump mem index failed: {}", commit_status.message()));
+        }
+    } else {
+        LOG_ERROR(fmt::format("Dump mem index failed: {}", status.message()));
         Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
         if (!rollback_status.ok()) {
             UnrecoverableError(rollback_status.message());
         }
     }
-
-    return;
 }
 
 void DumpIndexProcessor::Process() {

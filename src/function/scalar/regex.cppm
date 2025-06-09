@@ -6,8 +6,8 @@ export module regex;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterRegexFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

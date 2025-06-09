@@ -6,7 +6,7 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
-export void RegisterTruncFunction(const UniquePtr<Catalog> &catalog_ptr);
+class NewCatalog;
+export void RegisterTruncFunction(NewCatalog *catalog_ptr);
 
 }

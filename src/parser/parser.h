@@ -165,7 +165,7 @@ struct SQL_LTYPE {
     VALUES = 291,                  /* VALUES  */
     VIEW = 292,                    /* VIEW  */
     INDEX = 293,                   /* INDEX  */
-    VIEWS = 294,                   /* VIEWS  */
+    TASKS = 294,                   /* TASKS  */
     DATABASES = 295,               /* DATABASES  */
     SEGMENT = 296,                 /* SEGMENT  */
     SEGMENTS = 297,                /* SEGMENTS  */
@@ -303,36 +303,35 @@ struct SQL_LTYPE {
     LOGS = 429,                    /* LOGS  */
     CATALOGS = 430,                /* CATALOGS  */
     CATALOG = 431,                 /* CATALOG  */
-    TASKS = 432,                   /* TASKS  */
-    SEARCH = 433,                  /* SEARCH  */
-    MATCH = 434,                   /* MATCH  */
-    MAXSIM = 435,                  /* MAXSIM  */
-    QUERY = 436,                   /* QUERY  */
-    QUERIES = 437,                 /* QUERIES  */
-    FUSION = 438,                  /* FUSION  */
-    ROWLIMIT = 439,                /* ROWLIMIT  */
-    ADMIN = 440,                   /* ADMIN  */
-    LEADER = 441,                  /* LEADER  */
-    FOLLOWER = 442,                /* FOLLOWER  */
-    LEARNER = 443,                 /* LEARNER  */
-    CONNECT = 444,                 /* CONNECT  */
-    STANDALONE = 445,              /* STANDALONE  */
-    NODES = 446,                   /* NODES  */
-    NODE = 447,                    /* NODE  */
-    REMOVE = 448,                  /* REMOVE  */
-    SNAPSHOT = 449,                /* SNAPSHOT  */
-    SNAPSHOTS = 450,               /* SNAPSHOTS  */
-    RECOVER = 451,                 /* RECOVER  */
-    RESTORE = 452,                 /* RESTORE  */
-    PERSISTENCE = 453,             /* PERSISTENCE  */
-    OBJECT = 454,                  /* OBJECT  */
-    OBJECTS = 455,                 /* OBJECTS  */
-    FILES = 456,                   /* FILES  */
-    MEMORY = 457,                  /* MEMORY  */
-    ALLOCATION = 458,              /* ALLOCATION  */
-    HISTORY = 459,                 /* HISTORY  */
-    CHECK = 460,                   /* CHECK  */
-    NUMBER = 461                   /* NUMBER  */
+    SEARCH = 432,                  /* SEARCH  */
+    MATCH = 433,                   /* MATCH  */
+    MAXSIM = 434,                  /* MAXSIM  */
+    QUERY = 435,                   /* QUERY  */
+    QUERIES = 436,                 /* QUERIES  */
+    FUSION = 437,                  /* FUSION  */
+    ROWLIMIT = 438,                /* ROWLIMIT  */
+    ADMIN = 439,                   /* ADMIN  */
+    LEADER = 440,                  /* LEADER  */
+    FOLLOWER = 441,                /* FOLLOWER  */
+    LEARNER = 442,                 /* LEARNER  */
+    CONNECT = 443,                 /* CONNECT  */
+    STANDALONE = 444,              /* STANDALONE  */
+    NODES = 445,                   /* NODES  */
+    NODE = 446,                    /* NODE  */
+    REMOVE = 447,                  /* REMOVE  */
+    SNAPSHOT = 448,                /* SNAPSHOT  */
+    SNAPSHOTS = 449,               /* SNAPSHOTS  */
+    RECOVER = 450,                 /* RECOVER  */
+    RESTORE = 451,                 /* RESTORE  */
+    PERSISTENCE = 452,             /* PERSISTENCE  */
+    OBJECT = 453,                  /* OBJECT  */
+    OBJECTS = 454,                 /* OBJECTS  */
+    FILES = 455,                   /* FILES  */
+    MEMORY = 456,                  /* MEMORY  */
+    ALLOCATION = 457,              /* ALLOCATION  */
+    HISTORY = 458,                 /* HISTORY  */
+    CHECK = 459,                   /* CHECK  */
+    NUMBER = 460                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -422,7 +421,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 426 "parser.h"
+#line 425 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

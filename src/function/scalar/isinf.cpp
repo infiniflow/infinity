@@ -5,7 +5,7 @@ module;
 module isinf;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -47,7 +47,7 @@ inline void IsinfFunction::Run(BFloat16T &left, BooleanT &result) {
     result = std::isinf(static_cast<float>(left));
 }
 
-void RegisterIsinfFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterIsinfFunction(NewCatalog *catalog_ptr) {
     String func_name = "isinf";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -76,7 +76,7 @@ void RegisterIsinfFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                            &ScalarFunction::UnaryFunction<BFloat16T, BooleanT, IsinfFunction>);
     function_set_ptr->AddFunction(isinf_function_bfloat16);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

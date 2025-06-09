@@ -14,18 +14,42 @@
 
 module;
 
-export module bg_task_info;
+export module mem_index_appender;
 
 import stl;
-import third_party;
-//import global_resource_usage;
+import bg_task_type;
+import blocking_queue;
 import status;
 
 namespace infinity {
 
-struct BGTaskInfo {
+class TxnManager;
+class NewTxn;
+class BGTask;
+class AppendMemIndexTask;
 
+export class MemIndexAppender {
+public:
+    MemIndexAppender();
+    ~MemIndexAppender();
+
+    void Start();
+
+    void Stop();
+
+    void Submit(SharedPtr<BGTask> bg_task);
+
+    u64 RunningTaskCount() const { return task_count_; }
+
+private:
+    void Process();
+
+private:
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"MemIndexAppender"};
+
+    Thread processor_thread_{};
+
+    Atomic<u64> task_count_{};
 };
 
-}
-
+} // namespace infinity

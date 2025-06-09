@@ -26,7 +26,6 @@ import stl;
 import buffer_manager;
 import default_values;
 import wal_manager;
-import catalog;
 import new_catalog;
 import txn_manager;
 import new_txn_manager;
@@ -59,6 +58,7 @@ import virtual_store;
 import result_cache_manager;
 import global_resource_usage;
 import txn_state;
+import mem_index_appender;
 
 import wal_entry;
 
@@ -269,7 +269,7 @@ Status Storage::AdminToWriter() {
     auto [max_txn_id, system_start_ts, max_checkpoint_ts] = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
     // Init database, need to create default_db
     LOG_INFO(fmt::format("Init a new catalog"));
-    catalog_ = Catalog::NewCatalog();
+
     this->AttachCatalog(max_checkpoint_ts);
 
     if (new_txn_mgr_) {
@@ -306,17 +306,10 @@ Status Storage::AdminToWriter() {
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
     }
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
+    bg_processor_ = MakeUnique<BGTaskProcessor>();
 
     i64 compact_interval = std::max(config_ptr_->CompactInterval(), {0});
-    if (compact_interval > 0) {
-        LOG_INFO(fmt::format("Init compaction alg"));
-        catalog_->InitCompactionAlg(system_start_ts);
-    } else {
-        LOG_INFO(fmt::format("Skip init compaction alg"));
-    }
-
-    BuiltinFunctions builtin_functions(catalog_);
+    BuiltinFunctions builtin_functions(new_catalog_.get());
     builtin_functions.Init();
     // Catalog finish init here.
 
@@ -337,13 +330,16 @@ Status Storage::AdminToWriter() {
     compact_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
-        UnrecoverableError("mem index processor was initialized before.");
+        UnrecoverableError("dump index processor was initialized before.");
     }
     dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
     dump_index_processor_->Start();
 
-    // recover index after start compact process
-    catalog_->StartMemoryIndexCommit();
+    if (mem_index_appender_ != nullptr) {
+        UnrecoverableError("mem index appender was initialized before.");
+    }
+    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_->Start();
 
     this->RecoverMemIndex();
 
@@ -410,7 +406,6 @@ Status Storage::UnInitFromReader() {
             bg_processor_.reset();
         }
 
-        catalog_.reset();
         new_catalog_.reset();
         kv_store_->Uninit();
         kv_store_.reset();
@@ -507,10 +502,16 @@ Status Storage::ReaderToWriter() {
     compact_processor_->Start();
 
     if (dump_index_processor_ != nullptr) {
-        UnrecoverableError("mem index processor was initialized before.");
+        UnrecoverableError("dump index processor was initialized before.");
     }
     dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
     dump_index_processor_->Start();
+
+    if (mem_index_appender_ != nullptr) {
+        UnrecoverableError("mem index appender was initialized before.");
+    }
+    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_->Start();
 
     periodic_trigger_thread_->Stop();
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -543,12 +544,16 @@ Status Storage::WriterToAdmin() {
         dump_index_processor_.reset();
     }
 
+    if (mem_index_appender_ != nullptr) {
+        mem_index_appender_->Stop();
+        mem_index_appender_.reset();
+    }
+
     if (bg_processor_ != nullptr) {
         bg_processor_->Stop();
         bg_processor_.reset();
     }
 
-    catalog_.reset();
     new_catalog_.reset();
     kv_store_->Uninit();
     kv_store_.reset();
@@ -610,6 +615,11 @@ Status Storage::WriterToReader() {
         dump_index_processor_.reset();
     }
 
+    if (mem_index_appender_ != nullptr) {
+        mem_index_appender_->Stop();
+        mem_index_appender_.reset();
+    }
+
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
 
     periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
@@ -638,12 +648,16 @@ Status Storage::UnInitFromWriter() {
         dump_index_processor_.reset();
     }
 
+    if (mem_index_appender_ != nullptr) {
+        mem_index_appender_->Stop();
+        mem_index_appender_.reset();
+    }
+
     if (bg_processor_ != nullptr) {
         bg_processor_->Stop();
         bg_processor_.reset();
     }
 
-    catalog_.reset();
     new_catalog_.reset();
 
     memory_index_tracer_.reset();
@@ -803,13 +817,13 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
         UnrecoverableError(fmt::format("Expect current storage mode is READER with Phase1"));
     }
 
-    BuiltinFunctions builtin_functions(catalog_);
+    BuiltinFunctions builtin_functions(new_catalog_.get());
     builtin_functions.Init();
     // Catalog finish init here.
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
     }
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
+    bg_processor_ = MakeUnique<BGTaskProcessor>();
 
     // Construct txn manager
     if (txn_mgr_ != nullptr) {
@@ -831,9 +845,6 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
-    catalog_->StartMemoryIndexCommit();
-    catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-
     bg_processor_->Start();
 
     if (periodic_trigger_thread_ != nullptr) {
@@ -849,10 +860,6 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     current_storage_mode_ = StorageMode::kReadable;
 
     return Status::OK();
-}
-
-void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
-    catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
@@ -894,14 +901,6 @@ void Storage::RecoverMemIndex() {
         UnrecoverableError("Failed to commit mem index in new catalog");
     }
 }
-
-void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
-    if (catalog_.get() != nullptr) {
-        UnrecoverableError("Catalog was already initialized before.");
-    }
-    catalog_ = Catalog::LoadFullCheckpoint(checkpoint_path);
-}
-void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { catalog_->AttachDeltaCheckpoint(checkpoint_path); }
 
 void Storage::CreateDefaultDB() {
     if (new_txn_mgr_) {

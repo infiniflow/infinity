@@ -61,7 +61,6 @@ import txn_state;
 
 import new_txn;
 import new_txn_manager;
-import catalog;
 import new_catalog;
 
 namespace infinity {

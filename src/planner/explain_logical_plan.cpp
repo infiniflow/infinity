@@ -1520,7 +1520,7 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowStmtType::kViews: {
+        case ShowStmtType::kTasks: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
@@ -1983,34 +1983,6 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
                 show_str += "-> SHOW LOGS ";
             } else {
                 show_str = "SHOW LOGS ";
-            }
-            show_str += "(";
-            show_str += std::to_string(show_node->node_id());
-            show_str += ")";
-            result->emplace_back(MakeShared<String>(show_str));
-            break;
-        }
-        case ShowStmtType::kTasks: {
-            String show_str;
-            if (intent_size != 0) {
-                show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW TASKS ";
-            } else {
-                show_str = "SHOW TASKS ";
-            }
-            show_str += "(";
-            show_str += std::to_string(show_node->node_id());
-            show_str += ")";
-            result->emplace_back(MakeShared<String>(show_str));
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            String show_str;
-            if (intent_size != 0) {
-                show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW CATALOGS ";
-            } else {
-                show_str = "SHOW CATALOGS ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());

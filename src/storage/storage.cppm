@@ -15,15 +15,8 @@
 module;
 
 import stl;
-import config;
-import catalog;
-import txn_manager;
-import buffer_manager;
 import wal_manager;
-import object_storage_process;
 import log_file;
-import persistence_manager;
-import virtual_store;
 import status;
 
 export module storage;
@@ -33,14 +26,21 @@ namespace infinity {
 class CleanupInfoTracer;
 class ResultCacheManager;
 class NewCatalog;
+class Catalog;
 class NewTxnManager;
+class TxnManager;
 class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
 class CompactionProcessor;
 class DumpIndexProcessor;
+class MemIndexAppender;
 class BGTaskProcessor;
 class BGMemIndexTracer;
+class ObjectStorageProcess;
+class Config;
+class BufferManager;
+class PersistenceManager;
 
 export enum class ReaderInitPhase {
     kInvalid,
@@ -80,6 +80,8 @@ public:
 
     [[nodiscard]] inline DumpIndexProcessor *dump_index_processor() const noexcept { return dump_index_processor_.get(); }
 
+    [[nodiscard]] inline MemIndexAppender *mem_index_appender() const noexcept { return mem_index_appender_.get(); }
+
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
     UniquePtr<KVInstance> KVInstance();
@@ -110,11 +112,8 @@ public:
     Status WriterToReader();
     Status UnInitFromWriter();
 
-    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void AttachCatalog(TxnTimeStamp checkpoint_ts);
     void RecoverMemIndex();
-    void LoadFullCheckpoint(const String &checkpoint_path);
-    void AttachDeltaCheckpoint(const String &checkpoint_path);
 
     Config *config() const { return config_ptr_; }
     ReaderInitPhase reader_init_phase() const { return reader_init_phase_; }
@@ -137,6 +136,7 @@ private:
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<DumpIndexProcessor> dump_index_processor_{};
+    UniquePtr<MemIndexAppender> mem_index_appender_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<KVStore> kv_store_{};
 

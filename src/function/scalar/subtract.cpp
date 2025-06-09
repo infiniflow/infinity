@@ -17,7 +17,7 @@ module;
 module substract;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -189,7 +189,7 @@ inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
     return false;
 }
 
-void RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterSubtractFunction(NewCatalog *catalog_ptr) {
     String func_name = "-";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -309,7 +309,7 @@ void RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                             &ScalarFunction::BinaryFunctionWithFailure<MixedT, MixedT, MixedT, SubFunction>);
     function_set_ptr->AddFunction(sub_function_mixed_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

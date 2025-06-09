@@ -549,4 +549,8 @@ void InfinityContext::StopThriftServers() {
     LOG_INFO(fmt::format("Removed {} thrift sessions", removed_session_count));
 }
 
+void InfinityContext::SetConfig(UniquePtr<Config> &&config) {
+    config_ = std::move(config);
+}
+
 } // namespace infinity

@@ -45,6 +45,8 @@ import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
 import mem_index;
+import scalar_function_set;
+import special_function;
 
 import logical_type;
 import data_type;
@@ -56,6 +58,7 @@ namespace infinity {
 // String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
 // } // namespace
+
 
 void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock,
                                       BufferHandle version_buffer_handle,
@@ -126,13 +129,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return status;
     }
 
-    auto InitBlockColumn = [&](ColumnMeta &column_meta) {
-        Status status = column_meta.LoadSet();
-        if (!status.ok()) {
-            return status;
-        }
-        return Status::OK();
-    };
+    auto InitBlockColumn = [&](ColumnMeta &column_meta) { return column_meta.LoadSet(); };
     auto InitBlock = [&](BlockMeta &block_meta) {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
         std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
@@ -146,12 +143,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
                 return status;
             }
         }
-        Status status = block_meta.LoadSet(checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-
-        return Status::OK();
+        return block_meta.LoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
@@ -445,7 +437,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
         const String &db_id_str = (*db_id_strs_ptr)[i];
         const String &db_name = (*db_names_ptr)[i];
         DBMeeta db_meta(db_id_str, *kv_instance);
-        Status status = TraverseDB(db_meta, db_name);
+        status = TraverseDB(db_meta, db_name);
         if (!status.ok()) {
             return status;
         }
@@ -523,7 +515,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
                                TxnTimeStamp commit_ts,
                                const SharedPtr<TableDef> &table_def,
                                Optional<TableMeeta> &table_meta) {
-    // Create table key value pair
+    // Create table a key value pair
     KVInstance &kv_instance = db_meta.kv_instance();
     String table_key = KeyEncode::CatalogTableKey(db_meta.db_id_str(), *table_def->table_name(), commit_ts);
     Status status = kv_instance.Put(table_key, table_id_str);
@@ -600,7 +592,7 @@ Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
                                     TxnTimeStamp commit_ts,
                                     const SharedPtr<IndexBase> &index_base,
                                     Optional<TableIndexMeeta> &table_index_meta) {
-    // Create index key value pair
+    // Create index a key value pair
     KVInstance &kv_instance = table_meta.kv_instance();
     const String &index_name = *index_base->index_name_;
     String index_key = KeyEncode::CatalogIndexKey(table_meta.db_id_str(), table_meta.table_id_str(), index_name, commit_ts);
@@ -685,12 +677,7 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta,
         }
     }
 
-    Status status = table_index_meta.UninitSet1(usage_flag);
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
+    return table_index_meta.UninitSet1(usage_flag);
 }
 
 // Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
@@ -718,11 +705,7 @@ Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts
         return status;
     }
     segment_meta.emplace(segment_id, table_meta);
-    status = segment_meta->InitSet();
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    return segment_meta->InitSet();
 }
 
 Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id) {
@@ -731,11 +714,7 @@ Status NewCatalog::AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp comm
         return status;
     }
     segment_meta.emplace(segment_id, table_meta);
-    status = segment_meta->InitSet();
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    return segment_meta->InitSet();
 }
 
 Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
@@ -909,7 +888,7 @@ Status NewCatalog::AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeSta
     return Status::OK();
 }
 //
-// Status NewCatalog::AddNewTableIndexForTransform(TableMeeta &table_meta,TxnTimeStamp commit_ts,Optional<TableIndexMeta> &table_index_meta) {
+// Status NewCatalog::AddNewTableIndexForTransform(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<TableIndexMeta> &table_index_meta) {
 //     Status status;
 //     BlockID block_id;
 //     std::tie(block_id, status) = table_meta.AddBlockID1(commit_ts);
@@ -1327,7 +1306,7 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
     BufferHandle buffer_handle = version_buffer->Load();
     SharedPtr<BlockLock> block_lock;
     {
-        Status status = block_meta.GetBlockLock(block_lock);
+        status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
             return status;
         }
@@ -1452,9 +1431,9 @@ Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file
     if (!status.ok()) {
         return status;
     }
-    if (!column_def) {
-        for (const auto &column_def : *column_defs_ptr) {
-            ColumnMeta column_meta(column_def->id(), block_meta);
+    if (column_def == nullptr) {
+        for (const auto &column_def_ptr : *column_defs_ptr) {
+            ColumnMeta column_meta(column_def_ptr->id(), block_meta);
             status = GetBlockColumnFilePaths(column_meta, file_paths);
             if (!status.ok()) {
                 return status;
@@ -1620,12 +1599,94 @@ Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeSta
     }
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta);
-        Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
+        status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             return status;
         }
     }
     return Status::OK();
+}
+
+SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
+    // Transfer the function to upper case.
+    StringToLower(function_name);
+
+    if (!catalog->function_sets_.contains(function_name)) {
+        Status status = Status::FunctionNotFound(function_name);
+        RecoverableError(status);
+    }
+    return catalog->function_sets_[function_name];
+}
+
+void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if (catalog->function_sets_.contains(name)) {
+        String error_message = fmt::format("Trying to add duplicated function {} into catalog", name);
+        UnrecoverableError(error_message);
+    }
+    catalog->function_sets_.emplace(name, function_set);
+}
+
+void NewCatalog::AppendToScalarFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if (!catalog->function_sets_.contains(name)) {
+        String error_message = fmt::format("Trying to append to non-existent function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto target_scalar_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(catalog->function_sets_[name]);
+    if (!target_scalar_function_set) {
+        String error_message = fmt::format("Trying to append to non-scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto source_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(function_set);
+    if (!source_function_set) {
+        String error_message = fmt::format("Trying to append non-scalar function to scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    for (const auto &function : source_function_set->GetAllScalarFunctions()) {
+        target_scalar_function_set->AddFunction(function);
+    }
+}
+
+void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
+    String name = special_function->name();
+    StringToLower(name);
+    if (catalog->special_functions_.contains(name)) {
+        String error_message = fmt::format("Trying to add duplicated special function into catalog: {}", name);
+        UnrecoverableError(error_message);
+    }
+    catalog->special_functions_.emplace(name, special_function);
+    switch (special_function->special_type()) {
+        case SpecialType::kRowID:
+        case SpecialType::kDistance:
+        case SpecialType::kDistanceFactors:
+        case SpecialType::kSimilarity:
+        case SpecialType::kSimilarityFactors:
+        case SpecialType::kScore:
+        case SpecialType::kScoreFactors:
+        case SpecialType::kFilterFullText: {
+            return;
+        }
+        case SpecialType::kCreateTs:
+        case SpecialType::kDeleteTs: {
+            break;
+        }
+    }
+    auto special_column_def = MakeUnique<ColumnDef>(special_function->extra_idx(),
+                                                    MakeShared<DataType>(special_function->data_type()),
+                                                    special_function->name(),
+                                                    std::set<ConstraintType>());
+    catalog->special_columns_.emplace(name, std::move(special_column_def));
+}
+
+Tuple<SpecialFunction *, Status> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
+    StringToLower(function_name);
+    if (!catalog->special_functions_.contains(function_name)) {
+        return {nullptr, Status::SpecialFunctionNotFound()};
+    }
+    return {catalog->special_functions_[function_name].get(), Status::OK()};
 }
 
 } // namespace infinity

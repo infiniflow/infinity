@@ -27,7 +27,6 @@ export enum class GlobalVariable {
     kSessionCount,            // global
     kBufferPoolUsage,         // global
     kSchedulePolicy,          // global
-    kDeltaLogCount,           // global
     kNextTxnID,               // global
     kBufferedObjectCount,     // global
     kUnusedBufferObjectCount, // global

@@ -20,7 +20,6 @@ import stl;
 import buffer_manager;
 import txn_state;
 import default_values;
-import txn_context;
 import txn_manager;
 import status;
 
@@ -34,6 +33,8 @@ class NewTxn;
 class KVStore;
 struct WalEntry;
 class SystemCache;
+struct TxnContext;
+struct BGTaskInfo;
 
 export class NewTxnManager {
 public:
@@ -64,8 +65,6 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
 
-    TxnTimeStamp GetReplayWriteCommitTS(NewTxn *txn);
-
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
     bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
@@ -90,6 +89,8 @@ public:
     void SetNewSystemTS(TxnTimeStamp new_system_ts);
 
     void SetCurrentTransactionID(TransactionID latest_transaction_id);
+
+    TransactionID current_transaction_id() const { return current_transaction_id_; }
 
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
@@ -118,8 +119,6 @@ private:
     void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    bool InCheckpointProcess(TxnTimeStamp commit_ts);
-
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 
@@ -159,7 +158,7 @@ private:
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
     TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
-    TxnTimeStamp current_ts_{};              // The next txn ts
+    TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
@@ -175,6 +174,15 @@ private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
     SharedPtr<TxnAllocator> txn_allocator_{};
+
+public:
+    // Background task info list
+    void AddTaskInfo(SharedPtr<BGTaskInfo> task_info);
+    Vector<SharedPtr<BGTaskInfo>> GetTaskInfoList() const;
+
+private:
+    mutable std::mutex task_lock_{};
+    Deque<SharedPtr<BGTaskInfo>> task_info_list_{};
 };
 
 } // namespace infinity

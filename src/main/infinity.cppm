@@ -151,7 +151,6 @@ public:
     QueryResult ShowQuery(u64 query_index);
     QueryResult ShowTransactions();
     QueryResult ShowLogs();
-    QueryResult ShowCheckpoint();
     QueryResult ShowObjects();
     QueryResult ShowObject(const String &object_name);
     QueryResult ShowFilesInObject();

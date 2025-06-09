@@ -5,7 +5,7 @@ module;
 module regex;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -36,7 +36,7 @@ struct RegexFunction {
     }
 };
 
-void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterRegexFunction(NewCatalog *catalog_ptr) {
     String func_name = "regex";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -47,7 +47,7 @@ void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, RegexFunction>);
     function_set_ptr->AddFunction(regex_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

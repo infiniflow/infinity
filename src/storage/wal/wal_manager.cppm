@@ -105,8 +105,6 @@ public:
 
     void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
 
-    bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
-
     bool SetCheckpointing();
     bool UnsetCheckpoint();
     bool IsCheckpointing() const;
@@ -115,13 +113,9 @@ public:
 
     String GetWalFilename() const;
 
-    i64 ReplayWalFile(StorageMode targe_storage_mode);
-
     Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
 
     Tuple<TransactionID, TxnTimeStamp> ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
-
-    Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> GetCatalogFiles() const;
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
 
