@@ -1319,7 +1319,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     return Status::OK();
 }
 
-Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option) {
+Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1374,6 +1374,21 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
                 if (to_mmap) {
                     LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
                 }
+            }
+
+            if (!flush_column or !flush_version) {
+                continue;
+            } else {
+                SharedPtr<FlushDataEntry> flush_data_entry =
+                    MakeShared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+                if (flush_column && flush_version) {
+                    flush_data_entry->to_flush_ = "data and version";
+                } else if (flush_column) {
+                    flush_data_entry->to_flush_ = "data";
+                } else {
+                    flush_data_entry->to_flush_ = "version";
+                }
+                ckp_txn_store->entries_.emplace_back(flush_data_entry);
             }
         }
     }

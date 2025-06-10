@@ -402,9 +402,19 @@ export struct UpdateTxnStore : public BaseTxnStore {
     SizeT RowCount() const;
 };
 
+export struct FlushDataEntry {
+    explicit FlushDataEntry(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id)
+        : db_id_str_(db_id_str), table_id_str_(table_id_str), segment_id_(segment_id), block_id_(block_id) {}
+    String db_id_str_{};
+    String table_id_str_{};
+    SegmentID segment_id_{};
+    BlockID block_id_{};
+    String to_flush_{};
+};
 export struct CheckpointTxnStore : public BaseTxnStore {
     CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
 
+    Vector<SharedPtr<FlushDataEntry>> entries_{};
     i64 max_commit_ts_{};
 
     String ToString() const final;

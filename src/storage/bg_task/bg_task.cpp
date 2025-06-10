@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module bg_task;
 
 import base_memindex;
@@ -28,6 +30,7 @@ import infinity_exception;
 import txn_state;
 import column_vector;
 import mem_index;
+import base_txn_store;
 
 namespace infinity {
 
@@ -40,12 +43,30 @@ Status NewCheckpointTask::ExecuteWithinTxn() {
 
 Status NewCheckpointTask::ExecuteWithNewTxn() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-    new_txn->SetWalSize(wal_size_);
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    new_txn_shared->SetWalSize(wal_size_);
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
-    Status status = new_txn->Checkpoint(last_checkpoint_ts);
+    Status status = new_txn_shared->Checkpoint(last_checkpoint_ts);
     if (status.ok()) {
-        status = new_txn_mgr->CommitTxn(new_txn);
+        status = new_txn_mgr->CommitTxn(new_txn_shared.get());
+
+        CheckpointTxnStore *ckp_idx_store = static_cast<CheckpointTxnStore *>(new_txn_shared->GetTxnStore());
+        if (ckp_idx_store != nullptr) {
+            SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCheckpoint);
+            for (const SharedPtr<FlushDataEntry> &flush_data_entry : ckp_idx_store->entries_) {
+                String task_text = fmt::format("Txn: {}, commit: {}, checkpoint data: {}.{}.{}.{} {}",
+                                               new_txn_shared->TxnID(),
+                                               new_txn_shared->CommitTS(),
+                                               flush_data_entry->db_id_str_,
+                                               flush_data_entry->table_id_str_,
+                                               flush_data_entry->segment_id_,
+                                               flush_data_entry->block_id_,
+                                               flush_data_entry->to_flush_);
+                bg_task_info->task_info_list_.emplace_back(task_text);
+                bg_task_info->status_list_.emplace_back("OK");
+            }
+            new_txn_mgr->AddTaskInfo(bg_task_info);
+        }
     }
     return status;
 }

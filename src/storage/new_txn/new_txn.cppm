@@ -115,6 +115,7 @@ struct SegmentInfo;
 struct BlockInfo;
 struct BlockColumnInfo;
 struct TableDetail;
+struct CheckpointTxnStore;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -527,11 +528,9 @@ private:
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
-    Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option);
+    Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
-    Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option);
-
-    Status CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option);
+    Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
     Status CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges);
 
