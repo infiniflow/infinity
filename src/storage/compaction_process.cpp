@@ -14,8 +14,8 @@
 
 module;
 
-#include <thread>
 #include <ranges>
+#include <thread>
 
 module compaction_process;
 
