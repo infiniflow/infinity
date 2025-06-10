@@ -308,19 +308,6 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
     if (!status.ok()) {
         return status;
     }
-
-    // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
-        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-    }
-
-    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
-        optimize_index_txn_store->db_names_.end()) {
-        optimize_index_txn_store->db_names_.emplace_back(db_name);
-    }
-    optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
-
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
@@ -364,18 +351,6 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     if (!status.ok()) {
         return status;
     }
-
-    // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
-        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-    }
-
-    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
-        optimize_index_txn_store->db_names_.end()) {
-        optimize_index_txn_store->db_names_.emplace_back(db_name);
-    }
-    optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta_opt);
 
@@ -568,9 +543,20 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
-        return Status::UnexpectedError("txn store is null");
+        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
     }
+
     OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
+        optimize_index_txn_store->db_names_.end()) {
+        optimize_index_txn_store->db_names_.emplace_back(db_name);
+    }
+    if (std::find(optimize_index_txn_store->table_names_in_db_[db_name].begin(),
+                  optimize_index_txn_store->table_names_in_db_[db_name].end(),
+                  table_name) == optimize_index_txn_store->table_names_in_db_[db_name].end()) {
+        optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
+    }
+
     optimize_index_txn_store->entries_.emplace_back(db_name,
                                                     table_meta.db_id_str(),
                                                     std::stoull(table_meta.db_id_str()),
