@@ -48,17 +48,19 @@ SegmentOffset NewSegmentSnapshot::segment_offset() const {
     return segment_offset_;
 }
 
-Vector<UniquePtr<BlockMeta>> NewSegmentSnapshot::block_map() const {
-    Vector<UniquePtr<BlockMeta>> block_map;
+const Vector<UniquePtr<BlockMeta>>& NewSegmentSnapshot::block_map() const {
+    if (block_map_.size()) {
+        return block_map_;
+    }
     auto [block_ids_ptr, status] = segment_meta_->GetBlockIDs1();
     if (!status.ok()) {
         RecoverableError(status);
     }
     for (BlockID block_id : *block_ids_ptr) {
         auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_meta_);
-        block_map.emplace_back(std::move(block_meta));
+        block_map_.emplace_back(std::move(block_meta));
     }
-    return block_map;
+    return block_map_;
 }
 
 BlockIndex::BlockIndex() = default;
@@ -81,6 +83,16 @@ void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &t
     for (SegmentID segment_id : *segment_ids_ptr) {
         NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
         segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
+
+        // Vector<BlockID> *block_ids_ptr = nullptr;
+        // std::tie(block_ids_ptr, status) = segment_snapshot.segment_meta_->GetBlockIDs1();
+        // if (!status.ok()) {
+        //     RecoverableError(status);
+        // }
+        // for (BlockID block_id : *block_ids_ptr) {
+        //     auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_snapshot.segment_meta_);
+        //     segment_snapshot.block_map_.emplace_back(std::move(block_meta));
+        // }
     }
 }
 

@@ -1837,6 +1837,12 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
             if (!status.ok()) {
                 return status;
             }
+        } else {
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+            status = CountMemIndexGapInSegment(segment_index_meta, segment_meta, append_ranges);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     for (const auto &range : append_ranges) {
