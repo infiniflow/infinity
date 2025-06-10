@@ -49,7 +49,6 @@ export class EMVBIndexInMem {
 
     String db_id_str_;
     String table_id_str_;
-    SegmentID segment_id_ = -1;
 
     u32 row_count_ = 0;       // row of tensors
     u32 embedding_count_ = 0; // count of total embeddings
@@ -59,6 +58,11 @@ export class EMVBIndexInMem {
     u32 build_index_threshold_ = 0; // bar for building index
 
 public:
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    SegmentID segment_id_ = -1;
+
     static SharedPtr<EMVBIndexInMem>
     NewEMVBIndexInMem(const SharedPtr<IndexBase> &index_base, const SharedPtr<ColumnDef> &column_def, RowID begin_row_id);
 
