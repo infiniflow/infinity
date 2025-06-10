@@ -250,21 +250,44 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
 
 void CompactionProcessor::NewScanAndOptimize() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    auto *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", new_txn->BeginTS()));
+    auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", new_txn_shared->BeginTS()));
 
-    Status status = new_txn->OptimizeAllIndexes();
+    SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
+    Status status = new_txn_shared->OptimizeAllIndexes();
     if (status.ok()) {
-        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
+        Status commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
         if (!commit_status.ok()) {
             LOG_ERROR(fmt::format("Commit ScanAndOptimize opt failed: {}", commit_status.message()));
         }
+
+        OptimizeIndexTxnStore *optimize_idx_store = static_cast<OptimizeIndexTxnStore *>(new_txn_shared->GetTxnStore());
+        if (optimize_idx_store != nullptr) {
+            for (const OptimizeIndexStoreEntry &store_entry : optimize_idx_store->entries_) {
+                String task_text = fmt::format("Txn: {}, commit: {}, optimize table: {}.{}.{} with chunks: {} into {}",
+                                               new_txn_shared->TxnID(),
+                                               new_txn_shared->CommitTS(),
+                                               store_entry.db_name_,
+                                               store_entry.table_name_,
+                                               store_entry.segment_id_,
+                                               fmt::join(store_entry.deprecate_chunks_, ","),
+                                               store_entry.new_chunk_info_.chunk_id_);
+                bg_task_info->task_info_list_.emplace_back(task_text);
+                if (commit_status.ok()) {
+                    bg_task_info->status_list_.emplace_back("OK");
+                } else {
+                    bg_task_info->status_list_.emplace_back(commit_status.message());
+                }
+            }
+        }
     } else {
         LOG_ERROR(fmt::format("ScanAndOptimize opt failed: {}", status.message()));
-        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
         if (!rollback_status.ok()) {
             UnrecoverableError(rollback_status.message());
         }
+        bg_task_info->task_info_list_.emplace_back("Fail to optimize index");
+        bg_task_info->status_list_.emplace_back(status.message());
     }
 }
 

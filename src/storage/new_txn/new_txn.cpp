@@ -990,9 +990,16 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     if (!status.ok()) {
         return status;
     }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+    base_txn_store_ = MakeShared<CheckpointTxnStore>();
+    CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
     for (const String &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, *kv_instance_);
-        Status status = this->CheckpointDB(db_meta, option);
+        Status status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
         }
@@ -1010,18 +1017,12 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return status;
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-    base_txn_store_ = MakeShared<CheckpointTxnStore>();
-    CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
     txn_store->max_commit_ts_ = option.checkpoint_ts_;
 
     return Status::OK();
 }
 
-Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
+Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore* ckp_txn_store) {
     TxnTimeStamp begin_ts = this->BeginTS();
     TxnTimeStamp commit_ts = this->CommitTS();
 
@@ -1032,20 +1033,12 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
-        Status status = this->CheckpointTable(table_meta, option);
+        status = this->CheckpointTable(table_meta, option, ckp_txn_store);
         if (!status.ok()) {
             return status;
         }
     }
 
-    return Status::OK();
-}
-
-Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option) {
-    Status status = CheckpointTableData(table_meta, option);
-    if (!status.ok()) {
-        return status;
-    }
     return Status::OK();
 }
 

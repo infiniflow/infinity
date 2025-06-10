@@ -184,6 +184,22 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct OptimizeIndexStoreEntry {
+    String db_name_{};
+    String db_id_str_{};
+    u64 db_id_{};
+    String table_name_{};
+    String table_id_str_{};
+    u64 table_id_{};
+    String table_key_{};
+    String index_name_{};
+    String index_id_str_{};
+    u64 index_id_{};
+    SegmentID segment_id_{};
+    WalChunkIndexInfo new_chunk_info_;
+    Vector<ChunkID> deprecate_chunks_;
+};
+
 export struct OptimizeIndexTxnStore : public BaseTxnStore {
     OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
 
@@ -200,6 +216,9 @@ export struct OptimizeIndexTxnStore : public BaseTxnStore {
     Vector<SegmentID> segment_ids_{};
     Vector<Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
     Vector<Vector<ChunkID>> deprecate_ids_in_segments_{};
+
+    // Above should be removed
+    Vector<OptimizeIndexStoreEntry> entries_;
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -383,9 +402,19 @@ export struct UpdateTxnStore : public BaseTxnStore {
     SizeT RowCount() const;
 };
 
+export struct FlushDataEntry {
+    explicit FlushDataEntry(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id)
+        : db_id_str_(db_id_str), table_id_str_(table_id_str), segment_id_(segment_id), block_id_(block_id) {}
+    String db_id_str_{};
+    String table_id_str_{};
+    SegmentID segment_id_{};
+    BlockID block_id_{};
+    String to_flush_{};
+};
 export struct CheckpointTxnStore : public BaseTxnStore {
     CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
 
+    Vector<SharedPtr<FlushDataEntry>> entries_{};
     i64 max_commit_ts_{};
 
     String ToString() const final;
