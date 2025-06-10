@@ -1274,16 +1274,9 @@ Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, Share
     return Status::OK();
 }
 
-Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
-    bool delete_success = false;
-    {
-        std::unique_lock lock(segment_update_ts_mtx_);
-        delete_success = segment_update_ts_map_.erase(segment_update_ts_key) > 0;
-    }
-    if (!delete_success) {
-        return Status::CatalogError(fmt::format("Drop SegmentUpdateTS key: {} not found", segment_update_ts_key));
-    }
-    return Status::OK();
+void NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
+    std::unique_lock lock(segment_update_ts_mtx_);
+    segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
 void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
@@ -1422,8 +1415,8 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
 
     auto meta_tree = this->MakeMetaTree();
     // Vector<> = meta_tree->Check();
-    String meta_tree_str = meta_tree->ToJson().dump(4);
-    LOG_INFO(meta_tree_str);
+    // String meta_tree_str = meta_tree->ToJson().dump(4);
+    // LOG_INFO(meta_tree_str);
 
     system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();

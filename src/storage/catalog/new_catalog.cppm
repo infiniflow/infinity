@@ -257,7 +257,7 @@ private:
 public:
     Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
-    Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
+    void DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
 
 private:
     std::shared_mutex segment_update_ts_mtx_{};
