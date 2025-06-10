@@ -26,6 +26,7 @@ import third_party;
 import blocking_queue;
 import infinity_context;
 import base_memindex;
+import emvb_index_in_mem;
 import status;
 import wal_manager;
 import global_resource_usage;
@@ -35,6 +36,7 @@ import new_txn;
 import column_vector;
 import mem_index;
 import memory_indexer;
+import txn_state;
 
 namespace infinity {
 
@@ -73,24 +75,46 @@ void DumpIndexProcessor::DoDump(DumpIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     NewTxn *new_txn = dump_task->new_txn_;
-    const String &db_name = dump_task->mem_index_->db_name_;
-    const String &table_name = dump_task->mem_index_->table_name_;
-    const String &index_name = dump_task->mem_index_->index_name_;
-    SegmentID segment_id = dump_task->mem_index_->segment_id_;
-
-    Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
-    if (status.ok()) {
-        Status commit_status = new_txn_mgr->CommitTxn(new_txn);
-        if (!commit_status.ok()) {
-            LOG_ERROR(fmt::format("Commit dump mem index failed: {}", commit_status.message()));
-        }
+    String db_name{};
+    String table_name{};
+    String index_name{};
+    SegmentID segment_id{};
+    if (dump_task->mem_index_ != nullptr) {
+        db_name = dump_task->mem_index_->db_name_;
+        table_name = dump_task->mem_index_->table_name_;
+        index_name = dump_task->mem_index_->index_name_;
+        segment_id = dump_task->mem_index_->segment_id_;
+    } else if (dump_task->emvb_mem_index_ != nullptr) {
+        db_name = dump_task->emvb_mem_index_->db_name_;
+        table_name = dump_task->emvb_mem_index_->table_name_;
+        index_name = dump_task->emvb_mem_index_->index_name_;
+        segment_id = dump_task->emvb_mem_index_->segment_id_;
     } else {
-        LOG_ERROR(fmt::format("Dump mem index failed: {}", status.message()));
-        Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
-        if (!rollback_status.ok()) {
-            UnrecoverableError(rollback_status.message());
-        }
+        UnrecoverableError("Invalid mem index");
     }
+
+    Status commit_status = Status::OK();
+    Status rollback_status = Status::OK();
+    i64 retry_count = 0;
+    do {
+        if (!commit_status.ok()) {
+            new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index"), TransactionType::kNormal);
+        }
+
+        Status status = new_txn->DumpMemIndex(db_name, table_name, index_name, segment_id);
+        if (status.ok()) {
+            commit_status = new_txn_mgr->CommitTxn(new_txn);
+            if (!commit_status.ok()) {
+                LOG_ERROR(fmt::format("Commit dump mem index failed: {}", commit_status.message()));
+            }
+        } else {
+            LOG_ERROR(fmt::format("Dump mem index failed: {}", status.message()));
+            Status rollback_status = new_txn_mgr->RollBackTxn(new_txn);
+            if (!rollback_status.ok()) {
+                UnrecoverableError(rollback_status.message());
+            }
+        }
+    } while (!commit_status.ok() && rollback_status.ok() && (commit_status.code_ == ErrorCode::kTxnConflict || ++retry_count <= 3));
 }
 
 void DumpIndexProcessor::Process() {

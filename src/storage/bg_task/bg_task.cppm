@@ -27,6 +27,7 @@ namespace infinity {
 struct MemIndex;
 struct ColumnVector;
 class BaseMemIndex;
+class EMVBIndexInMem;
 struct ChunkIndexEntry;
 class NewTxn;
 
@@ -142,6 +143,7 @@ public:
 export class DumpIndexTask final : public BGTask {
 public:
     DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn);
+    DumpIndexTask(EMVBIndexInMem *emvb_mem_index, NewTxn *new_txn);
 
     ~DumpIndexTask() override = default;
 
@@ -149,6 +151,7 @@ public:
 
 public:
     BaseMemIndex *mem_index_{};
+    EMVBIndexInMem *emvb_mem_index_{};
     NewTxn *new_txn_{};
 };
 
@@ -194,7 +197,7 @@ public:
 export struct BGTaskInfo {
     explicit BGTaskInfo(BGTaskType type);
     Vector<String> task_info_list_{};
-    Vector<Status> status_list_{};
+    Vector<String> status_list_{};
     BGTaskType type_{BGTaskType::kInvalid};
 };
 
