@@ -308,6 +308,19 @@ Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_n
     if (!status.ok()) {
         return status;
     }
+
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
+    }
+
+    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
+        optimize_index_txn_store->db_names_.end()) {
+        optimize_index_txn_store->db_names_.emplace_back(db_name);
+    }
+    optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
+
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
@@ -351,6 +364,18 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     if (!status.ok()) {
         return status;
     }
+
+    // Put the data into local txn store
+    if (base_txn_store_ == nullptr) {
+        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
+    }
+
+    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
+        optimize_index_txn_store->db_names_.end()) {
+        optimize_index_txn_store->db_names_.emplace_back(db_name);
+    }
+    optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
 
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta_opt);
 
@@ -543,28 +568,22 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
-        base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->db_name_ = db_name;
-        optimize_index_txn_store->db_id_str_ = table_meta.db_id_str();
-        optimize_index_txn_store->table_name_ = table_name;
-        optimize_index_txn_store->table_id_str_ = table_meta.table_id_str();
-        optimize_index_txn_store->table_key_ = table_key;
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
-    } else {
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
+        return Status::UnexpectedError("txn store is null");
     }
+    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    optimize_index_txn_store->entries_.emplace_back(db_name,
+                                                    table_meta.db_id_str(),
+                                                    std::stoull(table_meta.db_id_str()),
+                                                    table_name,
+                                                    table_meta.table_id_str(),
+                                                    std::stoull(table_meta.table_id_str()),
+                                                    table_key,
+                                                    index_name,
+                                                    table_index_meta.index_id_str(),
+                                                    std::stoull(table_index_meta.index_id_str()),
+                                                    segment_id,
+                                                    std::move(chunk_infos),
+                                                    std::move(deprecate_ids));
 
     return Status::OK();
 }
