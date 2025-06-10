@@ -26,6 +26,7 @@ import third_party;
 import blocking_queue;
 import infinity_context;
 import base_memindex;
+import emvb_index_in_mem;
 import status;
 import wal_manager;
 import global_resource_usage;
@@ -74,10 +75,23 @@ void DumpIndexProcessor::DoDump(DumpIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     NewTxn *new_txn = dump_task->new_txn_;
-    const String &db_name = dump_task->mem_index_->db_name_;
-    const String &table_name = dump_task->mem_index_->table_name_;
-    const String &index_name = dump_task->mem_index_->index_name_;
-    SegmentID segment_id = dump_task->mem_index_->segment_id_;
+    String db_name{};
+    String table_name{};
+    String index_name{};
+    SegmentID segment_id{};
+    if (dump_task->mem_index_ != nullptr) {
+        db_name = dump_task->mem_index_->db_name_;
+        table_name = dump_task->mem_index_->table_name_;
+        index_name = dump_task->mem_index_->index_name_;
+        segment_id = dump_task->mem_index_->segment_id_;
+    } else if (dump_task->emvb_mem_index_ != nullptr) {
+        db_name = dump_task->emvb_mem_index_->db_name_;
+        table_name = dump_task->emvb_mem_index_->table_name_;
+        index_name = dump_task->emvb_mem_index_->index_name_;
+        segment_id = dump_task->emvb_mem_index_->segment_id_;
+    } else {
+        UnrecoverableError("Invalid mem index");
+    }
 
     Status commit_status = Status::OK();
     Status rollback_status = Status::OK();

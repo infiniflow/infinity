@@ -18,6 +18,7 @@ import base_test;
 import stl;
 import memindex_tracer;
 import base_memindex;
+import emvb_index_in_mem;
 import bg_task;
 import blocking_queue;
 import third_party;
@@ -171,6 +172,8 @@ public:
     Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override { return catalog_.GetMemIndexes(); }
 
     Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override { return {}; }
+
+    Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) override { return {}; }
 
     void HandleDump(UniquePtr<DumpIndexTask> task);
 

@@ -108,4 +108,25 @@ void MemIndex::SetBaseMemIndexInfo(const String &db_name, const String &table_na
     res->segment_id_ = segment_id;
 }
 
+void MemIndex::SetEMVBMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id) {
+    EMVBIndexInMem *res = memory_emvb_index_.get();
+    if (res != nullptr) {
+        res->db_name_ = db_name;
+        res->table_name_ = table_name;
+        res->index_name_ = index_name;
+        res->segment_id_ = segment_id;
+    }
+}
+
+EMVBIndexInMem *MemIndex::GetEMVBMemIndex(const MemIndexID &mem_index_id) {
+    EMVBIndexInMem *res = memory_emvb_index_.get();
+    if (res != nullptr) {
+        res->db_name_ = mem_index_id.db_name_;
+        res->table_name_ = mem_index_id.table_name_;
+        res->index_name_ = mem_index_id.index_name_;
+        res->segment_id_ = mem_index_id.segment_id_;
+    }
+    return res;
+}
+
 } // namespace infinity
