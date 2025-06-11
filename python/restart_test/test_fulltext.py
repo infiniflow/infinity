@@ -356,7 +356,7 @@ class TestFullText:
 
     def test_fulltext_offline(self, infinity_runner: InfinityRunner):
         # should add symbolic link in advance
-        enwiki_path = "test/data/benchmark/enwiki-10w.csv"
+        enwiki_path = "test/data/csv/enwiki_9999.csv"
         enwiki_size = 1000
 
         table_name = "test_fulltext_offline"
