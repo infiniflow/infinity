@@ -342,6 +342,8 @@ public:
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
+    Status Cleanup();
+
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 

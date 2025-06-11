@@ -999,7 +999,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
     for (const String &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, *kv_instance_);
-        Status status = this->CheckpointDB(db_meta, option, txn_store);
+        status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
         }
@@ -1022,7 +1022,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     return Status::OK();
 }
 
-Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore* ckp_txn_store) {
+Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     TxnTimeStamp begin_ts = this->BeginTS();
     TxnTimeStamp commit_ts = this->CommitTS();
 
@@ -1440,6 +1440,9 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::OPTIMIZE_V2: {
                 [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
+                break;
+            }
+            case WalCommandType::CLEANUP: {
                 break;
             }
             default: {
@@ -3881,6 +3884,129 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+}
+
+Status NewTxn::Cleanup() {
+    KVInstance* kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = BeginTS();
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    Vector<UniquePtr<MetaKey>> metas;
+    new_catalog->GetCleanedMeta(begin_ts, metas, kv_instance);
+
+    for (auto &meta : metas) {
+        switch (meta->type_) {
+            case MetaType::kDB: {
+                auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
+                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
+                Status status = NewCatalog::CleanDB(db_meta, db_meta_key->db_name_, begin_ts, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kTable: {
+                auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, begin_ts, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kSegment: {
+                auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
+                Status status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kBlock: {
+                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
+                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
+                Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kBlockColumn: {
+                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
+                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
+                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
+                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kTableIndex: {
+                auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
+                Status status = NewCatalog::CleanTableIndex(table_index_meta, table_index_meta_key->index_name_, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kSegmentIndex: {
+                auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
+                                      segment_index_meta_key->table_id_str_,
+                                      *kv_instance,
+                                      begin_ts,
+                                      MAX_TIMESTAMP);
+                TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
+                SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
+                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kChunkIndex: {
+                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
+                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
+                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
+                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            default: {
+                UnrecoverableError("Unexpected");
+            }
+        }
+    }
+
+    Status status = buffer_mgr->RemoveClean(kv_instance);
+
+    auto data_dir_str = buffer_mgr->GetFullDataDir();
+    auto data_dir = static_cast<Path>(*data_dir_str);
+    // Delete empty dir
+    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<CleanupTxnStore>();
+    CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
+    txn_store->timestamp_ = begin_ts;
+
+    return status;
 }
 
 Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
