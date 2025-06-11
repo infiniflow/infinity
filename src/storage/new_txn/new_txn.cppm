@@ -339,7 +339,7 @@ public:
 
     Status Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
 
-    Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
+    Status CheckTableIfDelete(TableMeeta &table_meta, bool &has_delete);
 
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);

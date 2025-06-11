@@ -51,6 +51,7 @@ import logger;
 
 import new_txn;
 import status;
+import table_meeta;
 import segment_meta;
 import block_meta;
 import column_meta;
@@ -183,7 +184,7 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
     }
 
     bool has_delete = false;
-    Status status = new_txn->CheckTableIfDelete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_, has_delete);
+    Status status = new_txn->CheckTableIfDelete(*base_table_ref_->block_index_->table_meta_, has_delete);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Check table has delete error: {}", status.message()));
     }
