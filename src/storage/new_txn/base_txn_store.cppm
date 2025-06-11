@@ -196,28 +196,15 @@ export struct OptimizeIndexStoreEntry {
     String index_id_str_{};
     u64 index_id_{};
     SegmentID segment_id_{};
-    WalChunkIndexInfo new_chunk_info_;
+    Vector<WalChunkIndexInfo> new_chunk_infos_;
     Vector<ChunkID> deprecate_chunks_;
 };
 
 export struct OptimizeIndexTxnStore : public BaseTxnStore {
     OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
 
-    String db_name_{};
-    String db_id_str_{};
-    u64 db_id_{};
-    String table_name_{};
-    String table_id_str_{};
-    u64 table_id_{};
-    String table_key_{};
-    Vector<String> index_names_{};
-    Vector<String> index_ids_str_{};
-    Vector<u64> index_ids_{};
-    Vector<SegmentID> segment_ids_{};
-    Vector<Vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
-    Vector<Vector<ChunkID>> deprecate_ids_in_segments_{};
-
-    // Above should be removed
+    Vector<String> db_names_{};
+    Map<String, Vector<String>> table_names_in_db_{};
     Vector<OptimizeIndexStoreEntry> entries_;
 
     String ToString() const final;
