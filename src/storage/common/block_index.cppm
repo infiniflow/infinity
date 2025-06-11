@@ -27,6 +27,7 @@ struct TableIndexEntry;
 struct SegmentIndexEntry;
 class Txn;
 
+class DBMeeta;
 class TableMeeta;
 class SegmentMeta;
 class BlockMeta;
@@ -57,7 +58,7 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(NewTxn *new_txn, const String &db_name, const String &table_name);
+    void NewInit(const Optional<TableMeeta> &table_meta);
 
     void Insert(SegmentEntry *segment_entry, Txn *txn);
 

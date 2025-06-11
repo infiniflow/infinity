@@ -67,18 +67,13 @@ BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
 
-void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &table_name) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
+void BlockIndex::NewInit(const Optional<TableMeeta> &table_meta) {
     table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(),
                                          table_meta->table_id_str(),
                                          table_meta->kv_instance(),
                                          table_meta->begin_ts(),
                                          table_meta->commit_ts());
+    Status status = Status::OK();
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();
     if (!status.ok()) {
