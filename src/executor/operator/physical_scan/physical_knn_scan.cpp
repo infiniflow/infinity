@@ -164,7 +164,7 @@ PhysicalKnnScan::PhysicalKnnScan(u64 id,
 
 PhysicalKnnScan::~PhysicalKnnScan() = default;
 
-void PhysicalKnnScan::Init(QueryContext* query_context) {
+void PhysicalKnnScan::Init(QueryContext *query_context) {
     KnnExpression *knn_expr = knn_expression_.get();
     const auto *column_expr = static_cast<const ColumnExpression *>(knn_expr->arguments()[0].get());
     const auto column_data_type = column_expr->Type();
@@ -374,7 +374,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
     }
 }
 
-//TableInfo *PhysicalKnnScan::table_info() const { return base_table_ref_->table_info_.get(); }
+// TableInfo *PhysicalKnnScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
 String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -390,7 +390,6 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     InitBlockParallelOption();                                     // PlanWithIndex() will be called in physical planner
 
     Status status;
-    SizeT knn_column_id = GetColumnID();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
     segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
@@ -421,15 +420,6 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                     RecoverableError(status);
                 }
 
-                ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != knn_column_id) {
-                    // knn_column_id isn't in this table index
-                    continue;
-                }
                 // check index type
                 if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                     LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
@@ -454,17 +444,6 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(status);
             }
 
-            ColumnID column_id = 0;
-            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (column_id != knn_column_id) {
-                // knn_column_id isn't in this table index
-                LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
-                Status error_status = Status::ColumnNotExist(index_base->column_name());
-                RecoverableError(std::move(error_status));
-            }
             // check index type
             if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                 Status error_status = Status::InvalidIndexType("invalid index");
@@ -711,28 +690,34 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                     BitmaskFilter<SegmentOffset> filter(bitmask);
                                     if (with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>
-                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>(
+                                                query,
+                                                knn_scan_shared_data->topk_,
+                                                filter,
+                                                search_option);
                                     } else {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>
-                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>(
+                                                query,
+                                                knn_scan_shared_data->topk_,
+                                                filter,
+                                                search_option);
                                     }
                                 } else {
                                     if (!with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, false>
-                                                    (query, knn_scan_shared_data->topk_, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, false>(query,
+                                                                                                                       knn_scan_shared_data->topk_,
+                                                                                                                       search_option);
                                     } else {
                                         SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                         AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, AppendFilter, true>
-                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, AppendFilter, true>(
+                                                query,
+                                                knn_scan_shared_data->topk_,
+                                                filter,
+                                                search_option);
                                     }
                                 }
 #else
@@ -791,7 +776,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                             BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
                                             auto [block_row_cnt, status] = block_meta->GetRowCnt1();
                                             ColumnMeta column_meta(knn_column_id, *block_meta);
-                                            status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                                            status =
+                                                NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
                                             if (!status.ok()) {
                                                 UnrecoverableError(status.message());
                                             }
