@@ -83,11 +83,11 @@ Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_c
 NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_name)
     : BGTask(BGTaskType::kNewCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
-DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn)
-    : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_(new_txn) {}
+DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, SharedPtr<NewTxn> &new_txn_shared)
+    : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_shared_(new_txn_shared) {}
 
-DumpIndexTask::DumpIndexTask(EMVBIndexInMem *emvb_mem_index, NewTxn *new_txn)
-    : BGTask(BGTaskType::kDumpIndex, true), emvb_mem_index_(emvb_mem_index), new_txn_(new_txn) {}
+DumpIndexTask::DumpIndexTask(EMVBIndexInMem *emvb_mem_index, SharedPtr<NewTxn> &new_txn_shared)
+    : BGTask(BGTaskType::kDumpIndex, true), emvb_mem_index_(emvb_mem_index), new_txn_shared_(new_txn_shared) {}
 
 AppendMemIndexTask::AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index,
                                        const SharedPtr<ColumnVector> &input_column,
@@ -108,6 +108,6 @@ void AppendMemIndexBatch::WaitForCompletion() {
 
 TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
 
-BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type) {}
+BGTaskInfo::BGTaskInfo(BGTaskType type) : type_(type), task_time_(std::chrono::system_clock::now()) {}
 
 } // namespace infinity

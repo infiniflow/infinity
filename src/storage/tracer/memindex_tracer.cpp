@@ -140,13 +140,13 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     std::lock_guard lck(mtx_);
 
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+    SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
 
     bool make_task = false;
     DeferFn defer_op([&] {
-        if (new_txn && !make_task) {
+        if (new_txn_shared.get() && !make_task) {
             auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-            Status status = new_txn_mgr->RollBackTxn(new_txn);
+            Status status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -154,13 +154,13 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     });
 
     UniquePtr<DumpIndexTask> dump_task{};
-    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(new_txn);
-    Vector<EMVBIndexInMem *> emvb_indexes = GetEMVBMemIndexes(new_txn);
+    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(new_txn_shared.get());
+    Vector<EMVBIndexInMem *> emvb_indexes = GetEMVBMemIndexes(new_txn_shared.get());
     if (!mem_indexes.empty()) {
         SizeT dump_idx = ChooseDump(mem_indexes);
         BaseMemIndex *mem_index = mem_indexes[dump_idx];
         MemIndexTracerInfo info = mem_index->GetInfo();
-        dump_task = MakeUnique<DumpIndexTask>(mem_index, new_txn);
+        dump_task = MakeUnique<DumpIndexTask>(mem_index, new_txn_shared);
 
         acc_proposed_dump_.fetch_add(info.mem_used_);
         proposed_dump_[mem_index] = info.mem_used_;
@@ -168,7 +168,7 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
         // FIXME: We do not calculate the memory used for each EMVB index,
         // so we choose the first EMVB index to dump.
         EMVBIndexInMem *emvb_index = emvb_indexes[0];
-        dump_task = MakeUnique<DumpIndexTask>(emvb_index, new_txn);
+        dump_task = MakeUnique<DumpIndexTask>(emvb_index, new_txn_shared);
     } else {
         LOG_WARN("Cannot find memindex to dump");
         return nullptr;

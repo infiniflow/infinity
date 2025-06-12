@@ -32,6 +32,7 @@ import new_txn;
 import bg_task_type;
 import global_resource_usage;
 import wal_manager;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -121,9 +122,20 @@ void BGTaskProcessor::Process() {
                                               last_cleanup_ts,
                                               cur_cleanup_ts));
                         Status status = task->Execute(last_cleanup_ts, cur_cleanup_ts);
-                        if (!status.ok()) {
+
+                        auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+                        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
+                        String task_text =
+                            fmt::format("NewCleanup task, last_cleanup_ts: {}, current_cleanup_ts: {}", last_cleanup_ts, cur_cleanup_ts);
+                        bg_task_info->task_info_list_.emplace_back(task_text);
+                        if (status.ok()) {
+                            bg_task_info->status_list_.emplace_back("OK");
+                        } else {
                             RecoverableError(status);
+                            bg_task_info->status_list_.emplace_back(status.message());
                         }
+                        new_txn_mgr->AddTaskInfo(bg_task_info);
+
                         if (cur_cleanup_ts > last_cleanup_ts) {
                             std::unique_lock lock(last_time_mtx_);
                             last_cleanup_ts_ = cur_cleanup_ts;

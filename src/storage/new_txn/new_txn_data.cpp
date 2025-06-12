@@ -1556,17 +1556,17 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
                         fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
                 }
 
-                NewTxn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("dump mem index aync"), TransactionType::kNormal);
+                SharedPtr<NewTxn> new_txn_shared = txn_mgr_->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
                 SharedPtr<DumpIndexTask> dump_index_task{};
                 if (mem_index->GetBaseMemIndex() != nullptr) {
                     mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
                     const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn);
+                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn_shared);
 
                 } else if (mem_index->GetEMVBIndex() != nullptr) {
                     mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
                     EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
-                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn);
+                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn_shared);
                 }
 
                 // Trigger dump index processor to dump mem index for new sealed segment
