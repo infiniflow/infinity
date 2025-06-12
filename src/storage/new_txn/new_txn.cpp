@@ -3220,14 +3220,27 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kDropIndex: {
             DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name &&
-                std::find(index_names.begin(), index_names.end(), drop_index_txn_store->index_name_) != index_names.end()) {
-                retry_query = false;
+            const String &prev_db_name = drop_index_txn_store->db_name_;
+            const String &prev_table_name = drop_index_txn_store->table_name_;
+            const String &prev_index_name = drop_index_txn_store->index_name_;
+
+            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
+            if (db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1) {
                 conflict = true;
+            } else {
+                for (const auto &current_store_entry : txn_store.entries_) {
+                    if (prev_db_name == current_store_entry.db_name_ && prev_table_name == current_store_entry.table_name_ &&
+                        prev_index_name == current_store_entry.index_name_) {
+                        retry_query = false;
+                        conflict = true;
+                        break;
+                    }
+                }
             }
             break;
         }
         case TransactionType::kDumpMemIndex: {
+            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
             const String &prev_db_name = dump_index_txn_store->db_name_;
             const String &prev_table_name = dump_index_txn_store->table_name_;
             const String &prev_index_name = dump_index_txn_store->index_name_;
