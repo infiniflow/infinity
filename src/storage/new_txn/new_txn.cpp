@@ -3228,15 +3228,21 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             break;
         }
         case TransactionType::kDumpMemIndex: {
-            DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name) {
-                conflict = true;
+            const String &prev_db_name = dump_index_txn_store->db_name_;
+            const String &prev_table_name = dump_index_txn_store->table_name_;
+            const String &prev_index_name = dump_index_txn_store->index_name_;
+            for (const auto &current_store_entry : txn_store.entries_) {
+                if (prev_db_name == current_store_entry.db_name_ && prev_table_name == current_store_entry.table_name_ &&
+                    prev_index_name == current_store_entry.index_name_) {
+                    conflict = true;
+                    break;
+                }
             }
             break;
         }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_db_txn_store->db_name_ == db_name) {
+            if (std::find(db_names.begin(), db_names.end(), drop_db_txn_store->db_name_) != db_names.end()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -3244,7 +3250,11 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = drop_table_txn_store->db_name_;
+            const String &prev_table_name = drop_table_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 retry_query = false;
                 conflict = true;
             }
