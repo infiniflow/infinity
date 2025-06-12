@@ -289,10 +289,14 @@ public:
 
     Status IncrLatestID(String &id_str, std::string_view id_name);
 
+    void SetLastCleanupTS(TxnTimeStamp cleanup_ts);
+    TxnTimeStamp GetLastCleanupTS() const;
+
 private:
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
     // bool is_vfs_{false};
+    Atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);

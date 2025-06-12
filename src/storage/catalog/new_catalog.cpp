@@ -1367,6 +1367,10 @@ Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
     return s;
 }
 
+void NewCatalog::SetLastCleanupTS(TxnTimeStamp cleanup_ts) { last_cleanup_ts_ = cleanup_ts; }
+
+TxnTimeStamp NewCatalog::GetLastCleanupTS() const { return last_cleanup_ts_; }
+
 SharedPtr<MetaTree> NewCatalog::MakeMetaTree() const {
     auto entries = this->MakeMetaKeys();
     auto meta_tree_ptr = MetaTree::MakeMetaTree(entries);

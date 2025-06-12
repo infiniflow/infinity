@@ -49,7 +49,7 @@ SharedPtr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     TxnTimeStamp last_cleanup_ts = bg_processor->last_cleanup_ts();
-    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetCleanupScanTS1();
+    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetOldestAliveTS();
     if (cur_cleanup_ts <= last_cleanup_ts) {
         return nullptr;
     }

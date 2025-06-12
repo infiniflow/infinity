@@ -3644,6 +3644,11 @@ void NewTxn::PostCommit() {
                 // auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 break;
             }
+            case WalCommandType::CLEANUP: {
+                auto *cmd = static_cast<WalCmdCleanup *>(wal_cmd.get());
+                new_catalog_->SetLastCleanupTS(cmd->timestamp_);
+                break;
+            }
             default: {
                 break;
             }
@@ -3887,13 +3892,23 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
 }
 
 Status NewTxn::Cleanup() {
-    KVInstance* kv_instance = kv_instance_.get();
+    TxnTimeStamp last_cleanup_ts = new_catalog_->GetLastCleanupTS();
+    TxnTimeStamp oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
+    if (last_cleanup_ts >= oldest_txn_begin_ts) {
+        LOG_TRACE("SKIP cleanup");
+        return Status::OK();
+    }
+
+    KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<UniquePtr<MetaKey>> metas;
-    new_catalog->GetCleanedMeta(begin_ts, metas, kv_instance);
+    new_catalog_->GetCleanedMeta(begin_ts, metas, kv_instance);
+
+    if (metas.empty()) {
+        LOG_TRACE("SIP cleanup, no data need to clean.");
+        return Status::OK();
+    }
 
     for (auto &meta : metas) {
         switch (meta->type_) {
@@ -3991,9 +4006,9 @@ Status NewTxn::Cleanup() {
         }
     }
 
-    Status status = buffer_mgr->RemoveClean(kv_instance);
+    Status status = buffer_mgr_->RemoveClean(kv_instance);
 
-    auto data_dir_str = buffer_mgr->GetFullDataDir();
+    auto data_dir_str = buffer_mgr_->GetFullDataDir();
     auto data_dir = static_cast<Path>(*data_dir_str);
     // Delete empty dir
     VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);

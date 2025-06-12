@@ -32,6 +32,8 @@ import new_txn;
 import bg_task_type;
 import global_resource_usage;
 import wal_manager;
+import new_txn_manager;
+import txn_state;
 
 namespace infinity {
 
@@ -107,28 +109,16 @@ void BGTaskProcessor::Process() {
                         UnrecoverableError("Uninitialized storage mode");
                     }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
-
-                        {
-                            std::unique_lock<std::mutex> locker(task_mutex_);
-                            task_text_ = bg_task->ToString();
-                        }
-
-                        auto task = static_cast<NewCleanupTask *>(bg_task.get());
-                        TxnTimeStamp last_cleanup_ts = this->last_cleanup_ts();
-                        TxnTimeStamp cur_cleanup_ts = 0;
-
-                        LOG_DEBUG(fmt::format("NewCleanup task in background, last_cleanup_ts: {}, current_cleanup_ts: {}",
-                                              last_cleanup_ts,
-                                              cur_cleanup_ts));
-                        Status status = task->Execute(last_cleanup_ts, cur_cleanup_ts);
+                        auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+                        NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("clean up"), TransactionType::kCleanup);
+                        Status status = new_txn->Cleanup();
                         if (!status.ok()) {
-                            RecoverableError(status);
+                            UnrecoverableError(status.message());
                         }
-                        if (cur_cleanup_ts > last_cleanup_ts) {
-                            std::unique_lock lock(last_time_mtx_);
-                            last_cleanup_ts_ = cur_cleanup_ts;
+                        status = new_txn_mgr->CommitTxn(new_txn);
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
                         }
-
                         LOG_DEBUG("NewCleanup task in background done");
                     }
                     break;

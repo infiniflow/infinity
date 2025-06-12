@@ -96,7 +96,7 @@ public:
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
 
-    TxnTimeStamp GetCleanupScanTS1();
+    TxnTimeStamp GetOldestAliveTS();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
 
