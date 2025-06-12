@@ -583,7 +583,7 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             Status::NotSupport("Show collections");
             break;
         }
-        case ShowStmtType::kViews: {
+        case ShowStmtType::kTasks: {
             Status::NotSupport("Show views");
             break;
         }
@@ -724,14 +724,6 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
         }
         case ShowStmtType::kLogs: {
             result->emplace_back(MakeShared<String>("SHOW LOGS"));
-            break;
-        }
-        case ShowStmtType::kDeltaLogs: {
-            result->emplace_back(MakeShared<String>("SHOW DELTA LOGS"));
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            result->emplace_back(MakeShared<String>("SHOW CATALOGS"));
             break;
         }
         case ShowStmtType::kCatalog: {

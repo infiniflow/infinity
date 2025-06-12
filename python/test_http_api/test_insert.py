@@ -1,9 +1,7 @@
-import sys
 import pytest
 import os
 import signal
 import time
-import concurrent.futures
 from httpapibase import HttpTest
 from common.common_values import *
 
@@ -314,7 +312,6 @@ class TestInsert(HttpTest):
         })
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     # @pytest.mark.parametrize("batch", [10, 1024, 2048])
     def test_http_batch_insert_within_limit(self):
@@ -332,7 +329,6 @@ class TestInsert(HttpTest):
             self.insert(db_name, table_name, values)
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
     def test_http_batch_insert(self):
         db_name = "default_db"

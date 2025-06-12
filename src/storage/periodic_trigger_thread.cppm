@@ -36,8 +36,7 @@ public:
 public:
     SharedPtr<NewCleanupPeriodicTrigger> new_cleanup_trigger_;
 
-    SharedPtr<CheckpointPeriodicTrigger> full_checkpoint_trigger_;
-    SharedPtr<CheckpointPeriodicTrigger> delta_checkpoint_trigger_;
+    SharedPtr<CheckpointPeriodicTrigger> checkpoint_trigger_;
     SharedPtr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
     SharedPtr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
 

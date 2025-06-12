@@ -42,6 +42,7 @@ if __name__ == "__main__":
         "-m",
         "pytest",
         "-v",
+        "--tb=short",
         test_case,
         f"--infinity_path={infinity_path}",
         "-x",

@@ -23,7 +23,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+import new_catalog;
 import scalar_function;
 import scalar_function_set;
 import function_set;
@@ -38,21 +38,28 @@ import multiply;
 import logical_type;
 import internal_types;
 import data_type;
+import config;
+import status;
+import kv_store;
 
 using namespace infinity;
-class MulFunctionsTest : public BaseTestParamStr {};
+class MulFunctionsTest : public BaseTest {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, MulFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
-
-TEST_P(MulFunctionsTest, mul_func) {
+TEST_F(MulFunctionsTest, mul_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(nullptr, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    RegisterMulFunction(catalog_ptr);
+    RegisterMulFunction(catalog_ptr.get());
 
     String op = "*";
-    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 
@@ -469,4 +476,5 @@ TEST_P(MulFunctionsTest, mul_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("*(Heterogeneous, Heterogeneous)->Heterogeneous", func.ToString().c_str());
     }
+    kv_store_ptr->Uninit();
 }

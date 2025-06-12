@@ -14,7 +14,7 @@
 module;
 module quarter;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -133,7 +133,7 @@ inline bool QuarterFunction::Run(TimestampT left, BigIntT &result) {
     return true;
 }
 
-void RegisterQuarterFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterQuarterFunction(NewCatalog *catalog_ptr) {
     String func_name = "quarter";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -156,7 +156,7 @@ void RegisterQuarterFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, QuarterFunction>);
     function_set_ptr->AddFunction(quarter_timestamp_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

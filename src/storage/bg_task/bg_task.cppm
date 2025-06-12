@@ -17,31 +17,17 @@ module;
 export module bg_task;
 
 import stl;
-import txn;
-import catalog;
-import catalog_delta_entry;
-import buffer_manager;
 import third_party;
 import global_resource_usage;
 import status;
+import bg_task_type;
 
 namespace infinity {
 
-export enum class BGTaskType {
-    kStopProcessor,
-    kNewCheckpoint,
-    kForceCheckpoint, // Manually triggered by PhysicalFlush
-    kNotifyCompact,
-    kNewCompact,
-    kNotifyOptimize,
-    kNewCleanup,
-    kUpdateSegmentBloomFilterData, // Not used
-    kDumpIndex,
-    kTestCommand,
-    kInvalid
-};
-
+struct MemIndex;
+struct ColumnVector;
 class BaseMemIndex;
+class EMVBIndexInMem;
 struct ChunkIndexEntry;
 class NewTxn;
 
@@ -124,13 +110,11 @@ private:
 
 export class NotifyCompactTask final : public BGTask {
 public:
-    NotifyCompactTask(bool new_compact = false) : BGTask(BGTaskType::kNotifyCompact, true), new_compact_(new_compact) {}
+    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
 
     ~NotifyCompactTask() override = default;
 
     String ToString() const override { return "NotifyCompactTask"; }
-
-    bool new_compact_ = false;
 };
 
 export class NewCompactTask final : public BGTask {
@@ -159,6 +143,7 @@ public:
 export class DumpIndexTask final : public BGTask {
 public:
     DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn);
+    DumpIndexTask(EMVBIndexInMem *emvb_mem_index, NewTxn *new_txn);
 
     ~DumpIndexTask() override = default;
 
@@ -166,7 +151,35 @@ public:
 
 public:
     BaseMemIndex *mem_index_{};
+    EMVBIndexInMem *emvb_mem_index_{};
     NewTxn *new_txn_{};
+};
+
+export class AppendMemIndexTask final : public BGTask {
+public:
+    AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index, const SharedPtr<ColumnVector> &input_column, BlockOffset offset, BlockOffset row_cnt);
+
+    ~AppendMemIndexTask() override = default;
+
+    String ToString() const override { return "AppendMemIndexTask"; }
+
+public:
+    SharedPtr<MemIndex> mem_index_{};
+    SharedPtr<ColumnVector> input_column_{};
+    BlockOffset offset_{};
+    BlockOffset row_cnt_{};
+    u64 seq_inserted_{};
+    u32 doc_count_{};
+};
+
+export struct AppendMemIndexBatch {
+    void InsertTask(AppendMemIndexTask *);
+    void WaitForCompletion();
+
+    Vector<AppendMemIndexTask *> append_tasks_{};
+    u64 task_count_{};
+    mutable std::mutex mtx_{};
+    std::condition_variable cv_{};
 };
 
 export class TestCommandTask final : public BGTask {
@@ -179,6 +192,13 @@ public:
 
 public:
     String command_content_{};
+};
+
+export struct BGTaskInfo {
+    explicit BGTaskInfo(BGTaskType type);
+    Vector<String> task_info_list_{};
+    Vector<String> status_list_{};
+    BGTaskType type_{BGTaskType::kInvalid};
 };
 
 } // namespace infinity

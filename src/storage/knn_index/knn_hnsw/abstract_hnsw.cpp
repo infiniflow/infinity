@@ -493,6 +493,10 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
 
 TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
+const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
+    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};
+}
+
 MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
     auto [mem_used, row_cnt] = std::visit(
         [](auto &&index) -> Pair<SizeT, SizeT> {

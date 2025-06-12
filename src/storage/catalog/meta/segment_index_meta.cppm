@@ -26,7 +26,7 @@ namespace infinity {
 
 class KVInstance;
 class TableIndexMeeta;
-class MemIndex;
+struct MemIndex;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
@@ -61,8 +61,6 @@ public:
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
 
     Status SetNextChunkID(ChunkID chunk_id);
-
-    Status SetFtInfo(const SharedPtr<SegmentIndexFtInfo> &ft_info);
 
     Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 

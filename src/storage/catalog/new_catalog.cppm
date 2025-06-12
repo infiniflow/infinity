@@ -33,7 +33,7 @@ import meta_tree;
 namespace infinity {
 
 class NewTxn;
-class MemIndex;
+struct MemIndex;
 class TableIndexReaderCache;
 class DBMeeta;
 class TableMeeta;
@@ -59,6 +59,8 @@ struct MemIndexID;
 class TableCache;
 class DbCache;
 class SystemCache;
+class FunctionSet;
+class SpecialFunction;
 
 enum class ColumnVectorTipe;
 
@@ -144,7 +146,7 @@ export enum class UsageFlag {
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
-    ~NewCatalog();
+    virtual ~NewCatalog();
 
 public:
     Status TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_paths);
@@ -204,7 +206,7 @@ public:
     SharedPtr<SystemCache> GetSystemCache() const;
     SystemCache *GetSystemCachePtr() const;
 
-    KVStore* kv_store() const;
+    KVStore *kv_store() const;
 
 private:
     KVStore *kv_store_{};
@@ -230,14 +232,9 @@ public:
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
-    Status SetMemIndexDump(const String &table_key);
-    Status UnsetMemIndexDump(const String &table_key);
-    bool IsMemIndexDump(const String &table_key);
-
 private:
     mutable std::shared_mutex mem_index_mtx_{};
     HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
-    HashMap<String, SharedPtr<TableLockForMemIndex>> table_lock_for_mem_index_{};
 
 public:
     Status AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache);
@@ -249,15 +246,6 @@ private:
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 
 public:
-    Status AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
-    Status GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info);
-    Status DropSegmentIndexFtInfoByKey(const String &segment_index_key);
-
-private:
-    std::shared_mutex segment_index_ft_info_mtx_{};
-    HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
-
-public:
     Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
     Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
@@ -265,6 +253,12 @@ public:
 private:
     std::shared_mutex segment_update_ts_mtx_{};
     HashMap<String, SharedPtr<SegmentUpdateTS>> segment_update_ts_map_{};
+
+public:
+    // Currently, these function or function set can't be changed and also will not be persistent.
+    HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
+    HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
+    HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
 public:
     void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
@@ -298,8 +292,7 @@ public:
 
     static Status MemIndexCommit(NewTxn *txn);
 
-    static Status
-    GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
+    static Status GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
@@ -425,5 +418,17 @@ public:
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
     static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
+
+public:
+    // Function related methods
+    static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
+
+    static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
+    static void AppendToScalarFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
+    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
+
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
 };
 } // namespace infinity

@@ -41,6 +41,12 @@ export struct MemIndex {
     void ClearMemIndex();
 
     BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
+    const BaseMemIndex *GetBaseMemIndex() const;
+    void SetBaseMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
+
+    void SetEMVBMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
+    EMVBIndexInMem *GetEMVBMemIndex(const MemIndexID &mem_index_id);
+
     SharedPtr<HnswIndexInMem> GetHnswIndex() {
         std::unique_lock<std::mutex> lock(mtx_);
         return memory_hnsw_index_;
@@ -67,7 +73,7 @@ export struct MemIndex {
         return memory_bmp_index_;
     }
 
-    std::mutex mtx_; // Used by append / mem index dump / clear
+    mutable std::mutex mtx_; // Used by append / mem index dump / clear
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<IVFIndexInMem> memory_ivf_index_{};

@@ -36,7 +36,6 @@ import index_secondary;
 import statement_common;
 import embedding_info;
 import knn_expr;
-import catalog;
 import infinity_exception;
 import bg_task;
 import txn_store;

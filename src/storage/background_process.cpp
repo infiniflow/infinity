@@ -25,18 +25,18 @@ import update_segment_bloom_filter_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
-import wal_manager;
-import catalog;
 import third_party;
-import buffer_manager;
-import periodic_trigger;
 import infinity_context;
 import status;
 import new_txn;
+import bg_task_type;
+import global_resource_usage;
+import wal_manager;
 
 namespace infinity {
 
-void BGTaskProcessor::SetCleanupTrigger(SharedPtr<CleanupPeriodicTrigger> cleanup_trigger) { cleanup_trigger_ = cleanup_trigger; }
+BGTaskProcessor::BGTaskProcessor() = default;
+BGTaskProcessor::~BGTaskProcessor() = default;
 
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });

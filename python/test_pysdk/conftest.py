@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from shutil import copyfile
 import sys
+
+import logging
+
+
+def pytest_configure():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(process)d-%(thread)d %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 parent = os.path.join(os.getcwd(), os.pardir)

@@ -93,7 +93,7 @@ private:
 
     void ExecuteShowTables(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowViews(QueryContext *query_context, ShowOperatorState *operator_state);
+    void ExecuteShowTasks(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *operator_state);
 
@@ -138,10 +138,6 @@ private:
     void ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state);
-
-    void ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state);
-
-    void ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state);
 

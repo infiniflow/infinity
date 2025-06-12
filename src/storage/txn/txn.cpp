@@ -848,18 +848,6 @@ void Txn::PostCommit() {
     for (auto &sema : txn_store_.semas()) {
         sema->acquire();
     }
-
-    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
-        if (wal_cmd->GetType() == WalCommandType::CHECKPOINT) {
-            auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
-            if (checkpoint_cmd->is_full_checkpoint_) {
-                wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
-            } else {
-                wal_manager->CommitDeltaCheckpoint(checkpoint_cmd->max_commit_ts_);
-            }
-        }
-    }
 }
 
 void Txn::CancelCommitBottom() {

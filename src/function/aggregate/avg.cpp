@@ -17,7 +17,7 @@ module;
 module avg;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import aggregate_function;
@@ -339,7 +339,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
-void RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterAvgFunction(NewCatalog *catalog_ptr) {
     String func_name = "AVG";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -419,7 +419,7 @@ void RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(avg_function);
     }
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

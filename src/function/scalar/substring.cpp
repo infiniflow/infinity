@@ -17,7 +17,7 @@ module;
 module substring;
 
 import stl;
-import catalog;
+import new_catalog;
 import logical_type;
 import infinity_exception;
 import scalar_function;
@@ -81,7 +81,7 @@ SubstrFunction::Run(VarcharT &first, BigIntT &second, BigIntT &third, VarcharT &
     return true;
 }
 
-void RegisterSubstringFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterSubstringFunction(NewCatalog *catalog_ptr) {
     String func_name = "substring";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -92,7 +92,7 @@ void RegisterSubstringFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::TernaryFunctionVarlenToVarlenWithFailure<VarcharT, BigIntT, BigIntT, VarcharT, SubstrFunction>);
     function_set_ptr->AddFunction(varchar_substr);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

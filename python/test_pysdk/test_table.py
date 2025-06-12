@@ -1,8 +1,6 @@
-import importlib
 import sys
 import os
 import concurrent.futures
-import os
 import pytest
 import polars as pl
 from common import common_values
@@ -929,9 +927,9 @@ class TestInfinity:
             res = db_obj.get_table("my_table"+suffix)
         except Exception as e:
             print(e)
+
     # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST") != "1", reason="Cost too much time")
     def test_create_10k_table(self, suffix):
         """
         target: create/drop/list/get 1K table

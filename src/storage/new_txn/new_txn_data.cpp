@@ -58,6 +58,11 @@ import expression_evaluator;
 import base_txn_store;
 import catalog_cache;
 import kv_code;
+import bg_task;
+import dump_index_process;
+import mem_index;
+import base_memindex;
+import emvb_index_in_mem;
 
 namespace infinity {
 
@@ -311,6 +316,14 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
+    // index
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = MakeShared<ImportTxnStore>();
@@ -321,20 +334,25 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         import_txn_store->table_id_str_ = table_meta.table_id_str();
         import_txn_store->table_key_ = table_key;
         import_txn_store->table_id_ = std::stoull(table_meta.table_id_str());
-        import_txn_store->input_blocks_in_imports_.emplace_back(input_blocks);
+
+        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const String &index_id_str = (*index_id_strs_ptr)[i];
+            const String &index_name = (*index_names_ptr)[i];
+            import_txn_store->index_names_.emplace_back(index_name);
+            import_txn_store->index_ids_str_.emplace_back(index_id_str);
+            import_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
+        }
+
+        import_txn_store->input_blocks_in_imports_.emplace(segment_ids[0], input_blocks);
         import_txn_store->segment_infos_.emplace_back(segment_info);
+        import_txn_store->segment_ids_.emplace_back(segment_ids[0]);
     } else {
         ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        import_txn_store->input_blocks_in_imports_.emplace(segment_ids[0], input_blocks);
         import_txn_store->segment_infos_.emplace_back(segment_info);
+        import_txn_store->segment_ids_.emplace_back(segment_ids[0]);
     }
 
-    // index
-    Vector<String> *index_id_strs_ptr = nullptr;
-    Vector<String> *index_names_ptr = nullptr;
-    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
-    if (!status.ok()) {
-        return status;
-    }
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_names_ptr)[i];
@@ -666,6 +684,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         compact_txn_store->segment_infos_ = segment_infos;
         compact_txn_store->deprecated_segment_ids_ = segment_ids;
         compact_txn_store->new_segment_id_ = new_segment_ids[0];
+        compact_txn_store->segment_ids_.emplace_back(new_segment_ids[0]);
 
         Vector<SegmentID> deprecated_segment_ids = segment_ids;
         {
@@ -701,6 +720,15 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
     if (!status.ok()) {
         return status;
+    }
+
+    CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
+    for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const String &index_id_str = (*index_id_strs_ptr)[i];
+        const String &index_name = (*index_name_ptr)[i];
+        compact_txn_store->index_names_.emplace_back(index_name);
+        compact_txn_store->index_ids_str_.emplace_back(index_id_str);
+        compact_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
     }
 
     //    LOG_TRACE(fmt::format("To populate index: {}", index_id_strs_ptr->size()));
@@ -1291,7 +1319,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     return Status::OK();
 }
 
-Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option) {
+Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1347,6 +1375,21 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
                     LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
                 }
             }
+
+            if (!flush_column or !flush_version) {
+                continue;
+            } else {
+                SharedPtr<FlushDataEntry> flush_data_entry =
+                    MakeShared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+                if (flush_column && flush_version) {
+                    flush_data_entry->to_flush_ = "data and version";
+                } else if (flush_column) {
+                    flush_data_entry->to_flush_ = "data";
+                } else {
+                    flush_data_entry->to_flush_ = "version";
+                }
+                ckp_txn_store->entries_.emplace_back(flush_data_entry);
+            }
         }
     }
 
@@ -1389,6 +1432,8 @@ Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
 
 Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     Status status;
+    const String &db_name = append_cmd->db_name_;
+    const String &table_name = append_cmd->table_name_;
     const String &db_id_str = append_cmd->db_id_;
     const String &table_id_str = append_cmd->table_id_;
     TxnTimeStamp begin_ts = BeginTS();
@@ -1403,10 +1448,11 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         return status;
     }
     Vector<TableIndexMeeta> table_index_metas;
+    Vector<String> *index_name_strs = nullptr;
     if (!this->IsReplay()) {
         Vector<String> *index_id_strs = nullptr;
         {
-            status = table_meta.GetIndexIDs(index_id_strs, nullptr);
+            status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
             if (!status.ok()) {
                 return status;
             }
@@ -1499,6 +1545,34 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         if (range.first.segment_offset_ + range.second == DEFAULT_SEGMENT_CAPACITY) {
             table_meta.DelUnsealedSegmentID();
             BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta.value());
+
+            for (SizeT i = 0; i < table_index_metas.size(); ++i) {
+                const String &index_name = (*index_name_strs)[i];
+                SegmentIndexMeta segment_index_meta(segment_id, table_index_metas[i]);
+                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+
+                if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+                    return Status::UnexpectedError(
+                        fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
+                }
+
+                NewTxn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("dump mem index aync"), TransactionType::kNormal);
+                SharedPtr<DumpIndexTask> dump_index_task{};
+                if (mem_index->GetBaseMemIndex() != nullptr) {
+                    mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
+                    const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
+                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn);
+
+                } else if (mem_index->GetEMVBIndex() != nullptr) {
+                    mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
+                    EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
+                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn);
+                }
+
+                // Trigger dump index processor to dump mem index for new sealed segment
+                auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
+                dump_index_processor->Submit(dump_index_task);
+            }
         }
         copied_row_cnt += range.second;
     }
@@ -1792,7 +1866,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
 
-        Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+        status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }

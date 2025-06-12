@@ -60,7 +60,6 @@ import segment_iter;
 import segment_entry;
 import variables;
 import default_values;
-import catalog;
 import txn_manager;
 import wal_manager;
 import logger;
@@ -69,6 +68,7 @@ import memory_indexer;
 import background_process;
 import compaction_process;
 import bg_task;
+import bg_task_type;
 import buffer_obj;
 import file_worker_type;
 import system_info;
@@ -218,7 +218,7 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -485,30 +485,6 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
-        case ShowStmtType::kDeltaLogs: {
-            output_names_->reserve(5);
-            output_types_->reserve(5);
-            output_names_->emplace_back("begin_ts");
-            output_names_->emplace_back("commit_ts");
-            output_names_->emplace_back("transaction_id");
-            output_names_->emplace_back("command_type");
-            output_names_->emplace_back("text");
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
-            output_names_->emplace_back("max_commit_timestamp");
-            output_names_->emplace_back("file_path");
-            output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(varchar_type);
-            break;
-        }
         case ShowStmtType::kCatalog: {
             output_names_->reserve(1);
             output_types_->reserve(1);
@@ -618,6 +594,17 @@ void PhysicalShow::Init(QueryContext *query_context) {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kTasks: {
+            output_names_->reserve(3);
+            output_types_->reserve(3);
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("status");
+            output_names_->emplace_back("description");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -694,8 +681,8 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowBlockColumn(query_context, show_operator_state);
             break;
         }
-        case ShowStmtType::kViews: {
-            ExecuteShowViews(query_context, show_operator_state);
+        case ShowStmtType::kTasks: {
+            ExecuteShowTasks(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kSessionVariable: {
@@ -748,14 +735,6 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kLogs: {
             ExecuteShowLogs(query_context, show_operator_state);
-            break;
-        }
-        case ShowStmtType::kDeltaLogs: {
-            ExecuteShowDeltaLogs(query_context, show_operator_state);
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            ExecuteShowCatalogs(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kCatalog: {
@@ -831,7 +810,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -923,7 +902,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -1061,7 +1040,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -1275,7 +1254,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -1386,7 +1365,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -1492,12 +1471,12 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     for (auto &database_detail : databases_detail) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         SizeT column_id = 0;
@@ -1567,13 +1546,13 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type, varchar_type};
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     for (auto &table_detail_ptr : tables_detail) {
         // Initialize the output data block
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         SizeT column_id = 0;
@@ -1709,13 +1688,63 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     }
 }
 
-void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    RecoverableError(Status::NotSupport("SHOW VIEW isn't implemented"));
+void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    NewTxnManager *txn_mgr = query_context->storage()->new_txn_manager();
+    Vector<SharedPtr<BGTaskInfo>> bg_task_info_list = txn_mgr->GetTaskInfoList();
+    // create data block for output state
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(*output_types_);
+    SizeT row_count = 0;
+
+    for (SizeT i = 0; i < bg_task_info_list.size(); ++i) {
+        BGTaskInfo *bg_task_info_ptr = bg_task_info_list[i].get();
+        SizeT task_count_ = bg_task_info_ptr->task_info_list_.size();
+        for (SizeT j = 0; j < task_count_; ++j) {
+            if (!output_block_ptr) {
+                output_block_ptr = DataBlock::MakeUniquePtr();
+                output_block_ptr->Init(*output_types_);
+            }
+
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar(ToString(bg_task_info_ptr->type_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(bg_task_info_ptr->status_list_[j]);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                String task_text = bg_task_info_ptr->task_info_list_[j];
+                Value value = Value::MakeVarchar(task_text);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            if (++row_count == output_block_ptr->capacity()) {
+                output_block_ptr->Finalize();
+                show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+                output_block_ptr = nullptr;
+                row_count = 0;
+            }
+        }
+    }
+
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto catalog = query_context->storage()->catalog();
+    auto catalog = query_context->storage()->new_catalog();
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1731,13 +1760,13 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
                                              varchar_type,
                                              varchar_type};
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     auto records = catalog->GetProfileRecords();
     for (SizeT i = 0; i < records.size(); ++i) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         // Output record no
@@ -1803,13 +1832,13 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
     };
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     SizeT column_count = table_info->column_count_;
     for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         const ColumnDef *column = table_info->GetColumnDefByIdx(input_column_id);
@@ -1882,12 +1911,12 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         varchar_type,
     };
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     for (auto &segment_info : segment_info_list) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         SizeT column_id = 0;
@@ -1955,7 +1984,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -2144,12 +2173,12 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         bigint_type,
     };
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     for (const auto &block_info : block_info_array) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         SizeT column_id = 0;
@@ -2216,7 +2245,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -2375,7 +2404,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         varchar_type,
         varchar_type,
     };
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -2498,7 +2527,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     // Config
     {
@@ -3439,13 +3468,13 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         for (const auto &table_index_info : table_index_info_list) {
             if (output_block_ptr.get() == nullptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
-                output_block_ptr->Init(column_types);
+                output_block_ptr->Init(*output_types_);
             }
 
             SizeT column_id = 0;
@@ -3678,7 +3707,7 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     BaseSession *session_ptr = query_context->current_session();
     for (auto &session_var_pair : VarUtil::session_name_map_) {
@@ -3990,27 +4019,6 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case GlobalVariable::kDeltaLogCount: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
-            };
-
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-            Vector<SharedPtr<DataType>> output_column_types{
-                integer_type,
-            };
-
-            output_block_ptr->Init(output_column_types);
-
-            Catalog *catalog_ptr = query_context->storage()->catalog();
-            Value value = Value::MakeBigInt(catalog_ptr->GetDeltaLogCount());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            break;
-        }
         case GlobalVariable::kNextTxnID: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
@@ -4026,9 +4034,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            Catalog *catalog_ptr = query_context->storage()->catalog();
-
-            Value value = Value::MakeBigInt(catalog_ptr->next_txn_id());
+            auto *new_txn_mgr = query_context->storage()->new_txn_manager();
+            Value value = Value::MakeBigInt(new_txn_mgr->current_transaction_id());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4209,7 +4216,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            Catalog *catalog_ptr = query_context->storage()->catalog();
+            auto *catalog_ptr = query_context->storage()->new_catalog();
             Value value = Value::MakeBigInt(catalog_ptr->ProfileHistorySize());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -4401,7 +4408,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             output_block_ptr->Init(output_column_types);
 
-            Value value = Value::MakeBool(InfinityContext::instance().storage()->catalog()->GetProfile());
+            Value value = Value::MakeBool(InfinityContext::instance().storage()->new_catalog()->GetProfile());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4434,7 +4441,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     for (auto &global_var_pair : VarUtil::global_name_map_) {
         const String &var_name = global_var_pair.first;
@@ -4652,28 +4659,6 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
-            case GlobalVariable::kDeltaLogCount: {
-                {
-                    // option name
-                    Value value = Value::MakeVarchar(var_name);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                }
-                {
-                    // option value
-                    Catalog *catalog_ptr = query_context->storage()->catalog();
-                    Value value = Value::MakeVarchar(std::to_string(catalog_ptr->GetDeltaLogCount()));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                }
-                {
-                    // option description
-                    Value value = Value::MakeVarchar("Catalog delta log count");
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-                }
-                break;
-            }
             case GlobalVariable::kNextTxnID: {
                 {
                     // option name
@@ -4683,8 +4668,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    Catalog *catalog_ptr = query_context->storage()->catalog();
-                    Value value = Value::MakeVarchar(std::to_string(catalog_ptr->next_txn_id()));
+                    auto *new_txn_mgr = query_context->storage()->new_txn_manager();
+                    Value value = Value::MakeVarchar(std::to_string(new_txn_mgr->current_transaction_id()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
@@ -4873,7 +4858,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    Catalog *catalog_ptr = query_context->storage()->catalog();
+                    auto *catalog_ptr = query_context->storage()->new_catalog();
                     Value value = Value::MakeVarchar(std::to_string(catalog_ptr->ProfileHistorySize()));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -5084,7 +5069,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option value
-                    bool enable_profile = InfinityContext::instance().storage()->catalog()->GetProfile();
+                    bool enable_profile = query_context->storage()->new_catalog()->GetProfile();
                     String enable_profile_condition = enable_profile ? "true" : "false";
                     Value value = Value::MakeVarchar(enable_profile_condition);
                     ValueExpression value_expr(value);
@@ -5245,7 +5230,7 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
@@ -5254,7 +5239,7 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
 
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -5315,7 +5300,7 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
         bigint_type,
     };
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     Status status = Status::NotSupport("Show memindex is not supported in new catalog since BGMemIndexTracer has not yet been ported.");
@@ -5327,7 +5312,7 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -5388,7 +5373,7 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     SessionManager *session_manager = query_context->session_manager();
@@ -5399,7 +5384,7 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
 
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -5462,7 +5447,7 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -5560,7 +5545,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     Vector<TxnInfo> txn_info_array;
@@ -5570,7 +5555,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
     for (const auto &txn_info : txn_info_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -5621,7 +5606,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -5700,13 +5685,13 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         varchar_type,
         varchar_type,
     };
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     for (const auto &txn_context : txn_context_histories) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -5805,7 +5790,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     WalManager *wal_manager = query_context->storage()->wal_manager();
@@ -5816,7 +5801,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
         for (const auto &cmd_ref : wal_entry_ref->cmds_) {
             if (output_block_ptr.get() == nullptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
-                output_block_ptr->Init(column_types);
+                output_block_ptr->Init(*output_types_);
             }
 
             {
@@ -5864,151 +5849,6 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
     return;
 }
 
-void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
-
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        varchar_type,
-        varchar_type,
-    };
-
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
-    SizeT row_count = 0;
-
-    auto catalog = query_context->storage()->catalog();
-    Vector<CatalogDeltaOpBrief> delta_log_brief_array = catalog->GetDeltaLogBriefs();
-
-    for (const auto &delta_op_brief : delta_log_brief_array) {
-        if (output_block_ptr.get() == nullptr) {
-            output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
-        }
-
-        {
-            // begin_ts
-            Value value = Value::MakeBigInt(delta_op_brief.begin_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // commit_ts_
-            Value value = Value::MakeBigInt(delta_op_brief.commit_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        {
-            // txn_id_
-            Value value = Value::MakeBigInt(delta_op_brief.txn_id_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-        }
-        {
-            // delta op type
-            Value value = Value::MakeVarchar(CatalogDeltaOpTypeToString(delta_op_brief.type_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
-        }
-        {
-            // delta op text
-            Value value = Value::MakeVarchar(*delta_op_brief.text_ptr);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
-        }
-
-        ++row_count;
-        if (row_count == output_block_ptr->capacity()) {
-            output_block_ptr->Finalize();
-            operator_state->output_.emplace_back(std::move(output_block_ptr));
-            output_block_ptr = nullptr;
-            row_count = 0;
-        }
-    }
-
-    output_block_ptr->Finalize();
-    operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return;
-}
-
-void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state) {
-    Status status = Status::NotSupport("Show catalogs is not supported in new catalog since RocksDB has replaced catalog files.");
-    RecoverableError(status);
-
-    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    // create data block for output state
-    Vector<SharedPtr<DataType>> column_types{
-        bigint_type,
-        varchar_type,
-    };
-
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
-    SizeT row_count = 0;
-
-    WalManager *wal_manager = query_context->storage()->wal_manager();
-    auto catalog_fileinfo = wal_manager->GetCatalogFiles();
-    if (!catalog_fileinfo.has_value()) {
-        String error_message = fmt::format("Can't get catalog files");
-        UnrecoverableError(error_message);
-    }
-    auto &[full_catalog_file_info, delta_catalog_file_infos] = catalog_fileinfo.value();
-
-    {
-        {
-            // full_ckp_commit_ts
-            Value value = Value::MakeBigInt(full_catalog_file_info.max_commit_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // full_ckp_catalog_file_path
-            Value value = Value::MakeVarchar(full_catalog_file_info.path_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-        ++row_count;
-    }
-
-    for (const auto &delta_catalog_file_info : delta_catalog_file_infos) {
-        if (output_block_ptr.get() == nullptr) {
-            output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
-        }
-
-        {
-            // delta_ckp_commit_ts
-            Value value = Value::MakeBigInt(delta_catalog_file_info.max_commit_ts_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // delta_ckp_catalog_file_path
-            Value value = Value::MakeVarchar(delta_catalog_file_info.path_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-
-        ++row_count;
-        if (row_count == output_block_ptr->capacity()) {
-            output_block_ptr->Finalize();
-            operator_state->output_.emplace_back(std::move(output_block_ptr));
-            output_block_ptr = nullptr;
-            row_count = 0;
-        }
-    }
-
-    output_block_ptr->Finalize();
-    operator_state->output_.emplace_back(std::move(output_block_ptr));
-}
-
 void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorState *operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
@@ -6023,7 +5863,7 @@ void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorS
     Vector<SharedPtr<DataType>> column_types{varchar_type};
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     {
         Value value = Value::MakeVarchar(meta_str);
         ValueExpression value_expr(value);
@@ -6061,7 +5901,7 @@ void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOpe
     Vector<SharedPtr<DataType>> column_types{varchar_type};
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     {
         Value value = Value::MakeVarchar(status_message);
         ValueExpression value_expr(value);
@@ -6084,7 +5924,7 @@ void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, Show
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     PersistenceManager *persistence_manager = query_context->persistence_manager();
@@ -6097,7 +5937,7 @@ void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, Show
     for (const auto &file_pair : file_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -6153,7 +5993,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     PersistenceManager *persistence_manager = query_context->persistence_manager();
@@ -6166,7 +6006,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
     for (const auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -6230,7 +6070,7 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
     SizeT row_count = 0;
 
     PersistenceManager *persistence_manager = query_context->persistence_manager();
@@ -6250,7 +6090,7 @@ void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, Sho
     for (auto &range : deleted_ranges) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
         {
             // start
@@ -6288,7 +6128,7 @@ void PhysicalShow::ExecuteShowMemory(QueryContext *query_context, ShowOperatorSt
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     {
         SizeT column_id = 0;
@@ -6338,7 +6178,7 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     std::unordered_map<String, i64> object_map = GlobalResourceUsage::GetObjectClones();
     SizeT row_count = 0;
@@ -6346,7 +6186,7 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
     for (auto &object_pair : object_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
         if (object_pair.second != 0) {
 
@@ -6389,7 +6229,7 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     std::unordered_map<String, i64> raw_memory_map = GlobalResourceUsage::GetRawMemoryClone();
     SizeT row_count = 0;
@@ -6397,7 +6237,7 @@ void PhysicalShow::ExecuteShowMemoryAllocation(QueryContext *query_context, Show
     for (auto &raw_memory_pair : raw_memory_map) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -6438,7 +6278,7 @@ void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperator
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     String function_name = *function_name_;
     ToLower(function_name);
@@ -6478,7 +6318,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
 
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type};
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     String snapshot_dir = query_context->global_config()->SnapshotDir();
     Vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
@@ -6487,7 +6327,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
     for (auto &snapshot_brief : snapshot_list) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
-            output_block_ptr->Init(column_types);
+            output_block_ptr->Init(*output_types_);
         }
 
         {
@@ -6571,7 +6411,7 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
         varchar_type,
     };
 
-    output_block_ptr->Init(column_types);
+    output_block_ptr->Init(*output_types_);
 
     String snapshot_dir = query_context->global_config()->SnapshotDir();
     Vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);

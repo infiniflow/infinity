@@ -1105,16 +1105,16 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
 
 SharedPtr<MemIndex> NewCatalog::GetMemIndex(const String &mem_index_key) {
     std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
-    if (mem_index_map_.contains(mem_index_key)) {
-        return mem_index_map_[mem_index_key];
+    if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
+        return iter->second;
     }
     return nullptr;
 }
 
 bool NewCatalog::GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
-    if (mem_index_map_.contains(mem_index_key)) {
-        mem_index = mem_index_map_[mem_index_key];
+    if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
+        mem_index = iter->second;
         return false;
     }
     mem_index_map_.emplace(mem_index_key, mem_index);
@@ -1169,54 +1169,6 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
     return result;
 }
 
-Status NewCatalog::SetMemIndexDump(const String &table_key) {
-    LOG_INFO(fmt::format("SetMemIndexDump {}", table_key));
-    std::unique_lock lock(mem_index_mtx_);
-    if (!table_lock_for_mem_index_.contains(table_key)) {
-        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
-    }
-    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
-    if (table_lock_for_mem_index->append_count_ > 0) {
-        return Status::DumpingMemIndex(fmt::format("Table key: {} is appending mem index", table_key));
-    }
-
-    if (table_lock_for_mem_index->dumping_mem_index_) {
-        return Status::DumpingMemIndex(fmt::format("Table key: {} is dumping mem index", table_key));
-    }
-    table_lock_for_mem_index->dumping_mem_index_ = true;
-    return Status::OK();
-}
-
-Status NewCatalog::UnsetMemIndexDump(const String &table_key) {
-    LOG_INFO(fmt::format("UnsetMemIndexDump {}", table_key));
-    std::unique_lock lock(mem_index_mtx_);
-    if (!table_lock_for_mem_index_.contains(table_key)) {
-        UnrecoverableError(fmt::format("Table key: {} isn't found in mem index dump", table_key));
-    }
-    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
-    if (!table_lock_for_mem_index->dumping_mem_index_) {
-        return Status::DumpingMemIndex(fmt::format("Table key: {} isn't dumping mem index", table_key));
-    }
-
-    table_lock_for_mem_index->dumping_mem_index_ = false;
-    if (table_lock_for_mem_index->append_count_ == 0) {
-        table_lock_for_mem_index_.erase(table_key);
-    } else {
-        UnrecoverableError(fmt::format("Table key: {} is appending, why unset mem index dump", table_key));
-    }
-
-    return Status::OK();
-}
-
-bool NewCatalog::IsMemIndexDump(const String &table_key) {
-    std::unique_lock lock(mem_index_mtx_);
-    if (!table_lock_for_mem_index_.contains(table_key)) {
-        return false;
-    }
-
-    return table_lock_for_mem_index_[table_key]->dumping_mem_index_;
-}
-
 Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache) {
     bool insert_success = false;
     HashMap<String, SharedPtr<TableIndexReaderCache>>::iterator iter;
@@ -1256,45 +1208,6 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cach
     return Status::OK();
 }
 
-Status NewCatalog::AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info) {
-    bool insert_success = false;
-    HashMap<String, SharedPtr<SegmentIndexFtInfo>>::iterator iter;
-    {
-        std::unique_lock lock(segment_index_ft_info_mtx_);
-        std::tie(iter, insert_success) = segment_index_ft_info_map_.emplace(std::move(segment_index_key), std::move(segment_index_ft_info));
-    }
-    if (!insert_success) {
-        return Status::CatalogError(fmt::format("SegmentIndexFtInfo key: {} already exists", iter->first));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info) {
-    segment_index_ft_info = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(segment_index_ft_info_mtx_);
-        if (auto iter = segment_index_ft_info_map_.find(segment_index_key); iter != segment_index_ft_info_map_.end()) {
-            segment_index_ft_info = iter->second;
-        }
-    }
-    if (segment_index_ft_info == nullptr) {
-        return Status::CatalogError(fmt::format("SegmentIndexFtInfo key: {} not found", segment_index_key));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::DropSegmentIndexFtInfoByKey(const String &segment_index_key) {
-    bool delete_success = false;
-    {
-        std::unique_lock lock(segment_index_ft_info_mtx_);
-        delete_success = segment_index_ft_info_map_.erase(segment_index_key) > 0;
-    }
-    if (!delete_success) {
-        return Status::CatalogError(fmt::format("SegmentIndexFtInfo key: {} not found", segment_index_key));
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts) {
     bool insert_success = false;
     HashMap<String, SharedPtr<SegmentUpdateTS>>::iterator iter;
@@ -1317,7 +1230,7 @@ Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, Share
         }
     }
     if (segment_update_ts == nullptr) {
-        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} not found", segment_update_ts_key));
+        return Status::CatalogError(fmt::format("Get SegmentUpdateTS key: {} not found", segment_update_ts_key));
     }
     return Status::OK();
 }
@@ -1329,7 +1242,7 @@ Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key)
         delete_success = segment_update_ts_map_.erase(segment_update_ts_key) > 0;
     }
     if (!delete_success) {
-        return Status::CatalogError(fmt::format("SegmentUpdateTS key: {} not found", segment_update_ts_key));
+        return Status::CatalogError(fmt::format("Drop SegmentUpdateTS key: {} not found", segment_update_ts_key));
     }
     return Status::OK();
 }

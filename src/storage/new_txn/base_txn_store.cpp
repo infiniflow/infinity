@@ -140,37 +140,40 @@ SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
 }
 
 String OptimizeIndexTxnStore::ToString() const {
-    return fmt::format(
-        "{}: database: {}, db_id: {}, table: {}, table_id: {}, table_key: {}, indexes: {}, index_ids: {}, segment_ids: {}, "
-        "deprecate_ids_in_segments_: {}",
-        TransactionType2Str(type_),
-        db_name_,
-        db_id_str_,
-        table_name_,
-        table_id_str_,
-        table_key_,
-        fmt::join(index_names_, " "),
-        fmt::join(index_ids_str_, " "),
-        fmt::join(segment_ids_, " "),
-        fmt::join(deprecate_ids_in_segments_ | std::views::transform([](const auto &row) { return fmt::format("({})", fmt::join(row, " ")); }),
-                  ", "));
+    std::string result;
+    for (const auto &store_entry : entries_) {
+        result += fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_key: {}, index: {}, index_id: {}, segment_id: {}, "
+                              "new_chunk_infos: {}, deprecate_chunks: {}\n",
+                              TransactionType2Str(type_),
+                              store_entry.db_name_,
+                              store_entry.db_id_str_,
+                              store_entry.table_name_,
+                              store_entry.table_id_str_,
+                              store_entry.table_key_,
+                              store_entry.index_name_,
+                              store_entry.index_id_str_,
+                              store_entry.segment_id_,
+                              fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), " "),
+                              fmt::join(store_entry.deprecate_chunks_, " "));
+    }
+    return result;
 }
 
 SharedPtr<WalEntry> OptimizeIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmdDumpIndexV2> dump_command;
-    for (SizeT i = 0; i < index_names_.size(); ++i) {
-        dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
-                                                     db_id_str_,
-                                                     table_name_,
-                                                     table_id_str_,
-                                                     index_names_[i],
-                                                     index_ids_str_[i],
-                                                     segment_ids_[i],
-                                                     chunk_infos_in_segments_[i],
-                                                     deprecate_ids_in_segments_[i],
-                                                     table_key_);
+    for (const auto &store_entry : entries_) {
+        dump_command = MakeShared<WalCmdDumpIndexV2>(store_entry.db_name_,
+                                                     store_entry.db_id_str_,
+                                                     store_entry.table_name_,
+                                                     store_entry.table_id_str_,
+                                                     store_entry.index_name_,
+                                                     store_entry.index_id_str_,
+                                                     store_entry.segment_id_,
+                                                     store_entry.new_chunk_infos_,
+                                                     store_entry.deprecate_chunks_,
+                                                     store_entry.table_key_);
         dump_command->dump_cause_ = DumpIndexCause::kOptimizeIndex;
         wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
     }
@@ -205,32 +208,35 @@ SharedPtr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     for (SizeT i = 0; i < segment_infos_.size(); ++i) {
-        SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_[i]);
+        SharedPtr<WalCmdImportV2> wal_command = MakeShared<WalCmdImportV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_[i]);
         wal_entry->cmds_.push_back(wal_command);
     }
 
-    SharedPtr<WalCmdDumpIndexV2> dump_command;
-    for (SizeT i = 0; i < index_names_.size(); ++i) {
-        dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
-                                                     db_id_str_,
-                                                     table_name_,
-                                                     table_id_str_,
-                                                     index_names_[i],
-                                                     index_ids_str_[i],
-                                                     segment_ids_[i],
-                                                     chunk_infos_in_segments_[i],
-                                                     deprecate_ids_in_segments_[i],
-                                                     table_key_);
-        dump_command->dump_cause_ = DumpIndexCause::kImport;
-        wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
+    SharedPtr<WalCmdDumpIndexV2> dump_command{};
+    for (const SegmentID &segment_id : segment_ids_) {
+        for (SizeT i = 0; i < index_names_.size(); ++i) {
+            dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
+                                                         db_id_str_,
+                                                         table_name_,
+                                                         table_id_str_,
+                                                         index_names_[i],
+                                                         index_ids_str_[i],
+                                                         segment_id,
+                                                         chunk_infos_in_segments_.at(segment_id),
+                                                         deprecate_ids_in_segments_.at(segment_id),
+                                                         table_key_);
+            dump_command->dump_cause_ = DumpIndexCause::kImport;
+            wal_entry->cmds_.push_back(dump_command);
+        }
     }
+
     return wal_entry;
 }
 
 SizeT ImportTxnStore::RowCount() const {
     SizeT row_count = 0;
-    for (const auto &input_block : input_blocks_in_imports_[0]) {
-        row_count += input_block->row_count();
+    for (const auto &input_blocks : input_blocks_in_imports_) {
+        row_count += input_blocks.second.at(0)->row_count();
     }
     return row_count;
 }
@@ -319,25 +325,28 @@ String CompactTxnStore::ToString() const {
 SharedPtr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command =
+    SharedPtr<WalCmdCompactV2> wal_command =
         MakeShared<WalCmdCompactV2>(db_name_, db_id_str_, table_name_, table_id_str_, segment_infos_, deprecated_segment_ids_);
     wal_entry->cmds_.push_back(wal_command);
 
-    SharedPtr<WalCmdDumpIndexV2> dump_command;
-    for (SizeT i = 0; i < index_names_.size(); ++i) {
-        dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
-                                                     db_id_str_,
-                                                     table_name_,
-                                                     table_id_str_,
-                                                     index_names_[i],
-                                                     index_ids_str_[i],
-                                                     segment_ids_[i],
-                                                     chunk_infos_in_segments_[i],
-                                                     deprecate_ids_in_segments_[i],
-                                                     table_key_);
-        dump_command->dump_cause_ = DumpIndexCause::kCompact;
-        wal_entry->cmds_.push_back(static_pointer_cast<WalCmd>(dump_command));
+    SharedPtr<WalCmdDumpIndexV2> dump_command{};
+    for (const SegmentID &segment_id : segment_ids_) {
+        for (SizeT i = 0; i < index_names_.size(); ++i) {
+            dump_command = MakeShared<WalCmdDumpIndexV2>(db_name_,
+                                                         db_id_str_,
+                                                         table_name_,
+                                                         table_id_str_,
+                                                         index_names_[i],
+                                                         index_ids_str_[i],
+                                                         segment_id,
+                                                         chunk_infos_in_segments_.at(segment_id),
+                                                         deprecate_ids_in_segments_.at(segment_id),
+                                                         table_key_);
+            dump_command->dump_cause_ = DumpIndexCause::kCompact;
+            wal_entry->cmds_.push_back(dump_command);
+        }
     }
+
     return wal_entry;
 }
 

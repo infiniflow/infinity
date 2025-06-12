@@ -19,7 +19,6 @@ module;
 module cleanup_scanner;
 
 import stl;
-import catalog;
 import base_entry;
 import infinity_exception;
 import status;

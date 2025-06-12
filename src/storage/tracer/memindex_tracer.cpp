@@ -20,6 +20,7 @@ module memindex_tracer;
 
 import stl;
 import base_memindex;
+import emvb_index_in_mem;
 import bg_task;
 import infinity_context;
 import infinity_exception;
@@ -31,7 +32,7 @@ import table_entry;
 import table_index_entry;
 import txn_manager;
 import txn_state;
-import compaction_process;
+import dump_index_process;
 import storage;
 
 import kv_store;
@@ -138,13 +139,8 @@ Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(NewTxn *new_txn) {
 UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     std::lock_guard lck(mtx_);
 
-    Vector<BaseMemIndex *> mem_indexes;
-
-    NewTxn *new_txn = GetTxn();
-
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
-    mem_indexes = GetUndumpedMemIndexes(new_txn);
+    NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
 
     bool make_task = false;
     DeferFn defer_op([&] {
@@ -157,20 +153,27 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
         }
     });
 
-    if (mem_indexes.empty()) {
+    UniquePtr<DumpIndexTask> dump_task{};
+    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(new_txn);
+    Vector<EMVBIndexInMem *> emvb_indexes = GetEMVBMemIndexes(new_txn);
+    if (!mem_indexes.empty()) {
+        SizeT dump_idx = ChooseDump(mem_indexes);
+        BaseMemIndex *mem_index = mem_indexes[dump_idx];
+        MemIndexTracerInfo info = mem_index->GetInfo();
+        dump_task = MakeUnique<DumpIndexTask>(mem_index, new_txn);
+
+        acc_proposed_dump_.fetch_add(info.mem_used_);
+        proposed_dump_[mem_index] = info.mem_used_;
+    } else if (!emvb_indexes.empty()) {
+        // FIXME: We do not calculate the memory used for each EMVB index,
+        // so we choose the first EMVB index to dump.
+        EMVBIndexInMem *emvb_index = emvb_indexes[0];
+        dump_task = MakeUnique<DumpIndexTask>(emvb_index, new_txn);
+    } else {
         LOG_WARN("Cannot find memindex to dump");
         return nullptr;
     }
-    SizeT dump_idx = ChooseDump(mem_indexes);
-    auto *mem_index = mem_indexes[dump_idx];
-    auto info = mem_index->GetInfo();
 
-    UniquePtr<DumpIndexTask> dump_task;
-
-    dump_task = MakeUnique<DumpIndexTask>(mem_index, new_txn);
-
-    acc_proposed_dump_.fetch_add(info.mem_used_);
-    proposed_dump_[mem_index] = info.mem_used_;
     make_task = true;
     return dump_task;
 }
@@ -198,10 +201,10 @@ BGMemIndexTracer::~BGMemIndexTracer() {
 }
 
 void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
-    auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
+    auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
 
     LOG_INFO(fmt::format("Submit dump task: {}", dump_task->ToString()));
-    compaction_process->Submit(std::move(dump_task));
+    dump_index_processor->Submit(std::move(dump_task));
 }
 
 NewTxn *BGMemIndexTracer::GetTxn() {
@@ -243,9 +246,11 @@ Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
     for (SizeT i = 0; i < mem_indexes.size(); ++i) {
         auto &mem_index = mem_indexes[i];
         auto &mem_index_id = mem_index_ids[i];
-        auto *base_mem_index = mem_index->GetBaseMemIndex(mem_index_id);
-        if (base_mem_index) {
+        BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex(mem_index_id);
+        EMVBIndexInMem *emvb_index = mem_index->GetEMVBMemIndex(mem_index_id);
+        if (base_mem_index != nullptr) {
             base_mem_indexes.emplace_back(base_mem_index);
+        } else if (emvb_index != nullptr) {
         } else {
             LOG_WARN(fmt::format("Not implement base index of index {}.{}.{}.{}",
                                  mem_index_id.db_name_,
@@ -255,6 +260,35 @@ Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
         }
     }
     return base_mem_indexes;
+}
+
+Vector<EMVBIndexInMem *> BGMemIndexTracer::GetEMVBMemIndexes(NewTxn *new_txn) {
+    Vector<SharedPtr<MemIndex>> mem_indexes;
+    Vector<MemIndexID> mem_index_ids;
+    Status status = NewCatalog::GetAllMemIndexes(new_txn, mem_indexes, mem_index_ids);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    Vector<EMVBIndexInMem *> emvb_indexes;
+    for (SizeT i = 0; i < mem_indexes.size(); ++i) {
+        auto &mem_index = mem_indexes[i];
+        auto &mem_index_id = mem_index_ids[i];
+        BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex(mem_index_id);
+        EMVBIndexInMem *emvb_index = mem_index->GetEMVBMemIndex(mem_index_id);
+
+        if (emvb_index != nullptr) {
+            emvb_indexes.emplace_back(emvb_index);
+        } else if (base_mem_index != nullptr) {
+        } else {
+            LOG_WARN(fmt::format("Not implement base index of index {}.{}.{}.{}",
+                                 mem_index_id.db_name_,
+                                 mem_index_id.table_name_,
+                                 mem_index_id.index_name_,
+                                 mem_index_id.segment_id_));
+        }
+    }
+    return emvb_indexes;
 }
 
 } // namespace infinity

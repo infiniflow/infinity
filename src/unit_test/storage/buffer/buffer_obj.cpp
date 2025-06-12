@@ -36,9 +36,6 @@ import table_def;
 import extra_ddl_info;
 import column_vector;
 import value;
-import catalog;
-import segment_entry;
-import block_entry;
 import status;
 import third_party;
 import base_table_ref;
@@ -49,7 +46,6 @@ import statement_common;
 import embedding_info;
 import bg_task;
 import physical_import;
-import chunk_index_entry;
 import memory_indexer;
 import wal_manager;
 import internal_types;
@@ -87,8 +83,10 @@ public:
     void WaitFlushOp(Storage *storage) {
         NewTxnManager *txn_mgr = storage->new_txn_manager();
         WalManager *wal_manager = storage->wal_manager();
-        auto *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-
+        NewTxn *new_txn = nullptr;
+        do {
+            new_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+        } while (new_txn == nullptr); // wait until we get a new transaction, which means no other checkpoint is running
         TxnTimeStamp max_commit_ts{};
         i64 wal_size{};
         std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();

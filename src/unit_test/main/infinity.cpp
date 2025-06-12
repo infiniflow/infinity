@@ -292,11 +292,6 @@ TEST_F(InfinityTest, test2) {
     }
 
     {
-        QueryResult result = infinity->ShowVariable("delta_log_count", SetScope::kGlobal);
-        EXPECT_EQ(result.IsOk(), true);
-    }
-
-    {
         QueryResult result = infinity->ShowVariable("schedule_policy", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }

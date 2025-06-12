@@ -44,7 +44,7 @@ if __name__ == "__main__":
     command_failed = False
     begin_time = time.time()
     try:
-        with futures.ProcessPoolExecutor() as executor:
+        with futures.ProcessPoolExecutor(max_workers=1) as executor:
             while not command_failed and time.time() - begin_time < test_sec:
                 futs = [executor.submit(run_command, cmd) for cmd in commands]
                 for fut in futures.as_completed(futs):

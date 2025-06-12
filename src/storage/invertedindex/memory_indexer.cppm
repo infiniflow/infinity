@@ -39,8 +39,12 @@ import memindex_tracer;
 import segment_index_entry;
 import table_index_entry;
 import mem_usage_change;
+import chunk_index_meta;
 
 namespace infinity {
+
+struct AppendMemIndexBatch;
+class AppendMemIndexTask;
 
 export class MemoryIndexer final : public BaseMemIndex {
 public:
@@ -70,6 +74,15 @@ public:
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
+
+    void AsyncInsertTop(AppendMemIndexTask *);
+
+    void AsyncInsertBottom(const SharedPtr<ColumnVector> &column_vector,
+                           u32 row_offset,
+                           u32 row_count,
+                           u64 seq_inserted,
+                           u32 doc_count,
+                           AppendMemIndexBatch *append_batch);
 
     UniquePtr<std::binary_semaphore> AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count);
 
@@ -105,7 +118,7 @@ public:
 
     RowID GetBaseRowId() const { return base_row_id_; }
 
-    u32 GetDocCount() {
+    u32 GetDocCount() const {
         std::unique_lock<std::mutex> lock(mutex_);
         return doc_count_;
     }
@@ -123,6 +136,8 @@ public:
     MemIndexTracerInfo GetInfo() const override;
 
     TableIndexEntry *table_index_entry() const override;
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
     SizeT MemUsed() const;
 
@@ -165,7 +180,7 @@ private:
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
     std::condition_variable cv_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::mutex mutex_commit_;
     std::shared_mutex mutex_commit_sync_share_;
 
