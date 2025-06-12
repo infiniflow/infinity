@@ -125,7 +125,7 @@ UniquePtr<NewTxn> NewTxn::NewReplayTxn(NewTxnManager *txn_mgr,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts,
                                        TxnTimeStamp commit_ts,
-                                       UniquePtr<KVInstance> &&kv_instance) {
+                                       UniquePtr<KVInstance> kv_instance) {
     auto txn = MakeUnique<NewTxn>(txn_mgr, txn_id, begin_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
     txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;

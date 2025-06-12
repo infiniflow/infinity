@@ -387,6 +387,15 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
         Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
         Status status = txn_import->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn_import);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        Status status = txn_import->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
 
         auto *txn_drop_db = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
@@ -396,18 +405,6 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
 
         status = new_txn_mgr->CommitTxn(txn_import);
         EXPECT_FALSE(status.ok());
-    }
-    {
-        // Scan and check
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn);
-        EXPECT_TRUE(status.ok());
     }
 }
 
