@@ -188,5 +188,4 @@ TEST_F(DayFunctionsTest, day_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
-    kv_store_ptr->Uninit();
 }

@@ -28,15 +28,6 @@ namespace infinity {
 
 KVIterator::KVIterator(rocksdb::Iterator *iterator_) : iterator_(iterator_) {}
 
-KVIterator::KVIterator(rocksdb::Transaction *transaction, rocksdb::ReadOptions &read_options, const String &upper_bound) {
-    if (!upper_bound.empty()) {
-        upper_bound_ = MakeUnique<rocksdb::Slice>(upper_bound);
-        read_options.iterate_upper_bound = upper_bound_.get();
-    }
-
-    iterator_ = transaction->GetIterator(read_options);
-}
-
 KVIterator::~KVIterator() { delete iterator_; }
 
 void KVIterator::Seek(const String &key) {
@@ -191,10 +182,20 @@ Status KVStore::Init(const String &db_path) {
 }
 
 Status KVStore::Uninit() {
-    delete transaction_db_;
-    transaction_db_ = nullptr;
+    if (transaction_db_) {
+        delete transaction_db_;
+        transaction_db_ = nullptr;
+    }
     LOG_INFO("KV store is stopped.");
     return Status::OK();
+}
+
+KVStore::~KVStore() {
+    if (transaction_db_) {
+        delete transaction_db_;
+        transaction_db_ = nullptr;
+    }
+    LOG_INFO("KV store is stopped.");
 }
 
 Status KVStore::Flush() {
