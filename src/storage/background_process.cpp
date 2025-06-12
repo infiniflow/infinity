@@ -33,6 +33,7 @@ import bg_task_type;
 import global_resource_usage;
 import wal_manager;
 import new_txn_manager;
+import base_txn_store;
 import txn_state;
 
 namespace infinity {
@@ -110,15 +111,28 @@ void BGTaskProcessor::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
                         auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-                        NewTxn *new_txn = new_txn_mgr->BeginTxn(MakeUnique<String>("clean up"), TransactionType::kCleanup);
-                        Status status = new_txn->Cleanup();
+                        auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("clean up"), TransactionType::kCleanup);
+                        Status status = new_txn_shared->Cleanup();
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
-                        status = new_txn_mgr->CommitTxn(new_txn);
+                        status = new_txn_mgr->CommitTxn(new_txn_shared.get());
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
+
+                        CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
+                        TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
+                        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
+                        String task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);
+                        bg_task_info->task_info_list_.emplace_back(task_text);
+                        if (status.ok()) {
+                            bg_task_info->status_list_.emplace_back("OK");
+                        } else {
+                            RecoverableError(status);
+                            bg_task_info->status_list_.emplace_back(status.message());
+                        }
+                        new_txn_mgr->AddTaskInfo(bg_task_info);
                         LOG_DEBUG("NewCleanup task in background done");
                     }
                     break;

@@ -246,15 +246,6 @@ private:
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 
 public:
-    Status AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
-    Status GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info);
-    Status DropSegmentIndexFtInfoByKey(const String &segment_index_key);
-
-private:
-    std::shared_mutex segment_index_ft_info_mtx_{};
-    HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
-
-public:
     Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
     void DropSegmentUpdateTSByKey(const String &segment_update_ts_key);

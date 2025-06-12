@@ -2768,13 +2768,13 @@ bool NewTxn::CheckConflictTxnStore(const CompactTxnStore &txn_store, NewTxn *pre
         }
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (optimize_index_txn_store->db_name_ == db_name && optimize_index_txn_store->table_name_ == table_name &&
-                std::find_first_of(segment_ids.begin(),
-                                   segment_ids.end(),
-                                   optimize_index_txn_store->segment_ids_.begin(),
-                                   optimize_index_txn_store->segment_ids_.end()) != segment_ids.end()) {
-                retry_query = false;
-                conflict = true;
+            for (const auto &store_entry : optimize_index_txn_store->entries_) {
+                if (store_entry.db_name_ == db_name && store_entry.table_name_ == table_name &&
+                    std::find(segment_ids.begin(), segment_ids.end(), store_entry.segment_id_) != segment_ids.end()) {
+                    retry_query = false;
+                    conflict = true;
+                    break;
+                }
             }
             break;
         }
@@ -3151,75 +3151,123 @@ bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *p
 }
 
 bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
-    const Vector<String> &index_names = txn_store.index_names_;
-    const Vector<SegmentID> &segment_ids = txn_store.segment_ids_;
+    const Vector<String> &db_names = txn_store.db_names_;
+    const Map<String, Vector<String>> &table_names_in_db = txn_store.table_names_in_db_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (optimize_index_txn_store->db_name_ == db_name && optimize_index_txn_store->table_name_ == table_name &&
-                std::find_first_of(index_names.begin(),
-                                   index_names.end(),
-                                   optimize_index_txn_store->index_names_.begin(),
-                                   optimize_index_txn_store->index_names_.end()) != index_names.end()) {
-                retry_query = false;
+            const Vector<String> &prev_db_names = optimize_index_txn_store->db_names_;
+            const Map<String, Vector<String>> &prev_table_names_in_db = optimize_index_txn_store->table_names_in_db_;
+
+            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
+            if (db_names.size() > 1 || prev_db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1 ||
+                prev_table_names_in_db.at(prev_db_names[0]).size() > 1) {
                 conflict = true;
+            } else {
+                for (const auto &prev_store_entry : optimize_index_txn_store->entries_) {
+                    for (const auto &current_store_entry : txn_store.entries_) {
+                        if (prev_store_entry.db_name_ == current_store_entry.db_name_ &&
+                            prev_store_entry.table_name_ == current_store_entry.table_name_ &&
+                            prev_store_entry.index_name_ == current_store_entry.index_name_) {
+                            retry_query = false;
+                            conflict = true;
+                            break;
+                        }
+                    }
+                    if (conflict) {
+                        break;
+                    }
+                }
             }
             break;
         }
         case TransactionType::kAppend: {
             AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(previous_txn->base_txn_store_.get());
-            if (append_txn_store->db_name_ == db_name && append_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = append_txn_store->db_name_;
+            const String &prev_table_name = append_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 conflict = true;
             }
             break;
         }
         case TransactionType::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
-            if (import_txn_store->db_name_ == db_name && import_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = import_txn_store->db_name_;
+            const String &prev_table_name = import_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 conflict = true;
             }
             break;
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
-            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name &&
-                std::find_first_of(segment_ids.begin(),
-                                   segment_ids.end(),
-                                   compact_txn_store->deprecated_segment_ids_.begin(),
-                                   compact_txn_store->deprecated_segment_ids_.end()) != segment_ids.end()) {
-                conflict = true;
+            const String &prev_db_name = compact_txn_store->db_name_;
+            const String &prev_table_name = compact_txn_store->table_name_;
+            for (const auto &store_entry : txn_store.entries_) {
+                if (store_entry.db_name_ == prev_db_name && store_entry.table_name_ == prev_table_name &&
+                    std::find(compact_txn_store->deprecated_segment_ids_.begin(),
+                              compact_txn_store->deprecated_segment_ids_.end(),
+                              store_entry.segment_id_) != compact_txn_store->deprecated_segment_ids_.end()) {
+                    conflict = true;
+                    break;
+                }
             }
             break;
         }
         case TransactionType::kUpdate: {
             UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
-            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = update_txn_store->db_name_;
+            const String &prev_table_name = update_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 conflict = true;
             }
             break;
         }
         case TransactionType::kDropIndex: {
             DropIndexTxnStore *drop_index_txn_store = static_cast<DropIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_index_txn_store->db_name_ == db_name && drop_index_txn_store->table_name_ == table_name &&
-                std::find(index_names.begin(), index_names.end(), drop_index_txn_store->index_name_) != index_names.end()) {
-                retry_query = false;
+            const String &prev_db_name = drop_index_txn_store->db_name_;
+            const String &prev_table_name = drop_index_txn_store->table_name_;
+            const String &prev_index_name = drop_index_txn_store->index_name_;
+
+            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
+            if (db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1) {
                 conflict = true;
+            } else {
+                for (const auto &current_store_entry : txn_store.entries_) {
+                    if (prev_db_name == current_store_entry.db_name_ && prev_table_name == current_store_entry.table_name_ &&
+                        prev_index_name == current_store_entry.index_name_) {
+                        retry_query = false;
+                        conflict = true;
+                        break;
+                    }
+                }
             }
             break;
         }
         case TransactionType::kDumpMemIndex: {
             DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (dump_index_txn_store->db_name_ == db_name && dump_index_txn_store->table_name_ == table_name) {
-                conflict = true;
+            const String &prev_db_name = dump_index_txn_store->db_name_;
+            const String &prev_table_name = dump_index_txn_store->table_name_;
+            const String &prev_index_name = dump_index_txn_store->index_name_;
+            for (const auto &current_store_entry : txn_store.entries_) {
+                if (prev_db_name == current_store_entry.db_name_ && prev_table_name == current_store_entry.table_name_ &&
+                    prev_index_name == current_store_entry.index_name_) {
+                    conflict = true;
+                    break;
+                }
             }
             break;
         }
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_db_txn_store->db_name_ == db_name) {
+            if (std::find(db_names.begin(), db_names.end(), drop_db_txn_store->db_name_) != db_names.end()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -3227,7 +3275,11 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kDropTable: {
             DropTableTxnStore *drop_table_txn_store = static_cast<DropTableTxnStore *>(previous_txn->base_txn_store_.get());
-            if (drop_table_txn_store->db_name_ == db_name && drop_table_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = drop_table_txn_store->db_name_;
+            const String &prev_table_name = drop_table_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 retry_query = false;
                 conflict = true;
             }
@@ -3726,7 +3778,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
 
-            if (optimize_index_txn_store->index_names_.size() > 0) {
+            if (optimize_index_txn_store->entries_.size() > 0) {
                 // Restore memory index here
                 UnrecoverableError("Not implemented");
             }

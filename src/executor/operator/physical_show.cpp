@@ -14,6 +14,7 @@
 
 module;
 
+#include <iomanip>
 #include <map>
 #include <string>
 
@@ -595,11 +596,13 @@ void PhysicalShow::Init(QueryContext *query_context) {
             break;
         }
         case ShowStmtType::kTasks: {
-            output_names_->reserve(3);
-            output_types_->reserve(3);
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("time");
             output_names_->emplace_back("type");
             output_names_->emplace_back("status");
             output_names_->emplace_back("description");
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -1706,6 +1709,17 @@ void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorSta
             }
 
             SizeT column_id = 0;
+            {
+                std::time_t task_time_t = std::chrono::system_clock::to_time_t(bg_task_info_ptr->task_time_);
+                std::tm *task_tm = std::localtime(&task_time_t);
+                std::ostringstream oss;
+                oss << std::put_time(task_tm, "%Y-%m-%d %H:%M:%S");
+                Value value = Value::MakeVarchar(oss.str());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
             {
                 Value value = Value::MakeVarchar(ToString(bg_task_info_ptr->type_));
                 ValueExpression value_expr(value);
