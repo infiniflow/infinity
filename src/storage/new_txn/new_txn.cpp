@@ -3164,6 +3164,21 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
             if (db_names.size() > 1 || prev_db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1 ||
                 prev_table_names_in_db.at(prev_db_names[0]).size() > 1) {
                 conflict = true;
+            } else {
+                for (const auto &prev_store_entry : optimize_index_txn_store->entries_) {
+                    for (const auto &current_store_entry : txn_store.entries_) {
+                        if (prev_store_entry.db_name_ == current_store_entry.db_name_ &&
+                            prev_store_entry.table_name_ == current_store_entry.table_name_ &&
+                            prev_store_entry.index_name_ == current_store_entry.index_name_) {
+                            retry_query = false;
+                            conflict = true;
+                            break;
+                        }
+                    }
+                    if (conflict) {
+                        break;
+                    }
+                }
             }
             break;
         }
