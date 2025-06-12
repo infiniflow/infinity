@@ -58,7 +58,7 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(const Optional<TableMeeta> &table_meta);
+    void NewInit(UniquePtr<TableMeeta> table_meta);
 
     void Insert(SegmentEntry *segment_entry, Txn *txn);
 

@@ -67,12 +67,8 @@ BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
 
-void BlockIndex::NewInit(const Optional<TableMeeta> &table_meta) {
-    table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(),
-                                         table_meta->table_id_str(),
-                                         table_meta->kv_instance(),
-                                         table_meta->begin_ts(),
-                                         table_meta->commit_ts());
+void BlockIndex::NewInit(UniquePtr<TableMeeta> table_meta) {
+    table_meta_ = std::move(table_meta);
     Status status = Status::OK();
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();

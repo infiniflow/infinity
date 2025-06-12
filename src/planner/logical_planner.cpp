@@ -113,6 +113,7 @@ import meta_info;
 import db_meeta;
 import table_meeta;
 import new_catalog;
+import kv_store;
 
 namespace infinity {
 
@@ -1036,11 +1037,16 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     Status status;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
     Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+    Optional<TableMeeta> tmp_table_meta;
+    status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, tmp_table_meta);
     if (!status.ok()) {
         RecoverableError(status);
     }
+    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
+                                             tmp_table_meta->table_id_str(),
+                                             tmp_table_meta->kv_instance(),
+                                             tmp_table_meta->begin_ts(),
+                                             tmp_table_meta->commit_ts());
     table_info = MakeShared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -1165,7 +1171,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();
-    block_index->NewInit(table_meta);
+    block_index->NewInit(std::move(table_meta));
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                       table_info,
