@@ -3195,25 +3195,37 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(previous_txn->base_txn_store_.get());
-            if (import_txn_store->db_name_ == db_name && import_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = import_txn_store->db_name_;
+            const String &prev_table_name = import_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 conflict = true;
             }
             break;
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(previous_txn->base_txn_store_.get());
-            if (compact_txn_store->db_name_ == db_name && compact_txn_store->table_name_ == table_name &&
-                std::find_first_of(segment_ids.begin(),
-                                   segment_ids.end(),
-                                   compact_txn_store->deprecated_segment_ids_.begin(),
-                                   compact_txn_store->deprecated_segment_ids_.end()) != segment_ids.end()) {
-                conflict = true;
+            const String &prev_db_name = compact_txn_store->db_name_;
+            const String &prev_table_name = compact_txn_store->table_name_;
+            for (const auto &store_entry : txn_store.entries_) {
+                if (store_entry.db_name_ == prev_db_name && store_entry.table_name_ == prev_table_name &&
+                    std::find(compact_txn_store->deprecated_segment_ids_.begin(),
+                              compact_txn_store->deprecated_segment_ids_.end(),
+                              store_entry.segment_id_) != compact_txn_store->deprecated_segment_ids_.end()) {
+                    conflict = true;
+                    break;
+                }
             }
             break;
         }
         case TransactionType::kUpdate: {
             UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
-            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = update_txn_store->db_name_;
+            const String &prev_table_name = update_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 conflict = true;
             }
             break;
