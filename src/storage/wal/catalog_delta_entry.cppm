@@ -90,9 +90,7 @@ enum class PruneFlag : u8 {
 /// class CatalogDeltaOperation
 export class CatalogDeltaOperation {
 public:
-    explicit CatalogDeltaOperation(CatalogDeltaOpType type, PersistenceManager *pm_ptr) : type_(type) {
-        pm_ = pm_ptr;
-    }
+    explicit CatalogDeltaOperation(CatalogDeltaOpType type, PersistenceManager *pm_ptr) : type_(type) {}
     CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts);
     virtual ~CatalogDeltaOperation() {};
     CatalogDeltaOpType GetType() const { return type_; }
@@ -101,7 +99,6 @@ public:
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(const char *&ptr, i32 max_bytes, PersistenceManager *pm_ptr);
     SizeT GetBaseSizeInBytes() const;
-    void InitializeAddrSerializer();
     void WriteAdvBase(char *&buf) const;
     void ReadAdvBase(const char *&ptr);
 
@@ -123,9 +120,6 @@ public:
     TxnTimeStamp commit_ts_{0};
     MergeFlag merge_flag_{MergeFlag::kInvalid};
     SharedPtr<String> encode_;
-    AddrSerializer addr_serializer_{};
-    mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
-    PersistenceManager *pm_;
 
 public:
     CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};

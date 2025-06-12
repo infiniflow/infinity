@@ -829,7 +829,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     }
 
     if (persistence_manager_) {
-        persistence_manager_->Deserialize(kv_instance.get());
+        persistence_manager_->SetKvStore(kv_store_.get());
     }
 
     status = kv_instance->Commit();

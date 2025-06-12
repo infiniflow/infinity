@@ -783,7 +783,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                         return status;
                     }
 
-                    SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+                    SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
                     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
                     String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                     mem_index->memory_indexer_ =
@@ -1126,16 +1126,17 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         UnrecoverableError("Invalid index type");
     }
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
+    Status status;
+    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+    segment_index_meta.GetOrSetMemIndex(mem_index);
+
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
     String full_path;
     {
-        SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+        SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
         full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
     }
-    Status status;
-    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-    segment_index_meta.GetOrSetMemIndex(mem_index);
     mem_index->memory_indexer_ =
         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
     MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
@@ -1353,7 +1354,7 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
     msg += " -> " + dst_base_name;
     LOG_INFO(msg);
 
-    SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+    SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
     ColumnIndexMerger column_index_merger(*index_dir, index_fulltext->flag_);
     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
     {

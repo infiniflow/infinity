@@ -39,6 +39,8 @@ import persistence_manager;
 import infinity_context;
 import virtual_store;
 import chunk_index_meta;
+import segment_index_meta;
+import table_index_meeta;
 import table_meeta;
 import segment_meta;
 import block_meta;
@@ -64,32 +66,6 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         UnrecoverableError(status.message());
     }
     outline_infos_.resize(column_defs_ptr->size());
-    Vector<String> paths;
-    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
-        ColumnMeta column_meta(column_idx, block_meta);
-        SizeT chunk_offset = 0;
-        // status = column_meta.GetChunkOffset(chunk_offset);
-        // if (!status.ok()) {
-        //     UnrecoverableError(status.message());
-        // }
-        outline_infos_[column_idx] = {1, chunk_offset};
-
-        Status status = column_meta.FilePaths(paths);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        paths_.insert(paths_.end(), paths.begin(), paths.end());
-    }
-    paths = block_meta.FilePaths();
-    paths_.insert(paths_.end(), paths.begin(), paths.end());
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(pm, paths_);
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -100,22 +76,10 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
     size += sizeof(i32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes();
-        size += pm_size_;
-    }
     return size;
 }
 
 void WalBlockInfo::WriteBufferAdv(char *&buf) const {
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
@@ -123,17 +87,6 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     for (const auto &[idx, off] : outline_infos_) {
         WriteBufAdv(buf, idx);
         WriteBufAdv(buf, off);
-    }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        char *start = buf;
-        addr_serializer_.WriteBufAdv(buf);
-        SizeT size = buf - start;
-        if (size != pm_size_) {
-            String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
-            UnrecoverableError(error_message);
-        }
     }
 }
 
@@ -149,11 +102,6 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(const char *&ptr) {
         const auto buffer_cnt = ReadBufAdv<u32>(ptr);
         const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
         outline_info = {buffer_cnt, last_chunk_offset};
-    }
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        block_info.paths_ = block_info.addr_serializer_.ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -266,11 +214,6 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_i
     base_rowid_ = chunk_info_ptr->base_row_id_;
     row_count_ = chunk_info_ptr->row_cnt_;
     deprecate_ts_ = UNCOMMIT_TS;
-
-    // TODO
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(pm, paths_);
 }
 
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
@@ -279,39 +222,15 @@ bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
 }
 
 i32 WalChunkIndexInfo::GetSizeInBytes() const {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    SizeT size = 0;
-    if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes();
-        size += pm_size_;
-    }
-    return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
+    return sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
     WriteBufAdv(buf, chunk_id_);
     WriteBufAdv(buf, base_name_);
     WriteBufAdv(buf, base_rowid_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, deprecate_ts_);
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        char *start = buf;
-        addr_serializer_.WriteBufAdv(buf);
-        SizeT size = buf - start;
-        if (size != pm_size_) {
-            String error_message = fmt::format("WriteBufferAdv size mismatch: expected {}, actual {}", pm_size_, size);
-            UnrecoverableError(error_message);
-        }
-    }
 }
 
 WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
@@ -321,12 +240,6 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(const char *&ptr) {
     chunk_index_info.base_rowid_ = ReadBufAdv<RowID>(ptr);
     chunk_index_info.row_count_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        chunk_index_info.paths_ = chunk_index_info.addr_serializer_.ReadBufAdv(ptr);
-    }
     return chunk_index_info;
 }
 

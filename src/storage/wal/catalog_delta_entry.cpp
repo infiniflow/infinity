@@ -83,23 +83,7 @@ String CatalogDeltaOpTypeToString(CatalogDeltaOpType op_type) {
 SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
     size += sizeof(i32) + encode_->size();
-
-    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm_ != nullptr;
-    if (use_object_cache) {
-        pm_size_ = addr_serializer_.GetSizeInBytes();
-        size += pm_size_;
-    }
     return size;
-}
-
-void CatalogDeltaOperation::InitializeAddrSerializer() {
-    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-
-    bool use_object_cache = pm_ != nullptr;
-    if (use_object_cache) {
-        addr_serializer_.Initialize(pm_, GetFilePaths());
-    }
 }
 
 void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
@@ -108,18 +92,6 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     WriteBufAdv(buf, this->txn_id_);
     WriteBufAdv(buf, this->commit_ts_);
     WriteBufAdv(buf, *(this->encode_));
-
-    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm_ != nullptr;
-    if (use_object_cache) {
-        char *start = buf;
-        addr_serializer_.WriteBufAdv(buf);
-        SizeT pm_size = buf - start;
-        if (pm_size != pm_size_) {
-            String error_message = fmt::format("Mismatched pm_size: {} != {}", pm_size, pm_size_);
-            UnrecoverableError(error_message);
-        }
-    }
 }
 
 void CatalogDeltaOperation::ReadAdvBase(const char *&ptr) {
@@ -128,29 +100,7 @@ void CatalogDeltaOperation::ReadAdvBase(const char *&ptr) {
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
-
-    // PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-
-    bool use_object_cache = pm_ != nullptr;
-
-    use_object_cache = true;
-
-    if (use_object_cache) {
-        addr_serializer_.ReadBufAdv(ptr); // discard return value
-    }
 }
-
-// void CatalogDeltaOperation::ReadAdvBaseForTransform(const char *&ptr, bool use_object_cache) {
-//     begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-//     merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
-//     txn_id_ = ReadBufAdv<TransactionID>(ptr);
-//     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-//     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
-//
-//     if (use_object_cache) {
-//         addr_serializer_.ReadBufAdv(ptr); // discard return value
-//     }
-// }
 
 const String CatalogDeltaOperation::ToString() const {
     return fmt::format("begin_ts: {}, txn_id: {}, commit_ts: {}, merge_flag: {}, encode: {}",
