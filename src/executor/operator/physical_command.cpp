@@ -402,16 +402,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 return true;
             }
 
-            auto *bg_process = query_context->storage()->bg_processor();
-
-            NewCleanupPeriodicTrigger *new_cleanup_trigger =
-                InfinityContext::instance().storage()->periodic_trigger_thread()->new_cleanup_trigger_.get();
-            auto cleanup_task = new_cleanup_trigger->CreateNewCleanupTask();
-            if (cleanup_task) {
-                bg_process->Submit(cleanup_task);
-                cleanup_task->Wait();
-            } else {
-                LOG_DEBUG("Skip cleanup");
+            NewTxn *new_txn = query_context->GetNewTxn();
+            Status status = new_txn->Cleanup();
+            if (!status.ok()) {
+                RecoverableError(status);
             }
             break;
         }

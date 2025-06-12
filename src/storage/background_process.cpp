@@ -33,6 +33,8 @@ import bg_task_type;
 import global_resource_usage;
 import wal_manager;
 import new_txn_manager;
+import base_txn_store;
+import txn_state;
 
 namespace infinity {
 
@@ -108,39 +110,31 @@ void BGTaskProcessor::Process() {
                         UnrecoverableError("Uninitialized storage mode");
                     }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
-
-                        {
-                            std::unique_lock<std::mutex> locker(task_mutex_);
-                            task_text_ = bg_task->ToString();
-                        }
-
-                        auto task = static_cast<NewCleanupTask *>(bg_task.get());
-                        TxnTimeStamp last_cleanup_ts = this->last_cleanup_ts();
-                        TxnTimeStamp cur_cleanup_ts = 0;
-
-                        LOG_DEBUG(fmt::format("NewCleanup task in background, last_cleanup_ts: {}, current_cleanup_ts: {}",
-                                              last_cleanup_ts,
-                                              cur_cleanup_ts));
-                        Status status = task->Execute(last_cleanup_ts, cur_cleanup_ts);
-
                         auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-                        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
-                        String task_text =
-                            fmt::format("NewCleanup task, last_cleanup_ts: {}, current_cleanup_ts: {}", last_cleanup_ts, cur_cleanup_ts);
-                        bg_task_info->task_info_list_.emplace_back(task_text);
-                        if (status.ok()) {
-                            bg_task_info->status_list_.emplace_back("OK");
-                        } else {
-                            RecoverableError(status);
-                            bg_task_info->status_list_.emplace_back(status.message());
+                        auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("clean up"), TransactionType::kCleanup);
+                        Status status = new_txn_shared->Cleanup();
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
                         }
-                        new_txn_mgr->AddTaskInfo(bg_task_info);
-
-                        if (cur_cleanup_ts > last_cleanup_ts) {
-                            std::unique_lock lock(last_time_mtx_);
-                            last_cleanup_ts_ = cur_cleanup_ts;
+                        status = new_txn_mgr->CommitTxn(new_txn_shared.get());
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
                         }
 
+                        CleanupTxnStore *cleanup_txn_store = static_cast<CleanupTxnStore *>(new_txn_shared->GetTxnStore());
+                        if(cleanup_txn_store != nullptr) {
+                            TxnTimeStamp clean_ts = cleanup_txn_store->timestamp_;
+                            SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCleanup);
+                            String task_text = fmt::format("NewCleanup task, cleanup timestamp: {}", clean_ts);
+                            bg_task_info->task_info_list_.emplace_back(task_text);
+                            if (status.ok()) {
+                                bg_task_info->status_list_.emplace_back("OK");
+                            } else {
+                                RecoverableError(status);
+                                bg_task_info->status_list_.emplace_back(status.message());
+                            }
+                            new_txn_mgr->AddTaskInfo(bg_task_info);
+                        }
                         LOG_DEBUG("NewCleanup task in background done");
                     }
                     break;

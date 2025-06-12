@@ -425,4 +425,15 @@ SharedPtr<WalEntry> CheckpointTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const
     return wal_entry;
 }
 
+String CleanupTxnStore::ToString() const { return fmt::format("{}: timestamp: {}", TransactionType2Str(type_), timestamp_); }
+
+SharedPtr<WalEntry> CleanupTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCleanup>(timestamp_);
+    wal_entry->cmds_.push_back(wal_command);
+
+    return wal_entry;
+}
+
 } // namespace infinity

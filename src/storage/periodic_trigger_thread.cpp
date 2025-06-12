@@ -69,6 +69,10 @@ void PeriodicTriggerThread::Run() {
         if (optimize_index_trigger_ != nullptr && optimize_index_trigger_->Check()) {
             optimize_index_trigger_->Trigger();
         }
+
+        if (new_cleanup_trigger_ != nullptr && new_cleanup_trigger_->Check()) {
+            // new_cleanup_trigger_->Trigger();
+        }
     }
 }
 
