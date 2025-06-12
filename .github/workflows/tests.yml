@@ -75,7 +75,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
 #      - name: Run cluster test
 #        if: ${{ !cancelled() && !failure() }}
@@ -341,7 +341,7 @@ jobs:
 
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 
       #      - name: Run cluster test
       #        if: ${{ !cancelled() && !failure() }}
