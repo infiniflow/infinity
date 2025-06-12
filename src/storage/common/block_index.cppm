@@ -78,7 +78,7 @@ public:
 
 public:
     Map<SegmentID, SegmentSnapshot> segment_block_index_;
-
+    Vector<SharedPtr<TableIndexMeeta>> table_index_meta_map_;
     UniquePtr<TableMeeta> table_meta_;
     Map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
 };

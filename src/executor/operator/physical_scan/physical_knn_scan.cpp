@@ -411,12 +411,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
+            // TODO: delete for() by table_index_meta ( in base_table_ref )
             for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-                const String &index_id_str = (*index_id_strs_ptr)[i];
-                auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+                auto it = base_table_ref_->block_index_->table_index_meta_map_[i];
 
                 SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = table_index_meta->GetIndexBase();
+                std::tie(index_base, status) = it->GetIndexBase();
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
@@ -435,7 +435,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                     LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
-                table_index_meta_ = std::move(table_index_meta);
+                table_index_meta_ = it;
                 break;
             }
         } else {
@@ -445,11 +445,10 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 Status status = Status::IndexNotExist(knn_expression_->using_index_);
                 RecoverableError(std::move(status));
             }
-            const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-            auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+            auto it = base_table_ref_->block_index_->table_index_meta_map_[iter - index_names_ptr->begin()];
 
             SharedPtr<IndexBase> index_base;
-            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            std::tie(index_base, status) = it->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -471,7 +470,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(std::move(error_status));
             }
 
-            table_index_meta_ = std::move(table_index_meta);
+            table_index_meta_ = it;
         }
         // Fill the segment with index
         if (table_index_meta_) {
