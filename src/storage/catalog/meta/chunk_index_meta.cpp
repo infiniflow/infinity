@@ -109,7 +109,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     }
 
     SegmentID segment_id = segment_index_meta_.segment_id();
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    SharedPtr<String> index_dir = segment_index_meta_.GetSegmentIndexDir();
     {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         switch (index_base->index_type_) {
@@ -229,7 +229,7 @@ Status ChunkIndexMeta::LoadSet() {
     if (!col_status.ok()) {
         return status;
     }
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    SharedPtr<String> index_dir = segment_index_meta_.GetSegmentIndexDir();
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -342,7 +342,7 @@ Status ChunkIndexMeta::RestoreSet() {
     if (!col_status.ok()) {
         return status;
     }
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    SharedPtr<String> index_dir = segment_index_meta_.GetSegmentIndexDir();
     UniquePtr<FileWorker> index_file_worker;
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -452,7 +452,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
             if (!status.ok()) {
                 return status;
             }
-            SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+            SharedPtr<String> index_dir = segment_index_meta_.GetSegmentIndexDir();
 
             String posting_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX);
             String dict_file = fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + DICT_SUFFIX);
@@ -522,7 +522,7 @@ Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
     if (!status.ok()) {
         return status;
     }
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    SharedPtr<String> index_dir = segment_index_meta_.GetSegmentIndexDir();
     switch (index_def->index_type_) {
         case IndexType::kFullText: {
             paths.push_back(fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX));
@@ -563,7 +563,7 @@ Status ChunkIndexMeta::LoadChunkInfo() {
 Status ChunkIndexMeta::LoadIndexBuffer() {
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
 
-    String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), table_index_meta.GetTableIndexDir()->c_str());
+    String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), segment_index_meta_.GetSegmentIndexDir()->c_str());
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     auto [index_def, index_status] = table_index_meta.GetIndexBase();

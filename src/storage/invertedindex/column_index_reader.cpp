@@ -106,13 +106,12 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             return status;
         }
     }
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
-
     u64 column_len_sum = 0;
     u32 column_len_cnt = 0;
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+        SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
         SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
         Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
         if (!status.ok()) {
@@ -158,10 +157,8 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                 for (SizeT i = 0; i < chunk_info_ptr->row_cnt_; i++) {
                     chunk_column_len_sum += column_lengths[i];
                 }
-                status = segment_index_meta.UpdateFtInfo(chunk_column_len_sum, chunk_info_ptr->row_cnt_);
-                if (!status.ok()) {
-                    return status;
-                }
+                column_len_sum += chunk_column_len_sum;
+                column_len_cnt += chunk_info_ptr->row_cnt_;
             }
         }
 

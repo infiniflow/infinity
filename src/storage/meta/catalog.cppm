@@ -234,8 +234,6 @@ public:
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
-    void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr);
-
 public:
     // Profile related methods
 
