@@ -257,9 +257,7 @@ void BufferObj::PickForCleanup() {
 }
 
 Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
-    if (status_ == BufferStatus::kUnloaded) {
-        file_worker_->FreeInMemory();
-    } else if (status_ != BufferStatus::kClean) {
+    if (status_ != BufferStatus::kClean) {
         String error_message = "Invalid status";
         UnrecoverableError(error_message);
     }
