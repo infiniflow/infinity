@@ -411,33 +411,17 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
-            // TODO: delete for() by table_index_meta ( in base_table_ref )
-            for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-                auto it = base_table_ref_->block_index_->table_index_meta_map_[i];
-
-                SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = it->GetIndexBase();
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-
-                ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != knn_column_id) {
-                    // knn_column_id isn't in this table index
-                    continue;
-                }
-                // check index type
-                if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
-                    LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                    continue;
-                }
-                table_index_meta_ = it;
-                break;
+            auto it = base_table_ref_->block_index_->table_index_meta_map_[knn_column_id];
+            SharedPtr<IndexBase> index_base;
+            std::tie(index_base, status) = it->GetIndexBase();
+            if (!status.ok()) {
+                RecoverableError(status);
             }
+            // check index type
+            if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
+                UnrecoverableError(fmt::format("Scan column index is not kIVF or kHnsw: knn_column_id is {}", knn_column_id));
+            }
+            table_index_meta_ = it;
         } else {
             LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
             auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), knn_expression_->using_index_);
