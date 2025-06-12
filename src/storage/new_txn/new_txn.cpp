@@ -3151,20 +3151,18 @@ bool NewTxn::CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *p
 }
 
 bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
-    const String &db_name = txn_store.db_name_;
-    const String &table_name = txn_store.table_name_;
-    const Vector<String> &index_names = txn_store.index_names_;
-    const Vector<SegmentID> &segment_ids = txn_store.segment_ids_;
+    const Vector<String> &db_names = txn_store.db_names_;
+    const Map<String, Vector<String>> &table_names_in_db = txn_store.table_names_in_db_;
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(previous_txn->base_txn_store_.get());
-            if (optimize_index_txn_store->db_name_ == db_name && optimize_index_txn_store->table_name_ == table_name &&
-                std::find_first_of(index_names.begin(),
-                                   index_names.end(),
-                                   optimize_index_txn_store->index_names_.begin(),
-                                   optimize_index_txn_store->index_names_.end()) != index_names.end()) {
-                retry_query = false;
+            const Vector<String> &prev_db_names = optimize_index_txn_store->db_names_;
+            const Map<String, Vector<String>> &prev_table_names_in_db = optimize_index_txn_store->table_names_in_db_;
+
+            // If there are multiple databases or multiple tables involved in index optimization, the optimization is processed for all indexes.
+            if (db_names.size() > 1 || prev_db_names.size() > 1 || table_names_in_db.at(db_names[0]).size() > 1 ||
+                prev_table_names_in_db.at(prev_db_names[0]).size() > 1) {
                 conflict = true;
             }
             break;
