@@ -408,4 +408,13 @@ export struct CheckpointTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct CleanupTxnStore : public BaseTxnStore {
+    CleanupTxnStore() : BaseTxnStore(TransactionType::kCleanup) {}
+
+    i64 timestamp_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 } // namespace infinity

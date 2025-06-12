@@ -84,7 +84,8 @@ export enum class TransactionType {
     kDumpMemIndex,
     kOptimizeIndex,
     kAddColumn,
-    kDropColumn
+    kDropColumn,
+    kCleanup
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -154,6 +155,9 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kDropColumn: {
             return "DropColumn";
+        }
+        case TransactionType::kCleanup: {
+            return "Cleanup";
         }
         case TransactionType::kInvalid: {
             return "Invalid";

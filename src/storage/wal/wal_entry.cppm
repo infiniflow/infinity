@@ -104,6 +104,7 @@ export enum class WalCommandType : i8 {
     DUMMY = 103,
     OPTIMIZE_V2 = 106,
     DUMP_INDEX_V2 = 107,
+    CLEANUP = 108
 };
 
 export struct WalBlockInfo {
@@ -1002,8 +1003,20 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
     Vector<String> column_names_{};
     Vector<ColumnID> column_ids_{};
 
-    // Redudant but usefule in commit phase.
+    // Redundant but useful in commit phase.
     String table_key_{};
+};
+
+export struct WalCmdCleanup : public WalCmd {
+    WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp) {};
+
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    i64 timestamp_{};
 };
 
 export struct WalEntryHeader {

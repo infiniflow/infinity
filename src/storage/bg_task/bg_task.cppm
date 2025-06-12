@@ -142,8 +142,8 @@ public:
 
 export class DumpIndexTask final : public BGTask {
 public:
-    DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn);
-    DumpIndexTask(EMVBIndexInMem *emvb_mem_index, NewTxn *new_txn);
+    DumpIndexTask(BaseMemIndex *mem_index, SharedPtr<NewTxn> &new_txn_shared);
+    DumpIndexTask(EMVBIndexInMem *emvb_mem_index, SharedPtr<NewTxn> &new_txn_shared);
 
     ~DumpIndexTask() override = default;
 
@@ -152,7 +152,7 @@ public:
 public:
     BaseMemIndex *mem_index_{};
     EMVBIndexInMem *emvb_mem_index_{};
-    NewTxn *new_txn_{};
+    SharedPtr<NewTxn> new_txn_shared_{};
 };
 
 export class AppendMemIndexTask final : public BGTask {
@@ -199,6 +199,7 @@ export struct BGTaskInfo {
     Vector<String> task_info_list_{};
     Vector<String> status_list_{};
     BGTaskType type_{BGTaskType::kInvalid};
+    std::chrono::system_clock::time_point task_time_{};
 };
 
 } // namespace infinity

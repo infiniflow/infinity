@@ -113,38 +113,36 @@ void CompactionProcessor::NewDoCompact() {
         DeferFn defer_fn([&] {
             if (status.ok()) {
                 Status commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
-                if (commit_status.ok()) {
-                    CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(new_txn_shared->GetTxnStore());
-                    if (compact_txn_store != nullptr) {
-                        // Record compact info
-                        String task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
-                                                       new_txn_shared->TxnID(),
-                                                       new_txn_shared->CommitTS(),
-                                                       db_name,
-                                                       table_name,
-                                                       fmt::join(compact_txn_store->segment_ids_, ","),
-                                                       compact_txn_store->new_segment_id_);
-                        bg_task_info->task_info_list_.emplace_back(task_text);
-                        if (commit_status.ok()) {
-                            bg_task_info->status_list_.emplace_back("OK");
-                        } else {
-                            bg_task_info->status_list_.emplace_back(commit_status.message());
-                        }
-                    }
-                } else {
-                    LOG_ERROR(fmt::format("Commit compaction failed: {}", commit_status.message()));
-                    bg_task_info->task_info_list_.emplace_back(fmt::format("Compact table: {}.{}", db_name, table_name));
-                    bg_task_info->status_list_.emplace_back(commit_status.message());
-                    return;
+                if (!commit_status.ok()) {
+                    LOG_ERROR(fmt::format("Commit compact table {}.{} failed: {}", db_name, table_name, commit_status.message()));
                 }
 
+                CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(new_txn_shared->GetTxnStore());
+                if (compact_txn_store != nullptr) {
+                    // Record compact info
+                    String task_text = fmt::format("Txn: {}, commit: {}, compact table: {}.{} with segments: {} into {}",
+                                                   new_txn_shared->TxnID(),
+                                                   new_txn_shared->CommitTS(),
+                                                   db_name,
+                                                   table_name,
+                                                   fmt::join(compact_txn_store->deprecated_segment_ids_, ","),
+                                                   compact_txn_store->new_segment_id_);
+
+                    bg_task_info->task_info_list_.emplace_back(task_text);
+                    if (commit_status.ok()) {
+                        bg_task_info->status_list_.emplace_back("OK");
+                    } else {
+                        bg_task_info->status_list_.emplace_back(commit_status.message());
+                    }
+                }
             } else {
-                LOG_ERROR(fmt::format("Compaction failed: {}", status.message()));
+                LOG_ERROR(fmt::format("Compact table {}.{} failed: {}", db_name, table_name, status.message()));
                 Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
                 if (!rollback_status.ok()) {
                     UnrecoverableError(rollback_status.message());
                 }
-                bg_task_info->task_info_list_.emplace_back(fmt::format("Compact table: {}.{}", db_name, table_name));
+                String task_text = fmt::format("Compact table: {}.{}", db_name, table_name);
+                bg_task_info->task_info_list_.emplace_back(task_text);
                 bg_task_info->status_list_.emplace_back(status.message());
             }
         });
@@ -170,7 +168,9 @@ void CompactionProcessor::NewDoCompact() {
             SegmentID unsealed_id = 0;
             status = table_meta->GetUnsealedSegmentID(unsealed_id);
             if (!status.ok()) {
-                if (status.code() != ErrorCode::kNotFound) {
+                if (status.code() == ErrorCode::kNotFound) {
+                    status = Status::OK(); // Ignore the error.
+                } else {
                     UnrecoverableError(status.message());
                 }
             } else {
@@ -196,13 +196,15 @@ void CompactionProcessor::NewDoCompact() {
         }
         Vector<SegmentID> compactible_segment_ids = compaction_alg->GetCompactiableSegments();
 
-        status = new_txn_shared->Compact(db_name, table_name, compactible_segment_ids);
+        if (!compactible_segment_ids.empty()) {
+            status = new_txn_shared->Compact(db_name, table_name, compactible_segment_ids);
+        }
     };
 
     if (db_table_names.empty()) {
         LOG_TRACE("No table to compact.");
     } else {
-        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNewCompact);
+        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNotifyCompact);
         for (const auto &[db_name, table_name] : db_table_names) {
             compact_table(db_name, table_name, bg_task_info);
         }
@@ -252,25 +254,26 @@ Status CompactionProcessor::NewManualCompact(const String &db_name, const String
 void CompactionProcessor::NewScanAndOptimize() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", new_txn_shared->BeginTS()));
+    LOG_INFO(fmt::format("Optimize all indexes begin ts: {}", new_txn_shared->BeginTS()));
 
     SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kNotifyOptimize);
     Status status = new_txn_shared->OptimizeAllIndexes();
     if (status.ok()) {
         Status commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
         if (!commit_status.ok()) {
-            LOG_ERROR(fmt::format("Commit ScanAndOptimize opt failed: {}", commit_status.message()));
+            LOG_ERROR(fmt::format("Commit optimize all indexes failed: {}", commit_status.message()));
         }
 
         OptimizeIndexTxnStore *optimize_idx_store = static_cast<OptimizeIndexTxnStore *>(new_txn_shared->GetTxnStore());
         if (optimize_idx_store != nullptr) {
             for (const OptimizeIndexStoreEntry &store_entry : optimize_idx_store->entries_) {
                 String task_text = fmt::format(
-                    "Txn: {}, commit: {}, optimize table: {}.{}.{} with chunks: {} into {}",
+                    "Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
                     new_txn_shared->TxnID(),
                     new_txn_shared->CommitTS(),
                     store_entry.db_name_,
                     store_entry.table_name_,
+                    store_entry.index_name_,
                     store_entry.segment_id_,
                     fmt::join(store_entry.deprecate_chunks_, ","),
                     fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), ","));
@@ -284,13 +287,18 @@ void CompactionProcessor::NewScanAndOptimize() {
             }
         }
     } else {
-        LOG_ERROR(fmt::format("ScanAndOptimize opt failed: {}", status.message()));
+        LOG_ERROR(fmt::format("optimize all indexes failed: {}", status.message()));
         Status rollback_status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
         if (!rollback_status.ok()) {
             UnrecoverableError(rollback_status.message());
         }
-        bg_task_info->task_info_list_.emplace_back("Fail to optimize index");
+        String task_text = "Optimize all indexes";
+        bg_task_info->task_info_list_.emplace_back(task_text);
         bg_task_info->status_list_.emplace_back(status.message());
+    }
+
+    if (!bg_task_info->task_info_list_.empty()) {
+        new_txn_mgr->AddTaskInfo(bg_task_info);
     }
 }
 
