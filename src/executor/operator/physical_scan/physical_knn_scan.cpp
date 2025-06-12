@@ -390,6 +390,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     InitBlockParallelOption();                                     // PlanWithIndex() will be called in physical planner
 
     Status status;
+    SizeT knn_column_id = GetColumnID();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
     segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
@@ -420,6 +421,15 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                     RecoverableError(status);
                 }
 
+                ColumnID column_id = 0;
+                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                if (column_id != knn_column_id) {
+                    // knn_column_id isn't in this table index
+                    continue;
+                }
                 // check index type
                 if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                     LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
@@ -444,6 +454,17 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(status);
             }
 
+            ColumnID column_id = 0;
+            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            if (column_id != knn_column_id) {
+                // knn_column_id isn't in this table index
+                LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
+                Status error_status = Status::ColumnNotExist(index_base->column_name());
+                RecoverableError(std::move(error_status));
+            }
             // check index type
             if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
                 Status error_status = Status::InvalidIndexType("invalid index");
