@@ -3805,7 +3805,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
 
-            if (optimize_index_txn_store->index_names_.size() > 0) {
+            if (optimize_index_txn_store->entries_.size() > 0) {
                 // Restore memory index here
                 UnrecoverableError("Not implemented");
             }
