@@ -1,7 +1,15 @@
-import pytest
 from infinity_cluster import InfinityCluster
 from mocked_infinity_cluster import MockInfinityCluster
 
+import logging
+
+
+def pytest_configure():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(process)d-%(thread)d %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 def pytest_addoption(parser):
     parser.addoption(
