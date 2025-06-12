@@ -3184,7 +3184,11 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
         }
         case TransactionType::kAppend: {
             AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(previous_txn->base_txn_store_.get());
-            if (append_txn_store->db_name_ == db_name && append_txn_store->table_name_ == table_name) {
+            const String &prev_db_name = append_txn_store->db_name_;
+            const String &prev_table_name = append_txn_store->table_name_;
+            if (std::find(db_names.begin(), db_names.end(), prev_db_name) != db_names.end() &&
+                std::find(table_names_in_db.at(prev_db_name).begin(), table_names_in_db.at(prev_db_name).end(), prev_table_name) !=
+                    table_names_in_db.at(prev_db_name).end()) {
                 conflict = true;
             }
             break;
