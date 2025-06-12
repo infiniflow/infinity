@@ -71,7 +71,7 @@ void PeriodicTriggerThread::Run() {
         }
 
         if (new_cleanup_trigger_ != nullptr && new_cleanup_trigger_->Check()) {
-            new_cleanup_trigger_->Trigger();
+            // new_cleanup_trigger_->Trigger();
         }
     }
 }
