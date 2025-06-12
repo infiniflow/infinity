@@ -116,6 +116,7 @@ struct BlockInfo;
 struct BlockColumnInfo;
 struct TableDetail;
 struct CheckpointTxnStore;
+struct MetaKey;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -155,7 +156,7 @@ public:
     virtual ~NewTxn();
 
     static UniquePtr<NewTxn>
-    NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance);
+    NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance>&& kv_instance);
 
     static UniquePtr<NewTxn> NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
@@ -606,6 +607,7 @@ private:
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
+    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
 
     bool IsReplay() const;
 
