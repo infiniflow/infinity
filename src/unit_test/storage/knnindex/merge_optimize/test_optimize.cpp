@@ -22,7 +22,6 @@ import third_party;
 import global_resource_usage;
 import storage;
 import infinity_context;
-import txn_manager;
 import txn;
 import extra_ddl_info;
 import table_def;

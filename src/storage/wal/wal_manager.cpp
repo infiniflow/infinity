@@ -20,7 +20,6 @@ module;
 
 import stl;
 import logger;
-import txn_manager;
 import new_txn_manager;
 import new_txn;
 import storage;

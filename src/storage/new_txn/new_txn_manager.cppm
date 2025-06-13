@@ -20,7 +20,6 @@ import stl;
 import buffer_manager;
 import txn_state;
 import default_values;
-import txn_manager;
 import status;
 
 namespace infinity {
