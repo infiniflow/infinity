@@ -54,42 +54,43 @@ TxnManager::~TxnManager() {
 
 Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
-    if (is_running_.load() == false) {
-        String error_message = "TxnManager is not running, cannot create txn";
-        UnrecoverableError(error_message);
-    }
-
-    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
-
-    std::lock_guard guard(locker_);
-
-    // Assign a new txn id
-    u64 new_txn_id = ++catalog_ptr->next_txn_id_;
-
-    // Record the start ts of the txn
-    TxnTimeStamp begin_ts = current_ts_ + 1;
-
-    if (txn_type == TransactionType::kCheckpoint) {
-        if (ckp_begin_ts_ == UNCOMMIT_TS) {
-            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
-            ckp_begin_ts_ = begin_ts;
-        } else {
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
-                                 ckp_begin_ts_,
-                                 begin_ts));
-            return nullptr;
-        }
-    }
-
-    // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text), txn_type));
-
-    // Storage txn in txn manager
-    txn_map_[new_txn_id] = new_txn;
-    beginned_txns_.emplace_back(new_txn);
-
-    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, begin_ts));
-    return new_txn.get();
+//    if (is_running_.load() == false) {
+//        String error_message = "TxnManager is not running, cannot create txn";
+//        UnrecoverableError(error_message);
+//    }
+//
+//    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
+//
+//    std::lock_guard guard(locker_);
+//
+//    // Assign a new txn id
+//    u64 new_txn_id = ++catalog_ptr->next_txn_id_;
+//
+//    // Record the start ts of the txn
+//    TxnTimeStamp begin_ts = current_ts_ + 1;
+//
+//    if (txn_type == TransactionType::kCheckpoint) {
+//        if (ckp_begin_ts_ == UNCOMMIT_TS) {
+//            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
+//            ckp_begin_ts_ = begin_ts;
+//        } else {
+//            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
+//                                 ckp_begin_ts_,
+//                                 begin_ts));
+//            return nullptr;
+//        }
+//    }
+//
+//    // Create txn instance
+//    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text), txn_type));
+//
+//    // Storage txn in txn manager
+//    txn_map_[new_txn_id] = new_txn;
+//    beginned_txns_.emplace_back(new_txn);
+//
+//    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, begin_ts));
+//    return new_txn.get();
+    return nullptr;
 }
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) const {

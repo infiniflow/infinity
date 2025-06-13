@@ -801,12 +801,12 @@ void NewTxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveTableEntry(table_entry, txn_id);
     }
 
-    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
-    for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
-        db_entry->Cleanup();
-
-        catalog_ptr->RemoveDBEntry(db_entry, txn_id);
-    }
+//    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
+//    for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
+//        db_entry->Cleanup();
+//
+//        catalog_ptr->RemoveDBEntry(db_entry, txn_id);
+//    }
 }
 
 bool NewTxnStore::ReadOnly() const {

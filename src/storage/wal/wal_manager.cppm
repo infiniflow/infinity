@@ -119,8 +119,6 @@ public:
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
 
-    void ReplayWalEntry(const WalEntry &entry, ReplayWalOptions options);
-
     TxnTimeStamp LastCheckpointTS() const;
     void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
@@ -134,30 +132,6 @@ public:
 
 private:
     i64 GetLastCkpWalSize();
-
-    void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts, bool is_replay);
-
-    // import and compact helper
-    SharedPtr<SegmentEntry> ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TransactionID txn_id, TxnTimeStamp commit_ts);
-
-    void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdCheckpointReplay(const WalCmdCheckpoint &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    // void WalCmdSetSegmentStatusSealedReplay(const WalCmdSetSegmentStatusSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    // void WalCmdUpdateSegmentBloomFilterDataReplay(const WalCmdUpdateSegmentBloomFilterData &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-
-    void WalCmdRenameTableReplay(WalCmdRenameTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
-    void WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     u64 cfg_wal_size_threshold_{};
