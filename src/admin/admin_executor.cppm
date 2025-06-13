@@ -19,12 +19,12 @@ import admin_statement;
 import query_context;
 import query_result;
 import stl;
-import catalog;
 import status;
 
 namespace infinity {
 
 struct WalEntry;
+class NewCatalog;
 
 export class AdminExecutor {
 public:
@@ -68,7 +68,7 @@ private:
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext *query_context, const AdminStatement *admin_statement);
     static Vector<String> GetAllCheckpointFiles(QueryContext *query_context, const AdminStatement *admin_statement);
-    static Tuple<UniquePtr<Catalog>, Status>
+    static Tuple<UniquePtr<NewCatalog>, Status>
     LoadCatalogFiles(QueryContext *query_context, const AdminStatement *admin_statement, Vector<SharedPtr<WalEntry>> &ckp_entries);
 };
 
