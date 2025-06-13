@@ -59,7 +59,6 @@ namespace infinity {
 
 // } // namespace
 
-
 void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock,
                                       BufferHandle version_buffer_handle,
                                       TxnTimeStamp begin_ts,
@@ -468,19 +467,6 @@ Status NewCatalog::AddNewDB(KVInstance *kv_instance,
 
 Status NewCatalog::CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanDB: cleaning database: {}, db_id: {}", db_name, db_meta.db_id_str()));
-    KVInstance &kv_instance = db_meta.kv_instance();
-    String db_prefix = KeyEncode::CatalogDbPrefix(db_name);
-    auto iter = kv_instance.GetIterator();
-    iter->Seek(db_prefix);
-    while (iter->Valid() && iter->Key().starts_with(db_prefix)) {
-        String db_key = iter->Key().ToString();
-        Status status = kv_instance.Delete(db_key);
-        if (!status.ok()) {
-            return status;
-        }
-        LOG_TRACE(fmt::format("CleanDB: delete key: {}", db_key));
-        iter->Next();
-    }
 
     Status status;
 
@@ -534,19 +520,6 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
 
 Status NewCatalog::CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag) {
     LOG_TRACE(fmt::format("CleanTable: cleaning table: {}, table_id: {}", table_name, table_meta.table_id_str()));
-    KVInstance &kv_instance = table_meta.kv_instance();
-    String table_prefix = KeyEncode::CatalogTablePrefix(table_meta.db_id_str(), table_name);
-    auto iter = kv_instance.GetIterator();
-    iter->Seek(table_prefix);
-    while (iter->Valid() && iter->Key().starts_with(table_prefix)) {
-        String table_key = iter->Key().ToString();
-        Status status = kv_instance.Delete(table_key);
-        if (!status.ok()) {
-            return status;
-        }
-        LOG_TRACE(fmt::format("CleanTable: delete key: {}", table_key));
-        iter->Next();
-    }
 
     Status status;
 
@@ -614,20 +587,6 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Stri
                           table_index_meta.table_meta().table_id_str(),
                           index_name,
                           table_index_meta.index_id_str()));
-    KVInstance &kv_instance = table_index_meta.kv_instance();
-    String index_prefix =
-        KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
-    auto iter = kv_instance.GetIterator();
-    iter->Seek(index_prefix);
-    while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
-        String index_key = iter->Key().ToString();
-        Status status = kv_instance.Delete(index_key);
-        if (!status.ok()) {
-            return status;
-        }
-        LOG_TRACE(fmt::format("CleanTableIndex: delete key: {}", index_key));
-        iter->Next();
-    }
 
     auto [segment_ids_ptr, status] = table_index_meta.GetSegmentIndexIDs1();
     if (!status.ok()) {
@@ -649,23 +608,24 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta, const Stri
     return Status::OK();
 }
 
+// Remove me later
 Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta,
                                    const String &index_name,
                                    const Vector<ChunkInfoForCreateIndex> &meta_infos,
                                    UsageFlag usage_flag) {
-    KVInstance &kv_instance = table_index_meta.kv_instance();
-    String index_prefix =
-        KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
-    auto iter = kv_instance.GetIterator();
-    iter->Seek(index_prefix);
-    while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
-        String index_key = iter->Key().ToString();
-        Status status = kv_instance.Delete(index_key);
-        if (!status.ok()) {
-            return status;
-        }
-        iter->Next();
-    }
+    // KVInstance &kv_instance = table_index_meta.kv_instance();
+    // String index_prefix =
+    //     KeyEncode::CatalogIndexPrefix(table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), index_name);
+    // auto iter = kv_instance.GetIterator();
+    // iter->Seek(index_prefix);
+    // while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
+    //     String index_key = iter->Key().ToString();
+    //     Status status = kv_instance.Delete(index_key);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     iter->Next();
+    // }
 
     for (auto iter = meta_infos.begin(); iter != meta_infos.end(); iter++) {
         if (table_index_meta.table_meta().db_id_str() == iter->db_id_ && table_index_meta.table_meta().table_id_str() == iter->table_id_) {
