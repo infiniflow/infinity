@@ -24,7 +24,6 @@ import infinity_context;
 import table_def;
 import data_block;
 import value;
-import txn_store;
 import buffer_manager;
 import meta_state;
 import wal_entry;

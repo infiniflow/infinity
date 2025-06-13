@@ -38,7 +38,6 @@ import embedding_info;
 import knn_expr;
 import infinity_exception;
 import bg_task;
-import txn_store;
 import wal_manager;
 import buffer_manager;
 import internal_types;

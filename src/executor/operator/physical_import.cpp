@@ -42,7 +42,6 @@ import data_block;
 import logger;
 import third_party;
 import defer_op;
-import txn_store;
 
 import buffer_handle;
 import data_file_worker;

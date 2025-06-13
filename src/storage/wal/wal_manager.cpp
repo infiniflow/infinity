@@ -28,7 +28,6 @@ import virtual_store;
 import third_party;
 import table_entry_type;
 import infinity_context;
-import txn_store;
 import data_access_state;
 import status;
 import bg_task;
