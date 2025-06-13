@@ -4108,157 +4108,152 @@ QueryResult AdminExecutor::RemoveNode(QueryContext *query_context, const AdminSt
 
 QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    //
-    //    Vector<SharedPtr<ColumnDef>> column_defs = {
-    //        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
-    //        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
-    //    };
-    //
-    //    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), nullptr,
-    //    column_defs);
-    //
-    //    QueryResult query_result;
-    //    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
-    //
-    //    Vector<SharedPtr<DataType>> column_types{
-    //        varchar_type,
-    //        varchar_type,
-    //    };
-    //
-    //    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    //    output_block_ptr->Init(column_types);
-    //
-    //    if (InfinityContext::instance().IsClusterRole()) {
-    //        SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("name");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                Value value = Value::MakeVarchar(server_node->node_name());
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("role");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                Value value = Value::MakeVarchar(ToString(server_node->node_role()));
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("status");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                Value value = Value::MakeVarchar(ToString(server_node->node_status()));
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("address");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->node_ip(), server_node->node_port()));
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("update_time");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                // const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
-    //                const std::time_t t_c = server_node->update_ts();
-    //                Value value = Value::MakeVarchar(std::ctime(&t_c));
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //    } else {
-    //        NodeRole server_role = InfinityContext::instance().GetServerRole();
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("role");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                Value value = Value::MakeVarchar(ToString(server_role));
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //
-    //        {
-    //            SizeT column_id = 0;
-    //            {
-    //                Value value = Value::MakeVarchar("status");
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //
-    //            ++column_id;
-    //            {
-    //                bool infinity_started = InfinityContext::instance().InfinityContextStarted();
-    //                String infinity_status("started");
-    //                if (!infinity_started && server_role != NodeRole::kAdmin) {
-    //                    infinity_status = "starting";
-    //                }
-    //                Value value = Value::MakeVarchar(infinity_status);
-    //                ValueExpression value_expr(value);
-    //                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //            }
-    //        }
-    //    }
-    //
-    //    output_block_ptr->Finalize();
-    //    query_result.result_table_->Append(std::move(output_block_ptr));
-    //    return query_result;
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_current_node"), nullptr, column_defs);
+
     QueryResult query_result;
-    query_result.result_table_ = nullptr;
-    query_result.status_ = Status::NotSupport("Not support to handle admin statement");
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    if (InfinityContext::instance().IsClusterRole()) {
+        SharedPtr<NodeInfo> server_node = InfinityContext::instance().cluster_manager()->ThisNode();
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("name");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(server_node->node_name());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("role");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_node->node_role()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("status");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_node->node_status()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("address");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(fmt::format("{}:{}", server_node->node_ip(), server_node->node_port()));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("update_time");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                // const std::chrono::system_clock::duration time_since_epoch = std::chrono::seconds(server_node->last_update_ts_);
+                const std::time_t t_c = server_node->update_ts();
+                Value value = Value::MakeVarchar(std::ctime(&t_c));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+    } else {
+        NodeRole server_role = InfinityContext::instance().GetServerRole();
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("role");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(server_role));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("status");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                bool infinity_started = InfinityContext::instance().InfinityContextStarted();
+                String infinity_status("started");
+                if (!infinity_started && server_role != NodeRole::kAdmin) {
+                    infinity_status = "starting";
+                }
+                Value value = Value::MakeVarchar(infinity_status);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
     return query_result;
 }
 

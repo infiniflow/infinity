@@ -22,7 +22,6 @@ import infinity_exception;
 import background_process;
 import compaction_process;
 import bg_task;
-import txn_manager;
 import third_party;
 
 import new_txn_manager;

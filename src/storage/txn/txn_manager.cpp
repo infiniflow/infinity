@@ -238,29 +238,29 @@ SizeT TxnManager::ActiveTxnCount() {
     return txn_map_.size();
 }
 
-Vector<TxnInfo> TxnManager::GetTxnInfoArray() const {
-    Vector<TxnInfo> res;
-
-    std::unique_lock w_lock(locker_);
-    res.reserve(txn_map_.size());
-
-    for (const auto &txn_pair : txn_map_) {
-        TxnInfo txn_info;
-        txn_info.txn_id_ = txn_pair.first;
-        txn_info.txn_text_ = txn_pair.second->GetTxnText();
-        res.emplace_back(txn_info);
-    }
-    return res;
-}
-
-UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
-    std::unique_lock w_lock(locker_);
-    auto iter = txn_map_.find(txn_id);
-    if (iter == txn_map_.end()) {
-        return nullptr;
-    }
-    return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
-}
+// Vector<TxnInfo> TxnManager::GetTxnInfoArray() const {
+//     Vector<TxnInfo> res;
+//
+//     std::unique_lock w_lock(locker_);
+//     res.reserve(txn_map_.size());
+//
+//     for (const auto &txn_pair : txn_map_) {
+//         TxnInfo txn_info;
+//         txn_info.txn_id_ = txn_pair.first;
+//         txn_info.txn_text_ = txn_pair.second->GetTxnText();
+//         res.emplace_back(txn_info);
+//     }
+//     return res;
+// }
+//
+// UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
+//     std::unique_lock w_lock(locker_);
+//     auto iter = txn_map_.find(txn_id);
+//     if (iter == txn_map_.end()) {
+//         return nullptr;
+//     }
+//     return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
+// }
 
 Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
     std::unique_lock w_lock(locker_);

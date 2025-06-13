@@ -21,7 +21,6 @@ import global_resource_usage;
 import storage;
 import infinity_context;
 
-import txn_manager;
 import table_def;
 import data_block;
 import value;

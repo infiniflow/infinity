@@ -36,6 +36,11 @@ class SystemCache;
 struct TxnContext;
 struct BGTaskInfo;
 
+export struct TxnInfo {
+    TransactionID txn_id_;
+    SharedPtr<String> txn_text_;
+};
+
 export class NewTxnManager {
 public:
     explicit NewTxnManager(Storage *storage, KVStore *kv_store, TxnTimeStamp start_ts);

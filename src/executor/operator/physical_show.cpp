@@ -61,7 +61,6 @@ import segment_iter;
 import segment_entry;
 import variables;
 import default_values;
-import txn_manager;
 import wal_manager;
 import logger;
 import chunk_index_entry;
