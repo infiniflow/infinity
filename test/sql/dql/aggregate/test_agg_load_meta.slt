@@ -10,18 +10,16 @@ EXPLAIN SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
 PROJECT (5)
  - table index: #4
  - expressions: [count(star) (#0)]
--> Merge aggregate (7)
-   - output columns: [COUNT(c1)]
-  -> AGGREGATE (4)
-     - aggregate table index: #3
-     - aggregate: [COUNT(c1 (#1))]
-    -> FILTER (3)
-       - filter: CAST(c2 (#0) AS BigInt) = 5
-       - output columns: [c2, __rowid]
-      -> TABLE SCAN (2)
-         - table name: test_agg_load_meta(default_db.test_agg_load_meta)
-         - table index: #1
-         - output_columns: [c2, __rowid]
+-> AGGREGATE (4)
+   - aggregate table index: #3
+   - aggregate: [COUNT(c1 (#1))]
+  -> FILTER (3)
+     - filter: CAST(c2 (#0) AS BigInt) = 5
+     - output columns: [c2, __rowid]
+    -> TABLE SCAN (2)
+       - table name: test_agg_load_meta(default_db.test_agg_load_meta)
+       - table index: #1
+       - output_columns: [c2, __rowid]
 
 query I
 SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
