@@ -28,15 +28,6 @@ namespace infinity {
 
 KVIterator::KVIterator(rocksdb::Iterator *iterator_) : iterator_(iterator_) {}
 
-KVIterator::KVIterator(rocksdb::Transaction *transaction, rocksdb::ReadOptions &read_options, const String &upper_bound) {
-    if (!upper_bound.empty()) {
-        upper_bound_ = MakeUnique<rocksdb::Slice>(upper_bound);
-        read_options.iterate_upper_bound = upper_bound_.get();
-    }
-
-    iterator_ = transaction->GetIterator(read_options);
-}
-
 KVIterator::~KVIterator() { delete iterator_; }
 
 void KVIterator::Seek(const String &key) {
