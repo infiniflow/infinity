@@ -33,7 +33,6 @@ import third_party;
 import logger;
 import kv_store;
 
-import txn;
 import new_txn;
 import infinity_exception;
 import status;

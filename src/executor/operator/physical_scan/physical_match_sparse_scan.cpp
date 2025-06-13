@@ -52,7 +52,6 @@ import match_sparse_scan_function_data;
 import fix_heap;
 import global_block_id;
 import roaring_bitmap;
-import txn;
 import bmp_index_file_worker;
 import segment_index_entry;
 import buffer_handle;
