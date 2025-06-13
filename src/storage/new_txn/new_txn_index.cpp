@@ -434,7 +434,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    txn_store_.AddMetaKeyForBufferObject(
+    this->AddMetaKeyForBufferObject(
         MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
@@ -811,7 +811,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 auto col_ptr = MakeShared<ColumnVector>(std::move(col));
                 if (index_fulltext->IsRealtime()) {
                     UniquePtr<std::binary_semaphore> sema = mem_index->memory_indexer_->AsyncInsert(col_ptr, offset, row_cnt);
-                    txn_store()->AddSemaphore(std::move(sema));
+                    this->AddSemaphore(std::move(sema));
                 } else {
                     // mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                     SharedPtr<AppendMemIndexTask> append_mem_index_task = MakeShared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);

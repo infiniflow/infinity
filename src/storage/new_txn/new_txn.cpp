@@ -249,13 +249,6 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     return Status::OK();
 }
 
-Tuple<DBEntry *, Status> NewTxn::GetDatabase(const String &db_name) {
-    this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    return catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
-}
-
 Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_name) {
     this->CheckTxnStatus();
 
@@ -931,15 +924,6 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
     return block_meta.GetBlockColumnInfo(column_id);
 }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
-    this->CheckTxn(db_name);
-    return catalog_->GetTableSnapshot(db_name, table_name, nullptr);
-}
-
-Status NewTxn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
-    return catalog_->ApplyTableSnapshot(table_snapshot_info, nullptr);
-}
-
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
@@ -1181,8 +1165,7 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 Status NewTxn::Commit() {
-    DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
-    if ((base_txn_store_ == nullptr && txn_store_.ReadOnly() && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
+    if ((base_txn_store_ == nullptr && !this->IsReplay()) or txn_type_ == TxnType::kReadOnly) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
@@ -3638,9 +3621,8 @@ void NewTxn::NotifyTopHalf() {
 }
 
 void NewTxn::PostCommit() {
-    // txn_store_.MaintainCompactionAlg();
 
-    for (auto &sema : txn_store_.semas()) {
+    for (auto &sema : this->semas()) {
         sema->acquire();
     }
 
@@ -3848,8 +3830,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     }
 
     // We will remove buffer objects for block, blockColumn and chunkIndex added in this txn.
-    const Vector<UniquePtr<MetaKey>> &metas = txn_store_.GetMetaKeyForBufferObject();
-    for (auto &meta : metas) {
+    for (auto &meta : object_meta_keys_) {
         switch (meta->type_) {
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
@@ -3921,7 +3902,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     if (!status.ok()) {
         return status;
     }
-    txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
 
     if (conflicted_txn_ != nullptr) {
         // Wait for dependent transaction finished
@@ -3934,7 +3914,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
 }
 
 Status NewTxn::Rollback() {
-    DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
     auto state = this->GetTxnState();
     TxnTimeStamp abort_ts = 0;
     if (state == TxnState::kStarted) {
@@ -3952,27 +3931,6 @@ Status NewTxn::Rollback() {
     LOG_TRACE(fmt::format("NewTxn: {} is rolled back.", txn_context_ptr_->txn_id_));
 
     return status;
-}
-
-// the max_commit_ts is determined by the max commit ts of flushed delta entry
-// Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
-bool NewTxn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts) {
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    return true;
-}
-
-// those whose commit_ts is <= max_commit_ts will be checkpointed
-void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String full_path, full_name;
-
-    catalog_->SaveFullCatalog(max_commit_ts, full_path, full_name);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpointV2>(max_commit_ts);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 }
 
 Status NewTxn::Cleanup() {
@@ -4591,5 +4549,13 @@ String NewTxn::GetTableIdStr() {
     }
     return "";
 }
+
+void NewTxn::AddSemaphore(UniquePtr<std::binary_semaphore> sema) { semas_.push_back(std::move(sema)); }
+
+const Vector<UniquePtr<std::binary_semaphore>> &NewTxn::semas() const { return semas_; }
+
+void NewTxn::AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key) { object_meta_keys_.push_back(std::move(object_meta_key)); }
+
+const Vector<UniquePtr<MetaKey>> &NewTxn::GetMetaKeyForBufferObject() const { return object_meta_keys_; };
 
 } // namespace infinity
