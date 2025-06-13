@@ -68,7 +68,7 @@ Txn::Txn(TxnManager *txn_manager,
          TransactionType txn_type)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), txn_text_(std::move(txn_text)) {
-    catalog_ = InfinityContext::instance().storage()->catalog();
+//    catalog_ = InfinityContext::instance().storage()->catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
 #endif
@@ -82,7 +82,7 @@ Txn::Txn(TxnManager *txn_manager,
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
-    catalog_ = InfinityContext::instance().storage()->catalog();
+//    catalog_ = InfinityContext::instance().storage()->catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
 #endif

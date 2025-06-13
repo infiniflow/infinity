@@ -24,7 +24,6 @@ import physical_operator;
 import physical_operator_type;
 import third_party;
 import txn;
-import txn_store;
 import constant_expr;
 import segment_entry;
 import block_entry;

@@ -6,7 +6,6 @@ import logical_type;
 import third_party;
 import infinity_context;
 import storage;
-import txn_manager;
 import table_def;
 import column_def;
 import data_type;

@@ -20,7 +20,6 @@ import stl;
 import buffer_manager;
 import txn_state;
 import default_values;
-import txn_manager;
 import status;
 
 namespace infinity {
@@ -35,6 +34,11 @@ struct WalEntry;
 class SystemCache;
 struct TxnContext;
 struct BGTaskInfo;
+
+export struct TxnInfo {
+    TransactionID txn_id_;
+    SharedPtr<String> txn_text_;
+};
 
 export class NewTxnManager {
 public:

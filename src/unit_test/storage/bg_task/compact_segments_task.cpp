@@ -25,7 +25,6 @@ import infinity_context;
 import status;
 import txn;
 import buffer_manager;
-import txn_manager;
 import column_vector;
 
 import table_def;

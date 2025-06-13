@@ -29,7 +29,6 @@ module;
 module physical_import;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;
@@ -42,7 +41,6 @@ import data_block;
 import logger;
 import third_party;
 import defer_op;
-import txn_store;
 
 import buffer_handle;
 import data_file_worker;

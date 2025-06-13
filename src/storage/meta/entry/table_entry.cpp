@@ -996,9 +996,9 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                                                         nullptr);
                 }
                 //segment_index_entry->MemIndexWaitInflightTasks();
-                InfinityContext::instance().storage()->catalog()->all_memindex_recover_segment_.push_back(segment_index_entry);
-                message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
-                LOG_INFO(message);
+//                InfinityContext::instance().storage()->catalog()->all_memindex_recover_segment_.push_back(segment_index_entry);
+//                message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
+//                LOG_INFO(message);
             }
         }
     }

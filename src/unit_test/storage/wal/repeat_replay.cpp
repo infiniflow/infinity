@@ -21,7 +21,6 @@ import global_resource_usage;
 import storage;
 import infinity_context;
 import compilation_config;
-import txn_manager;
 import extra_ddl_info;
 import infinity_exception;
 import log_file;
