@@ -305,7 +305,7 @@ public:
                            const String *db_comment,
                            Optional<DBMeeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -314,7 +314,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
                             String &index_id_str,
@@ -322,11 +322,8 @@ public:
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UsageFlag usage_flag);
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta,
-                                  const String &index_name,
-                                  const Vector<ChunkInfoForCreateIndex> &meta_infos,
-                                  UsageFlag usage_flag);
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
+
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);

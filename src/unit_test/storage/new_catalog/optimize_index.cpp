@@ -161,7 +161,7 @@ protected:
 
     void DropDB() {
         // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
         Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);

@@ -73,10 +73,13 @@ Status NewCheckpointTask::ExecuteWithNewTxn() {
 
 Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_cleanup_ts) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    Status status = new_txn_mgr->Cleanup(last_cleanup_ts, &cur_cleanup_ts);
+    // Status status = new_txn_mgr->Cleanup(last_cleanup_ts, &cur_cleanup_ts);
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+    Status status = txn->Cleanup();
     if (!status.ok()) {
         return status;
     }
+    status = new_txn_mgr->CommitTxn(txn);
     return Status::OK();
 }
 

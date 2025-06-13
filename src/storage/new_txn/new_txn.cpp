@@ -3783,7 +3783,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
                 auto index_id_str = compact_txn_store->index_ids_str_[i];
-                const Vector<SegmentID> &deprecated_ids = compact_txn_store->deprecated_segment_ids_;
+                const Vector<SegmentID> &deprecated_ids = compact_txn_store->segment_ids_;
                 for (SegmentID segment_id : deprecated_ids) {
                     metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
                     metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
@@ -3999,7 +3999,7 @@ Status NewTxn::Cleanup() {
             case MetaType::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
                 DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta, db_meta_key->db_name_, begin_ts, UsageFlag::kOther);
+                Status status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4008,7 +4008,7 @@ Status NewTxn::Cleanup() {
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, begin_ts, UsageFlag::kOther);
+                Status status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4051,7 +4051,7 @@ Status NewTxn::Cleanup() {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                Status status = NewCatalog::CleanTableIndex(table_index_meta, table_index_meta_key->index_name_, UsageFlag::kOther);
+                Status status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4125,7 +4125,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             case MetaType::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
                 DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta, db_meta_key->db_name_, ts, UsageFlag::kOther);
+                Status status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4134,7 +4134,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = NewCatalog::CleanTable(table_meta, table_meta_key->table_name_, ts, UsageFlag::kOther);
+                Status status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4144,7 +4144,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
-                Status status = NewCatalog::CleanSegment(segment_meta, ts, UsageFlag::kOther);
+                Status status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4177,7 +4177,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                Status status = NewCatalog::CleanTableIndex(table_index_meta, table_index_meta_key->index_name_, UsageFlag::kOther);
+                Status status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
