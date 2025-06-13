@@ -57,7 +57,7 @@ BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def,
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    bmp_ = new IndexT(term_num, block_size);
+                    index = new IndexT(term_num, block_size);
                 } else {
                     UnrecoverableError("BMPHandler::BMPHandler: index does not own memory");
                 }
@@ -258,6 +258,7 @@ void BMPHandler::Load(LocalFileHandle &file_handle) {
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = new IndexT(IndexT::Load(file_handle));
                 } else {
                     UnrecoverableError("BMPHandler::Load: index does not own memory");
@@ -274,6 +275,7 @@ void BMPHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = new IndexT(IndexT::LoadFromPtr(file_handle, file_size));
                 } else {
                     UnrecoverableError("BMPHandler::LoadFromPtr: index does not own memory");
@@ -292,6 +294,7 @@ void BMPHandler::LoadFromPtr(const char *ptr, SizeT file_size) {
                 if constexpr (IndexT::kOwnMem) {
                     UnrecoverableError("BMPHandler::LoadFromPtr: index own memory");
                 } else {
+                    delete index;
                     index = new IndexT(IndexT::LoadFromPtr(ptr, file_size));
                 }
             }

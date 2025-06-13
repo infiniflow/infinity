@@ -27,6 +27,7 @@ struct TableIndexEntry;
 struct SegmentIndexEntry;
 class Txn;
 
+class DBMeeta;
 class TableMeeta;
 class SegmentMeta;
 class BlockMeta;
@@ -43,9 +44,12 @@ export struct SegmentSnapshot {
 };
 
 export struct NewSegmentSnapshot {
+public:
+    SegmentOffset segment_offset() const;
+    const Vector<UniquePtr<BlockMeta>>& block_map() const;
     UniquePtr<SegmentMeta> segment_meta_;
-    Vector<UniquePtr<BlockMeta>> block_map_;
-    SegmentOffset segment_offset_ = 0;
+private:
+    mutable Vector<UniquePtr<BlockMeta>> block_map_;
 };
 
 export struct BlockIndex {
@@ -54,7 +58,7 @@ public:
 
     ~BlockIndex();
 
-    void NewInit(NewTxn *new_txn, const String &db_name, const String &table_name);
+    void NewInit(UniquePtr<TableMeeta> table_meta);
 
     void Insert(SegmentEntry *segment_entry, Txn *txn);
 
@@ -74,7 +78,7 @@ public:
 
 public:
     Map<SegmentID, SegmentSnapshot> segment_block_index_;
-
+    Vector<SharedPtr<TableIndexMeeta>> table_index_meta_map_;
     UniquePtr<TableMeeta> table_meta_;
     Map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
 };

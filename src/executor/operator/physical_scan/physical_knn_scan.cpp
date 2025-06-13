@@ -163,7 +163,7 @@ PhysicalKnnScan::PhysicalKnnScan(u64 id,
 
 PhysicalKnnScan::~PhysicalKnnScan() = default;
 
-void PhysicalKnnScan::Init(QueryContext* query_context) {
+void PhysicalKnnScan::Init(QueryContext *query_context) {
     KnnExpression *knn_expr = knn_expression_.get();
     const auto *column_expr = static_cast<const ColumnExpression *>(knn_expr->arguments()[0].get());
     const auto column_data_type = column_expr->Type();
@@ -373,7 +373,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
     }
 }
 
-//TableInfo *PhysicalKnnScan::table_info() const { return base_table_ref_->table_info_.get(); }
+// TableInfo *PhysicalKnnScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
 String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -410,33 +410,17 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
-            for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
-                const String &index_id_str = (*index_id_strs_ptr)[i];
-                auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
-
-                SharedPtr<IndexBase> index_base;
-                std::tie(index_base, status) = table_index_meta->GetIndexBase();
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-
-                ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != knn_column_id) {
-                    // knn_column_id isn't in this table index
-                    continue;
-                }
-                // check index type
-                if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
-                    LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                    continue;
-                }
-                table_index_meta_ = std::move(table_index_meta);
-                break;
+            auto it = base_table_ref_->block_index_->table_index_meta_map_[knn_column_id];
+            SharedPtr<IndexBase> index_base;
+            std::tie(index_base, status) = it->GetIndexBase();
+            if (!status.ok()) {
+                RecoverableError(status);
             }
+            // check index type
+            if (auto index_type = index_base->index_type_; index_type != IndexType::kIVF and index_type != IndexType::kHnsw) {
+                UnrecoverableError(fmt::format("Scan column index is not kIVF or kHnsw: knn_column_id is {}", knn_column_id));
+            }
+            table_index_meta_ = it;
         } else {
             LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
             auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), knn_expression_->using_index_);
@@ -444,11 +428,10 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 Status status = Status::IndexNotExist(knn_expression_->using_index_);
                 RecoverableError(std::move(status));
             }
-            const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
-            auto table_index_meta = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+            auto it = base_table_ref_->block_index_->table_index_meta_map_[iter - index_names_ptr->begin()];
 
             SharedPtr<IndexBase> index_base;
-            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            std::tie(index_base, status) = it->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -470,7 +453,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(std::move(error_status));
             }
 
-            table_index_meta_ = std::move(table_index_meta);
+            table_index_meta_ = it;
         }
         // Fill the segment with index
         if (table_index_meta_) {
@@ -489,7 +472,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
             segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
         } else {
-            const auto &block_map = segment_info.block_map_;
+            const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
                 block_metas_->emplace_back(block_meta.get());
             }
@@ -603,16 +586,12 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
 
-        SegmentOffset segment_row_count = 0;
         SegmentIndexMeta *segment_index_meta = &knn_scan_shared_data->segment_index_metas_->at(index_idx);
         SegmentID segment_id = segment_index_meta->segment_id();
 
         const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
-        } else {
-            SegmentMeta *segment_meta = iter->second.segment_meta_.get();
-            std::tie(segment_row_count, std::ignore) = segment_meta->GetRowCnt1();
         }
 
         bool has_some_result = false;
@@ -627,9 +606,6 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                       index_idx + 1,
                                       index_task_n));
                 bitmask = it->second;
-                if (segment_row_count != bitmask.count()) {
-                    UnrecoverableError(fmt::format("Segment row count mismatch with filter result: {} vs {}", segment_row_count, bitmask.count()));
-                }
                 has_some_result = true;
                 use_bitmask = !bitmask.IsAllTrue();
             }
@@ -717,28 +693,34 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                     BitmaskFilter<SegmentOffset> filter(bitmask);
                                     if (with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>
-                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, true>(
+                                                query,
+                                                knn_scan_shared_data->topk_,
+                                                filter,
+                                                search_option);
                                     } else {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>
-                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, BitmaskFilter<SegmentOffset>, false>(
+                                                query,
+                                                knn_scan_shared_data->topk_,
+                                                filter,
+                                                search_option);
                                     }
                                 } else {
-                                    SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                     if (!with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, false>
-                                                    (query, knn_scan_shared_data->topk_, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, false>(query,
+                                                                                                                       knn_scan_shared_data->topk_,
+                                                                                                                       search_option);
                                     } else {
+                                        SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                         AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_handler->template SearchIndex
-                                                <DistanceDataType, SegmentOffset, AppendFilter, true>
-                                                    (query, knn_scan_shared_data->topk_, filter, search_option);
+                                            hnsw_handler->template SearchIndex<DistanceDataType, SegmentOffset, AppendFilter, true>(
+                                                query,
+                                                knn_scan_shared_data->topk_,
+                                                filter,
+                                                search_option);
                                     }
                                 }
 #else
@@ -797,7 +779,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                             BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
                                             auto [block_row_cnt, status] = block_meta->GetRowCnt1();
                                             ColumnMeta column_meta(knn_column_id, *block_meta);
-                                            status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                                            status =
+                                                NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
                                             if (!status.ok()) {
                                                 UnrecoverableError(status.message());
                                             }

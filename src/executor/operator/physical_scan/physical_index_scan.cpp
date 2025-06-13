@@ -197,7 +197,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
         UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
     } else {
         segment_meta = iter->second.segment_meta_.get();
-        segment_row_count = iter->second.segment_offset_;
+        segment_row_count = iter->second.segment_offset();
     }
 
     // check FastRoughFilter

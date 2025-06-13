@@ -65,7 +65,7 @@ KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
 
 KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                                      UniquePtr<Vector<BlockMeta *>> block_metas,
-                                     UniquePtr<TableIndexMeeta> table_index_meta,
+                                     SharedPtr<TableIndexMeeta> table_index_meta,
                                      UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
                                      Vector<InitParameter> opt_params,
                                      i64 topk,

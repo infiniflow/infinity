@@ -712,15 +712,9 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     return Status::OK();
 }
 
-Status NewTxn::CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete) {
+Status NewTxn::CheckTableIfDelete(TableMeeta &table_meta, bool &has_delete) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
-    if (!status.ok()) {
-        return status;
-    }
-    status = NewCatalog::CheckTableIfDelete(*table_meta, begin_ts, has_delete);
+    Status status = NewCatalog::CheckTableIfDelete(table_meta, begin_ts, has_delete);
     if (!status.ok()) {
         return status;
     }

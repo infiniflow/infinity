@@ -530,7 +530,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 if (segment_it == block_index->new_segment_block_index_.end()) {
                     UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
                 }
-                SizeT segment_row_count = segment_it->second.segment_offset_;
+                SizeT segment_row_count = segment_it->second.segment_offset();
                 bitmask = it->second;
                 if (bitmask.count() != segment_row_count) {
                     UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));
