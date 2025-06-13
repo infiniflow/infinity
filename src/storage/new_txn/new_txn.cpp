@@ -3747,24 +3747,56 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         case TransactionType::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
-            SizeT data_block_count = import_txn_store->input_blocks_in_imports_[0].size();
-            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
-                import_txn_store->input_blocks_in_imports_[0][block_idx]->UnInit();
+            for (auto &[_, blocks] : import_txn_store->input_blocks_in_imports_) {
+                std::for_each(blocks.begin(), blocks.end(), [](auto &block) { block->UnInit(); });
             }
 
-            if (import_txn_store->index_names_.size() > 0) {
+            const Vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
+            Vector<UniquePtr<MetaKey>> metas;
+            auto index_names_size = import_txn_store->index_names_.size();
+            auto db_id_str = import_txn_store->db_id_str_;
+            auto table_id_str = import_txn_store->table_id_str_;
+            for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
-                UnrecoverableError("Not implemented");
+                auto index_id_str = import_txn_store->index_ids_str_[i];
+                for (SegmentID segment_id : segment_ids) {
+                    metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                    metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                }
             }
-            break;
+
+            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            // if (status.code_ == ErrorCode::kIOError) {
+            //     // TODO: move metas to kv_store
+            // } else
+            if (!status.ok()) {
+                UnrecoverableError("During PostRollback, cleanup failed.");
+            }
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            if (compact_txn_store->index_names_.size() > 0) {
+
+            Vector<UniquePtr<MetaKey>> metas;
+            auto db_id_str = compact_txn_store->db_id_str_;
+            auto table_id_str = compact_txn_store->table_id_str_;
+            auto index_names_size = compact_txn_store->index_names_.size();
+            for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
-                UnrecoverableError("Not implemented");
+                auto index_id_str = compact_txn_store->index_ids_str_[i];
+                const Vector<SegmentID> &deprecated_ids = compact_txn_store->deprecated_segment_ids_;
+                for (SegmentID segment_id : deprecated_ids) {
+                    metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+                    metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                }
             }
-            break;
+
+            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            // if (status.code_ == ErrorCode::kIOError) {
+            //     // TODO: move metas to kv_store
+            // } else
+            if (!status.ok()) {
+                UnrecoverableError("During PostRollback, cleanup failed.");
+            }
         }
         case TransactionType::kCreateIndex: {
             break;
@@ -4077,13 +4109,17 @@ Status NewTxn::Cleanup() {
 }
 
 Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
-    TxnTimeStamp begin_ts = ts;
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<UniquePtr<MetaKey>> metas;
     new_catalog->GetCleanedMeta(ts, metas, kv_instance);
 
+    return CleanupImpl(ts, kv_instance, std::move(metas));
+}
+
+Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas) {
+    TxnTimeStamp begin_ts = ts;
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {

@@ -116,6 +116,7 @@ struct BlockInfo;
 struct BlockColumnInfo;
 struct TableDetail;
 struct CheckpointTxnStore;
+struct MetaKey;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -608,6 +609,7 @@ private:
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
+    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
 
     bool IsReplay() const;
 

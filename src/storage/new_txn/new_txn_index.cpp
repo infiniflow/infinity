@@ -983,7 +983,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
             if (!status.ok()) {
                 return status;
             }
-            if (new_chunk_id == (ChunkID)-1 && segment_row_cnt > 0) {
+            if (new_chunk_id == static_cast<ChunkID>(-1) && segment_row_cnt > 0) {
                 UnrecoverableError(fmt::format("Failed to dump {} rows", segment_row_cnt));
             }
         }
@@ -1682,8 +1682,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             return status;
         }
 
-        chunk_infos_.push_back(
-            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), new_chunk_id});
+        chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                       table_index_meta.table_meta().table_id_str(),
+                                                       segment_index_meta.segment_id(),
+                                                       new_chunk_id});
 
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {

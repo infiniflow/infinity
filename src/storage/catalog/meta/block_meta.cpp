@@ -35,7 +35,6 @@ import meta_info;
 import column_def;
 import column_meta;
 import fast_rough_filter;
-import kv_code;
 import kv_utility;
 import logger;
 
