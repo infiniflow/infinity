@@ -26,7 +26,6 @@ import analyzer_pool;
 import index_defines;
 import logical_type;
 import status;
-import txn;
 import infinity_exception;
 import match_expr;
 import internal_types;

@@ -66,7 +66,6 @@ import roaring_bitmap;
 import index_filter_evaluators;
 import index_emvb;
 import constant_expr;
-import txn;
 import infinity;
 import table_entry;
 

@@ -542,7 +542,7 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
                                   MemUsed(),
                                   doc_count_);
     }
- 
+
     auto *table_index_entry = segment_index_entry_->table_index_entry();
     SharedPtr<String> index_name = table_index_entry->GetIndexName();
     auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();

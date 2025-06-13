@@ -118,8 +118,6 @@ export struct WalBlockInfo {
 
     WalBlockInfo() = default;
 
-    explicit WalBlockInfo(BlockEntry *block_entry);
-
     explicit WalBlockInfo(BlockMeta &block_meta);
 
     bool operator==(const WalBlockInfo &other) const;
@@ -142,8 +140,6 @@ export struct WalSegmentInfo {
     Vector<WalBlockInfo> block_infos_;
 
     WalSegmentInfo() = default;
-
-    explicit WalSegmentInfo(SegmentEntry *segment_entry);
 
     explicit WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts);
 
@@ -169,8 +165,6 @@ export struct WalChunkIndexInfo {
     TxnTimeStamp deprecate_ts_{};
 
     WalChunkIndexInfo() = default;
-
-    explicit WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry);
 
     explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
 

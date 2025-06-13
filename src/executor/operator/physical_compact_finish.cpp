@@ -56,7 +56,6 @@ bool PhysicalCompactFinish::Execute(QueryContext *query_context, OperatorState *
         LOG_WARN("Failed to apply deletes in compact finish");
         return true;
     }
-    SaveSegmentData(query_context, compact_state_data);
     compact_finish_operator_state->SetComplete();
     return true;
 }
