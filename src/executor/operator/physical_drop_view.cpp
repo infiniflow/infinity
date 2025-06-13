@@ -17,7 +17,6 @@ module;
 module physical_drop_view;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;
