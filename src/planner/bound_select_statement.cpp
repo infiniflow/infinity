@@ -89,8 +89,6 @@ import parse_fulltext_options;
 import highlighter;
 import data_type;
 import internal_types;
-import txn;
-
 import new_txn;
 
 namespace infinity {

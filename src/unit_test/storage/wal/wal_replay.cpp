@@ -31,7 +31,6 @@ import infinity_exception;
 import status;
 import column_vector;
 import physical_import;
-import txn;
 import index_base;
 import index_ivf;
 import index_hnsw;

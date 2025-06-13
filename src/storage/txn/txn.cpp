@@ -29,7 +29,6 @@ import wal_entry;
 import third_party;
 import logger;
 import data_block;
-import txn_store;
 import txn_state;
 
 import meta_state;
