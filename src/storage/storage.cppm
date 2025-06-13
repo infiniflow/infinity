@@ -60,8 +60,6 @@ public:
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
 
-    [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
-
     [[nodiscard]] inline NewTxnManager *new_txn_manager() const noexcept { return new_txn_mgr_.get(); }
 
     [[nodiscard]] inline WalManager *wal_manager() const noexcept { return wal_mgr_.get(); }
@@ -128,7 +126,6 @@ private:
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<NewCatalog> new_catalog_{};
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
-    UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<NewTxnManager> new_txn_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};

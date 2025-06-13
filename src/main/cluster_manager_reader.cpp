@@ -110,11 +110,9 @@ Status ClusterManager::RegisterToLeaderNoLock() {
     Storage *storage_ptr = InfinityContext::instance().storage();
     SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
     if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
-        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name(),
-                                                          this_node_->node_role(),
-                                                          this_node_->node_ip(),
-                                                          this_node_->node_port(),
-                                                          storage_ptr->txn_manager()->CurrentTS());
+        register_peer_task =
+            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
+        //                                                          storage_ptr->txn_manager()->CurrentTS());
     } else {
         register_peer_task =
             MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
@@ -166,7 +164,7 @@ Status ClusterManager::UnregisterToLeaderNoLock() {
 void ClusterManager::HeartBeatToLeaderThread() {
     // Heartbeat interval
     auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval());
-    Storage *storage_ptr = InfinityContext::instance().storage();
+    //    Storage *storage_ptr = InfinityContext::instance().storage();
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
@@ -198,8 +196,11 @@ void ClusterManager::HeartBeatToLeaderThread() {
             i64 this_node_port = this_node_->node_port();
 
             // Send heartbeat
-            hb_task =
-                MakeShared<HeartBeatPeerTask>(this_node_name, this_node_role, this_node_ip, this_node_port, storage_ptr->txn_manager()->CurrentTS());
+            hb_task = MakeShared<HeartBeatPeerTask>(this_node_name,
+                                                    this_node_role,
+                                                    this_node_ip,
+                                                    this_node_port,
+                                                    0); // storage_ptr->txn_manager()->CurrentTS());
         }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
