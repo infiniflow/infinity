@@ -1208,45 +1208,6 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cach
     return Status::OK();
 }
 
-Status NewCatalog::AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info) {
-    bool insert_success = false;
-    HashMap<String, SharedPtr<SegmentIndexFtInfo>>::iterator iter;
-    {
-        std::unique_lock lock(segment_index_ft_info_mtx_);
-        std::tie(iter, insert_success) = segment_index_ft_info_map_.emplace(std::move(segment_index_key), std::move(segment_index_ft_info));
-    }
-    if (!insert_success) {
-        return Status::CatalogError(fmt::format("SegmentIndexFtInfo key: {} already exists", iter->first));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info) {
-    segment_index_ft_info = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(segment_index_ft_info_mtx_);
-        if (auto iter = segment_index_ft_info_map_.find(segment_index_key); iter != segment_index_ft_info_map_.end()) {
-            segment_index_ft_info = iter->second;
-        }
-    }
-    if (segment_index_ft_info == nullptr) {
-        return Status::CatalogError(fmt::format("SegmentIndexFtInfo key: {} not found", segment_index_key));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::DropSegmentIndexFtInfoByKey(const String &segment_index_key) {
-    bool delete_success = false;
-    {
-        std::unique_lock lock(segment_index_ft_info_mtx_);
-        delete_success = segment_index_ft_info_map_.erase(segment_index_key) > 0;
-    }
-    if (!delete_success) {
-        return Status::CatalogError(fmt::format("SegmentIndexFtInfo key: {} not found", segment_index_key));
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts) {
     bool insert_success = false;
     HashMap<String, SharedPtr<SegmentUpdateTS>>::iterator iter;
@@ -1274,16 +1235,9 @@ Status NewCatalog::GetSegmentUpdateTS(const String &segment_update_ts_key, Share
     return Status::OK();
 }
 
-Status NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
-    bool delete_success = false;
-    {
-        std::unique_lock lock(segment_update_ts_mtx_);
-        delete_success = segment_update_ts_map_.erase(segment_update_ts_key) > 0;
-    }
-    if (!delete_success) {
-        return Status::CatalogError(fmt::format("Drop SegmentUpdateTS key: {} not found", segment_update_ts_key));
-    }
-    return Status::OK();
+void NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
+    std::unique_lock lock(segment_update_ts_mtx_);
+    segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
 void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
@@ -1374,6 +1328,10 @@ Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
     return s;
 }
 
+void NewCatalog::SetLastCleanupTS(TxnTimeStamp cleanup_ts) { last_cleanup_ts_ = cleanup_ts; }
+
+TxnTimeStamp NewCatalog::GetLastCleanupTS() const { return last_cleanup_ts_; }
+
 SharedPtr<MetaTree> NewCatalog::MakeMetaTree() const {
     auto entries = this->MakeMetaKeys();
     auto meta_tree_ptr = MetaTree::MakeMetaTree(entries);
@@ -1422,8 +1380,8 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
 
     auto meta_tree = this->MakeMetaTree();
     // Vector<> = meta_tree->Check();
-    String meta_tree_str = meta_tree->ToJson().dump(4);
-    LOG_INFO(meta_tree_str);
+    // String meta_tree_str = meta_tree->ToJson().dump(4);
+    // LOG_INFO(meta_tree_str);
 
     system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();

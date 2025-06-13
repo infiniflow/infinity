@@ -246,18 +246,9 @@ private:
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 
 public:
-    Status AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
-    Status GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info);
-    Status DropSegmentIndexFtInfoByKey(const String &segment_index_key);
-
-private:
-    std::shared_mutex segment_index_ft_info_mtx_{};
-    HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
-
-public:
     Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
-    Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
+    void DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
 
 private:
     std::shared_mutex segment_update_ts_mtx_{};
@@ -289,10 +280,14 @@ public:
 
     Status IncrLatestID(String &id_str, std::string_view id_name);
 
+    void SetLastCleanupTS(TxnTimeStamp cleanup_ts);
+    TxnTimeStamp GetLastCleanupTS() const;
+
 private:
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
     // bool is_vfs_{false};
+    Atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);

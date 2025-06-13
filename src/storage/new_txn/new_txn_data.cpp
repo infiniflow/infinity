@@ -62,6 +62,7 @@ import bg_task;
 import dump_index_process;
 import mem_index;
 import base_memindex;
+import emvb_index_in_mem;
 
 namespace infinity {
 
@@ -1318,7 +1319,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     return Status::OK();
 }
 
-Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option) {
+Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Status status;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -1374,6 +1375,21 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
                     LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
                 }
             }
+
+            if (!flush_column or !flush_version) {
+                continue;
+            } else {
+                SharedPtr<FlushDataEntry> flush_data_entry =
+                    MakeShared<FlushDataEntry>(table_meta.db_id_str(), table_meta.table_id_str(), segment_id, block_id);
+                if (flush_column && flush_version) {
+                    flush_data_entry->to_flush_ = "data and version";
+                } else if (flush_column) {
+                    flush_data_entry->to_flush_ = "data";
+                } else {
+                    flush_data_entry->to_flush_ = "version";
+                }
+                ckp_txn_store->entries_.emplace_back(flush_data_entry);
+            }
         }
     }
 
@@ -1389,7 +1405,7 @@ Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
     const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1540,15 +1556,20 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
                         fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
                 }
 
-                if (mem_index->GetEMVBIndex() != nullptr) {
-                    return Status::UnexpectedError("Not implemented EMVB index");
+                SharedPtr<NewTxn> new_txn_shared = txn_mgr_->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
+                SharedPtr<DumpIndexTask> dump_index_task{};
+                if (mem_index->GetBaseMemIndex() != nullptr) {
+                    mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
+                    const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
+                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn_shared);
+
+                } else if (mem_index->GetEMVBIndex() != nullptr) {
+                    mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
+                    EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
+                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn_shared);
                 }
 
-                // Trigger dump mem processor to dump mem index for new sealed segment
-                mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
-                const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-                NewTxn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("dump mem index aync"), TransactionType::kNormal);
-                auto dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn);
+                // Trigger dump index processor to dump mem index for new sealed segment
                 auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
                 dump_index_processor->Submit(dump_index_task);
             }

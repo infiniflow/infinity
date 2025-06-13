@@ -115,6 +115,8 @@ struct SegmentInfo;
 struct BlockInfo;
 struct BlockColumnInfo;
 struct TableDetail;
+struct CheckpointTxnStore;
+struct MetaKey;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -341,6 +343,8 @@ public:
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
+    Status Cleanup();
+
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
@@ -527,11 +531,9 @@ private:
 
     Status DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id);
 
-    Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option);
+    Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
-    Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option);
-
-    Status CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option);
+    Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store);
 
     Status CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<Pair<RowID, u64>> &append_ranges);
 
@@ -607,6 +609,7 @@ private:
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
+    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
 
     bool IsReplay() const;
 

@@ -433,6 +433,7 @@ Status ChunkIndexMeta::RestoreSet() {
 }
 
 Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
+    auto *kv_store = InfinityContext::instance().storage()->kv_store();
     Status status = this->GetIndexBuffer(index_buffer_);
     if (!status.ok()) {
         return status;
@@ -467,8 +468,8 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 handler.HandleWriteResult(result1);
                 handler.HandleWriteResult(result2);
 
-                kv_instance_.Delete(KeyEncode::PMObjectKey(posting_file));
-                kv_instance_.Delete(KeyEncode::PMObjectKey(dict_file));
+                kv_store->Delete(KeyEncode::PMObjectKey(posting_file));
+                kv_store->Delete(KeyEncode::PMObjectKey(dict_file));
 
             } else {
                 String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);

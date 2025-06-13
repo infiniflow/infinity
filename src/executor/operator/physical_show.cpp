@@ -14,6 +14,7 @@
 
 module;
 
+#include <iomanip>
 #include <map>
 #include <string>
 
@@ -68,6 +69,7 @@ import memory_indexer;
 import background_process;
 import compaction_process;
 import bg_task;
+import bg_task_type;
 import buffer_obj;
 import file_worker_type;
 import system_info;
@@ -594,10 +596,14 @@ void PhysicalShow::Init(QueryContext *query_context) {
             break;
         }
         case ShowStmtType::kTasks: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("time");
             output_names_->emplace_back("type");
+            output_names_->emplace_back("status");
             output_names_->emplace_back("description");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             break;
@@ -1691,23 +1697,58 @@ void PhysicalShow::ExecuteShowTasks(QueryContext *query_context, ShowOperatorSta
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(*output_types_);
-    //    SizeT row_count = 0;
+    SizeT row_count = 0;
 
-    //    for (SizeT i = 0; i < bg_task_info_list.size(); ++i) {
-    //        if (!output_block_ptr) {
-    //            output_block_ptr = DataBlock::MakeUniquePtr();
-    //            output_block_ptr->Init(*output_types_);
-    //        }
-    //
-    //
-    //
-    //        if (++row_count == output_block_ptr->capacity()) {
-    //            output_block_ptr->Finalize();
-    //            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
-    //            output_block_ptr = nullptr;
-    //            row_count = 0;
-    //        }
-    //    }
+    for (SizeT i = 0; i < bg_task_info_list.size(); ++i) {
+        BGTaskInfo *bg_task_info_ptr = bg_task_info_list[i].get();
+        SizeT task_count_ = bg_task_info_ptr->task_info_list_.size();
+        for (SizeT j = 0; j < task_count_; ++j) {
+            if (!output_block_ptr) {
+                output_block_ptr = DataBlock::MakeUniquePtr();
+                output_block_ptr->Init(*output_types_);
+            }
+
+            SizeT column_id = 0;
+            {
+                std::time_t task_time_t = std::chrono::system_clock::to_time_t(bg_task_info_ptr->task_time_);
+                std::tm *task_tm = std::localtime(&task_time_t);
+                std::ostringstream oss;
+                oss << std::put_time(task_tm, "%Y-%m-%d %H:%M:%S");
+                Value value = Value::MakeVarchar(oss.str());
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(ToString(bg_task_info_ptr->type_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(bg_task_info_ptr->status_list_[j]);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                String task_text = bg_task_info_ptr->task_info_list_[j];
+                Value value = Value::MakeVarchar(task_text);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            if (++row_count == output_block_ptr->capacity()) {
+                output_block_ptr->Finalize();
+                show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+                output_block_ptr = nullptr;
+                row_count = 0;
+            }
+        }
+    }
 
     if (output_block_ptr) {
         output_block_ptr->Finalize();

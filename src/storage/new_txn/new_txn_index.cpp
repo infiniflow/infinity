@@ -544,27 +544,32 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->db_name_ = db_name;
-        optimize_index_txn_store->db_id_str_ = table_meta.db_id_str();
-        optimize_index_txn_store->table_name_ = table_name;
-        optimize_index_txn_store->table_id_str_ = table_meta.table_id_str();
-        optimize_index_txn_store->table_key_ = table_key;
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
-    } else {
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
     }
+
+    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
+        optimize_index_txn_store->db_names_.end()) {
+        optimize_index_txn_store->db_names_.emplace_back(db_name);
+    }
+    if (std::find(optimize_index_txn_store->table_names_in_db_[db_name].begin(),
+                  optimize_index_txn_store->table_names_in_db_[db_name].end(),
+                  table_name) == optimize_index_txn_store->table_names_in_db_[db_name].end()) {
+        optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
+    }
+
+    optimize_index_txn_store->entries_.emplace_back(db_name,
+                                                    table_meta.db_id_str(),
+                                                    std::stoull(table_meta.db_id_str()),
+                                                    table_name,
+                                                    table_meta.table_id_str(),
+                                                    std::stoull(table_meta.table_id_str()),
+                                                    table_key,
+                                                    index_name,
+                                                    table_index_meta.index_id_str(),
+                                                    std::stoull(table_index_meta.index_id_str()),
+                                                    segment_id,
+                                                    std::move(chunk_infos),
+                                                    std::move(deprecate_ids));
 
     return Status::OK();
 }
@@ -978,7 +983,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
             if (!status.ok()) {
                 return status;
             }
-            if (new_chunk_id == (ChunkID)-1 && segment_row_cnt > 0) {
+            if (new_chunk_id == static_cast<ChunkID>(-1) && segment_row_cnt > 0) {
                 UnrecoverableError(fmt::format("Failed to dump {} rows", segment_row_cnt));
             }
         }
@@ -1677,8 +1682,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             return status;
         }
 
-        chunk_infos_.push_back(
-            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), new_chunk_id});
+        chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                       table_index_meta.table_meta().table_id_str(),
+                                                       segment_index_meta.segment_id(),
+                                                       new_chunk_id});
 
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
