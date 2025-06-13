@@ -108,117 +108,35 @@ Txn::~Txn() {
 
 // DML
 Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
-    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-
-    this->CheckTxn(db_name);
-
-    // build WalCmd
-    WalSegmentInfo segment_info(segment_entry.get());
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info));
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
-    table_store->Import(std::move(segment_entry), this);
-
     return Status::OK();
 }
 
 Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-
-    this->CheckTxn(db_name);
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    auto [err_msg, append_status] = table_store->Append(input_block);
-    return append_status;
+    return Status::OK();
 }
 
 Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
-    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-
-    this->CheckTxn(db_name);
-
-    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_context_ptr_->txn_id_)) {
-        String log_msg = fmt::format("Rollback delete in table {} due to conflict.", table_name);
-        RecoverableError(Status::TxnRollback(TxnID(), log_msg));
-    }
-
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-    auto [err_msg, delete_status] = table_store->Delete(row_ids);
-    return delete_status;
+    return Status::OK();
 }
 
 Status
 Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type) {
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
-
-    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
-    return compact_status;
+    return Status::OK();
 }
 
 void Txn::OptimizeIndexes() {
-    TransactionID txn_id = this->TxnID();
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
-    for (auto *db_entry : db_entries) {
-        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
-        for (auto *table_entry : table_entries) {
-            table_entry->OptimizeIndex(this);
-        }
-    }
 }
 
 Status Txn::OptimizeTableIndexes(const String &db_name, const String &table_name) {
-    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
-    if (!table_status.ok()) {
-        return table_status;
-    }
-    table_entry->OptimizeIndex(this);
     return Status::OK();
 }
 
 Status
 Txn::OptimizeIndexByName(const String &db_name, const String &table_name, const String &index_name, Vector<UniquePtr<InitParameter>> init_params) {
-    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
-    if (!status.ok()) {
-        return status;
-    }
-    this->OptIndex(table_index_entry, std::move(init_params));
     return Status::OK();
 }
 
 Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
-    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
-    TxnTableStore *txn_table_store = this->GetTxnTableStore(table_entry);
-
-    const String &index_name = *table_index_entry->GetIndexName();
-    const String &table_name = *table_entry->GetTableName();
-    table_index_entry->OptIndex(txn_table_store, init_params, false /*replay*/);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params));
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
     return Status::OK();
 }
 
