@@ -35,6 +35,7 @@ import logger;
 import block_entry;
 import segment_entry;
 import segment_index_entry;
+import table_index_entry;
 import chunk_index_entry;
 import block_version;
 import index_defines;

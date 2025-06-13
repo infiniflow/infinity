@@ -18,7 +18,6 @@ export module wal_manager;
 
 import stl;
 import options;
-import catalog_delta_entry;
 import blocking_queue;
 import log_file;
 

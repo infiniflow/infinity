@@ -54,12 +54,6 @@ struct WalSegmentInfo;
 struct WalCmdCheckpointV2;
 struct WalCmdOptimizeV2;
 
-class CatalogDeltaEntry;
-class CatalogDeltaOperation;
-class BaseTableRef;
-enum class CompactStatementType;
-struct SegmentIndexEntry;
-struct AddDeltaEntryTask;
 class BufferObj;
 
 class ColumnMeta;
@@ -614,9 +608,6 @@ private:
     /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
-
-    // TODO: remove this
-    UniquePtr<CatalogDeltaEntry> txn_delta_ops_entry_{};
 
     // WalManager notify the commit bottom half is done
     std::mutex commit_lock_{};

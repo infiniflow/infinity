@@ -41,7 +41,6 @@ import database_detail;
 import status;
 import table_def;
 import index_base;
-import catalog_delta_entry;
 import bg_task;
 import background_process;
 import base_table_ref;
@@ -91,7 +90,7 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
                SharedPtr<String> txn_text,
                TransactionType txn_type)
     : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
-      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
+      kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
@@ -109,8 +108,7 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
                TxnTimeStamp begin_ts,
                UniquePtr<KVInstance> kv_instance,
                TransactionType txn_type)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
-      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)) {
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), wal_entry_(MakeShared<WalEntry>()), kv_instance_(std::move(kv_instance)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");

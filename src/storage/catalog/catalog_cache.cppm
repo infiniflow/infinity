@@ -24,20 +24,6 @@ import default_values;
 import internal_types;
 import third_party;
 import status;
-// import buffer_handle;
-// import column_def;
-// import profiler;
-// import storage;
-// import catalog_delta_entry;
-
-// using SegmentID = uint32_t;
-// using ChunkID = uint32_t;
-// using BlockID = uint16_t;
-// using ColumnID = uint64_t;
-//
-//// Related to entry
-// using BlockOffset = uint16_t;
-// using SegmentOffset = uint32_t;
 
 namespace infinity {
 

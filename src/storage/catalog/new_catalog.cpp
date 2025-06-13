@@ -34,7 +34,6 @@ import data_type;
 import parsed_expr;
 import constant_expr;
 import meta_key;
-import catalog_delta_entry;
 import db_meeta;
 import table_def;
 import table_meeta;

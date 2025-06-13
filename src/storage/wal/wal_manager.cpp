@@ -37,7 +37,6 @@ import infinity_exception;
 import block_column_entry;
 import compact_state_data;
 import build_fast_rough_filter_task;
-import catalog_delta_entry;
 import column_def;
 
 import db_meta;

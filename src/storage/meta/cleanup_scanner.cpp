@@ -31,6 +31,7 @@ import virtual_store;
 import segment_index_entry;
 import chunk_index_entry;
 import kv_store;
+import catalog;
 
 namespace infinity {
 

@@ -68,6 +68,8 @@ import virtual_store;
 import local_file_handle;
 import mem_usage_change;
 import bg_task;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -540,7 +542,7 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
                                   MemUsed(),
                                   doc_count_);
     }
-
+ 
     auto *table_index_entry = segment_index_entry_->table_index_entry();
     SharedPtr<String> index_name = table_index_entry->GetIndexName();
     auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();

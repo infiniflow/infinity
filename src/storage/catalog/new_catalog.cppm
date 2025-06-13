@@ -27,7 +27,6 @@ import column_def;
 import profiler;
 import third_party;
 import storage;
-import catalog_delta_entry;
 import meta_tree;
 
 namespace infinity {
