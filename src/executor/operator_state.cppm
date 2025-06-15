@@ -421,33 +421,6 @@ export struct CompactOperatorState : public OperatorState {
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
-export struct CompactIndexPrepareOperatorState : public OperatorState {
-    CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
-                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data);
-    ~CompactIndexPrepareOperatorState();
-
-    SharedPtr<CompactStateData> compact_state_data_{};
-    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
-    SizeT create_index_idx_{};
-};
-
-export struct CompactIndexDoOperatorState : public OperatorState {
-    CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
-                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data);
-    ~CompactIndexDoOperatorState();
-
-    SharedPtr<CompactStateData> compact_state_data_{};
-    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
-    SizeT create_index_idx_{};
-};
-
-export struct CompactFinishOperatorState : public OperatorState {
-    CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data);
-    ~CompactFinishOperatorState();
-
-    SharedPtr<CompactStateData> compact_state_data_{};
-};
-
 // Unnest
 export struct UnnestOperatorState : public OperatorState {
     inline explicit UnnestOperatorState() : OperatorState(PhysicalOperatorType::kUnnest) {}
