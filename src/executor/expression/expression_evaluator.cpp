@@ -251,7 +251,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &exp
         if (!expr->block_index_->segment_block_index_.empty()) {
             segment_row_count = expr->block_index_->segment_block_index_.at(segment_id).segment_offset_;
         } else {
-            segment_row_count = expr->block_index_->new_segment_block_index_.at(segment_id).segment_offset_;
+            segment_row_count = expr->block_index_->new_segment_block_index_.at(segment_id).segment_offset();
         }
         const Bitmask *segment_filter_result_ptr = nullptr;
         {

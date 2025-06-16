@@ -58,6 +58,7 @@ target_link_directories(infinity_benchmark PUBLIC "/usr/local/openssl30/lib64")
 add_executable(knn_import_benchmark
     ./knn/knn_import_benchmark.cpp
 )
+add_dependencies(knn_import_benchmark miniocpp inih)
 
 target_include_directories(knn_import_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
@@ -113,6 +114,7 @@ target_link_directories(knn_import_benchmark PUBLIC "/usr/local/openssl30/lib64"
 add_executable(knn_query_benchmark
     ./knn/knn_query_benchmark.cpp
 )
+add_dependencies(knn_query_benchmark miniocpp inih)
 
 target_include_directories(knn_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
