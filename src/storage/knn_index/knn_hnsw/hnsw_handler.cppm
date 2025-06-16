@@ -341,10 +341,8 @@ public:
     const HnswHandlerPtr &get() const { return hnsw_handler_; }
     HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
     void SetLSGParam(float alpha, UniquePtr<float[]> avg);
-    TableIndexEntry *table_index_entry() const override;
     SizeT GetRowCount() const;
     SizeT GetSizeInBytes() const;
-    void SetSegmentEntry(SegmentIndexEntry *segment_index_entry);
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 

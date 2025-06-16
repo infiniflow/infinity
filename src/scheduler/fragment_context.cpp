@@ -67,6 +67,7 @@ import column_def;
 import explain_statement;
 import global_resource_usage;
 import block_index;
+import segment_entry;
 
 import table_index_meeta;
 import segment_index_meta;
@@ -803,11 +804,11 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                 UnrecoverableError(
                     fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
-            //            auto *physical_compact = static_cast<PhysicalCompact *>(first_operator);
-            //            Vector<Vector<Vector<SegmentEntry *>>> segment_groups_list = physical_compact->PlanCompact(parallel_count);
-            //            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-            //                tasks_[task_id]->source_state_ = MakeUnique<CompactSourceState>(std::move(segment_groups_list[task_id]));
-            //            }
+            auto *physical_compact = static_cast<PhysicalCompact *>(first_operator);
+            Vector<Vector<Vector<SegmentEntry *>>> segment_groups_list = physical_compact->PlanCompact(parallel_count);
+            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->source_state_ = MakeUnique<CompactSourceState>(std::move(segment_groups_list[task_id]));
+            }
             UnrecoverableError("Not implemented");
             break;
         }

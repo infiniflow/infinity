@@ -61,8 +61,6 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
     return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
 }
 
-TableIndexEntry *BMPIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
-
 const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()}; }
 
 BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry)

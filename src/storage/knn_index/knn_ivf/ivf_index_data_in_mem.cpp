@@ -141,8 +141,6 @@ public:
         return MemIndexTracerInfo(index_name, table_name, db_name, mem, input_row_count_);
     }
 
-    TableIndexEntry *table_index_entry() const override { return segment_index_entry_->table_index_entry(); }
-
     IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 embedding_dimension, SegmentIndexEntry *segment_index_entry)
         : IVFIndexInMem(begin_row_id, ivf_option, column_logical_type, embedding_data_type, embedding_dimension, segment_index_entry) {
         const auto mid = this->ivf_option().centroid_option_.centroids_num_ratio_ * this->ivf_option().centroid_option_.min_points_per_centroid_;
