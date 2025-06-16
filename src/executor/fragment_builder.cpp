@@ -324,44 +324,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
             return;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
-                String error_message = fmt::format("Invalid input node of {}", phys_op->GetName());
-                UnrecoverableError(error_message);
-            }
-            current_fragment_ptr->AddOperator(phys_op);
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
-            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-
-            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-            next_plan_fragment->SetSinkNode(query_context_ptr_,
-                                            SinkType::kLocalQueue,
-                                            phys_op->left()->GetOutputNames(),
-                                            phys_op->left()->GetOutputTypes());
-            BuildFragments(phys_op->left(), next_plan_fragment.get());
-
-            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
-            return;
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
-                String error_message = fmt::format("Invalid input node of {}", phys_op->GetName());
-                UnrecoverableError(error_message);
-            }
-            current_fragment_ptr->AddOperator(phys_op);
-            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
-            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-
-            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-            next_plan_fragment->SetSinkNode(query_context_ptr_,
-                                            SinkType::kLocalQueue,
-                                            phys_op->left()->GetOutputNames(),
-                                            phys_op->left()->GetOutputTypes());
-            BuildFragments(phys_op->left(), next_plan_fragment.get());
-
-            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
-            return;
-        }
         case PhysicalOperatorType::kCompact: {
             if (phys_op->left() != nullptr || phys_op->right() != nullptr) {
                 String error_message = fmt::format("Invalid input node of {}", phys_op->GetName());

@@ -1058,7 +1058,7 @@ bool NewTxn::NeedToAllocate() const {
     if (base_txn_store_ != nullptr) {
         txn_type = base_txn_store_->type_;
         if (txn_type != GetTxnType()) {
-            LOG_WARN(fmt::format("Transaction type mismatch: {} vs {}", TransactionType2Str(txn_type), TransactionType2Str(GetTxnType())));
+            LOG_DEBUG(fmt::format("Transaction type mismatch: {} vs {}", TransactionType2Str(txn_type), TransactionType2Str(GetTxnType())));
         }
     } else {
         txn_type = GetTxnType();

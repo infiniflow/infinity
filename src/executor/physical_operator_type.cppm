@@ -90,8 +90,6 @@ export enum class PhysicalOperatorType : i8 {
     kDropView,
 
     kCreateIndexPrepare,
-    kCreateIndexDo,
-    kCreateIndexFinish,
 
     // misc
     kExplain,
