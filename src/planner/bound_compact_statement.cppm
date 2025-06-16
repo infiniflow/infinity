@@ -24,7 +24,6 @@ import query_context;
 import bind_context;
 import logger;
 import third_party;
-import table_entry;
 import compact_statement;
 
 namespace infinity {

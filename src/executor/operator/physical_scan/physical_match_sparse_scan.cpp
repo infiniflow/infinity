@@ -23,7 +23,6 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_entry;
 import match_sparse_expression;
 import base_table_ref;
 import block_index;
@@ -58,7 +57,6 @@ import buffer_handle;
 import sparse_util;
 import bmp_util;
 import knn_filter;
-import segment_entry;
 #ifdef INDEX_HANDLER
 import bmp_handler;
 #else

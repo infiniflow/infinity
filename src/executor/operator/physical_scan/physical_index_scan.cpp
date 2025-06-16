@@ -32,7 +32,6 @@ import table_index_entry;
 import segment_index_entry;
 import chunk_index_entry;
 import secondary_index_in_mem;
-import segment_entry;
 import fast_rough_filter;
 import roaring_bitmap;
 import filter_value_type_classification;

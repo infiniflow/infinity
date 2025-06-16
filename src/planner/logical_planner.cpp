@@ -105,7 +105,6 @@ import special_function;
 import utility;
 import wal_manager;
 import infinity_context;
-import table_entry;
 
 import new_txn;
 import meta_info;

@@ -25,8 +25,6 @@ import stl;
 
 import doc_iterator;
 import column_index_reader;
-import table_entry;
-import segment_index_entry;
 import internal_types;
 import index_base;
 import infinity_exception;

@@ -48,11 +48,6 @@ import column_def;
 import statement_common;
 import data_type;
 
-import segment_entry;
-import block_entry;
-import block_column_entry;
-import table_index_entry;
-import base_entry;
 import compilation_config;
 import compaction_process;
 import txn_state;

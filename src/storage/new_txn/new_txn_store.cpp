@@ -30,20 +30,11 @@ import logger;
 import data_access_state;
 import new_txn;
 import default_values;
-import table_entry;
-import catalog;
-import catalog_delta_entry;
 import internal_types;
 import data_type;
-import background_process;
-import bg_task;
 import compact_statement;
-import build_fast_rough_filter_task;
-import create_index_info;
 import persistence_manager;
 import infinity_context;
-import persist_result_handler;
-import wal_entry;
 import kv_store;
 
 namespace infinity {
@@ -133,39 +124,7 @@ DeleteState &NewTxnTableStore1::undo_delete_state() {
     return *undo_delete_state_;
 }
 
-NewTxnStore::NewTxnStore(NewTxn *txn) : txn_(txn) {}
-
-void NewTxnStore::AddDBStore(DBEntry *db_entry) {}
-
-void NewTxnStore::DropDBStore(DBEntry *dropped_db_entry) {}
-
-void NewTxnStore::AddTableStore(TableEntry *table_entry) {}
-
-void NewTxnStore::DropTableStore(TableEntry *dropped_table_entry) {}
-
-void NewTxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr) const {}
-
-void NewTxnStore::MaintainCompactionAlg() const {}
-
-bool NewTxnStore::CheckConflict(Catalog *catalog) { return false; }
-
-Optional<String> NewTxnStore::CheckConflict(const NewTxnStore &other_txn_store) { return None; }
-
-void NewTxnStore::PrepareCommit1() {}
-
-void NewTxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {}
-
-void NewTxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {}
-
-void NewTxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {}
-
-bool NewTxnStore::ReadOnly() const { return false; }
-
-void NewTxnStore::RevertTableStatus() {}
-
-void NewTxnStore::SetCompacting(TableEntry *table_entry) {}
-
-void NewTxnStore::SetCreatingIndex(TableEntry *table_entry) {}
+NewTxnStore::NewTxnStore() = default;
 
 NewTxnTableStore1 *NewTxnStore::GetNewTxnTableStore1(const String &db_id_str, const String &table_id_str) {
     auto iter = txn_tables_store1_.find(table_id_str);

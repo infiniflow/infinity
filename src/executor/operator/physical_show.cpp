@@ -55,9 +55,6 @@ import session_manager;
 import compilation_config;
 import logical_type;
 import create_index_info;
-import segment_index_entry;
-import segment_iter;
-import segment_entry;
 import variables;
 import default_values;
 import wal_manager;
@@ -72,7 +69,6 @@ import buffer_obj;
 import file_worker_type;
 import system_info;
 import wal_entry;
-import catalog_delta_entry;
 import memindex_tracer;
 import persistence_manager;
 import global_resource_usage;
@@ -1940,7 +1936,8 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_info->status_));
+            //            SegmentEntry::SegmentStatusToString(segment_info->status_)
+            Value value = Value::MakeVarchar("No value");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2024,7 +2021,8 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_info->status_));
+            // SegmentEntry::SegmentStatusToString(segment_info->status_)
+            Value value = Value::MakeVarchar("No value");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -4425,12 +4423,6 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case GlobalVariable::kCleanupTrace: {
-            CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
-            String error_msg = tracer->GetCleanupInfo();
-            LOG_INFO(std::move(error_msg));
-            break;
-        }
         default: {
             operator_state->status_ = Status::NoSysVar(*object_name_);
             RecoverableError(operator_state->status_);
@@ -5095,12 +5087,6 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
-            case GlobalVariable::kCleanupTrace: {
-                CleanupInfoTracer *tracer = query_context->storage()->cleanup_info_tracer();
-                String error_msg = tracer->GetCleanupInfo();
-                LOG_INFO(std::move(error_msg));
-                break;
-            }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
                 RecoverableError(operator_state->status_);
@@ -5320,57 +5306,57 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     //    SizeT row_count = 0;
 
     //
-//    BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
-//    Txn *txn = query_context->GetTxn();
-//    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
-//    for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
-//        if (output_block_ptr.get() == nullptr) {
-//            output_block_ptr = DataBlock::MakeUniquePtr();
-//            output_block_ptr->Init(*output_types_);
-//        }
-//
-//        {
-//            // index_name
-//            Value value = Value::MakeVarchar(*memindex_tracer_info.index_name_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-//        }
-//        {
-//            // table_name
-//            Value value = Value::MakeVarchar(*memindex_tracer_info.table_name_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-//        }
-//        {
-//            // db_name
-//            Value value = Value::MakeVarchar(*memindex_tracer_info.db_name_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-//        }
-//        {
-//            // size
-//            Value value = Value::MakeBigInt(memindex_tracer_info.mem_used_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
-//        }
-//        {
-//            // row_count
-//            Value value = Value::MakeBigInt(memindex_tracer_info.row_count_);
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
-//        }
-//
-//        ++row_count;
-//        if (row_count == output_block_ptr->capacity()) {
-//            output_block_ptr->Finalize();
-//            operator_state->output_.emplace_back(std::move(output_block_ptr));
-//            output_block_ptr = nullptr;
-//            row_count = 0;
-//        }
-//    }
-//    output_block_ptr->Finalize();
-//    operator_state->output_.emplace_back(std::move(output_block_ptr));
-//    return;
+    //    BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
+    //    Txn *txn = query_context->GetTxn();
+    //    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
+    //    for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
+    //        if (output_block_ptr.get() == nullptr) {
+    //            output_block_ptr = DataBlock::MakeUniquePtr();
+    //            output_block_ptr->Init(*output_types_);
+    //        }
+    //
+    //        {
+    //            // index_name
+    //            Value value = Value::MakeVarchar(*memindex_tracer_info.index_name_);
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    //        }
+    //        {
+    //            // table_name
+    //            Value value = Value::MakeVarchar(*memindex_tracer_info.table_name_);
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+    //        }
+    //        {
+    //            // db_name
+    //            Value value = Value::MakeVarchar(*memindex_tracer_info.db_name_);
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+    //        }
+    //        {
+    //            // size
+    //            Value value = Value::MakeBigInt(memindex_tracer_info.mem_used_);
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+    //        }
+    //        {
+    //            // row_count
+    //            Value value = Value::MakeBigInt(memindex_tracer_info.row_count_);
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+    //        }
+    //
+    //        ++row_count;
+    //        if (row_count == output_block_ptr->capacity()) {
+    //            output_block_ptr->Finalize();
+    //            operator_state->output_.emplace_back(std::move(output_block_ptr));
+    //            output_block_ptr = nullptr;
+    //            row_count = 0;
+    //        }
+    //    }
+    //    output_block_ptr->Finalize();
+    //    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    //    return;
 }
 
 void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state) {

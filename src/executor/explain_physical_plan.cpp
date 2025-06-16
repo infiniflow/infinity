@@ -94,7 +94,6 @@ import column_def;
 import statement_common;
 import flush_statement;
 import common_query_filter;
-import table_entry;
 import logger;
 import show_statement;
 import check_statement;
