@@ -350,6 +350,9 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
             UnrecoverableError(fmt::format("Remove clean meta failed. {}", *status.msg_));
         }
     }
+    std::sort(metas.begin(), metas.end(), [&](const UniquePtr<MetaKey> &lhs, const UniquePtr<MetaKey> &rhs) {
+        return static_cast<SizeT>(lhs->type_) > static_cast<SizeT>(rhs->type_);
+    });
 }
 
 Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {

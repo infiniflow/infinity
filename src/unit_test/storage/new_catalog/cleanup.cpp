@@ -23,48 +23,19 @@ import new_txn_manager;
 import infinity_context;
 import txn_state;
 import extra_ddl_info;
-import infinity_exception;
 import column_def;
 import data_type;
 import logical_type;
 import table_def;
 import index_base;
 import index_secondary;
-import index_ivf;
-import index_full_text;
-import index_hnsw;
-import embedding_info;
-import sparse_info;
-import index_bmp;
 import internal_types;
-import defer_op;
-import statement_common;
-import meta_info;
 import data_block;
 import column_vector;
 import value;
-import data_access_state;
-import kv_code;
-import kv_store;
 import new_txn;
-import buffer_obj;
-import buffer_handle;
-import secondary_index_in_mem;
-import secondary_index_data;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import db_meeta;
-import catalog_meta;
-import mem_index;
-import roaring_bitmap;
-import index_filter_evaluators;
-import index_emvb;
 import constant_expr;
+import logger;
 
 using namespace infinity;
 
@@ -72,33 +43,97 @@ class TestTxnCleanup : public BaseTestParamStr {
 protected:
     void SetUp() override {
         BaseTestParamStr::SetUp();
-        new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+        new_txn_mgr_ = InfinityContext::instance().storage()->new_txn_manager();
 
-        db_name = std::make_shared<String>("db1");
-        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-        table_name = std::make_shared<std::string>("tb1");
-        table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        db_name_ = std::make_shared<String>("db1");
+        column_def1_ = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        column_def2_ = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        table_name_ = std::make_shared<std::string>("tb1");
+        table_def_ = TableDef::Make(db_name_, table_name_, MakeShared<String>(), {column_def1_, column_def2_});
+
+        index_name1_ = std::make_shared<std::string>("index1");
+        index_def1_ = IndexSecondary::Make(index_name1_, MakeShared<String>(), "file_name", {column_def1_->name()});
+
+        CalculatePlans(0, 0);
     }
 
     void TearDown() override {
-        new_txn_mgr = nullptr;
+        new_txn_mgr_ = nullptr;
         BaseTestParamStr::TearDown();
     }
 
-    void PrepareForCompact() {
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+    void MappingFunction(const std::function<void()> &other_begin, const std::function<void()> &other, const std::function<void()> &other_commit) {
+        function_dictionary_['A'] = other_begin;
+        function_dictionary_['B'] = other;
+        function_dictionary_['C'] = other_commit;
+
+        MappingCleanFunction();
+    }
+
+    void MappingCleanFunction() {
+        // Status status;
+        auto cleanup_begin = [this] { txn_clean_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup); };
+        auto cleanup = [this] {
+            Status status = txn_clean_->Cleanup();
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
+        };
+        auto cleanup_commit = [this] {
+            Status status = new_txn_mgr_->CommitTxn(txn_clean_);
+            EXPECT_TRUE(status.ok());
+        };
+        function_dictionary_['a'] = cleanup_begin;
+        function_dictionary_['b'] = cleanup;
+        function_dictionary_['c'] = cleanup_commit;
+    }
+
+    void CalculatePlans(SizeT clean_function_index, SizeT other_function_index) {
+        if (clean_function_index == 3 && other_function_index == 3) {
+            plans_.push_back(tags_);
+            return;
+        }
+        if (clean_function_index <= 2) {
+            tags_.push_back(clean_function_index + 'a');
+            CalculatePlans(clean_function_index + 1, other_function_index);
+            tags_.pop_back();
+        }
+        if (other_function_index <= 2) {
+            tags_.push_back(other_function_index + 'A');
+            CalculatePlans(clean_function_index, other_function_index + 1);
+            tags_.pop_back();
+        }
+    }
+
+    void TestNoConflict(bool is_compact) {
+        for (const auto &plan : plans_) {
+            LOG_INFO(fmt::format("---{}", plan));
+            PreTest(is_compact);
+            for (auto func_char : plan) {
+                function_dictionary_[func_char]();
+            }
+            PostTest();
+        }
+    }
+
+    void PreTest(bool is_compact) {
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name_, ConflictType::kError, MakeShared<String>());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            Status status = txn->CreateTable(*db_name_, std::move(table_def_), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name_, *table_name_, index_def1_, ConflictType::kError);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
         u32 block_row_cnt = 8192;
@@ -111,13 +146,13 @@ protected:
             };
             // Initialize input block
             {
-                auto col1 = ColumnVector::Make(column_def1->type());
+                auto col1 = ColumnVector::Make(column_def1_->type());
                 col1->Initialize();
                 append_to_col(*col1, v1);
                 input_block->InsertVector(col1, 0);
             }
             {
-                auto col2 = ColumnVector::Make(column_def2->type());
+                auto col2 = ColumnVector::Make(column_def2_->type());
                 col2->Initialize();
                 append_to_col(*col2, v2);
                 input_block->InsertVector(col2, 1);
@@ -127,1735 +162,359 @@ protected:
         };
         for (int i = 0; i < 2; ++i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
+                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
                 Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-                Status status = txn->Import(*db_name, *table_name, input_blocks);
+                Status status = txn->Import(*db_name_, *table_name_, input_blocks);
                 EXPECT_TRUE(status.ok());
-                status = new_txn_mgr->CommitTxn(txn);
+                status = new_txn_mgr_->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
             }
-
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("delete an element {}", i)), TransactionType::kDelete);
+                auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>(fmt::format("delete an element {}", i)), TransactionType::kDelete);
                 Vector<RowID> row_ids;
                 for (u32 j = 1; j < block_row_cnt; j += 2) {
                     row_ids.push_back(RowID(i, j));
                 }
-                Status status = txn->Delete(*db_name, *table_name, row_ids);
+                Status status = txn->Delete(*db_name_, *table_name_, row_ids);
                 EXPECT_TRUE(status.ok());
-                status = new_txn_mgr->CommitTxn(txn);
+                status = new_txn_mgr_->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
             }
         }
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-            Status status = txn->Compact(*db_name, *table_name, {0, 1});
+        if (!is_compact) {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+            Status status = txn->Compact(*db_name_, *table_name_, {0, 1});
             EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
+            status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
     }
 
-    void DropDB() {
-        // drop database
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        Status status = txn5->DropDatabase("db1", ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn5);
-        EXPECT_TRUE(status.ok());
+    void PostTest() {
+        Status status;
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+            status = txn->DropDatabase("db1", ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+            status = txn->Cleanup();
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+            status = txn->Checkpoint(wal_manager->LastCheckpointTS());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr_->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
     }
 
 protected:
-    NewTxnManager *new_txn_mgr = nullptr;
+    NewTxnManager *new_txn_mgr_{};
 
-    SharedPtr<String> db_name;
-    SharedPtr<ColumnDef> column_def1;
-    SharedPtr<ColumnDef> column_def2;
-    SharedPtr<String> table_name;
-    SharedPtr<TableDef> table_def;
+    SharedPtr<String> db_name_;
+    SharedPtr<ColumnDef> column_def1_;
+    SharedPtr<ColumnDef> column_def2_;
+    SharedPtr<String> table_name_;
+    SharedPtr<TableDef> table_def_;
+
+    SharedPtr<String> index_name1_;
+    SharedPtr<IndexBase> index_def1_;
+    NewTxn *txn_clean_{};
+    NewTxn *txn_other_{};
+    Vector<String> plans_;
+    HashMap<char, std::function<void()>> function_dictionary_;
+    String tags_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCleanup,
                          ::testing::Values(/*BaseTestParamStr::NEW_CONFIG_PATH, */ BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-// TEST_P(TestTxnCleanup, compact_with_index_rollback) {
-//     Status status;
-//     {
-//         PrepareForCompact();
-//         auto index_name1 = std::make_shared<std::string>("index1");
-//         auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-//         auto index_name2 = std::make_shared<String>("index2");
-//         auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
-//         auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
-//             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)),
-//             TransactionType::kNormal); Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
-//             EXPECT_TRUE(status.ok());
-//             status = new_txn_mgr->CommitTxn(txn);
-//             EXPECT_TRUE(status.ok());
-//         };
-//         create_index(index_def1);
-//         create_index(index_def2);
-//
-//         //  t1            compact     commit (fail)
-//         //  |--------------|---------------|
-//         //         |-----|----------|
-//         //        t2   drop db    commit
-//
-//         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-//
-//         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-//         status = txn2->DropDatabase(*db_name, ConflictType::kError);
-//         EXPECT_TRUE(status.ok());
-//
-//         status = txn->Compact(*db_name, *table_name, {0, 1});
-//         EXPECT_TRUE(status.ok());
-//
-//         status = new_txn_mgr->CommitTxn(txn2);
-//         EXPECT_TRUE(status.ok());
-//
-//         status = new_txn_mgr->CommitTxn(txn);
-//         EXPECT_FALSE(status.ok());
-//     }
-// }
+// TEST_P(TestTxnCleanup, cleanup_and_create_db) {}
 
-TEST_P(TestTxnCleanup, cleanup_and_drop_db) {
+TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
+    LOG_INFO("Checking cleanup & drop db...");
     Status status;
-    // {
-    //     PrepareForCompact();
-    //     // cleanup's rollback will do nothing, since
-    //     //  t1         cleanup            commit(success)
-    //     //  |------------|-----------------------|
-    //     //      |------------------|--------------------|
-    //     //     t2               rename table          commit
-    //
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-    //
-    //     status = txn2->RenameTable(*db_name, *table_name, "table2");
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     Status status = txn->Cleanup();
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     // {
-    //     //     auto wal_manager = InfinityContext::instance().storage()->wal_manager();
-    //     //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-    //     //     Status status = txn->Checkpoint(wal_manager->LastCheckpointTS());
-    //     //     EXPECT_TRUE(status.ok());
-    //     //     status = new_txn_mgr->CommitTxn(txn);
-    //     //     EXPECT_TRUE(status.ok());
-    //     // }
-    //
-    //     new_txn_mgr->PrintAllKeyValue();
-    //     //
-    //     // EXPECT_TRUE(status.ok());
-    //     // status = new_txn_mgr->CommitTxn(txn2);
-    //     // EXPECT_TRUE(status.ok());
-    //     // new_txn_mgr->PrintAllKeyValue();
-    // }
-    {
-        PrepareForCompact();
-        // cleanup's rollback will do nothing, since
-        //  t1         cleanup            commit(success)
-        //  |------------|-----------------------|
-        //      |------------------|--------------------|
-        //     t2                compact              commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kCompact);
-
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->DropDatabase(*db_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        Status status = txn->Cleanup();
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        // {
-        //     auto wal_manager = InfinityContext::instance().storage()->wal_manager();
-        //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        //     Status status = txn->Checkpoint(wal_manager->LastCheckpointTS());
-        //     EXPECT_TRUE(status.ok());
-        //     status = new_txn_mgr->CommitTxn(txn);
-        //     EXPECT_TRUE(status.ok());
-        // }
-
-        new_txn_mgr->PrintAllKeyValue();
-        //
-        // EXPECT_TRUE(status.ok());
-        // status = new_txn_mgr->CommitTxn(txn2);
-        // EXPECT_TRUE(status.ok());
-        // new_txn_mgr->PrintAllKeyValue();
-    }
-
-    // {
-    //     PrepareForCompact();
-    //
-    //     //  t1            compact     commit (success)
-    //     //  |--------------|---------------|
-    //     //                         |------------------|----------|
-    //     //                        t2                drop db    commit
-    //
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //     status = txn->Compact(*db_name, *table_name, {0, 1});
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-    //
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = txn2->DropDatabase(*db_name, ConflictType::kError);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-    // }
-    // {
-    //     PrepareForCompact();
-    //
-    //     //  t1            compact     commit (success)
-    //     //  |--------------|---------------|
-    //     //         |------------------|----------|
-    //     //        t2                drop db    commit
-    //
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-    //
-    //     status = txn->Compact(*db_name, *table_name, {0, 1});
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = txn2->DropDatabase(*db_name, ConflictType::kError);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-    // }
-    // {
-    //     PrepareForCompact();
-    //
-    //     //  t1            compact     commit (fail)
-    //     //  |--------------|---------------|
-    //     //         |-----|----------|
-    //     //        t2   drop db    commit
-    //
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-    //     status = txn2->DropDatabase(*db_name, ConflictType::kError);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = txn->Compact(*db_name, *table_name, {0, 1});
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_FALSE(status.ok());
-    // }
-    // {
-    //     PrepareForCompact();
-    //
-    //     //                  t1                     compact (fail)    rollback
-    //     //                  |--------------------------|---------------|
-    //     //         |-----|----------|
-    //     //        t2   drop db    commit
-    //
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-    //     status = txn2->DropDatabase(*db_name, ConflictType::kError);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     status = txn->Compact(*db_name, *table_name, {0, 1});
-    //     EXPECT_FALSE(status.ok());
-    //     status = new_txn_mgr->RollBackTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
-    // {
-    //     PrepareForCompact();
-    //
-    //     //                             t1                     compact (fail) rollback
-    //     //                             |--------------------------|---------------|
-    //     //         |-----|----------|
-    //     //        t2   drop db    commit
-    //
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-    //     status = txn2->DropDatabase(*db_name, ConflictType::kError);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-    //
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //     status = txn->Compact(*db_name, *table_name, {0, 1});
-    //     EXPECT_FALSE(status.ok());
-    //     status = new_txn_mgr->RollBackTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
 
-TEST_P(TestTxnCleanup, compact_and_drop_table) {
+// TEST_P(TestTxnCleanup, cleanup_and_create_table) {}
+
+TEST_P(TestTxnCleanup, cleanup_and_drop_table) {
+    LOG_INFO("Checking cleanup & drop table...");
     Status status;
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|----------|
-        //                                    t2                drop table    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->DropTable(*db_name_, *table_name_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //                         |------------------|----------|
-        //                        t2                drop table    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //         |------------------|----------|
-        //        t2                drop table    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (fail)
-        //  |--------------|---------------|
-        //         |-----|----------|
-        //        t2   drop table    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                  t1                     compact (fail)    rollback
-        //                  |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   drop table    commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                             t1                     compact (fail) rollback
-        //                             |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   drop table    commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
 
-TEST_P(TestTxnCleanup, compact_and_add_columns) {
+TEST_P(TestTxnCleanup, cleanup_and_add_columns) {
+    LOG_INFO("Checking cleanup & add columns...");
+    Status status;
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
     auto column_def3 =
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-    auto CheckTable = [&](Vector<ColumnID> column_idxes) {
-        auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
-            EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
-            if (column_meta.column_idx() != 0) {
-                EXPECT_NE(outline_buffer, nullptr);
-            }
-        };
 
-        auto check_block = [&](BlockMeta &block_meta) {
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(row_cnt, 8192);
-
-            for (auto column_id : column_idxes) {
-                ColumnMeta column_meta(column_id, block_meta);
-                check_column(column_meta);
-            }
-        };
-
-        auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
-
-            for (auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta);
-                check_block(block_meta);
-            }
-        };
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("add columns"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->AddColumns(*db_name_, *table_name_, Vector<SharedPtr<ColumnDef>>{column_def3});
         EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>{2});
-
-        {
-            SegmentID segment_id = (*segment_ids_ptr)[0];
-            SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
-        }
-
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
     };
 
-    auto CheckTable1 = [&](Vector<ColumnID> column_idxes) {
-        auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
-            EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
-            if (column_meta.column_idx() != 0) {
-                EXPECT_NE(outline_buffer, nullptr);
-            }
-        };
-
-        auto check_block = [&](BlockMeta &block_meta) {
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(row_cnt, 8192);
-
-            for (auto column_id : column_idxes) {
-                ColumnMeta column_meta(column_id, block_meta);
-                check_column(column_meta);
-            }
-        };
-
-        auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-
-            for (auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta);
-                check_block(block_meta);
-            }
-        };
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(segment_ids_ptr->size(), 2);
-
-        {
-            SegmentID segment_id = (*segment_ids_ptr)[0];
-            SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
-        }
-
-        {
-            SegmentID segment_id = (*segment_ids_ptr)[1];
-            SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
-        }
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
-
-    Status status;
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|----------|
-        //                                    t2                add column    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable({0, 1, 2});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //                         |------------------|----------|
-        //                        t2                add column    commit (fail)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable({0, 1});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //         |------------------|----------|
-        //        t2                add column    commit (fail)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable({0, 1});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (fail)
-        //  |--------------|---------------|
-        //         |-----|----------|
-        //        t2   add column    commit (success)
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable1({0, 1, 2});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                  t1                     compact     commit (fail)
-        //                  |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   add column    commit (success)
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable1({0, 1, 2});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                             t1                     compact         commit (success)
-        //                             |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   add column    commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable({0, 1, 2});
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
 
-TEST_P(TestTxnCleanup, compact_and_drop_columns) {
-    auto CheckTable = [&](const Vector<ColumnID> &column_idxes, const Vector<SegmentID> &segment_ids) {
-        auto check_column = [&](ColumnMeta &column_meta) {
-            BufferObj *column_buffer = nullptr;
-            BufferObj *outline_buffer = nullptr;
-            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
-            EXPECT_TRUE(status.ok());
-            EXPECT_NE(column_buffer, nullptr);
-            // EXPECT_NE(outline_buffer, nullptr);
-        };
-
-        auto check_block = [&](BlockMeta &block_meta) {
-            auto [row_cnt, status] = block_meta.GetRowCnt1();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(row_cnt, 8192);
-
-            for (auto column_id : column_idxes) {
-                ColumnMeta column_meta(column_id, block_meta);
-                check_column(column_meta);
-            }
-        };
-
-        auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
-            EXPECT_TRUE(status.ok());
-
-            for (auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta);
-                check_block(block_meta);
-            }
-        };
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+TEST_P(TestTxnCleanup, cleanup_and_drop_columns) {
+    LOG_INFO("Checking cleanup & drop columns...");
+    Status status;
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("drop columns"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->DropColumns(*db_name_, *table_name_, Vector<String>({column_def2_->name()}));
         EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, segment_ids);
-
-        {
-            SegmentID segment_id = (*segment_ids_ptr)[0];
-            SegmentMeta segment_meta(segment_id, *table_meta);
-            check_segment(segment_meta);
-        }
-
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
     };
 
-    Status status;
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|----------|
-        //                                    t2                drop column    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable({0}, {2});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //                         |------------------|----------|
-        //                        t2                drop column    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable({0, 1}, {2});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (success)
-        //  |--------------|---------------|
-        //         |------------------|----------|
-        //        t2                drop column    commit (fail)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable({0, 1}, {2});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact     commit (fail)
-        //  |--------------|---------------|
-        //         |-----|----------|
-        //        t2   drop column    commit (success)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable({0}, {0, 1});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                  t1                     compact     commit (fail)
-        //                  |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   drop column    commit
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        CheckTable({0}, {0, 1});
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                             t1                     compact         commit (success)
-        //                             |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   drop column    commit
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
-        status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable({0}, {2});
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
 
-TEST_P(TestTxnCleanup, compact_and_rename_table) {
+TEST_P(TestTxnCleanup, cleanup_and_rename_table) {
+    LOG_INFO("Checking cleanup & rename table...");
     Status status;
     auto new_table_name = std::make_shared<std::string>("tb2");
 
-    {
-        PrepareForCompact();
-
-        //  t1            compact      commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|------------------|
-        //                                    t2                rename          commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->RenameTable(*db_name_, *table_name_, *new_table_name);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact      commit (success)
-        //  |--------------|---------------|
-        //                           |------------------|------------------|
-        //                          t2                rename          commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact      commit (success)
-        //  |--------------|---------------|
-        //               |---------------------|------------------|
-        //              t2                 rename          commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact      commit (success)
-        //  |--------------|---------------|
-        //               |---------------|------------------|
-        //              t2              rename          commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1                 compact      commit (success)
-        //  |--------------------|---------------|
-        //      |-------------|----------------------|
-        //      t2            rename              commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1                 compact        commit (success)
-        //  |--------------------|-----------------------|
-        //      |-------------|----------------------|
-        //      t2            rename              commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //            t1                 compact        commit (success)
-        //             |--------------------|-----------------------|
-        //      |-------------|----------------------|
-        //      t2            rename              commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                                t1                 compact        commit (success)
-        //                                |--------------------|-----------------------|
-        //      |-------------|----------------------|
-        //      t2            rename              commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
-        status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
 
-TEST_P(TestTxnCleanup, compact_and_compact) {
-    auto CheckTable = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+TEST_P(TestTxnCleanup, cleanup_and_compact) {
+    LOG_INFO("Checking cleanup & compact...");
+    Status status;
+    auto new_table_name = std::make_shared<std::string>("tb2");
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->Compact(*db_name_, *table_name_, {0, 1});
         EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(segment_ids_ptr->size(), 1);
     };
 
-    Status status;
-    {
-        PrepareForCompact();
-
-        //  t1            compact   commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|------------------|
-        //                                    t2                compact (fail)     commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        //        new_txn_mgr->PrintAllKeyValue();
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact   commit (success)
-        //  |--------------|---------------|
-        //                         |------------------|------------------|
-        //                        t2                compact (fail)    rollback
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact   commit (success)
-        //  |--------------|---------------|
-        //         |------------------|------------------|
-        //        t2                compact (fail)       rollback
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            compact                        commit
-        //  |--------------|--------------------------------|
-        //         |------------------|------------------|
-        //        t2                compact (fail)      rollback
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
-
-        status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable();
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(true);
 }
 
-TEST_P(TestTxnCleanup, compact_and_create_index) {
-    auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+// TEST_P(TestTxnCleanup, cleanup_and_create_index) {}
 
-    auto CheckTable = [&](const Vector<SegmentID> &segment_ids = {2}) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, segment_ids);
-
-        Vector<String> *index_ids_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_names_ptr, Vector<String>({*index_name1}));
-        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], *table_meta);
-
-        SharedPtr<IndexBase> index_base;
-        std::tie(index_base, status) = table_index_meta.GetIndexBase();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_base->index_name_, *index_name1);
-
-        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
-
-    auto CheckWithNoIndex = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
-
-        Vector<String> *index_ids_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_ids_strs_ptr, Vector<String>({}));
-    };
-
-    auto CheckWithNoCompact = [&] { return CheckTable(Vector<SegmentID>({0, 1})); };
-
+TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
+    LOG_INFO("Checking cleanup & drop index...");
     Status status;
-    {
-        PrepareForCompact();
+    auto new_table_name = std::make_shared<std::string>("tb2");
 
-        //  t1            create index   commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|----------|
-        //                                    t2                compact    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        status = txn_other_->DropIndexByName(*db_name_, *table_name_, *index_name1_, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            create index   commit (success)
-        //  |--------------|---------------|
-        //                         |------------------|----------|
-        //                        t2                compact    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckWithNoCompact();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            create index   commit (success)
-        //  |--------------|---------------|
-        //         |------------------|----------|
-        //        t2                compact    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckWithNoCompact();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //  t1            create index   commit (success)
-        //  |--------------|---------------|
-        //         |-----|----------|
-        //        t2   compact    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                  t1                     create index   commit (success)
-        //                  |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   compact    commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                             t1                     create index     commit
-        //                             |--------------------------|---------------|
-        //         |-----|----------|
-        //        t2   compact    commit
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckTable();
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
 
-TEST_P(TestTxnCleanup, compact_and_drop_index) {
-    auto index_name1 = std::make_shared<std::string>("index1");
-    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-
-    [[maybe_unused]] auto CheckTable = [&](const Vector<SegmentID> &segment_ids = {2}) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, segment_ids);
-
-        Vector<String> *index_ids_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_names_ptr, Vector<String>({*index_name1}));
-        TableIndexMeeta table_index_meta((*index_ids_strs_ptr)[0], *table_meta);
-
-        SharedPtr<IndexBase> index_base;
-        std::tie(index_base, status) = table_index_meta.GetIndexBase();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_base->index_name_, *index_name1);
-
-        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        std::tie(index_segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_segment_ids_ptr, segment_ids);
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    };
-
-    auto CheckWithNoIndex = [&] {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
-
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
-
-        Vector<String> *index_ids_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
-        status = table_meta->GetIndexIDs(index_ids_strs_ptr, &index_names_ptr);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_ids_strs_ptr, Vector<String>({}));
-    };
-
-    [[maybe_unused]] auto CheckWithNoCompact = [&] { return CheckTable(Vector<SegmentID>({0, 1})); };
-
-    auto PrepareForCompact = [&] {
-        this->PrepareForCompact();
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-            Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
-    };
-
+TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
+    LOG_INFO("Checking cleanup & optimize index...");
     Status status;
-    {
-        PrepareForCompact();
+    auto new_table_name = std::make_shared<std::string>("tb2");
 
-        //  t1            drop index   commit (success)
-        //  |--------------|---------------|
-        //                                     |------------------|----------|
-        //                                    t2                compact    commit
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        SegmentID segment_id = 2;
+        status = txn_other_->OptimizeIndex(*db_name_, *table_name_, *index_name1_, segment_id);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
+}
+
+TEST_P(TestTxnCleanup, cleanup_and_append) {
+    LOG_INFO("Checking cleanup & append...");
+    Status status;
+    auto new_table_name = std::make_shared<std::string>("tb2");
+
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        auto make_input_block = [&](const Value &v1, const Value &v2, SizeT row_cnt) {
+            auto make_column = [&](SharedPtr<ColumnDef> &column_def, const Value &v) {
+                auto col = ColumnVector::Make(column_def->type());
+                col->Initialize();
+                for (SizeT i = 0; i < row_cnt; ++i) {
+                    col->AppendValue(v);
+                }
+                return col;
+            };
+            auto input_block = MakeShared<DataBlock>();
+            {
+                auto col1 = make_column(column_def1_, v1);
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = make_column(column_def2_, v2);
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
+        auto input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 4);
+        status = txn_other_->Append(*db_name_, *table_name_, input_block);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        CheckWithNoIndex();
-        DropDB();
-    }
-    /* FIXME: PostRollback() for dump index is not implemented.
-    {
-        PrepareForCompact();
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
+}
 
-        //    t1      drop index       commit (success)
-        //    |----------|---------|
-        //                    |------------------|----------------|
-        //                    t2             compact       commit (fail)
+TEST_P(TestTxnCleanup, cleanup_and_delete) {
+    LOG_INFO("Checking cleanup & delete...");
+    Status status;
+    auto new_table_name = std::make_shared<std::string>("tb2");
 
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        Vector<RowID> row_ids;
+        row_ids.push_back(RowID(2, 0));
+        status = txn_other_->Delete(*db_name_, *table_name_, row_ids);
         EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
+}
+
+TEST_P(TestTxnCleanup, cleanup_and_update) {
+    LOG_INFO("Checking cleanup & update...");
+    Status status;
+    auto new_table_name = std::make_shared<std::string>("tb2");
+
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("update"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        auto make_input_block = [&](const Value &v1, const Value &v2, SizeT row_cnt) {
+            auto make_column = [&](SharedPtr<ColumnDef> &column_def, const Value &v) {
+                auto col = ColumnVector::Make(column_def->type());
+                col->Initialize();
+                for (SizeT i = 0; i < row_cnt; ++i) {
+                    col->AppendValue(v);
+                }
+                return col;
+            };
+            auto input_block = MakeShared<DataBlock>();
+            {
+                auto col1 = make_column(column_def1_, v1);
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = make_column(column_def2_, v2);
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
+        auto input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 4);
+        Vector<RowID> row_ids;
+        row_ids.push_back(RowID(2, 0));
+        status = txn_other_->Update(*db_name_, *table_name_, input_block, row_ids);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //    t1      drop index                       commit (success)
-        //    |----------|--------------------------------|
-        //                    |-----------------------|-------------------------|
-        //                    t2                  compact              commit (fail)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
+}
+
+TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
+    LOG_INFO("Checking cleanup & dump index...");
+    Status status;
+    auto new_table_name = std::make_shared<std::string>("tb2");
+
+    auto other_begin = [this] { txn_other_ = new_txn_mgr_->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal); };
+    auto other = [&, this] {
+        SegmentID segment_id = 2;
+        status = txn_other_->DumpMemIndex(*db_name_, *table_name_, *index_name1_, segment_id);
         EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
+    };
+    auto other_commit = [&, this] {
+        status = new_txn_mgr_->CommitTxn(txn_other_);
         EXPECT_TRUE(status.ok());
+    };
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //    t1      drop index                                   commit (success)
-        //    |----------|-----------------------------------------------|
-        //                    |-------------|-----------------------|
-        //                    t2        compact            commit (success)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    */
-    {
-        PrepareForCompact();
-
-        //    t1                                      drop index                              commit (success)
-        //    |------------------------------------------|------------------------------------------|
-        //                    |----------------------|------------------------------|
-        //                    t2                  compact                    commit (success)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //    t1                                                   drop index                                   commit (success)
-        //    |------------------------------------------------------|------------------------------------------|
-        //                    |----------------------|------------|
-        //                    t2                  compact   commit (success)
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                                                  t1                drop index                                 commit (success)
-        //                                                  |--------------------|------------------------------------------|
-        //                    |----------------------|---------------|
-        //                    t2                   compact     commit (success)
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
-    {
-        PrepareForCompact();
-
-        //                                                           t1               drop index                             commit (success)
-        //                                                          |--------------------|------------------------------------------|
-        //                    |-----------------|------------|
-        //                    t2              compact     commit (success)
-
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-
-        CheckWithNoIndex();
-        DropDB();
-    }
+    MappingFunction(other_begin, other, other_commit);
+    TestNoConflict(false);
 }
