@@ -80,8 +80,6 @@ import physical_match_tensor_scan;
 import physical_match_sparse_scan;
 import physical_fusion;
 import physical_create_index_prepare;
-import physical_create_index_do;
-import physical_create_index_finish;
 import physical_read_cache;
 import physical_unnest;
 import physical_unnest_aggregate;

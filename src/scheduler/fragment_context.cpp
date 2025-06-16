@@ -37,7 +37,6 @@ import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
 import physical_create_index_prepare;
-import physical_create_index_do;
 import physical_sort;
 import physical_top;
 import physical_merge_top;
@@ -81,13 +80,6 @@ template <typename OperatorStateType>
 UniquePtr<OperatorState> MakeTaskStateTemplate(PhysicalOperator *physical_op) {
 
     return MakeUnique<OperatorStateType>();
-}
-
-UniquePtr<OperatorState> MakeCreateIndexDoState(PhysicalCreateIndexDo *physical_create_index_do, FragmentTask *task, FragmentContext *fragment_ctx) {
-    UniquePtr<CreateIndexDoOperatorState> operator_state = MakeUnique<CreateIndexDoOperatorState>();
-    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    operator_state->create_index_shared_data_ = parallel_materialize_fragment_ctx->create_index_shared_data_.get();
-    return operator_state;
 }
 
 UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_scan, FragmentTask *task) {
@@ -388,13 +380,6 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         }
         case PhysicalOperatorType::kCreateIndexPrepare: {
             return MakeTaskStateTemplate<CreateIndexPrepareOperatorState>(physical_ops[operator_id]);
-        }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            auto *physical_create_index_do = static_cast<PhysicalCreateIndexDo *>(physical_ops[operator_id]);
-            return MakeCreateIndexDoState(physical_create_index_do, task, fragment_ctx);
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            return MakeTaskStateTemplate<CreateIndexFinishOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateCollection: {
             return MakeTaskStateTemplate<CreateCollectionOperatorState>(physical_ops[operator_id]);
@@ -714,16 +699,6 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     return task_n;
 }
 
-SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index_do_operator, FragmentContext *fragment_ctx) {
-    auto *table_ref = create_index_do_operator->base_table_ref_.get();
-    // FIXME: to create index on unsealed_segment
-    SizeT segment_cnt = table_ref->block_index_->SegmentCount();
-
-    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    parallel_materialize_fragment_ctx->create_index_shared_data_ = MakeUnique<CreateIndexSharedData>(table_ref->block_index_.get());
-    return segment_cnt;
-}
-
 SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentContext *fragment_context, FragmentContext *parent_context) {
     if (parent_context == nullptr) {
         SizeT task_n = compact_operator->TaskletCount();
@@ -837,16 +812,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            if (fragment_type_ != FragmentType::kParallelMaterialize) {
-                UnrecoverableError(
-                    fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
-            }
-            for (auto &task : tasks_) {
-                task->source_state_ = MakeUnique<EmptySourceState>();
-            }
-            break;
-        }
         case PhysicalOperatorType::kUnionAll:
         case PhysicalOperatorType::kIntersect:
         case PhysicalOperatorType::kExcept:
@@ -944,7 +909,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndexPrepare:
-        case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -1185,11 +1149,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kCreateIndexPrepare: {
-            auto *create_index_prepare_operator = static_cast<const PhysicalCreateIndexPrepare *>(last_operator);
-            if (!create_index_prepare_operator->prepare_) {
-                tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
-                break;
-            }
+            tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
+            break;
         }
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
@@ -1207,7 +1168,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo:
         case PhysicalOperatorType::kCompact: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(
@@ -1221,7 +1181,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kCreateTable:
-        case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -1284,12 +1243,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
         case PhysicalOperatorType::kProjection: {
             // Serial Materialize
             parallel_count = 1;
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            const auto *create_index_do_operator = static_cast<const PhysicalCreateIndexDo *>(first_operator);
-            InitCreateIndexDoFragmentContext(create_index_do_operator, this);
-            parallel_count = std::max(parallel_count, (i64)1l);
             break;
         }
         case PhysicalOperatorType::kCompact: {
