@@ -377,6 +377,12 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
     SharedPtr<String> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
     SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
     const auto &index_def_ptr = logical_create_index->index_definition();
+
+    bool parallel = false;
+    if (index_def_ptr->index_type_ == IndexType::kHnsw) {
+        parallel = true;
+    }
+
     return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
                                                   logical_create_index->base_table_ref(),
                                                   logical_create_index->index_definition(),
@@ -384,7 +390,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
                                                   logical_create_index->GetOutputNames(),
                                                   logical_create_index->GetOutputTypes(),
                                                   logical_create_index->load_metas(),
-                                                  false);
+                                                  parallel);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
