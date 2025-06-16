@@ -176,6 +176,6 @@ def count_star_thread(connection_pool: ConnectionPool, loop_count, thread_id):
     table_obj = db_obj.get_table("parallel_insert_test")
 
     for i in range(loop_count):
-        table_obj.filter("1=1").output(["count(*)"]).to_pl()
+        table_obj.output(["count(*)"]).to_pl()
 
     connection_pool.release_conn(infinity_obj)
