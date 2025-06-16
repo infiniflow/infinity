@@ -4088,7 +4088,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
     }
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_rename) {
@@ -4477,8 +4476,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_create_index) {
@@ -5099,8 +5096,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_drop_index) {
@@ -5748,8 +5743,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_compact) {
@@ -6093,8 +6086,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
 
         DropDB();
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_optimize_index) {
@@ -6475,6 +6466,4 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
 
         DropDB();
     }
-
-    RemoveDbDirs();
 }
