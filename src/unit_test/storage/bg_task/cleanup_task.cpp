@@ -22,7 +22,6 @@ import storage;
 import column_def;
 import logical_type;
 import data_type;
-import txn_manager;
 import table_def;
 import extra_ddl_info;
 import column_vector;

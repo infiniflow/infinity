@@ -45,7 +45,6 @@ import internal_types;
 import virtual_store;
 import local_file_handle;
 import knn_filter;
-import txn;
 import block_index;
 
 import new_txn;

@@ -36,6 +36,7 @@ import table_index_meeta;
 import create_index_info;
 import segment_meta;
 import kv_utility;
+import column_index_reader;
 
 namespace infinity {
 

@@ -32,10 +32,6 @@ import defer_op;
 import third_party;
 import internal_types;
 import logger;
-import block_entry;
-import segment_entry;
-import segment_index_entry;
-import chunk_index_entry;
 import block_version;
 import index_defines;
 import create_index_info;
@@ -51,27 +47,6 @@ import default_values;
 import status;
 
 namespace infinity {
-
-WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
-    : block_id_(block_entry->block_id_), row_count_(block_entry->block_row_count_), row_capacity_(block_entry->row_capacity_) {
-    outline_infos_.resize(block_entry->columns_.size());
-    for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
-        auto &col_i_outline_info = outline_infos_[i];
-        auto *column = block_entry->columns_[i].get();
-        col_i_outline_info = {column->OutlineBufferCount(), column->LastChunkOff()};
-        Vector<String> paths = column->FilePaths();
-        paths_.insert(paths_.end(), paths.begin(), paths.end());
-    }
-    String version_file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
-    paths_.push_back(version_file_path);
-    auto *pm = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(pm, paths_);
-#ifdef INFINITY_DEBUG
-    for (auto &pth : paths_) {
-        assert(!std::filesystem::path(pth).is_absolute());
-    }
-#endif
-}
 
 WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
     Status status;
@@ -199,14 +174,6 @@ String WalBlockInfo::ToString() const {
     return std::move(ss).str();
 }
 
-WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
-    : segment_id_(segment_entry->segment_id_), column_count_(segment_entry->column_count_), row_count_(segment_entry->row_count_),
-      actual_row_count_(segment_entry->actual_row_count_), row_capacity_(segment_entry->row_capacity_) {
-    for (auto &block_entry : segment_entry->block_entries_) {
-        block_infos_.push_back(WalBlockInfo(block_entry.get()));
-    }
-}
-
 WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) : segment_id_(segment_meta.segment_id()) {
     Status status;
 
@@ -287,38 +254,6 @@ String WalSegmentInfo::ToString() const {
        << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", block_info count: " << block_infos_.size() << std::endl;
     return std::move(ss).str();
-}
-
-WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
-    : chunk_id_(chunk_index_entry->chunk_id_), base_name_(chunk_index_entry->base_name_), base_rowid_(chunk_index_entry->base_rowid_),
-      row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
-    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
-    IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
-    switch (index_type) {
-        case IndexType::kFullText: {
-            Path rela_dir = *(segment_index_entry->index_dir());
-            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + POSTING_SUFFIX));
-            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + DICT_SUFFIX));
-            paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
-            break;
-        }
-        case IndexType::kHnsw:
-        case IndexType::kEMVB:
-        case IndexType::kIVF:
-        case IndexType::kSecondary:
-        case IndexType::kBMP: {
-            String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
-            String file_path = Path(*(segment_index_entry->index_dir())) / file_name;
-            paths_.push_back(file_path);
-            break;
-        }
-        default: {
-            String error_message = "Unsupported index type when add wal.";
-            UnrecoverableError(error_message);
-        }
-    }
-    auto *pm = InfinityContext::instance().persistence_manager();
-    addr_serializer_.Initialize(pm, paths_);
 }
 
 WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_id_(chunk_index_meta.chunk_id()) {

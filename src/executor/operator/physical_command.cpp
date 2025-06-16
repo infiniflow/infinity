@@ -42,7 +42,6 @@ import infinity_exception;
 import variables;
 import logger;
 import table_entry;
-import txn;
 import cleanup_scanner;
 import infinity_context;
 import periodic_trigger;

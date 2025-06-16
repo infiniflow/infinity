@@ -79,7 +79,6 @@ import txn;
 import logger;
 import defer_op;
 import highlighter;
-import txn_store;
 
 import meta_info;
 import new_txn;

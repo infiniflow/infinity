@@ -47,7 +47,6 @@ import data_access_state;
 import kv_code;
 import kv_store;
 import new_txn;
-import new_txn_store;
 import buffer_obj;
 import buffer_handle;
 import secondary_index_in_mem;

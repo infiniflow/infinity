@@ -410,14 +410,6 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
 }
 
 void SegmentIndexEntry::AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn, Vector<ChunkID> deprecate_chunk_ids) {
-    Vector<WalChunkIndexInfo> chunk_infos;
-    chunk_infos.emplace_back(dumped_index_entry);
-
-    TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
-    const auto &db_name = *table_entry->GetDBName();
-    const auto &table_name = *table_entry->GetTableName();
-    const auto &index_name = *table_index_entry_->GetIndexName();
-    txn->AddWalCmd(MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id_, std::move(chunk_infos), std::move(deprecate_chunk_ids)));
 }
 
 // void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {

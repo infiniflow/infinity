@@ -19,7 +19,6 @@ export module periodic_trigger;
 import stl;
 import background_process;
 import compaction_process;
-import txn_manager;
 import wal_manager;
 import global_resource_usage;
 

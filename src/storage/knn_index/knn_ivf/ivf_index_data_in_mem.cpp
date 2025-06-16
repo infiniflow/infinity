@@ -46,6 +46,8 @@ import table_index_entry;
 import infinity_context;
 import third_party;
 import buffer_obj;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 

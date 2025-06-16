@@ -29,11 +29,6 @@ class BGTaskProcessor;
 class WalManager;
 class CatalogDeltaEntry;
 
-export struct TxnInfo {
-    TransactionID txn_id_;
-    SharedPtr<String> txn_text_;
-};
-
 export class TxnManager {
 public:
     explicit TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts);
@@ -74,9 +69,9 @@ public:
 
     SizeT ActiveTxnCount();
 
-    Vector<TxnInfo> GetTxnInfoArray() const;
-
-    UniquePtr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
+    //    Vector<TxnInfo> GetTxnInfoArray() const;
+    //
+    //    UniquePtr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
 
     Vector<SharedPtr<TxnContext>> GetTxnContextHistories() const;
 

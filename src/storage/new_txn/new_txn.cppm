@@ -33,12 +33,6 @@ namespace infinity {
 class KVInstance;
 class NewCatalog;
 class NewTxnManager;
-struct Catalog;
-struct TableEntry;
-struct DBEntry;
-struct BaseEntry;
-struct TableIndexEntry;
-struct SegmentEntry;
 struct WalEntry;
 struct WalCmd;
 struct WalCmdCreateDatabaseV2;
@@ -60,12 +54,6 @@ struct WalSegmentInfo;
 struct WalCmdCheckpointV2;
 struct WalCmdOptimizeV2;
 
-class CatalogDeltaEntry;
-class CatalogDeltaOperation;
-class BaseTableRef;
-enum class CompactStatementType;
-struct SegmentIndexEntry;
-struct AddDeltaEntryTask;
 class BufferObj;
 
 class ColumnMeta;
@@ -201,8 +189,6 @@ public:
 
     Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
-    Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
-
     // bool CheckDatabaseExists(const String &db_name);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
@@ -214,23 +200,15 @@ public:
 
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
-    // Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
-
     Status AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
     Status DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names);
-
-    // Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
-
-    // Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
 
     Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
 
     Status RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name);
 
     Status ListTable(const String &db_name, Vector<String> &table_names);
-
-    // Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
@@ -252,10 +230,6 @@ public:
 
     Tuple<SharedPtr<BlockColumnInfo>, Status>
     GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
-
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
-
-    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
     // Index OPs
 
@@ -285,38 +259,12 @@ public:
 
     Status ListIndex(const String &db_name, const String &table_name, Vector<String> &index_names);
 
-    // // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
-    // // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
-    // // operator. (called by `PhysicalCreateIndexDo`)
-    // Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
-
-    // Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
-
-    // Pair<Vector<SegmentIndexEntry *>, Status>
-    // CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
-
-    // Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
-
-    // Status CreateIndexDo(TableEntry *table_entry,
-    //                      const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
-    //                      const String &index_name,
-    //                      HashMap<SegmentID, atomic_u64> &create_index_idxes);
-
-    // Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
-
-    // Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
-
-    // DML
-    // Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
-
     Status Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks);
 
 private:
     Status ReplayImport(WalCmdImportV2 *import_cmd);
 
 public:
-    // Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
-
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
     Status Append(const TableInfo &table_info, const SharedPtr<DataBlock> &input_block);
@@ -335,8 +283,6 @@ private:
     Status DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids);
 
 public:
-    // Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
-
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
     Status Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
@@ -349,11 +295,6 @@ private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
 public:
-    // Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType
-    // type);
-
-    // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
-
     Status Checkpoint(TxnTimeStamp last_ckp_ts);
 
     // Getter
@@ -409,8 +350,6 @@ public:
 
     bool IsReaderAllowed() const { return allowed_in_reader_; }
 
-    NewTxnStore *txn_store() { return &txn_store_; }
-
     BaseTxnStore *GetTxnStore() const { return base_txn_store_.get(); }
 
     SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
@@ -418,8 +357,6 @@ public:
     Vector<SharedPtr<String>> GetOperations() const;
 
     KVInstance *kv_instance() const { return kv_instance_.get(); }
-
-    Status PrintVersion(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool ignore_invisible);
 
     void AddMetaKeyForCommit(const String &key);
 
@@ -645,11 +582,15 @@ public:
     // Get the table id which is used in the txn. Return empty string if no table is used.
     String GetTableIdStr();
 
+    void AddSemaphore(UniquePtr<std::binary_semaphore> sema);
+    const Vector<UniquePtr<std::binary_semaphore>> &semas() const;
+    void AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key);
+    const Vector<UniquePtr<MetaKey>> &GetMetaKeyForBufferObject() const;
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
     BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
-    Catalog *catalog_{};
     NewCatalog *new_catalog_{};
 
     // Used to store the local data in this transaction
@@ -667,9 +608,6 @@ private:
     /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
-
-    // TODO: remove this
-    UniquePtr<CatalogDeltaEntry> txn_delta_ops_entry_{};
 
     // WalManager notify the commit bottom half is done
     std::mutex commit_lock_{};
@@ -690,6 +628,10 @@ private:
     // Used for new checkpoint
     TxnTimeStamp current_ckp_ts_{};
     SizeT wal_size_{};
+
+    // Use for commit and rollback
+    Vector<UniquePtr<MetaKey>> object_meta_keys_{};
+    Vector<UniquePtr<std::binary_semaphore>> semas_{};
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
