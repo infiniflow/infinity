@@ -71,7 +71,7 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
         }
     } else {
         for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
-            for (auto &block_meta : segment_info.block_map_) {
+            for (auto &block_meta : segment_info.block_map()) {
                 global_blocks.emplace_back(segment_id, block_meta->block_id());
             }
         }
