@@ -1381,6 +1381,15 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
                 UnrecoverableError("Uninitialized storage mode");
             }
 
+            if (storage_mode != StorageMode::kWritable) {
+                return Status::InvalidNodeRole("Attempt to write on non-writable node");
+            }
+
+            auto *dump_index = static_cast<DumpIndexCmd *>(command_statement->command_info_.get());
+            if (dump_index->db_name().empty()) {
+                dump_index->SetDBName(query_context_ptr_->schema_name());
+            }
+
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
             this->logical_plan_ = logical_command;
             break;
