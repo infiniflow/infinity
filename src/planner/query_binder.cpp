@@ -84,6 +84,7 @@ import new_txn;
 import db_meeta;
 import table_meeta;
 import new_catalog;
+import kv_store;
 
 namespace infinity {
 
@@ -440,11 +441,16 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
     Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    Optional<TableMeeta> tmp_table_meta;
+    status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
     if (!status.ok()) {
         RecoverableError(status);
     }
+    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
+                                             tmp_table_meta->table_id_str(),
+                                             tmp_table_meta->kv_instance(),
+                                             tmp_table_meta->begin_ts(),
+                                             tmp_table_meta->commit_ts());
     table_info = MakeShared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -484,7 +490,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();
-    block_index->NewInit(new_txn, db_name, table_name);
+    block_index->NewInit(std::move(table_meta));
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);

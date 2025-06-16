@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "hnsw_benchmark_util.h"
 #include <cassert>
 #include <cstring>
 #include <functional>
@@ -20,7 +21,6 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
-#include "hnsw_benchmark_util.h"
 
 import compilation_config;
 
@@ -221,7 +221,9 @@ int main(int argc, char *argv[]) {
             auto select_rowid_expr = new FunctionExpr();
             select_rowid_expr->func_name_ = "row_id";
             output_columns->emplace_back(select_rowid_expr);
-            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
+            auto result =
+                infinity
+                    ->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
             {
                 auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
                 auto &column = *cv[0];
