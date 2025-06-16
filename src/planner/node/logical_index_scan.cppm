@@ -21,13 +21,11 @@ import logical_node_type;
 import logical_node;
 import column_binding;
 import base_table_ref;
-import segment_index_entry;
 import base_expression;
 import default_values;
 import filter_expression_push_down;
 import data_type;
 import meta_info;
-import table_index_entry;
 import fast_rough_filter;
 
 namespace infinity {
