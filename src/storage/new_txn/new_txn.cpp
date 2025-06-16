@@ -764,6 +764,10 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     if (!status.ok()) {
         return {nullptr, status};
     }
+    status = table_meta->GetComment(*table_info);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
     return {std::move(table_info), Status::OK()};
 }
 
