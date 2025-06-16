@@ -23,7 +23,6 @@ import session_manager;
 import persistence_manager;
 import profiler;
 import storage;
-import txn;
 import data_table;
 import sql_parser;
 import optimizer;
@@ -102,10 +101,6 @@ public:
     TxnTimeStamp CommitTxn();
 
     void RollbackTxn();
-
-    [[nodiscard]] Txn *GetTxn() const { return nullptr; }
-
-    bool SetTxn(Txn *txn) const { return false; }
 
     [[nodiscard]] NewTxn *GetNewTxn() const;
 

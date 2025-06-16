@@ -345,7 +345,7 @@ public:
         switch (leftover_filter->type()) {
             case ExpressionType::kFilterFullText: {
                 auto *filter_fulltext_expression = static_cast<FilterFulltextExpression *>(leftover_filter.get());
-                filter_fulltext_expression->txn_ = query_context_->GetTxn();
+                filter_fulltext_expression->txn_ = nullptr;
                 filter_fulltext_expression->block_index_ = base_table_ref_ptr_->block_index_;
                 TreeT fake_tree;
                 fake_tree.src_ptr = &leftover_filter;

@@ -56,12 +56,6 @@ bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorSta
         operator_state->SetComplete();
         return true;
     }
-
-    auto *txn = query_context->GetTxn();
-    auto status = txn->CreateIndexFinish(*db_name_, *table_name_, index_base_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
     operator_state->SetComplete();
     return true;
 }

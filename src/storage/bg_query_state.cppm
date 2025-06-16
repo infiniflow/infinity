@@ -25,7 +25,6 @@ import query_context;
 import infinity_context;
 import session_manager;
 import session;
-import txn;
 
 namespace infinity {
 
@@ -34,37 +33,6 @@ export struct BGQueryState {
     Vector<UniquePtr<PhysicalOperator>> physical_plans{};
     SharedPtr<PlanFragment> plan_fragment{};
     UniquePtr<Notifier> notifier{};
-};
-
-export struct BGQueryContextWrapper {
-    UniquePtr<QueryContext> query_context_;
-
-    SessionManager *session_mgr_;
-    SharedPtr<BaseSession> session_;
-
-    BGQueryContextWrapper(BGQueryContextWrapper &&other)
-        : query_context_(std::move(other.query_context_)), session_mgr_(other.session_mgr_), session_(std::move(other.session_)) {
-        other.session_mgr_ = nullptr;
-    }
-
-    BGQueryContextWrapper(Txn *txn) : session_mgr_(InfinityContext::instance().session_manager()) {
-        session_ = session_mgr_->CreateLocalSession();
-        query_context_ = MakeUnique<QueryContext>(session_.get());
-        query_context_->Init(InfinityContext::instance().config(),
-                             InfinityContext::instance().task_scheduler(),
-                             InfinityContext::instance().storage(),
-                             InfinityContext::instance().resource_manager(),
-                             InfinityContext::instance().session_manager(),
-                             InfinityContext::instance().persistence_manager());
-        query_context_->SetTxn(txn);
-    }
-
-    ~BGQueryContextWrapper() {
-        if (session_mgr_ != nullptr) {
-            auto *session = query_context_->current_session();
-            session_mgr_->RemoveSessionByID(session->session_id());
-        }
-    }
 };
 
 } // namespace infinity

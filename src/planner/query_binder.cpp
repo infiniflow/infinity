@@ -75,7 +75,6 @@ import logical_type;
 import base_entry;
 import view_entry;
 import table_entry;
-import txn;
 import logger;
 import defer_op;
 import highlighter;
@@ -498,11 +497,6 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
 SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
     BaseEntry *base_view_entry{nullptr};
-    Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
     ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
 
     // Build view scan operator
