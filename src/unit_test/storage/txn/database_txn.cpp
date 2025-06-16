@@ -27,8 +27,6 @@ import value;
 
 import data_block;
 import default_values;
-import txn_manager;
-import txn;
 import status;
 import extra_ddl_info;
 import txn_state;

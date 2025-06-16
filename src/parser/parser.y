@@ -410,7 +410,7 @@ struct SQL_LTYPE {
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE
-%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK
+%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK CLEAN
 
 %token NUMBER
 
@@ -2330,6 +2330,10 @@ command_statement: USE IDENTIFIER {
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kRestore, infinity::SnapshotScope::kTable);
     free($4);
+}
+| CLEAN DATA {
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::CleanupCmd>();
 }
 
 compact_statement: COMPACT TABLE table_name {

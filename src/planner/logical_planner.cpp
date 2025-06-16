@@ -38,7 +38,6 @@ import cast_expression;
 import cast_function;
 import bound_cast_func;
 import base_expression;
-import txn;
 import table_entry_type;
 import third_party;
 import table_def;

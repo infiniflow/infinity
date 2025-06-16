@@ -40,7 +40,6 @@ import block_index;
 import knn_scan_data;
 import knn_filter;
 import third_party;
-import txn;
 import infinity_exception;
 import default_values;
 import column_expression;

@@ -27,7 +27,6 @@ import column_def;
 import profiler;
 import third_party;
 import storage;
-import catalog_delta_entry;
 import meta_tree;
 
 namespace infinity {
@@ -147,56 +146,7 @@ export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
     virtual ~NewCatalog();
-
-public:
-    Status TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_paths);
-    static String GetPathNameTail(const String &path);
     static Status Init(KVStore *kv_store);
-
-private:
-    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance, const String &db_path, bool is_vfs);
-    Status TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json &table_meta_json, String const &db_name, const String &db_path, bool is_vfs);
-    Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json, const String &db_path, bool is_vfs);
-    Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json, const String &db_path, bool is_vfs);
-    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json);
-    Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
-    Status TransformCatalogSegmentIndex(TableIndexMeeta &table_meta, const nlohmann::json &table_index_entry_json);
-    Status TransformCatalogChunkIndex(SegmentIndexMeta &segment_index_meta, const nlohmann::json &chunk_index_entry_json);
-    Status TransformDeltaMeta(Config *config, const Vector<String> &delta_ckp_paths, KVInstance *kv_instance, bool is_vfs);
-    Status RefactorPath(const String &path_key, String &fine_path, char delimiter);
-    Status TransformData(const String &data_path, KVInstance *kv_instance, nlohmann::json *full_ckp_json, bool is_vfs);
-    Map<String, String> dbname_to_idstr_;
-    Map<String, String> indexstr_to_idstr_;
-    Set<String> dir_set_;
-    static constexpr SizeT db_prefix_len_ = 14;    // XXXXXXXXXX_db_
-    static constexpr SizeT table_prefix_len_ = 17; // XXXXXXXXXX_table_
-    // // Database related functions
-    // Status CreateDatabase(const SharedPtr<String> &db_name,
-    //                       const SharedPtr<String> &comment,
-    //                       NewTxn *txn,
-    //                       ConflictType conflict_type = ConflictType::kError);
-
-    // Status DropDatabase(const SharedPtr<String> &db_name, NewTxn *txn, ConflictType conflict_type = ConflictType::kError);
-
-    // bool CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *txn);
-
-    // Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, NewTxn *txn);
-
-    //    void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
-    //
-    //    // replay
-    //    void
-    //    CreateDatabaseReplay(const SharedPtr<String> &db_name,
-    //                         const SharedPtr<String> &comment,
-    //                         std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)>
-    //                         &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
-    //
-    //    void DropDatabaseReplay(const String &db_name,
-    //                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    //                            TransactionID txn_id,
-    //                            TxnTimeStamp begin_ts);
-    //
-    //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
     SharedPtr<MetaTree> MakeMetaTree() const;
@@ -248,7 +198,7 @@ private:
 public:
     Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
-    Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
+    void DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
 
 private:
     std::shared_mutex segment_update_ts_mtx_{};
@@ -280,10 +230,14 @@ public:
 
     Status IncrLatestID(String &id_str, std::string_view id_name);
 
+    void SetLastCleanupTS(TxnTimeStamp cleanup_ts);
+    TxnTimeStamp GetLastCleanupTS() const;
+
 private:
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
     // bool is_vfs_{false};
+    Atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);

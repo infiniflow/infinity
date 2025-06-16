@@ -434,7 +434,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    txn_store_.AddMetaKeyForBufferObject(
+    this->AddMetaKeyForBufferObject(
         MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
@@ -811,7 +811,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 auto col_ptr = MakeShared<ColumnVector>(std::move(col));
                 if (index_fulltext->IsRealtime()) {
                     UniquePtr<std::binary_semaphore> sema = mem_index->memory_indexer_->AsyncInsert(col_ptr, offset, row_cnt);
-                    txn_store()->AddSemaphore(std::move(sema));
+                    this->AddSemaphore(std::move(sema));
                 } else {
                     // mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                     SharedPtr<AppendMemIndexTask> append_mem_index_task = MakeShared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
@@ -983,7 +983,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
             if (!status.ok()) {
                 return status;
             }
-            if (new_chunk_id == (ChunkID)-1 && segment_row_cnt > 0) {
+            if (new_chunk_id == static_cast<ChunkID>(-1) && segment_row_cnt > 0) {
                 UnrecoverableError(fmt::format("Failed to dump {} rows", segment_row_cnt));
             }
         }
@@ -1682,8 +1682,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             return status;
         }
 
-        chunk_infos_.push_back(
-            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), new_chunk_id});
+        chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                       table_index_meta.table_meta().table_id_str(),
+                                                       segment_index_meta.segment_id(),
+                                                       new_chunk_id});
 
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {

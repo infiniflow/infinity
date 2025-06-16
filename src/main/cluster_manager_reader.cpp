@@ -110,11 +110,9 @@ Status ClusterManager::RegisterToLeaderNoLock() {
     Storage *storage_ptr = InfinityContext::instance().storage();
     SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
     if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
-        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name(),
-                                                          this_node_->node_role(),
-                                                          this_node_->node_ip(),
-                                                          this_node_->node_port(),
-                                                          storage_ptr->txn_manager()->CurrentTS());
+        register_peer_task =
+            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
+        //                                                          storage_ptr->txn_manager()->CurrentTS());
     } else {
         register_peer_task =
             MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
@@ -166,7 +164,7 @@ Status ClusterManager::UnregisterToLeaderNoLock() {
 void ClusterManager::HeartBeatToLeaderThread() {
     // Heartbeat interval
     auto hb_interval = std::chrono::milliseconds(leader_node_->heartbeat_interval());
-    Storage *storage_ptr = InfinityContext::instance().storage();
+    //    Storage *storage_ptr = InfinityContext::instance().storage();
     while (true) {
         std::unique_lock hb_lock(this->hb_mutex_);
         this->hb_cv_.wait_for(hb_lock, hb_interval, [&] { return !this->hb_running_; });
@@ -198,8 +196,11 @@ void ClusterManager::HeartBeatToLeaderThread() {
             i64 this_node_port = this_node_->node_port();
 
             // Send heartbeat
-            hb_task =
-                MakeShared<HeartBeatPeerTask>(this_node_name, this_node_role, this_node_ip, this_node_port, storage_ptr->txn_manager()->CurrentTS());
+            hb_task = MakeShared<HeartBeatPeerTask>(this_node_name,
+                                                    this_node_role,
+                                                    this_node_ip,
+                                                    this_node_port,
+                                                    0); // storage_ptr->txn_manager()->CurrentTS());
         }
         client_to_leader_->Send(hb_task);
         hb_task->Wait();
@@ -285,55 +286,55 @@ Status ClusterManager::UpdateNodeInfoNoLock(const Vector<SharedPtr<NodeInfo>> &i
 }
 
 Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
-    Storage *storage_ptr = InfinityContext::instance().storage();
-    WalManager *wal_manager = storage_ptr->wal_manager();
-    TransactionID last_txn_id = 0;
-    TxnTimeStamp last_commit_ts = 0;
-    for (auto &log_str : synced_logs) {
-        const i32 entry_size = log_str.size();
-        const char *ptr = log_str.data();
-        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
-        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
-        last_txn_id = entry->txn_id_;
-        last_commit_ts = entry->commit_ts_;
-        ReplayWalOptions options{.on_startup_ = false, .is_replay_ = false, .sync_from_leader_ = true};
-        wal_manager->ReplayWalEntry(*entry, options);
-    }
-
-    LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
-    storage_ptr->new_txn_manager()->SetCurrentTransactionID(last_txn_id);
-    storage_ptr->wal_manager()->UpdateCommitState(last_commit_ts, 0);
-    storage_ptr->new_txn_manager()->SetStartTS(last_commit_ts);
+    //    Storage *storage_ptr = InfinityContext::instance().storage();
+    //    WalManager *wal_manager = storage_ptr->wal_manager();
+    //    TransactionID last_txn_id = 0;
+    //    TxnTimeStamp last_commit_ts = 0;
+    //    for (auto &log_str : synced_logs) {
+    //        const i32 entry_size = log_str.size();
+    //        const char *ptr = log_str.data();
+    //        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+    //        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+    //        last_txn_id = entry->txn_id_;
+    //        last_commit_ts = entry->commit_ts_;
+    //        ReplayWalOptions options{.on_startup_ = false, .is_replay_ = false, .sync_from_leader_ = true};
+    //        wal_manager->ReplayWalEntry(*entry, options);
+    //    }
+    //
+    //    LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
+    //    storage_ptr->new_txn_manager()->SetCurrentTransactionID(last_txn_id);
+    //    storage_ptr->wal_manager()->UpdateCommitState(last_commit_ts, 0);
+    //    storage_ptr->new_txn_manager()->SetStartTS(last_commit_ts);
     return Status::OK();
 }
 
 Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
-    Storage *storage_ptr = InfinityContext::instance().storage();
-    WalManager *wal_manager = storage_ptr->wal_manager();
-    bool is_checkpoint = true;
-    TxnTimeStamp last_commit_ts;
-    for (auto &log_str : synced_logs) {
-        const i32 entry_size = log_str.size();
-        const char *ptr = log_str.data();
-        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
-        for (const auto &cmd : entry->cmds_) {
-            if (is_checkpoint) {
-                if (cmd->GetType() != WalCommandType::CHECKPOINT) {
-                    is_checkpoint = false;
-                }
-            } else {
-                if (cmd->GetType() == WalCommandType::CHECKPOINT) {
-                    UnrecoverableError("Expect non-checkpoint log");
-                }
-            }
-        }
-        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
-        ReplayWalOptions options{.on_startup_ = true, .is_replay_ = false, .sync_from_leader_ = true};
-        wal_manager->ReplayWalEntry(*entry, options);
-        last_commit_ts = entry->commit_ts_;
-    }
-
-    storage_ptr->AdminToReaderBottom(last_commit_ts + 1);
+    //    Storage *storage_ptr = InfinityContext::instance().storage();
+    //    WalManager *wal_manager = storage_ptr->wal_manager();
+    //    bool is_checkpoint = true;
+    //    TxnTimeStamp last_commit_ts;
+    //    for (auto &log_str : synced_logs) {
+    //        const i32 entry_size = log_str.size();
+    //        const char *ptr = log_str.data();
+    //        SharedPtr<WalEntry> entry = WalEntry::ReadAdv(ptr, entry_size);
+    //        for (const auto &cmd : entry->cmds_) {
+    //            if (is_checkpoint) {
+    //                if (cmd->GetType() != WalCommandType::CHECKPOINT) {
+    //                    is_checkpoint = false;
+    //                }
+    //            } else {
+    //                if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+    //                    UnrecoverableError("Expect non-checkpoint log");
+    //                }
+    //            }
+    //        }
+    //        LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
+    //        ReplayWalOptions options{.on_startup_ = true, .is_replay_ = false, .sync_from_leader_ = true};
+    //        wal_manager->ReplayWalEntry(*entry, options);
+    //        last_commit_ts = entry->commit_ts_;
+    //    }
+    //
+    //    storage_ptr->AdminToReaderBottom(last_commit_ts + 1);
     return Status::OK();
 }
 

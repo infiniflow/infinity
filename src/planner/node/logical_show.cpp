@@ -75,7 +75,7 @@ String ToString(ShowStmtType type) {
         case ShowStmtType::kBuffer:
             return "Show buffer";
         case ShowStmtType::kMemIndex:
-            return "Sow memindex";
+            return "Show memindex";
         case ShowStmtType::kQueries:
             return "Show queries";
         case ShowStmtType::kQuery:

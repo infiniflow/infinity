@@ -27,14 +27,12 @@ import buffer_manager;
 import default_values;
 import wal_manager;
 import new_catalog;
-import txn_manager;
 import new_txn_manager;
 import builtin_functions;
 import third_party;
 import logger;
 import kv_store;
 
-import txn;
 import new_txn;
 import infinity_exception;
 import status;
@@ -419,14 +417,6 @@ Status Storage::UnInitFromReader() {
             wal_mgr_.reset();
         }
 
-        if (txn_mgr_ != nullptr) {
-            if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                UnrecoverableError("Error reader init phase");
-            }
-            txn_mgr_->Stop();
-            txn_mgr_.reset();
-        }
-
         if (new_txn_mgr_ != nullptr) {
             if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
                 UnrecoverableError("Error reader init phase");
@@ -565,11 +555,6 @@ Status Storage::WriterToAdmin() {
         wal_mgr_.reset();
     }
 
-    if (txn_mgr_ != nullptr) {
-        txn_mgr_->Stop();
-        txn_mgr_.reset();
-    }
-
     if (new_txn_mgr_ != nullptr) {
         new_txn_mgr_->Stop();
         new_txn_mgr_.reset();
@@ -683,11 +668,6 @@ Status Storage::UnInitFromWriter() {
         default: {
             UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
         }
-    }
-
-    if (txn_mgr_ != nullptr) {
-        txn_mgr_->Stop();
-        txn_mgr_.reset();
     }
 
     if (new_txn_mgr_ != nullptr) {
@@ -825,13 +805,6 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     }
     bg_processor_ = MakeUnique<BGTaskProcessor>();
 
-    // Construct txn manager
-    if (txn_mgr_ != nullptr) {
-        UnrecoverableError("Transaction manager was initialized before.");
-    }
-    txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
-    txn_mgr_->Start();
-
     // TODO: new txn manager
     new_txn_mgr_ = MakeUnique<NewTxnManager>(this, kv_store_.get(), system_start_ts);
     new_txn_mgr_->Start();
@@ -903,35 +876,23 @@ void Storage::RecoverMemIndex() {
 }
 
 void Storage::CreateDefaultDB() {
-    if (new_txn_mgr_) {
-        NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create default_db"), TransactionType::kNormal);
-        Status status = txn->CreateDatabase("default_db", ConflictType::kError, MakeShared<String>());
-        if (!status.ok()) {
-            if (status.code_ == ErrorCode::kDuplicateDatabaseName) {
-                // Only valid for unit test
-                status = new_txn_mgr_->RollBackTxn(txn);
-                if (!status.ok()) {
-                    UnrecoverableError("Can't rollback txn for creating 'default_db'");
-                }
-                return;
-            }
-            UnrecoverableError("Can't create 'default_db'");
-        }
-        status = new_txn_mgr_->CommitTxn(txn);
-        if (!status.ok()) {
-            UnrecoverableError("Can't commit txn for 'default_db'");
-        }
-        return;
-    }
-
-    Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
-    new_txn->SetReaderAllowed(true);
-    // Txn1: Create db1, OK
-    Status status = new_txn->CreateDatabase(MakeShared<String>("default_db"), ConflictType::kError, MakeShared<String>("Initial startup created"));
+    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create default_db"), TransactionType::kNormal);
+    Status status = txn->CreateDatabase("default_db", ConflictType::kError, MakeShared<String>());
     if (!status.ok()) {
-        UnrecoverableError("Can't initial 'default_db'");
+        if (status.code_ == ErrorCode::kDuplicateDatabaseName) {
+            // Only valid for unit test
+            status = new_txn_mgr_->RollBackTxn(txn);
+            if (!status.ok()) {
+                UnrecoverableError("Can't rollback txn for creating 'default_db'");
+            }
+            return;
+        }
+        UnrecoverableError("Can't create 'default_db'");
     }
-    txn_mgr_->CommitTxn(new_txn);
+    status = new_txn_mgr_->CommitTxn(txn);
+    if (!status.ok()) {
+        UnrecoverableError("Can't commit txn for 'default_db'");
+    }
 }
 
 } // namespace infinity

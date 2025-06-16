@@ -21,7 +21,6 @@ module block_index;
 import stl;
 import segment_entry;
 import global_block_id;
-import txn;
 import table_index_entry;
 import segment_index_entry;
 import default_values;

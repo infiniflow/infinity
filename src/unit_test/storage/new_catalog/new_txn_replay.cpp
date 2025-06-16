@@ -61,23 +61,6 @@ import mem_index;
 import buffer_obj;
 import buffer_handle;
 
-// import infinity_exception;
-// import meta_info;
-// import value;
-// import data_access_state;
-// import kv_code;
-// import kv_store;
-// import new_txn;
-// import new_txn_store;
-
-// import secondary_index_in_mem;
-// import secondary_index_data;
-
-// import roaring_bitmap;
-// import index_filter_evaluators;
-
-// import constant_expr;
-
 using namespace infinity;
 
 class TestTxnReplayTest : public NewReplayTest {};
