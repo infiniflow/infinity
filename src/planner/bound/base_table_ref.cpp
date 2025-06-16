@@ -18,7 +18,6 @@ module base_table_ref;
 
 import stl;
 import table_ref;
-import txn;
 import table_function;
 import internal_types;
 import infinity_exception;
@@ -49,18 +48,5 @@ BaseTableRef::BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex
     : TableRef(TableRefType::kTable, ""), table_info_(std::move(table_info)), block_index_(block_index), index_index_(index_index) {}
 
 BaseTableRef::~BaseTableRef() = default;
-
-SharedPtr<BaseTableRef> BaseTableRef::FakeTableRef(Txn *txn, const String &db_name, const String &table_name) {
-
-    SharedPtr<TableInfo> table_info;
-    Status status;
-    std::tie(table_info, status) = txn->GetTableInfo(db_name, table_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-        return nullptr;
-    }
-    SharedPtr<BlockIndex> block_index = txn->GetBlockIndexFromTable(db_name, table_name);
-    return MakeShared<BaseTableRef>(table_info, std::move(block_index));
-}
 
 } // namespace infinity
