@@ -121,10 +121,10 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *co
 
 HnswHandler::~HnswHandler() {
     std::visit(
-        [&](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                delete arg;
+                delete index;
             }
         },
         hnsw_);
@@ -443,6 +443,7 @@ void HnswHandler::Load(LocalFileHandle &file_handle) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = IndexT::Load(file_handle).release();
                 } else {
                     UnrecoverableError("Invalid index type.");
@@ -461,6 +462,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = IndexT::LoadFromPtr(file_handle, file_size).release();
                 } else {
                     UnrecoverableError("Invalid index type.");
@@ -481,6 +483,7 @@ void HnswHandler::LoadFromPtr(const char *ptr, SizeT size) {
                 if constexpr (IndexT::kOwnMem) {
                     UnrecoverableError("Invalid index type.");
                 } else {
+                    delete index;
                     index = IndexT::LoadFromPtr(ptr, size).release();
                 }
             }
