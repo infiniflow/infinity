@@ -210,7 +210,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id) {
         return;
     }
     const SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn_ptr_);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() == 0) {
         // empty result
         return;
@@ -290,7 +290,7 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
     }
 
     SizeT segment_row_count = segment_index.at(segment_id).segment_offset();
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() == 0) {
         // empty result
         return;

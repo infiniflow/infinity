@@ -239,7 +239,6 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
     }
 
     ColumnVector column_vector(column_type_);
-    column_vector.Initialize(buffer_mgr, this, row_count, tipe);
     return column_vector;
 }
 

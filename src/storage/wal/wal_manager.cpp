@@ -34,7 +34,6 @@ import background_process;
 import extra_ddl_info;
 
 import infinity_exception;
-import block_column_entry;
 import compact_state_data;
 import build_fast_rough_filter_task;
 import column_def;

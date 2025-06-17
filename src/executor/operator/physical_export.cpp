@@ -29,7 +29,6 @@ import logger;
 import statement_common;
 import third_party;
 import column_def;
-import block_entry;
 import column_vector;
 import value;
 import virtual_store;

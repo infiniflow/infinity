@@ -95,37 +95,6 @@ struct ExpressionIndexScanInfo {
     TableMeeta *table_meta_ = nullptr;
     HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
 
-    inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
-        const TransactionID txn_id = txn->TxnID();
-        const TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [table_entry, table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
-        if (!table_status.ok()) {
-            LOG_ERROR(fmt::format("InitColumnIndexEntries: GetTableByName db: {}, table: {}, failed: {}",
-                                  *table_info->db_name_,
-                                  *table_info->table_name_,
-                                  table_status.message()));
-            RecoverableError(table_status);
-        }
-        for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-            if (!status.ok()) {
-                // skip invalid entry, for example, the index is deleted
-                continue;
-            }
-            const IndexBase *index_base = table_index_entry->index_base();
-            if (index_base->index_type_ != IndexType::kSecondary) {
-                continue;
-            }
-            auto column_name = index_base->column_name();
-            const ColumnID column_id = table_entry->GetColumnIdByName(column_name);
-            if (candidate_column_index_map_.contains(column_id)) {
-                LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
-            } else {
-                candidate_column_index_map_.emplace(column_id, table_index_entry);
-            }
-        }
-    }
-
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
@@ -350,7 +319,6 @@ public:
         switch (leftover_filter->type()) {
             case ExpressionType::kFilterFullText: {
                 auto *filter_fulltext_expression = static_cast<FilterFulltextExpression *>(leftover_filter.get());
-                filter_fulltext_expression->txn_ = nullptr;
                 filter_fulltext_expression->block_index_ = base_table_ref_ptr_->block_index_;
                 TreeT fake_tree;
                 fake_tree.src_ptr = &leftover_filter;

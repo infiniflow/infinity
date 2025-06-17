@@ -46,9 +46,6 @@ public:
     static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
     static SharedPtr<VectorBuffer>
-    Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_types);
-
-    static SharedPtr<VectorBuffer>
     Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
 public:
@@ -67,10 +64,6 @@ public:
     void Initialize(SizeT type_size, SizeT capacity);
 
     void InitializeCompactBit(SizeT capacity);
-
-    void InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity);
-
-    void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity);
 
     void InitializeCompactBit(BufferObj *buffer_obj, SizeT capacity);
 

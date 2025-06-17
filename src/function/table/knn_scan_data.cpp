@@ -50,20 +50,6 @@ UniquePtr<KnnDistanceBase1> InitDistanceBase(KnnDistanceType distance_type) {
 } // namespace
 
 KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
-                                     UniquePtr<Vector<BlockColumnEntry *>> block_column_entries,
-                                     UniquePtr<Vector<SegmentIndexEntry *>> index_entries,
-                                     Vector<InitParameter> opt_params,
-                                     i64 topk,
-                                     i64 dimension,
-                                     i64 query_embedding_count,
-                                     void *query_embedding,
-                                     EmbeddingDataType elem_type,
-                                     KnnDistanceType knn_distance_type)
-    : table_ref_(table_ref), block_column_entries_(std::move(block_column_entries)), index_entries_(std::move(index_entries)),
-      opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count), query_embedding_(query_embedding),
-      query_elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
-
-KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                                      UniquePtr<Vector<BlockMeta *>> block_metas,
                                      SharedPtr<TableIndexMeeta> table_index_meta,
                                      UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
