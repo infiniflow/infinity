@@ -3945,7 +3945,7 @@ Status NewTxn::Cleanup() {
 
     Vector<UniquePtr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(begin_ts, metas, kv_instance);
-    if (!status.OK()) {
+    if (!status.ok()) {
         return status;
     }
     if (metas.empty()) {
