@@ -21,12 +21,8 @@ import roaring_bitmap;
 
 namespace infinity {
 
-struct BlockEntry;
 class BufferManager;
 class ColumnDef;
-struct ChunkIndexEntry;
-struct SegmentIndexEntry;
-struct SegmentEntry;
 class IndexBase;
 class EMVBIndex;
 struct BlockIndex;
@@ -45,7 +41,6 @@ export class EMVBIndexInMem {
     const u32 embedding_dimension_ = 0;
     const RowID begin_row_id_ = {};
     const SharedPtr<ColumnDef> column_def_;
-    const SegmentEntry *segment_entry_ = nullptr;
 
     String db_id_str_;
     String table_id_str_;
@@ -82,11 +77,7 @@ public:
 
     u32 GetRowCount() const;
 
-    void Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
-
     void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts);
-
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 
     void Dump(BufferObj *buffer_obj);
 

@@ -213,7 +213,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
 
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() > 0) {
         // Remove deleted rows from the result
         // segment_entry->CheckRowsVisible(result_elem, begin_ts);

@@ -24,7 +24,6 @@ import infinity_exception;
 import vector_heap_chunk;
 import global_resource_usage;
 
-import block_column_entry;
 import buffer_manager;
 import data_file_worker;
 import logger;

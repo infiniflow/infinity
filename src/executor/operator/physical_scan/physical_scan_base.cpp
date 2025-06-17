@@ -29,8 +29,6 @@ import operator_state;
 import default_values;
 import third_party;
 import infinity_exception;
-import block_entry;
-import block_column_entry;
 import logger;
 import column_vector;
 import query_context;

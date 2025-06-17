@@ -61,7 +61,7 @@ void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState
 
     if (set_sealed) {
         // build minmax filter
-        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry_, txn->buffer_mgr(), commit_ts);
+        //        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry_, txn->buffer_mgr(), commit_ts);
         // now have minmax filter and optional bloom filter
         // serialize filter
         local_delta_ops->AddOperation(
@@ -800,12 +800,12 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveTableEntry(table_entry, txn_id);
     }
 
-//    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
-//    for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
-//        db_entry->Cleanup();
-//
-//        catalog_ptr->RemoveDBEntry(db_entry, txn_id);
-//    }
+    //    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
+    //    for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
+    //        db_entry->Cleanup();
+    //
+    //        catalog_ptr->RemoveDBEntry(db_entry, txn_id);
+    //    }
 }
 
 bool TxnStore::ReadOnly() const {

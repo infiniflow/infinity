@@ -43,8 +43,6 @@ import infinity_exception;
 import third_party;
 import base_table_ref;
 import load_meta;
-import block_entry;
-import block_column_entry;
 import logical_type;
 import status;
 import logger;
@@ -365,9 +363,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             segment_bitmask.SetAllTrue();
         } else {
             if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
-                LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter",
-                                      task_job_index,
-                                      segment_index_metas_->size()));
+                LOG_TRACE(
+                    fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
                 segment_bitmask = it->second;
                 if (segment_row_count != segment_bitmask.count()) {
                     UnrecoverableError(
@@ -391,64 +388,62 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // 1. in mem index
             if (emvb_index_in_mem) {
                 // TODO: fix the parameters
-                const auto result =
-                    emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
-                                                         calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
-                                                         topn_,
-                                                         segment_bitmask,
-                                                         block_index,
-                                                         begin_ts,
-                                                         index_options_->emvb_centroid_nprobe_,
-                                                         index_options_->emvb_threshold_first_,
-                                                         index_options_->emvb_n_doc_to_score_,
-                                                         index_options_->emvb_n_doc_out_second_stage_,
-                                                         index_options_->emvb_threshold_final_);
-                std::visit(
-                    Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
-                                 const auto &[result_num, score_ptr, row_id_ptr] = index_result;
-                                 for (u32 i = 0; i < result_num; ++i) {
-                                     function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
-                                 }
-                             },
-                             [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
-                                 const auto &[start_offset, total_row_count] = in_mem_result;
-                                 BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
-                                 BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
-                                 u32 row_leftover = total_row_count;
-                                 do {
-                                     const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
-                                     Bitmask block_bitmask;
-                                     if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
-                                         BlockMeta block_meta(block_id, *segment_meta);
-                                         Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
-                                         if (!status.ok()) {
-                                             UnrecoverableError(status.message());
-                                         }
-                                         ColumnMeta column_meta(this->search_column_id_, block_meta);
-                                         ColumnVector column_vector;
-                                         status =
-                                             NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorTipe::kReadOnly, column_vector);
-                                         if (!status.ok()) {
-                                             UnrecoverableError(status.message());
-                                         }
+                const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                                         calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                                         topn_,
+                                                                         segment_bitmask,
+                                                                         block_index,
+                                                                         begin_ts,
+                                                                         index_options_->emvb_centroid_nprobe_,
+                                                                         index_options_->emvb_threshold_first_,
+                                                                         index_options_->emvb_n_doc_to_score_,
+                                                                         index_options_->emvb_n_doc_out_second_stage_,
+                                                                         index_options_->emvb_threshold_final_);
+                std::visit(Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
+                                        const auto &[result_num, score_ptr, row_id_ptr] = index_result;
+                                        for (u32 i = 0; i < result_num; ++i) {
+                                            function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                                        }
+                                    },
+                                    [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
+                                        const auto &[start_offset, total_row_count] = in_mem_result;
+                                        BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
+                                        BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
+                                        u32 row_leftover = total_row_count;
+                                        do {
+                                            const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
+                                            Bitmask block_bitmask;
+                                            if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
+                                                BlockMeta block_meta(block_id, *segment_meta);
+                                                Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                                                if (!status.ok()) {
+                                                    UnrecoverableError(status.message());
+                                                }
+                                                ColumnMeta column_meta(this->search_column_id_, block_meta);
+                                                ColumnVector column_vector;
+                                                status =
+                                                    NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorTipe::kReadOnly, column_vector);
+                                                if (!status.ok()) {
+                                                    UnrecoverableError(status.message());
+                                                }
 
-                                         // output score will always be float type
-                                         CalculateScoreOnColumnVector(column_vector,
-                                                                      segment_id,
-                                                                      block_id,
-                                                                      block_offset,
-                                                                      row_to_read,
-                                                                      block_bitmask,
-                                                                      *(this->calc_match_tensor_expr_),
-                                                                      function_data);
-                                     }
-                                     // prepare next block
-                                     row_leftover -= row_to_read;
-                                     ++block_id;
-                                     block_offset = 0;
-                                 } while (row_leftover);
-                             }},
-                    result);
+                                                // output score will always be float type
+                                                CalculateScoreOnColumnVector(column_vector,
+                                                                             segment_id,
+                                                                             block_id,
+                                                                             block_offset,
+                                                                             row_to_read,
+                                                                             block_bitmask,
+                                                                             *(this->calc_match_tensor_expr_),
+                                                                             function_data);
+                                            }
+                                            // prepare next block
+                                            row_leftover -= row_to_read;
+                                            ++block_id;
+                                            block_offset = 0;
+                                        } while (row_leftover);
+                                    }},
+                           result);
             }
             // 2. chunk index
             for (ChunkID chunk_id : *chunk_ids_ptr) {
@@ -998,22 +993,17 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
         ColumnVector column_vec;
-        if (!block_index->segment_block_index_.empty()) {
-            BlockEntry *block_entry = block_index->segment_block_index_.at(segment_id).block_map_.at(block_id);
-            column_vec = block_entry->GetConstColumnVector(buffer_mgr, column_id);
-
-        } else {
-            BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map().at(block_id).get();
-            ColumnMeta column_meta(column_id, *block_meta);
-            auto [block_row_cnt, status] = block_meta->GetRowCnt1();
-            if (!status.ok()) {
-                UnrecoverableError("GetRowCnt1 failed!");
-            }
-            status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vec);
-            if (!status.ok()) {
-                UnrecoverableError("GetRowCnt1 failed!");
-            }
+        BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map().at(block_id).get();
+        ColumnMeta column_meta(column_id, *block_meta);
+        auto [block_row_cnt, status] = block_meta->GetRowCnt1();
+        if (!status.ok()) {
+            UnrecoverableError("GetRowCnt1 failed!");
         }
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vec);
+        if (!status.ok()) {
+            UnrecoverableError("GetRowCnt1 failed!");
+        }
+
         doc.score_ = CalcutateScoreOfRowOp::Execute(column_vec, block_offset, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
     }
 }
