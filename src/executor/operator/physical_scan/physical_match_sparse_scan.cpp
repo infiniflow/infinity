@@ -123,19 +123,11 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes()
 SizeT PhysicalMatchSparseScan::TaskletCount() {
     SizeT ret = base_table_ref_->block_index_->BlockCount();
     if (base_table_ref_->index_index_.get() != nullptr) {
-        if (!base_table_ref_->index_index_->index_snapshots_vec_.empty()) {
-            const auto &index_snapshots = base_table_ref_->index_index_->index_snapshots_vec_;
-            if (index_snapshots.size() != 1) {
-                UnrecoverableError("Multiple index snapshots are not supported.");
-            }
-            ret = index_snapshots[0]->segment_index_entries_.size();
-        } else if (!base_table_ref_->index_index_->new_index_snapshots_vec_.empty()) {
-            const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
-            if (index_snapshots.size() != 1) {
-                UnrecoverableError("Multiple index snapshots are not supported.");
-            }
-            ret = index_snapshots[0]->segment_index_metas_.size();
+        const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
+        if (index_snapshots.size() != 1) {
+            UnrecoverableError("Multiple index snapshots are not supported.");
         }
+        ret = index_snapshots[0]->segment_index_metas_.size();
     }
     return ret;
 }

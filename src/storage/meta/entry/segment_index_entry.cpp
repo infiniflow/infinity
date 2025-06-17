@@ -961,10 +961,10 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     const IndexBase *index_base = table_index_entry_->index_base();
     SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
 
-    BufferManager *buffer_mgr = txn->buffer_mgr();
+    //    BufferManager *buffer_mgr = txn->buffer_mgr();
     Vector<ChunkIndexEntry *> old_chunks;
     Vector<ChunkID> old_ids;
-    u32 row_count = 0;
+    //    u32 row_count = 0;
     {
         std::shared_lock lock(rw_locker_);
         for (const auto &chunk_index_entry : chunk_index_entries_) {
@@ -1061,10 +1061,10 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             break;
         }
         case IndexType::kSecondary: {
-            merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
-            BufferHandle handle = merged_chunk_index_entry->GetIndex();
-            auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-            data_ptr->InsertMergeData(old_chunks);
+            //            merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
+            //            BufferHandle handle = merged_chunk_index_entry->GetIndex();
+            //            auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
+            //            data_ptr->InsertMergeData(old_chunks);
             break;
         }
         case IndexType::kEMVB: {

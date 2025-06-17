@@ -46,14 +46,14 @@ namespace infinity {
 class GreedyCompactableSegmentsGenerator {
 public:
     GreedyCompactableSegmentsGenerator(const BaseTableRef *base_table_ref, SizeT max_segment_size) : max_segment_size_(max_segment_size) {
-        const auto &block_index = *base_table_ref->block_index_;
-        for (const auto &[segment_id, segment_snapshot] : block_index.segment_block_index_) {
-            SegmentEntry *segment_entry = segment_snapshot.segment_entry_;
-            if (segment_entry->status() == SegmentStatus::kSealed) {
-                SizeT row_count = segment_entry->actual_row_count();
-                segments_.emplace(row_count, segment_entry);
-            }
-        }
+        //        const auto &block_index = *base_table_ref->block_index_;
+        //        for (const auto &[segment_id, segment_snapshot] : block_index.segment_block_index_) {
+        //            SegmentEntry *segment_entry = segment_snapshot.segment_entry_;
+        //            if (segment_entry->status() == SegmentStatus::kSealed) {
+        //                SizeT row_count = segment_entry->actual_row_count();
+        //                segments_.emplace(row_count, segment_entry);
+        //            }
+        //        }
     }
 
     // find the largest segment to fill the free space

@@ -32,8 +32,6 @@ import base_table_ref;
 import value;
 import knn_filter;
 import secondary_index_data;
-import table_index_entry;
-import segment_index_entry;
 import fast_rough_filter;
 import global_block_id;
 import roaring_bitmap;
