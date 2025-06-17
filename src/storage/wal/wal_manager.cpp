@@ -39,15 +39,6 @@ import compact_state_data;
 import build_fast_rough_filter_task;
 import column_def;
 
-import db_meta;
-import db_entry;
-import table_meta;
-import table_entry;
-import segment_entry;
-import block_entry;
-import table_index_meta;
-import table_index_entry;
-import segment_index_entry;
 import log_file;
 import default_values;
 import defer_op;

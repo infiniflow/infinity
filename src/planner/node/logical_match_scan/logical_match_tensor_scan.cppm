@@ -24,7 +24,6 @@ import logical_match_scan_base;
 import base_expression;
 import match_tensor_expression;
 import base_table_ref;
-import table_entry;
 import internal_types;
 import data_type;
 import fast_rough_filter;

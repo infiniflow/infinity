@@ -28,11 +28,7 @@ import logger;
 import third_party;
 import data_block;
 import logical_type;
-import table_index_entry;
-import segment_index_entry;
-import chunk_index_entry;
 import secondary_index_in_mem;
-import segment_entry;
 import fast_rough_filter;
 import roaring_bitmap;
 import filter_value_type_classification;
@@ -221,7 +217,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     if (result_elem.CountTrue() > 0) {
         // Remove deleted rows from the result
         // segment_entry->CheckRowsVisible(result_elem, begin_ts);
-        Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
+        status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

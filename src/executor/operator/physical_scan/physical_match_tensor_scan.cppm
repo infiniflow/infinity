@@ -20,7 +20,6 @@ import stl;
 import query_context;
 import operator_state;
 import physical_operator;
-import table_entry;
 import match_tensor_expression;
 import base_table_ref;
 import data_type;

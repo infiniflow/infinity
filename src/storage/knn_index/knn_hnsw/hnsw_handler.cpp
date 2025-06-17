@@ -670,16 +670,9 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
 
 void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) { hnsw_handler_->SetLSGParam(alpha, std::move(avg)); }
 
-TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
-
 SizeT HnswIndexInMem::GetRowCount() const { return hnsw_handler_->GetRowCount(); }
 
 SizeT HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
-
-void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
-    segment_index_entry_ = segment_index_entry;
-    begin_row_id_ = RowID(segment_index_entry->segment_id(), 0);
-}
 
 const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
     return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};

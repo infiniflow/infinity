@@ -25,9 +25,6 @@ import query_context;
 import operator_state;
 import physical_operator_type;
 import base_table_ref;
-import table_entry;
-import block_column_entry;
-import segment_index_entry;
 import load_meta;
 import knn_expression;
 import data_type;
@@ -56,8 +53,6 @@ import index_hnsw;
 import status;
 import create_index_info;
 import knn_expr;
-import block_entry;
-import segment_entry;
 #ifdef INDEX_HANDLER
 import hnsw_handler;
 #else

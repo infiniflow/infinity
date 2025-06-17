@@ -89,8 +89,8 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
                UniquePtr<KVInstance> kv_instance,
                SharedPtr<String> txn_text,
                TransactionType txn_type)
-    : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
-      kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
+    : txn_mgr_(txn_manager), buffer_mgr_(txn_mgr_->GetBufferMgr()), wal_entry_(MakeShared<WalEntry>()), kv_instance_(std::move(kv_instance)),
+      txn_text_(std::move(txn_text)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
@@ -108,7 +108,7 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
                TxnTimeStamp begin_ts,
                UniquePtr<KVInstance> kv_instance,
                TransactionType txn_type)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), wal_entry_(MakeShared<WalEntry>()), kv_instance_(std::move(kv_instance)) {
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), wal_entry_(MakeShared<WalEntry>()), kv_instance_(std::move(kv_instance)) {
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");

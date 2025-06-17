@@ -552,8 +552,6 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
     return MemIndexTracerInfo(index_name, table_name, db_name, MemUsed(), doc_count_);
 }
 
-TableIndexEntry *MemoryIndexer::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
-
 const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
 
 SizeT MemoryIndexer::MemUsed() const { return mem_used_; }

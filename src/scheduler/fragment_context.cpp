@@ -65,10 +65,9 @@ import aggregate_expression;
 import expression_state;
 import column_def;
 import explain_statement;
-import table_entry;
-import segment_entry;
 import global_resource_usage;
 import block_index;
+import segment_entry;
 
 import table_index_meeta;
 import segment_index_meta;

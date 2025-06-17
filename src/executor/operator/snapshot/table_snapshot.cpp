@@ -18,7 +18,6 @@ module snapshot;
 
 import stl;
 import query_context;
-import table_entry;
 import status;
 import third_party;
 import config;

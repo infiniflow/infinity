@@ -56,11 +56,6 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
     return memidx;
 }
 
-void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
-    segment_index_entry_ = segment_index_entry;
-    begin_row_id_ = RowID(segment_index_entry->segment_id(), 0);
-}
-
 UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace) {
     RowID begin_row_id{0, 0};
     auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, nullptr, trace);
@@ -490,8 +485,6 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
     own_memory_ = false;
     chunk_handle_ = std::move(handle);
 }
-
-TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
 const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
     return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};

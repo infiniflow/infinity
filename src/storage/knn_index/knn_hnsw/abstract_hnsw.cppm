@@ -105,8 +105,6 @@ public:
     static UniquePtr<HnswIndexInMem>
     Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace = false);
 
-    void SetSegmentEntry(SegmentIndexEntry *segment_index_entry);
-
     static UniquePtr<HnswIndexInMem> Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
 
     HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace);
@@ -218,8 +216,6 @@ public:
     const AbstractHnsw &get() const { return hnsw_; }
 
     AbstractHnsw *get_ptr() { return &hnsw_; }
-
-    TableIndexEntry *table_index_entry() const override;
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 

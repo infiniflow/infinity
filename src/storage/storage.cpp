@@ -311,8 +311,6 @@ Status Storage::AdminToWriter() {
     builtin_functions.Init();
     // Catalog finish init here.
 
-    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
-
     bg_processor_->Start();
 
     // Compact processor will do in WRITABLE MODE:
@@ -456,10 +454,6 @@ Status Storage::UnInitFromReader() {
             persistence_manager_.reset();
         }
 
-        if (cleanup_info_tracer_ != nullptr) {
-            cleanup_info_tracer_.reset();
-        }
-
         std::unique_lock<std::mutex> lock(mutex_);
         current_storage_mode_ = StorageMode::kUnInitialized;
     }
@@ -567,10 +561,6 @@ Status Storage::WriterToAdmin() {
 
     if (result_cache_manager_ != nullptr) {
         result_cache_manager_.reset();
-    }
-
-    if (cleanup_info_tracer_ != nullptr) {
-        cleanup_info_tracer_.reset();
     }
 
     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
@@ -688,10 +678,6 @@ Status Storage::UnInitFromWriter() {
 
     if (persistence_manager_ != nullptr) {
         persistence_manager_.reset();
-    }
-
-    if (cleanup_info_tracer_ != nullptr) {
-        cleanup_info_tracer_.reset();
     }
 
     std::unique_lock<std::mutex> lock(mutex_);
@@ -816,7 +802,6 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
-    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     bg_processor_->Start();
 
