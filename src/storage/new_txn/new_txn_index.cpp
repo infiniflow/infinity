@@ -853,7 +853,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), nullptr, true /*trace*/);
+                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), true /*trace*/);
                 }
                 memory_hnsw_index = mem_index->memory_hnsw_index_;
             }
@@ -1380,7 +1380,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             UnrecoverableError("Not implemented yet");
         }
 
-        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get(), nullptr);
+        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get());
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;

@@ -7,7 +7,7 @@ module;
 #include <future>
 
 namespace infinity {
-struct SegmentEntry;
+struct ChunkIndexMetaInfo;
 }
 
 export module hnsw_handler;
@@ -30,17 +30,12 @@ import infinity_context;
 import logger;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import buffer_handle;
 import third_party;
-import chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
-struct ChunkIndexEntry;
-struct SegmentIndexEntry;
-struct BlockColumnEntry;
 class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
@@ -177,26 +172,10 @@ private:
     }
 
 public:
-    SizeT InsertVecs(SizeT block_offset,
-                     BlockColumnEntry *block_column_entry,
-                     BufferManager *buffer_manager,
-                     SizeT row_offset,
-                     SizeT row_count,
-                     const HnswInsertConfig &config = kDefaultHnswInsertConfig,
-                     SizeT kBuildBucketSize = 1024);
-
     SizeT InsertVecs(SegmentOffset block_offset,
                      const ColumnVector &col,
                      BlockOffset offset,
                      BlockOffset row_count,
-                     const HnswInsertConfig &config = kDefaultHnswInsertConfig,
-                     SizeT kBuildBucketSize = 1024);
-
-    SizeT InsertVecs(const SegmentEntry *segment_entry,
-                     BufferManager *buffer_mgr,
-                     SizeT column_id,
-                     TxnTimeStamp begin_ts,
-                     bool check_ts,
                      const HnswInsertConfig &config = kDefaultHnswInsertConfig,
                      SizeT kBuildBucketSize = 1024);
 
@@ -220,14 +199,6 @@ public:
             hnsw_);
         return mem_usage;
     }
-
-    SizeT InsertVecs(int row_count,
-                     const SegmentEntry *segment_entry,
-                     BufferManager *buffer_mgr,
-                     SizeT column_id,
-                     TxnTimeStamp begin_ts,
-                     const HnswInsertConfig &config = kDefaultHnswInsertConfig,
-                     SizeT kBuildBucketSize = 1024);
 
     template <typename LabelT>
     Pair<VertexType, VertexType> StoreData(const auto *data, SizeT dim, SizeT vec_num, const HnswInsertConfig &option = kDefaultHnswInsertConfig) {
@@ -294,36 +265,20 @@ export using HnswHandlerPtr = HnswHandler *;
 export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_handler_(nullptr) {}
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace)
-        : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), segment_index_entry_(segment_index_entry),
-          trace_(trace), own_memory_(true) {}
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace)
+        : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), trace_(trace), own_memory_(true) {}
     HnswIndexInMem(const HnswIndexInMem &) = delete;
     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
     virtual ~HnswIndexInMem();
 
-    static UniquePtr<HnswIndexInMem>
-    Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace = false);
+    static UniquePtr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
 
     static UniquePtr<HnswIndexInMem> Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
-
-    void InsertVecs(SizeT block_offset,
-                    BlockColumnEntry *block_column_entry,
-                    BufferManager *buffer_manager,
-                    SizeT row_offset,
-                    SizeT row_count,
-                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     void InsertVecs(SegmentOffset block_offset,
                     const ColumnVector &col,
                     BlockOffset offset,
                     BlockOffset row_count,
-                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
-
-    void InsertVecs(const SegmentEntry *segment_entry,
-                    BufferManager *buffer_mgr,
-                    SizeT column_id,
-                    TxnTimeStamp begin_ts,
-                    bool check_ts,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     template <typename Iter>
@@ -334,7 +289,6 @@ public:
         }
     }
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size_ptr = nullptr);
     void Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr = nullptr);
 
     RowID GetBeginRowID() const { return begin_row_id_; }
@@ -354,8 +308,6 @@ private:
 
     RowID begin_row_id_ = {};
     HnswHandlerPtr hnsw_handler_;
-
-    SegmentIndexEntry *segment_index_entry_{};
     bool trace_{};
     bool own_memory_{};
     BufferHandle chunk_handle_{};
