@@ -339,6 +339,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &m
             return status;
         }
     }
+    // Delete entities at lower hierarchy level first to avoid missing them when removing higher-level entities.
     std::sort(metas.begin(), metas.end(), [&](const UniquePtr<MetaKey> &lhs, const UniquePtr<MetaKey> &rhs) {
         return static_cast<SizeT>(lhs->type_) > static_cast<SizeT>(rhs->type_);
     });

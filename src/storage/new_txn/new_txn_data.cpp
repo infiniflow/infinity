@@ -168,7 +168,7 @@ struct NewTxnCompactState {
         return status;
     }
 
-    TxnTimeStamp commit_ts_;
+    TxnTimeStamp commit_ts_{};
     Optional<SegmentMeta> new_segment_meta_;
     Optional<BlockMeta> block_meta_;
 
