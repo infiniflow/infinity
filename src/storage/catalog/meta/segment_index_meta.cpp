@@ -343,14 +343,18 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
         next_chunk_id_.reset();
     }
     if (usage_flag == UsageFlag::kOther) {
-        {
-            // Remove mem index
-            String mem_index_key = GetSegmentIndexTag("mem_index");
-            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-            Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
-            if (!status.ok()) {
-                return status;
-            }
+        // Clear mem index
+        SharedPtr<MemIndex> mem_index = GetMemIndex();
+        if (mem_index != nullptr) {
+            mem_index->ClearMemIndex();
+        }
+
+        // Remove mem index
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+        if (!status.ok()) {
+            return status;
         }
     }
     {

@@ -3763,8 +3763,8 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
                 auto index_id_str = compact_txn_store->index_ids_str_[i];
-                const Vector<SegmentID> &deprecated_ids = compact_txn_store->deprecated_segment_ids_;
-                for (SegmentID segment_id : deprecated_ids) {
+                const Vector<SegmentID> &segment_ids = compact_txn_store->segment_ids_;
+                for (const SegmentID &segment_id : segment_ids) {
                     metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
                     metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }

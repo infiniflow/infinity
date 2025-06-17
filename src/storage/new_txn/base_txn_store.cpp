@@ -265,7 +265,6 @@ SharedPtr<WalEntry> DumpMemIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
         SharedPtr<WalCmdDumpIndexV2> wal_command =
             MakeShared<WalCmdDumpIndexV2>(db_name_, db_id_str_, table_name_, table_id_str_, index_name_, index_id_str_, segment_id, table_key_);
         wal_command->dump_cause_ = DumpIndexCause::kDumpMemIndex;
-        wal_command->clear_mem_index_ = true;
         wal_command->chunk_infos_ = chunk_infos_in_segments_.at(segment_id);
         wal_entry->cmds_.push_back(wal_command);
     }
