@@ -969,7 +969,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         std::shared_lock lock(rw_locker_);
         for (const auto &chunk_index_entry : chunk_index_entries_) {
             if (chunk_index_entry->CheckVisible(txn)) {
-                row_count += chunk_index_entry->row_count_;
+                //                row_count += chunk_index_entry->row_count_;
                 old_chunks.push_back(chunk_index_entry.get());
                 old_ids.push_back(chunk_index_entry->chunk_id_);
             }
