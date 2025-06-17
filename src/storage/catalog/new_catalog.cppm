@@ -211,7 +211,7 @@ public:
     HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
 public:
-    void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
+    Status GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
 
     // Profile related methods
     void SetProfile(bool flag) { enable_profile_ = flag; }

@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <sys/stat.h>
 #include <tuple>
 #include <vector>
 
@@ -3763,8 +3764,8 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
                 auto index_id_str = compact_txn_store->index_ids_str_[i];
-                const Vector<SegmentID> &deprecated_ids = compact_txn_store->segment_ids_;
-                for (SegmentID segment_id : deprecated_ids) {
+                const Vector<SegmentID> &segment_ids_ = compact_txn_store->segment_ids_;
+                for (SegmentID segment_id : segment_ids_) {
                     metas.emplace_back(MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
                     metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
@@ -3943,8 +3944,10 @@ Status NewTxn::Cleanup() {
     TxnTimeStamp begin_ts = BeginTS();
 
     Vector<UniquePtr<MetaKey>> metas;
-    new_catalog_->GetCleanedMeta(begin_ts, metas, kv_instance);
-
+    Status status = new_catalog_->GetCleanedMeta(begin_ts, metas, kv_instance);
+    if (!status.OK()) {
+        return status;
+    }
     if (metas.empty()) {
         LOG_TRACE("SIP cleanup, no data need to clean.");
         return Status::OK();
