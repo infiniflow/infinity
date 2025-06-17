@@ -279,12 +279,12 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kBMP: {
-            if (memory_bmp_index_.get() == nullptr) {
-                std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get(), this);
-            }
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-            memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+            // if (memory_bmp_index_.get() == nullptr) {
+            //     std::unique_lock<std::shared_mutex> lck(rw_locker_);
+            //     memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get(), this);
+            // }
+            // BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
+            // memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -391,14 +391,14 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             break;
         }
         case IndexType::kBMP: {
-            if (memory_bmp_index_.get() == nullptr) {
-                return nullptr;
-            }
-            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_, dump_size);
-            chunk_index_entry->SaveIndexFile();
-            std::unique_lock lck(rw_locker_);
-            chunk_index_entries_.push_back(chunk_index_entry);
-            memory_bmp_index_.reset();
+            // if (memory_bmp_index_.get() == nullptr) {
+            //     return nullptr;
+            // }
+            // chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_, dump_size);
+            // chunk_index_entry->SaveIndexFile();
+            // std::unique_lock lck(rw_locker_);
+            // chunk_index_entries_.push_back(chunk_index_entry);
+            // memory_bmp_index_.reset();
             break;
         }
         default: {
@@ -452,7 +452,7 @@ u32 SegmentIndexEntry::MemIndexRowCount() {
 }
 
 void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
-    TxnTimeStamp begin_ts = txn->BeginTS();
+    // TxnTimeStamp begin_ts = txn->BeginTS();
     auto *buffer_mgr = txn->buffer_mgr();
     const IndexBase *index_base = table_index_entry_->index_base();
     SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
@@ -553,10 +553,10 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kBMP: {
-            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get(), this);
-
-            memory_bmp_index_->AddDocs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_);
-            dumped_memindex_entry = MemIndexDump();
+            // memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get(), this);
+            //
+            // memory_bmp_index_->AddDocs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_);
+            // dumped_memindex_entry = MemIndexDump();
             break;
         }
         case IndexType::kDiskAnn: { // TODO
@@ -733,56 +733,56 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
 
     switch (table_index_entry_->index_base()->index_type_) {
         case IndexType::kBMP: {
-            Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
-            if (!ret) {
-                break;
-            }
-            const auto &options = ret.value();
-            const auto [chunk_index_entries, memory_index_entry] = this->GetBMPIndexSnapshot();
-
-#ifdef INDEX_HANDLER
-#else
-            auto optimize_index = [&](const AbstractBMP &index) {
-                std::visit(
-                    [&](auto &&index) {
-                        using T = std::decay_t<decltype(index)>;
-                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                            UnrecoverableError("Invalid index type.");
-                        } else {
-                            using IndexT = typename std::remove_pointer_t<T>;
-                            if constexpr (IndexT::kOwnMem) {
-                                index->Optimize(options);
-                            } else {
-                                UnrecoverableError("Invalid index type.");
-                            }
-                        }
-                    },
-                    index);
-            };
-#endif
-            for (auto &chunk_index_entry : chunk_index_entries) {
-                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
-#ifdef INDEX_HANDLER
-                BMPHandlerPtr bmp_handler = *static_cast<BMPHandlerPtr *>(buffer_handle.GetDataMut());
-                bmp_handler->Optimize(options);
-#else
-                auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
-                optimize_index(*abstract_bmp);
-#endif
-                chunk_index_entry->SaveIndexFile();
-
-                set_fileworker_index_def(chunk_index_entry.get());
-            }
-            if (memory_index_entry.get() != nullptr) {
-#ifdef INDEX_HANDLER
-                BMPHandlerPtr bmp_handler = memory_index_entry->get();
-                bmp_handler->Optimize(options);
-#else
-                optimize_index(memory_index_entry->get());
-#endif
-
-                dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
-            }
+//             Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
+//             if (!ret) {
+//                 break;
+//             }
+//             const auto &options = ret.value();
+//             const auto [chunk_index_entries, memory_index_entry] = this->GetBMPIndexSnapshot();
+//
+// #ifdef INDEX_HANDLER
+// #else
+//             auto optimize_index = [&](const AbstractBMP &index) {
+//                 std::visit(
+//                     [&](auto &&index) {
+//                         using T = std::decay_t<decltype(index)>;
+//                         if constexpr (std::is_same_v<T, std::nullptr_t>) {
+//                             UnrecoverableError("Invalid index type.");
+//                         } else {
+//                             using IndexT = typename std::remove_pointer_t<T>;
+//                             if constexpr (IndexT::kOwnMem) {
+//                                 index->Optimize(options);
+//                             } else {
+//                                 UnrecoverableError("Invalid index type.");
+//                             }
+//                         }
+//                     },
+//                     index);
+//             };
+// #endif
+//             for (auto &chunk_index_entry : chunk_index_entries) {
+//                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+// #ifdef INDEX_HANDLER
+//                 BMPHandlerPtr bmp_handler = *static_cast<BMPHandlerPtr *>(buffer_handle.GetDataMut());
+//                 bmp_handler->Optimize(options);
+// #else
+//                 auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
+//                 optimize_index(*abstract_bmp);
+// #endif
+//                 chunk_index_entry->SaveIndexFile();
+//
+//                 set_fileworker_index_def(chunk_index_entry.get());
+//             }
+//             if (memory_index_entry.get() != nullptr) {
+// #ifdef INDEX_HANDLER
+//                 BMPHandlerPtr bmp_handler = memory_index_entry->get();
+//                 bmp_handler->Optimize(options);
+// #else
+//                 optimize_index(memory_index_entry->get());
+// #endif
+//
+//                 dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
+//             }
             break;
         }
         case IndexType::kHnsw: {
@@ -1025,9 +1025,9 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
 // #endif
 //             }
 //             merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
-//             break;
-//         }
-//         case IndexType::kBMP: {
+             break;
+         }
+         case IndexType::kBMP: {
 //             auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get(), this);
 // #ifdef INDEX_HANDLER
 //             BMPHandlerPtr bmp_handler = memory_bmp_index->get();
