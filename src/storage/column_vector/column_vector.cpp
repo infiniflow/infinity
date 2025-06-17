@@ -50,8 +50,6 @@ import expression_evaluator;
 import expression_state;
 import sparse_info;
 
-import block_column_entry;
-
 namespace infinity {
 
 VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
@@ -134,39 +132,6 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         // Initialize after reset will come to this branch
         buffer_->ResetToInit(vector_buffer_type);
     }
-}
-
-void ColumnVector::Initialize(BufferManager *buffer_mgr,
-                              BlockColumnEntry *block_column_entry,
-                              SizeT current_row_count,
-                              ColumnVectorTipe vector_tipe,
-                              ColumnVectorType vector_type,
-                              SizeT capacity) {
-    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
-
-    if (buffer_.get() != nullptr) {
-        String error_message = "Column vector is already initialized.";
-        UnrecoverableError(error_message);
-    }
-
-    if (vector_type_ == ColumnVectorType::kConstant) {
-        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_type);
-        nulls_ptr_ = Bitmask::MakeSharedAllTrue(1);
-    } else {
-        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
-        nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
-    }
-    switch (vector_tipe) {
-        case ColumnVectorTipe::kReadWrite: {
-            data_ptr_ = buffer_->GetDataMut();
-            break;
-        }
-        case ColumnVectorTipe::kReadOnly: {
-            data_ptr_ = const_cast<ptr_t>(buffer_->GetData());
-            break;
-        }
-    }
-    tail_index_ = current_row_count;
 }
 
 void ColumnVector::Initialize(BufferObj *buffer_obj,
