@@ -7,6 +7,7 @@ import third_party;
 import persist_result_handler;
 import local_file_handle;
 import kv_store;
+import status;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -24,13 +25,12 @@ public:
         system(("mkdir -p " + catalog_dir_).c_str());
 
         kv_store_ = MakeUnique<KVStore>();
-        kv_store_->Init(catalog_dir_);
+        Status status = kv_store_->Init(catalog_dir_);
+        EXPECT_TRUE(status.ok());
         pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
         pm_->SetKvStore(kv_store_.get());
         handler_ = MakeUnique<PersistResultHandler>(pm_.get());
     }
-
-    void TearDown() override { kv_store_->Uninit(); }
 
     void CheckObjData(const String &obj_addr, const String &data);
 

@@ -806,6 +806,9 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize(true);
         handler.HandleWriteResult(result);
+        for (auto &op : flush_delta_entry->operations()) {
+            op->InitializeAddrSerializer();
+        }
     }
 
     // Save the global catalog delta entry to disk.

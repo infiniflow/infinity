@@ -130,6 +130,9 @@ private:
 
     void CheckValid();
 
+public: // for unit test
+    void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
+
 private:
     void SaveObjStat(const String &obj_key, const ObjStat &obj_stat);
 
@@ -148,6 +151,25 @@ private:
     SizeT current_object_size_ = 0;
     SizeT current_object_parts_ = 0;
     SizeT current_object_ref_count_ = 0;
+    friend struct AddrSerializer;
+};
+
+export struct AddrSerializer {
+    void Initialize(PersistenceManager *persistence_manager, const Vector<String> &path);
+
+    void InitializeValid(PersistenceManager *persistence_manager);
+
+    SizeT GetSizeInBytes() const;
+
+    void WriteBufAdv(char *&buf) const;
+
+    Vector<String> ReadBufAdv(const char *&buf);
+
+    void AddToPersistenceManager(PersistenceManager *persistence_manager) const;
+
+    Vector<String> paths_;
+    Vector<ObjAddr> obj_addrs_; // set mutable to minimize refactor
+    Vector<ObjStat> obj_stats_;
 };
 
 } // namespace infinity

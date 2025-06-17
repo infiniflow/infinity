@@ -453,6 +453,8 @@ void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts, WalBlockInfo *block_info)
     max_row_ts_ = commit_ts;
 
     FlushVersionNoLock(commit_ts, false);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    block_info->addr_serializer_.InitializeValid(pm);
 }
 
 void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {

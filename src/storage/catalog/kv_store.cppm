@@ -67,7 +67,7 @@ private:
 class KVStore {
 public:
     KVStore() = default;
-    ~KVStore() = default;
+    ~KVStore();
 
     Status Init(const String &db_path);
     Status Uninit();

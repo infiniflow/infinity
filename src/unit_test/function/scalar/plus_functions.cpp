@@ -388,5 +388,4 @@ TEST_F(PlusFunctionsTest, plus_func) {
 
         // TODO: complete it.
     }
-    kv_store_ptr->Uninit();
 }

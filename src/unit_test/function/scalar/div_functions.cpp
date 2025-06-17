@@ -404,5 +404,4 @@ TEST_F(DivFunctionsTest, div_func) {
             }
         }
     }
-    kv_store_ptr->Uninit();
 }

@@ -182,10 +182,20 @@ Status KVStore::Init(const String &db_path) {
 }
 
 Status KVStore::Uninit() {
-    delete transaction_db_;
-    transaction_db_ = nullptr;
+    if (transaction_db_) {
+        delete transaction_db_;
+        transaction_db_ = nullptr;
+    }
     LOG_INFO("KV store is stopped.");
     return Status::OK();
+}
+
+KVStore::~KVStore() {
+    if (transaction_db_) {
+        delete transaction_db_;
+        transaction_db_ = nullptr;
+    }
+    LOG_INFO("KV store is stopped.");
 }
 
 Status KVStore::Flush() {
