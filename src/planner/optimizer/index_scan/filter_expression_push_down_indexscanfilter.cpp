@@ -95,37 +95,6 @@ struct ExpressionIndexScanInfo {
     TableMeeta *table_meta_ = nullptr;
     HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
 
-    inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
-        const TransactionID txn_id = txn->TxnID();
-        const TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [table_entry, table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
-        if (!table_status.ok()) {
-            LOG_ERROR(fmt::format("InitColumnIndexEntries: GetTableByName db: {}, table: {}, failed: {}",
-                                  *table_info->db_name_,
-                                  *table_info->table_name_,
-                                  table_status.message()));
-            RecoverableError(table_status);
-        }
-        for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-            if (!status.ok()) {
-                // skip invalid entry, for example, the index is deleted
-                continue;
-            }
-            const IndexBase *index_base = table_index_entry->index_base();
-            if (index_base->index_type_ != IndexType::kSecondary) {
-                continue;
-            }
-            auto column_name = index_base->column_name();
-            const ColumnID column_id = table_entry->GetColumnIdByName(column_name);
-            if (candidate_column_index_map_.contains(column_id)) {
-                LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
-            } else {
-                candidate_column_index_map_.emplace(column_id, table_index_entry);
-            }
-        }
-    }
-
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
@@ -133,6 +102,7 @@ struct ExpressionIndexScanInfo {
                 MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS(), new_txn->CommitTS());
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
+        auto& table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
 
         Vector<String> *index_id_strs_ptr = nullptr;
         status = table_meta_->GetIndexIDs(index_id_strs_ptr);
@@ -144,10 +114,14 @@ struct ExpressionIndexScanInfo {
         }
         for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
             const String &index_id_str = (*index_id_strs_ptr)[i];
-            auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
+            if (table_index_meta_map.size() <= i) {
+                auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
+                table_index_meta_map.emplace_back(std::move(table_index_meta));
+            }
+            SharedPtr<TableIndexMeeta>& it = table_index_meta_map[i];
 
             SharedPtr<IndexBase> index_base;
-            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            std::tie(index_base, status) = it->GetIndexBase();
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -163,7 +137,7 @@ struct ExpressionIndexScanInfo {
             if (new_candidate_column_index_map_.contains(column_id)) {
                 LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
             } else {
-                new_candidate_column_index_map_.emplace(column_id, table_index_meta);
+                new_candidate_column_index_map_.emplace(column_id, it);
             }
         }
     }
@@ -345,7 +319,6 @@ public:
         switch (leftover_filter->type()) {
             case ExpressionType::kFilterFullText: {
                 auto *filter_fulltext_expression = static_cast<FilterFulltextExpression *>(leftover_filter.get());
-                filter_fulltext_expression->txn_ = query_context_->GetTxn();
                 filter_fulltext_expression->block_index_ = base_table_ref_ptr_->block_index_;
                 TreeT fake_tree;
                 fake_tree.src_ptr = &leftover_filter;

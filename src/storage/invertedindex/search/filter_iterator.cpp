@@ -21,7 +21,6 @@ import stl;
 import doc_iterator;
 import query_node;
 import internal_types;
-import table_entry;
 import column_index_reader;
 import explain_logical_plan;
 

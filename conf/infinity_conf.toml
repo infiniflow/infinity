@@ -22,6 +22,7 @@ log_level               = "info"
 [storage]
 persistence_dir         = "/var/infinity/persistence"
 data_dir                = "/var/infinity/data"
+catalog_dir             = "/var/infinity/catalog"
 # periodically activates garbage collection:
 # 0 means real-time,
 # s means seconds, for example "60s", 60 seconds

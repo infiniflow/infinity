@@ -20,11 +20,8 @@ module ivf_index_data_in_mem;
 import stl;
 import ivf_index_storage;
 import internal_types;
-import block_column_entry;
 import buffer_manager;
 import column_def;
-import chunk_index_entry;
-import segment_index_entry;
 import index_base;
 import index_ivf;
 import embedding_info;
@@ -42,10 +39,11 @@ import knn_scan_data;
 import ivf_index_util_func;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import infinity_context;
 import third_party;
 import buffer_obj;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 
@@ -138,8 +136,6 @@ public:
 
         return MemIndexTracerInfo(index_name, table_name, db_name, mem, input_row_count_);
     }
-
-    TableIndexEntry *table_index_entry() const override { return segment_index_entry_->table_index_entry(); }
 
     IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 embedding_dimension, SegmentIndexEntry *segment_index_entry)
         : IVFIndexInMem(begin_row_id, ivf_option, column_logical_type, embedding_data_type, embedding_dimension, segment_index_entry) {

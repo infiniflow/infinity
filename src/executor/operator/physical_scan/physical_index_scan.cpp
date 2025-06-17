@@ -28,11 +28,7 @@ import logger;
 import third_party;
 import data_block;
 import logical_type;
-import table_index_entry;
-import segment_index_entry;
-import chunk_index_entry;
 import secondary_index_in_mem;
-import segment_entry;
 import fast_rough_filter;
 import roaring_bitmap;
 import filter_value_type_classification;
@@ -197,7 +193,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
         UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
     } else {
         segment_meta = iter->second.segment_meta_.get();
-        segment_row_count = iter->second.segment_offset_;
+        segment_row_count = iter->second.segment_offset();
     }
 
     // check FastRoughFilter
@@ -217,11 +213,11 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
 
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() > 0) {
         // Remove deleted rows from the result
         // segment_entry->CheckRowsVisible(result_elem, begin_ts);
-        Status status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
+        status = NewCatalog::CheckSegmentRowsVisible(*segment_meta, begin_ts, commit_ts, result_elem);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

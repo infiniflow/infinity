@@ -217,8 +217,9 @@ Status FileWorker::CleanupFile(KVInstance *kv_instance) const {
         handler.HandleWriteResult(result);
         // Delete from RocksDB
         if (kv_instance != nullptr) {
+            auto *kv_store = InfinityContext::instance().storage()->kv_store();
             String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
-            kv_instance->Delete(relevant_full_path);
+            kv_store->Delete(relevant_full_path);
             LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
         }
         return Status::OK();

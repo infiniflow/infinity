@@ -251,7 +251,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &exp
         if (!expr->block_index_->segment_block_index_.empty()) {
             segment_row_count = expr->block_index_->segment_block_index_.at(segment_id).segment_offset_;
         } else {
-            segment_row_count = expr->block_index_->new_segment_block_index_.at(segment_id).segment_offset_;
+            segment_row_count = expr->block_index_->new_segment_block_index_.at(segment_id).segment_offset();
         }
         const Bitmask *segment_filter_result_ptr = nullptr;
         {
@@ -266,7 +266,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &exp
                 segment_filter_result_ptr = &(it->second);
             } else {
                 auto &bitmap_ref = expr->segment_results_[segment_id];
-                bitmap_ref = expr->filter_fulltext_evaluator_->Evaluate(segment_id, segment_row_count, expr->txn_);
+                bitmap_ref = expr->filter_fulltext_evaluator_->Evaluate(segment_id, segment_row_count);
                 segment_filter_result_ptr = &bitmap_ref;
             }
         }

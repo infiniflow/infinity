@@ -75,16 +75,11 @@ import physical_update;
 import physical_drop_index;
 import physical_command;
 import physical_compact;
-import physical_compact_index_prepare;
-import physical_compact_index_do;
-import physical_compact_finish;
 import physical_match;
 import physical_match_tensor_scan;
 import physical_match_sparse_scan;
 import physical_fusion;
 import physical_create_index_prepare;
-import physical_create_index_do;
-import physical_create_index_finish;
 import physical_read_cache;
 import physical_unnest;
 import physical_unnest_aggregate;
@@ -126,8 +121,6 @@ import logical_explain;
 import logical_drop_index;
 import logical_command;
 import logical_compact;
-import logical_compact_index;
-import logical_compact_finish;
 import logical_match;
 import logical_match_tensor_scan;
 import logical_match_sparse_scan;
@@ -333,14 +326,6 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             result = BuildExplain(logical_operator);
             break;
         }
-        case LogicalNodeType::kCompactIndex: {
-            result = BuildCompactIndex(logical_operator);
-            break;
-        }
-        case LogicalNodeType::kCompactFinish: {
-            result = BuildCompactFinish(logical_operator);
-            break;
-        }
         case LogicalNodeType::kReadCache: {
             result = BuildReadCache(logical_operator);
             break;
@@ -390,43 +375,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
     SharedPtr<String> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
     SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
     const auto &index_def_ptr = logical_create_index->index_definition();
-    if (index_def_ptr->index_type_ != IndexType::kHnsw) {
-        // TODO: support other index types build in parallel.
-        return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
-                                                      logical_create_index->base_table_ref(),
-                                                      logical_create_index->index_definition(),
-                                                      logical_create_index->conflict_type(),
-                                                      logical_create_index->GetOutputNames(),
-                                                      logical_create_index->GetOutputTypes(),
-                                                      logical_create_index->load_metas(),
-                                                      false);
+
+    bool parallel = false;
+    if (index_def_ptr->index_type_ == IndexType::kHnsw) {
+        parallel = true;
     }
 
-    // use new `PhysicalCreateIndexPrepare` `PhysicalCreateIndexDo` `PhysicalCreateIndexFinish`
-    auto create_index_prepare = MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
-                                                                       logical_create_index->base_table_ref(),
-                                                                       logical_create_index->index_definition(),
-                                                                       logical_create_index->conflict_type(),
-                                                                       logical_create_index->GetOutputNames(),
-                                                                       logical_create_index->GetOutputTypes(),
-                                                                       logical_create_index->load_metas(),
-                                                                       true);
-    auto create_index_do = MakeUnique<PhysicalCreateIndexDo>(logical_create_index->node_id(),
-                                                             std::move(create_index_prepare),
-                                                             logical_create_index->base_table_ref(),
-                                                             logical_create_index->index_definition()->index_name_,
-                                                             logical_create_index->GetOutputNames(),
-                                                             logical_create_index->GetOutputTypes(),
-                                                             logical_create_index->load_metas());
-    auto create_index_finish = MakeUnique<PhysicalCreateIndexFinish>(logical_create_index->node_id(),
-                                                                     std::move(create_index_do),
-                                                                     schema_name,
-                                                                     table_name,
-                                                                     logical_create_index->index_definition(),
-                                                                     logical_create_index->GetOutputNames(),
-                                                                     logical_create_index->GetOutputTypes(),
-                                                                     logical_create_index->load_metas());
-    return create_index_finish;
+    return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
+                                                  logical_create_index->base_table_ref(),
+                                                  logical_create_index->index_definition(),
+                                                  logical_create_index->conflict_type(),
+                                                  logical_create_index->GetOutputNames(),
+                                                  logical_create_index->GetOutputTypes(),
+                                                  logical_create_index->load_metas(),
+                                                  parallel);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -658,7 +620,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                          logical_aggregate->aggregate_index_,
                                                          logical_operator->load_metas());
 
-    if (tasklet_count == 1) {
+    if (tasklet_count <= 1) {
         return physical_agg_op;
     } else {
         return MakeUnique<PhysicalMergeAggregate>(query_context_ptr_->GetNextNodeID(),
@@ -1128,77 +1090,6 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<Logica
                                        logical_compact->GetOutputNames(),
                                        logical_compact->GetOutputTypes(),
                                        logical_operator->load_metas());
-}
-
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const {
-    const auto *logical_compact_index = static_cast<const LogicalCompactIndex *>(logical_operator.get());
-    if (logical_compact_index->right_node().get() != nullptr) {
-        String error_message = "Compact index node shouldn't have right child.";
-        UnrecoverableError(error_message);
-    }
-    UniquePtr<PhysicalOperator> left{};
-    if (logical_compact_index->left_node().get() != nullptr) {
-        const auto &left_node = logical_compact_index->left_node();
-        left = BuildPhysicalOperator(left_node);
-    }
-    auto &index_index = logical_compact_index->base_table_ref_->index_index_;
-
-    bool use_prepare = false;
-    for (const auto &[index_name, index_snapshot] : index_index->index_snapshots_) {
-        const auto *index_base = index_snapshot->table_index_entry_->index_base();
-        if (index_base->index_type_ == IndexType::kHnsw) {
-            use_prepare = true;
-            break;
-        }
-    }
-    if (!use_prepare) {
-        return MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
-                                                       std::move(left),
-                                                       logical_compact_index->base_table_ref_,
-                                                       false,
-                                                       logical_compact_index->GetOutputNames(),
-                                                       logical_compact_index->GetOutputTypes(),
-                                                       logical_operator->load_metas());
-    }
-    auto compact_index_prepare = MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
-                                                                         std::move(left),
-                                                                         logical_compact_index->base_table_ref_,
-                                                                         true,
-                                                                         logical_compact_index->GetOutputNames(),
-                                                                         logical_compact_index->GetOutputTypes(),
-                                                                         logical_operator->load_metas());
-
-    auto compact_index_do = MakeUnique<PhysicalCompactIndexDo>(logical_compact_index->node_id(),
-                                                               std::move(compact_index_prepare),
-                                                               logical_compact_index->base_table_ref_,
-                                                               logical_compact_index->GetOutputNames(),
-                                                               logical_compact_index->GetOutputTypes(),
-                                                               logical_operator->load_metas());
-    return compact_index_do;
-}
-
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {
-    const auto *logical_compact_finish = static_cast<const LogicalCompactFinish *>(logical_operator.get());
-    UniquePtr<PhysicalOperator> left{}, right{};
-    if (logical_compact_finish->left_node().get() != nullptr) {
-        const auto &left_logical_node = logical_compact_finish->left_node();
-        left = BuildPhysicalOperator(left_logical_node);
-        if (logical_compact_finish->right_node().get() != nullptr) {
-            const auto &right_logical_node = logical_compact_finish->right_node();
-            right = BuildPhysicalOperator(right_logical_node);
-        }
-    } else if (logical_compact_finish->right_node().get() != nullptr) {
-        String error_message = "Compact finish node shouldn't have right child.";
-        UnrecoverableError(error_message);
-    }
-    return MakeUnique<PhysicalCompactFinish>(logical_compact_finish->node_id(),
-                                             std::move(left),
-                                             std::move(right),
-                                             logical_compact_finish->base_table_ref_,
-                                             logical_compact_finish->compact_type_,
-                                             logical_compact_finish->GetOutputNames(),
-                                             logical_compact_finish->GetOutputTypes(),
-                                             logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const {

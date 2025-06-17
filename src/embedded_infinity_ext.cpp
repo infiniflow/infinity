@@ -482,8 +482,6 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kFlush", LogicalNodeType::kFlush)
         .value("kOptimize", LogicalNodeType::kOptimize)
         .value("kCompact", LogicalNodeType::kCompact)
-        .value("kCompactIndex", LogicalNodeType::kCompactIndex)
-        .value("kCompactFinish", LogicalNodeType::kCompactFinish)
         .export_values();
 
     // column_def

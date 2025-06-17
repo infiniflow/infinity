@@ -56,6 +56,8 @@ CATALOGS        { return CATALOGS; }
 CHECK           { return CHECK; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
+CLEAN           { return CLEAN; }
+DUMP            { return DUMP; }
 COLLECTION      { return COLLECTION; }
 COLUMN          { return COLUMN; }
 COLUMNS         { return COLUMNS; }

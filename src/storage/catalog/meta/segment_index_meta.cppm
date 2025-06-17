@@ -62,8 +62,6 @@ public:
 
     Status SetNextChunkID(ChunkID chunk_id);
 
-    Status SetFtInfo(const SharedPtr<SegmentIndexFtInfo> &ft_info);
-
     Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 
     Status SetNoMemIndex();

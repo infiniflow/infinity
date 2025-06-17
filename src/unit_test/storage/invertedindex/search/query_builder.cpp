@@ -26,7 +26,6 @@ import column_index_reader;
 import query_builder;
 import query_node;
 import search_driver;
-import table_entry;
 import infinity_context;
 import global_resource_usage;
 import third_party;

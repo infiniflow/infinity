@@ -38,7 +38,6 @@ import logger;
 import column_vector;
 import logical_type;
 import meta_info;
-import block_entry;
 
 import new_txn;
 import block_meta;

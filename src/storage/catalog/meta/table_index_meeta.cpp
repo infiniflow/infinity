@@ -220,10 +220,7 @@ Status TableIndexMeeta::UninitSet1(UsageFlag usage_flag) {
 
             NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
             String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-            status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
-            if (!status.ok()) {
-                return status;
-            }
+            new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
         }
     }
 

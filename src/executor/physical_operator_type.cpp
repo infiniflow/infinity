@@ -127,12 +127,6 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Command";
         case PhysicalOperatorType::kCompact:
             return "Compact";
-        case PhysicalOperatorType::kCompactIndexPrepare:
-            return "CompactIndexPrepare";
-        case PhysicalOperatorType::kCompactIndexDo:
-            return "CompactIndexDo";
-        case PhysicalOperatorType::kCompactFinish:
-            return "CompactFinish";
         case PhysicalOperatorType::kMatch:
             return "Match";
         case PhysicalOperatorType::kMatchTensorScan:
@@ -149,10 +143,6 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MergeAggregate";
         case PhysicalOperatorType::kCreateIndexPrepare:
             return "CreateIndexPrepare";
-        case PhysicalOperatorType::kCreateIndexDo:
-            return "CreateIndexDo";
-        case PhysicalOperatorType::kCreateIndexFinish:
-            return "CreateIndexFinish";
         case PhysicalOperatorType::kReadCache:
             return "ReadCache";
         case PhysicalOperatorType::kUnnest:

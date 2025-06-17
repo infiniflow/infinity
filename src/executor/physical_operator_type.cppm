@@ -90,8 +90,6 @@ export enum class PhysicalOperatorType : i8 {
     kDropView,
 
     kCreateIndexPrepare,
-    kCreateIndexDo,
-    kCreateIndexFinish,
 
     // misc
     kExplain,
@@ -103,9 +101,6 @@ export enum class PhysicalOperatorType : i8 {
 
     // Compact
     kCompact,
-    kCompactIndexPrepare,
-    kCompactIndexDo,
-    kCompactFinish,
 
     kReadCache,
 

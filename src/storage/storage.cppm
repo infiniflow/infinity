@@ -23,7 +23,6 @@ export module storage;
 
 namespace infinity {
 
-class CleanupInfoTracer;
 class ResultCacheManager;
 class NewCatalog;
 class Catalog;
@@ -54,15 +53,11 @@ public:
 
     ~Storage();
 
-    [[nodiscard]] inline Catalog *catalog() noexcept { return catalog_.get(); }
-
     [[nodiscard]] inline NewCatalog *new_catalog() noexcept { return new_catalog_.get(); }
 
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
-
-    [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
 
     [[nodiscard]] inline NewTxnManager *new_txn_manager() const noexcept { return new_txn_mgr_.get(); }
 
@@ -81,8 +76,6 @@ public:
     [[nodiscard]] inline DumpIndexProcessor *dump_index_processor() const noexcept { return dump_index_processor_.get(); }
 
     [[nodiscard]] inline MemIndexAppender *mem_index_appender() const noexcept { return mem_index_appender_.get(); }
-
-    [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
     UniquePtr<KVInstance> KVInstance();
 
@@ -122,16 +115,13 @@ public:
 
 private:
     Config *config_ptr_{};
-    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<ObjectStorageProcess> object_storage_processor_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<ResultCacheManager> result_cache_manager_{};
     UniquePtr<BufferManager> buffer_mgr_{};
-    UniquePtr<Catalog> catalog_{};
     UniquePtr<NewCatalog> new_catalog_{};
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
-    UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<NewTxnManager> new_txn_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};

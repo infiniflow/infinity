@@ -147,6 +147,10 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
     }
 
+    if (txn_store->chunk_infos_in_segments_.empty()) {
+        base_txn_store_ = nullptr; // No mem index to dump.
+    }
+
     return Status::OK();
 }
 
@@ -434,7 +438,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         }
     }
 
-    txn_store_.AddMetaKeyForBufferObject(
+    this->AddMetaKeyForBufferObject(
         MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
                                       chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
@@ -544,27 +548,32 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     // Put the data into local txn store
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = MakeShared<OptimizeIndexTxnStore>();
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->db_name_ = db_name;
-        optimize_index_txn_store->db_id_str_ = table_meta.db_id_str();
-        optimize_index_txn_store->table_name_ = table_name;
-        optimize_index_txn_store->table_id_str_ = table_meta.table_id_str();
-        optimize_index_txn_store->table_key_ = table_key;
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
-    } else {
-        OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-        optimize_index_txn_store->index_names_.emplace_back(index_name);
-        optimize_index_txn_store->index_ids_str_.emplace_back(table_index_meta.index_id_str());
-        optimize_index_txn_store->index_ids_.emplace_back(std::stoull(table_index_meta.index_id_str()));
-        optimize_index_txn_store->segment_ids_.emplace_back(segment_id);
-        optimize_index_txn_store->chunk_infos_in_segments_.emplace_back(chunk_infos);
-        optimize_index_txn_store->deprecate_ids_in_segments_.emplace_back(deprecate_ids);
     }
+
+    OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+    if (std::find(optimize_index_txn_store->db_names_.begin(), optimize_index_txn_store->db_names_.end(), db_name) ==
+        optimize_index_txn_store->db_names_.end()) {
+        optimize_index_txn_store->db_names_.emplace_back(db_name);
+    }
+    if (std::find(optimize_index_txn_store->table_names_in_db_[db_name].begin(),
+                  optimize_index_txn_store->table_names_in_db_[db_name].end(),
+                  table_name) == optimize_index_txn_store->table_names_in_db_[db_name].end()) {
+        optimize_index_txn_store->table_names_in_db_[db_name].emplace_back(table_name);
+    }
+
+    optimize_index_txn_store->entries_.emplace_back(db_name,
+                                                    table_meta.db_id_str(),
+                                                    std::stoull(table_meta.db_id_str()),
+                                                    table_name,
+                                                    table_meta.table_id_str(),
+                                                    std::stoull(table_meta.table_id_str()),
+                                                    table_key,
+                                                    index_name,
+                                                    table_index_meta.index_id_str(),
+                                                    std::stoull(table_index_meta.index_id_str()),
+                                                    segment_id,
+                                                    std::move(chunk_infos),
+                                                    std::move(deprecate_ids));
 
     return Status::OK();
 }
@@ -764,7 +773,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, nullptr, base_row_id);
+                    mem_index->memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
                 }
                 memory_secondary_index = mem_index->memory_secondary_index_;
             }
@@ -806,7 +815,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 auto col_ptr = MakeShared<ColumnVector>(std::move(col));
                 if (index_fulltext->IsRealtime()) {
                     UniquePtr<std::binary_semaphore> sema = mem_index->memory_indexer_->AsyncInsert(col_ptr, offset, row_cnt);
-                    txn_store()->AddSemaphore(std::move(sema));
+                    this->AddSemaphore(std::move(sema));
                 } else {
                     // mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
                     SharedPtr<AppendMemIndexTask> append_mem_index_task = MakeShared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
@@ -848,7 +857,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), nullptr, true /*trace*/);
+                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), true /*trace*/);
                 }
                 memory_hnsw_index = mem_index->memory_hnsw_index_;
             }
@@ -864,7 +873,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base.get(), column_def.get(), nullptr);
+                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base.get(), column_def.get());
                 }
                 memory_bmp_index = mem_index->memory_bmp_index_;
             }
@@ -974,11 +983,20 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
         }
         {
-            Status status = DumpSegmentMemIndex(*segment_index_meta, new_chunk_id);
+            Status status = segment_index_meta->GetNextChunkID(new_chunk_id);
             if (!status.ok()) {
                 return status;
             }
-            if (new_chunk_id == (ChunkID)-1 && segment_row_cnt > 0) {
+            status = segment_index_meta->SetNextChunkID(new_chunk_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+
+            status = DumpSegmentMemIndex(*segment_index_meta, new_chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+            if (new_chunk_id == static_cast<ChunkID>(-1) && segment_row_cnt > 0) {
                 UnrecoverableError(fmt::format("Failed to dump {} rows", segment_row_cnt));
             }
         }
@@ -1375,7 +1393,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             UnrecoverableError("Not implemented yet");
         }
 
-        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get(), nullptr);
+        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get());
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
@@ -1398,7 +1416,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
 
         memory_hnsw_index->Dump(buffer_obj);
     } else if (index_base->index_type_ == IndexType::kBMP) {
-        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get(), nullptr);
+        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get());
 
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
@@ -1677,8 +1695,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             return status;
         }
 
-        chunk_infos_.push_back(
-            {table_index_meta.table_meta().db_id_str(), table_index_meta.table_meta().table_id_str(), segment_index_meta.segment_id(), new_chunk_id});
+        chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                       table_index_meta.table_meta().table_id_str(),
+                                                       segment_index_meta.segment_id(),
+                                                       new_chunk_id});
 
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
@@ -1759,14 +1779,12 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
 
     RowID start_row_id(segment_id, 0);
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
-        if (chunk_index_meta_info.base_row_id_ < start_row_id) {
-            UnrecoverableError("chunk index range overlap");
-        } else {
-            if (chunk_index_meta_info.base_row_id_ > start_row_id) {
-                UnrecoverableError("Not implemented");
-            }
-            start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
+        if (chunk_index_meta_info.base_row_id_ != start_row_id) {
+            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {} but got {}",
+                                           chunk_index_meta_info.base_row_id_.segment_id_,
+                                           start_row_id.segment_id_));
         }
+        start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
     }
 
     Vector<BlockID> *block_ids_ptr = nullptr;
@@ -1780,15 +1798,9 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
     BlockID start_block_id = start_row_id.segment_offset_ / block_capacity;
     BlockOffset block_offset = start_row_id.segment_offset_ % block_capacity;
     {
-        SizeT i = 0;
-        while (i < block_ids.size() && block_ids[i] != start_block_id) {
-            ++i;
-        }
+        SizeT i = start_block_id;
         if (i >= block_ids.size()) {
             return Status::OK();
-        }
-        if (block_ids[i] != start_block_id) {
-            UnrecoverableError(fmt::format("block id {} not found in segment {}", start_block_id, segment_id));
         }
         for (; i < block_ids.size(); ++i) {
             BlockID block_id = block_ids[i];
@@ -1796,7 +1808,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
-            if (!status.ok()) {
+            if (!status.ok() || block_row_cnt == block_offset) {
                 return status;
             }
             append_ranges.emplace_back(RowID(segment_id, (u32(block_id) << BLOCK_OFFSET_SHIFT) + block_offset), block_row_cnt - block_offset);

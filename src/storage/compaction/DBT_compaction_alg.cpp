@@ -22,7 +22,6 @@ module DBT_compaction_alg;
 import stl;
 import segment_entry;
 import infinity_exception;
-import txn;
 import compaction_alg;
 import third_party;
 import logger;

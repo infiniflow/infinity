@@ -45,8 +45,6 @@ public:
         return MemIndexTracerInfo(index_name_, table_name_, db_name_, mem_used_, row_count_);
     }
 
-    TableIndexEntry *table_index_entry() const override { return nullptr; }
-
     void IncreaseMemoryUsage(SizeT usage, SizeT row_cnt);
 
     void Dump(SizeT &usage, SizeT &row_cnt) && {

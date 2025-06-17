@@ -18,15 +18,12 @@ export module bound_compact_statement;
 
 import stl;
 import logical_compact;
-import logical_compact_finish;
-import logical_compact_index;
 import base_table_ref;
 import logical_node;
 import query_context;
 import bind_context;
 import logger;
 import third_party;
-import table_entry;
 import compact_statement;
 
 namespace infinity {

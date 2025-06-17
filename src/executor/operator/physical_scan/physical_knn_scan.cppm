@@ -22,8 +22,6 @@ import operator_state;
 import physical_operator_type;
 import base_table_ref;
 import meta_info;
-import block_column_entry;
-import segment_index_entry;
 import load_meta;
 import knn_expression;
 import data_type;
@@ -51,7 +49,7 @@ public:
 
     ~PhysicalKnnScan() override;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 
@@ -92,11 +90,9 @@ public:
     Vector<Pair<u32, u32>> block_parallel_options_;
     u32 block_column_entries_size_ = 0; // need this value because block_column_entries_ will be moved into KnnScanSharedData
     u32 index_entries_size_ = 0;
-    UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
-    UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
-    UniquePtr<TableIndexMeeta> table_index_meta_{};
+    SharedPtr<TableIndexMeeta> table_index_meta_{};
     UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
 
 private:

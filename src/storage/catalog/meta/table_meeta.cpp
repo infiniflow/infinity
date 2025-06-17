@@ -36,6 +36,7 @@ import table_index_meeta;
 import create_index_info;
 import segment_meta;
 import kv_utility;
+import column_index_reader;
 
 namespace infinity {
 
@@ -279,7 +280,7 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
 
     for (const auto &column : table_def->columns()) {
         String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name());
-        Status status = kv_instance_.Put(column_key, column->ToJson().dump());
+        status = kv_instance_.Put(column_key, column->ToJson().dump());
         if (!status.ok()) {
             return status;
         }
@@ -378,7 +379,7 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
 
     while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
         String table_column_key = iter2->Key().ToString();
-        Status status = kv_instance_.Delete(table_column_key);
+        status = kv_instance_.Delete(table_column_key);
         if (!status.ok()) {
             return status;
         }
@@ -391,7 +392,7 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
 
     while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
         String index_key = iter->Key().ToString();
-        Status status = kv_instance_.Delete(index_key);
+        status = kv_instance_.Delete(index_key);
         if (!status.ok()) {
             return status;
         }
@@ -487,7 +488,7 @@ Status TableMeeta::AddColumn(const ColumnDef &column_def) {
     String column_name_value;
     Status status = kv_instance_.Get(column_key, column_name_value);
     if (status.code() == ErrorCode::kNotFound) {
-        Status status = kv_instance_.Put(column_key, column_def.ToJson().dump());
+        status = kv_instance_.Put(column_key, column_def.ToJson().dump());
         if (!status.ok()) {
             return status;
         }

@@ -72,20 +72,16 @@ import join_reference;
 import cross_product_reference;
 import data_type;
 import logical_type;
-import base_entry;
-import view_entry;
-import table_entry;
-import txn;
 import logger;
 import defer_op;
 import highlighter;
-import txn_store;
 
 import meta_info;
 import new_txn;
 import db_meeta;
 import table_meeta;
 import new_catalog;
+import kv_store;
 
 namespace infinity {
 
@@ -442,11 +438,16 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     Status status;
     NewTxn *new_txn = query_context->GetNewTxn();
     Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    Optional<TableMeeta> tmp_table_meta;
+    status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
     if (!status.ok()) {
         RecoverableError(status);
     }
+    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
+                                             tmp_table_meta->table_id_str(),
+                                             tmp_table_meta->kv_instance(),
+                                             tmp_table_meta->begin_ts(),
+                                             tmp_table_meta->commit_ts());
     table_info = MakeShared<TableInfo>();
     status = table_meta->GetTableInfo(*table_info);
     if (!status.ok()) {
@@ -486,7 +487,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     SharedPtr<BlockIndex> block_index;
     block_index = MakeShared<BlockIndex>();
-    block_index->NewInit(new_txn, db_name, table_name);
+    block_index->NewInit(std::move(table_meta));
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);
@@ -498,44 +499,40 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 }
 
 SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
-    BaseEntry *base_view_entry{nullptr};
-    Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
-
-    // Build view scan operator
-    if (this->bind_context_ptr_->IsViewBound(from_table->table_name_)) {
-        Status status = Status::SyntaxError(fmt::format("View: {} is bound before!", from_table->table_name_));
-        RecoverableError(status);
-    }
-    this->bind_context_ptr_->BoundView(from_table->table_name_);
-
-    const SelectStatement *select_stmt_ptr = view_entry->GetSQLStatement();
-
-    // Create new bind context and add into context array;
-    SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
-
-    // Create bound select node and subquery table reference
-    QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
-    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
-
-    // View table index is the output index of view.
-    u64 view_index = bound_statement_ptr->result_index_;
-
-    // Add binding into bind context
-    this->bind_context_ptr_->AddViewBinding(from_table->table_name_, view_index, view_entry->column_types(), view_entry->column_names());
-
-    // Use view name as the subquery table reference name
-    auto subquery_table_ref_ptr =
-        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
-
-    // TODO: Not care about the correlated expression
-
-    // return subquery table reference
-    return subquery_table_ref_ptr;
+    //    BaseEntry *base_view_entry{nullptr};
+    //    ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
+    //
+    //    // Build view scan operator
+    //    if (this->bind_context_ptr_->IsViewBound(from_table->table_name_)) {
+    //        Status status = Status::SyntaxError(fmt::format("View: {} is bound before!", from_table->table_name_));
+    //        RecoverableError(status);
+    //    }
+    //    this->bind_context_ptr_->BoundView(from_table->table_name_);
+    //
+    //    const SelectStatement *select_stmt_ptr = view_entry->GetSQLStatement();
+    //
+    //    // Create new bind context and add into context array;
+    //    SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    //
+    //    // Create bound select node and subquery table reference
+    //    QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
+    //    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
+    //
+    //    // View table index is the output index of view.
+    //    u64 view_index = bound_statement_ptr->result_index_;
+    //
+    //    // Add binding into bind context
+    //    this->bind_context_ptr_->AddViewBinding(from_table->table_name_, view_index, view_entry->column_types(), view_entry->column_names());
+    //
+    //    // Use view name as the subquery table reference name
+    //    auto subquery_table_ref_ptr =
+    //        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+    //
+    //    // TODO: Not care about the correlated expression
+    //
+    //    // return subquery table reference
+    //    return subquery_table_ref_ptr;
+    return nullptr;
 }
 
 SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, const CrossProductReference *from_table) {

@@ -21,7 +21,6 @@ import txn;
 import new_txn;
 import new_txn_manager;
 import query_context;
-import table_entry;
 import status;
 import third_party;
 import config;
@@ -49,16 +48,16 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
 }
 
 Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
-    Txn *txn_ptr = query_context->GetTxn();
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
-
-    SharedPtr<TableSnapshotInfo> table_snapshot;
-    Status status;
-    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    if(!status.ok()) {
-        return status;
-    }
-    txn_ptr->ApplyTableSnapshot(table_snapshot);
+    //    Txn *txn_ptr = query_context->GetTxn();
+    //    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    //
+    //    SharedPtr<TableSnapshotInfo> table_snapshot;
+    //    Status status;
+    //    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    //    if(!status.ok()) {
+    //        return status;
+    //    }
+    //    txn_ptr->ApplyTableSnapshot(table_snapshot);
     return Status::OK();
 }
 

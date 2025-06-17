@@ -317,6 +317,97 @@ TEST_P(TestTxnImport, test_import_with_index) {
     check_index(*index_name2);
 }
 
+TEST_P(TestTxnImport, test_import_with_index_rollback) {
+
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def1);
+    create_index(index_def2);
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&] {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
+    {
+        auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        Status status = txn_import->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn_import);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn_import = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block()};
+        Status status = txn_import->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn_drop_db = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn_drop_db->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn_drop_db);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn_import);
+        EXPECT_FALSE(status.ok());
+    }
+}
+
 TEST_P(TestTxnImport, test_insert_and_import) {
     using namespace infinity;
 
@@ -3997,7 +4088,6 @@ TEST_P(TestTxnImport, test_import_import_table) {
         status = new_txn_mgr->CommitTxn(txn8);
         EXPECT_TRUE(status.ok());
     }
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_rename) {
@@ -4386,8 +4476,6 @@ TEST_P(TestTxnImport, test_import_rename) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_create_index) {
@@ -5008,8 +5096,6 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_drop_index) {
@@ -5657,8 +5743,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_compact) {
@@ -6002,8 +6086,6 @@ TEST_P(TestTxnImport, test_import_and_compact) {
 
         DropDB();
     }
-
-    RemoveDbDirs();
 }
 
 TEST_P(TestTxnImport, test_import_and_optimize_index) {
@@ -6384,6 +6466,4 @@ TEST_P(TestTxnImport, test_import_and_optimize_index) {
 
         DropDB();
     }
-
-    RemoveDbDirs();
 }

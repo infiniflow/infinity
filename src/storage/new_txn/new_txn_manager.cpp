@@ -365,7 +365,7 @@ void NewTxnManager::SetCurrentTransactionID(TransactionID current_transaction_id
     current_transaction_id_ = current_transaction_id;
 }
 
-TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
+TxnTimeStamp NewTxnManager::GetOldestAliveTS() {
     std::lock_guard guard(locker_);
     //    return begin_txns_.empty() ? current_ts_ + 1 : begin_txns_.begin()->first;
     return begin_txn_map_.empty() ? current_ts_ + 1 : begin_txn_map_.begin()->first;
@@ -564,7 +564,7 @@ void NewTxnManager::PrintAllKeyValue() const {
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
 Status NewTxnManager::Cleanup(TxnTimeStamp last_cleanup_ts, TxnTimeStamp *cur_cleanup_ts) {
-    TxnTimeStamp cleanup_ts = this->GetCleanupScanTS1();
+    TxnTimeStamp cleanup_ts = this->GetOldestAliveTS();
     if (cur_cleanup_ts) {
         *cur_cleanup_ts = cleanup_ts;
     }

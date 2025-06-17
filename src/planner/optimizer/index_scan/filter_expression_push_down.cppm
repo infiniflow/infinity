@@ -23,7 +23,6 @@ import base_table_ref;
 import index_base;
 import fast_rough_filter;
 import roaring_bitmap;
-import txn;
 
 namespace infinity {
 
@@ -49,7 +48,7 @@ export struct IndexFilterEvaluator {
 
     Type type() const { return type_; }
     virtual ~IndexFilterEvaluator() = default;
-    [[nodiscard]] virtual Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const = 0;
+    [[nodiscard]] virtual Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const = 0;
 
 protected:
     Type type_;

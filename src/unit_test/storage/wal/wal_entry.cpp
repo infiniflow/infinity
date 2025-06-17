@@ -23,7 +23,6 @@ import third_party;
 import logger;
 import table_def;
 import wal_entry;
-import segment_entry;
 import value;
 
 import data_block;

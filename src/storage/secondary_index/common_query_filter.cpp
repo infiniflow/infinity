@@ -51,6 +51,7 @@ import logger;
 
 import new_txn;
 import status;
+import table_meeta;
 import segment_meta;
 import block_meta;
 import column_meta;
@@ -183,7 +184,7 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
     }
 
     bool has_delete = false;
-    Status status = new_txn->CheckTableIfDelete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_, has_delete);
+    Status status = new_txn->CheckTableIfDelete(*base_table_ref_->block_index_->table_meta_, has_delete);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Check table has delete error: {}", status.message()));
     }
@@ -209,7 +210,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id) {
         return;
     }
     const SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn_ptr_);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() == 0) {
         // empty result
         return;
@@ -288,8 +289,8 @@ void CommonQueryFilter::NewBuildFilter(u32 task_id) {
         }
     }
 
-    SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
+    SizeT segment_row_count = segment_index.at(segment_id).segment_offset();
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count);
     if (result_elem.CountTrue() == 0) {
         // empty result
         return;

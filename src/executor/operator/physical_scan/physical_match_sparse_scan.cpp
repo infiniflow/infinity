@@ -23,7 +23,6 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_entry;
 import match_sparse_expression;
 import base_table_ref;
 import block_index;
@@ -34,7 +33,6 @@ import common_query_filter;
 import default_values;
 import logical_type;
 import match_sparse_scan_function_data;
-import block_entry;
 import logger;
 import infinity_exception;
 import third_party;
@@ -52,14 +50,11 @@ import match_sparse_scan_function_data;
 import fix_heap;
 import global_block_id;
 import roaring_bitmap;
-import txn;
 import bmp_index_file_worker;
-import segment_index_entry;
 import buffer_handle;
 import sparse_util;
 import bmp_util;
 import knn_filter;
-import segment_entry;
 #ifdef INDEX_HANDLER
 import bmp_handler;
 #else
@@ -531,7 +526,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 if (segment_it == block_index->new_segment_block_index_.end()) {
                     UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
                 }
-                SizeT segment_row_count = segment_it->second.segment_offset_;
+                SizeT segment_row_count = segment_it->second.segment_offset();
                 bitmask = it->second;
                 if (bitmask.count() != segment_row_count) {
                     UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));

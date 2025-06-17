@@ -104,6 +104,7 @@ export enum class WalCommandType : i8 {
     DUMMY = 103,
     OPTIMIZE_V2 = 106,
     DUMP_INDEX_V2 = 107,
+    CLEANUP = 108
 };
 
 export struct WalBlockInfo {
@@ -116,8 +117,6 @@ export struct WalBlockInfo {
     mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
 
     WalBlockInfo() = default;
-
-    explicit WalBlockInfo(BlockEntry *block_entry);
 
     explicit WalBlockInfo(BlockMeta &block_meta);
 
@@ -141,8 +140,6 @@ export struct WalSegmentInfo {
     Vector<WalBlockInfo> block_infos_;
 
     WalSegmentInfo() = default;
-
-    explicit WalSegmentInfo(SegmentEntry *segment_entry);
 
     explicit WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts);
 
@@ -168,8 +165,6 @@ export struct WalChunkIndexInfo {
     TxnTimeStamp deprecate_ts_{};
 
     WalChunkIndexInfo() = default;
-
-    explicit WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry);
 
     explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
 
@@ -1002,8 +997,20 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
     Vector<String> column_names_{};
     Vector<ColumnID> column_ids_{};
 
-    // Redudant but usefule in commit phase.
+    // Redundant but useful in commit phase.
     String table_key_{};
+};
+
+export struct WalCmdCleanup : public WalCmd {
+    WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp) {};
+
+    bool operator==(const WalCmd &other) const final;
+    i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    i64 timestamp_{};
 };
 
 export struct WalEntryHeader {

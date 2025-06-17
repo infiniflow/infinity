@@ -385,30 +385,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             }
             break;
         }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            auto *output_state = static_cast<CreateIndexFinishOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-                break;
-            }
-            result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
-            };
-            break;
-        }
         case PhysicalOperatorType::kCreateIndexPrepare: {
             auto *output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-                break;
-            }
-            result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
-            };
-            break;
-        }
-        case PhysicalOperatorType::kCompactFinish: {
-            auto *output_state = static_cast<CompactFinishOperatorState *>(task_operator_state);
             if (!output_state->Ok()) {
                 result_sink_state->status_ = std::move(output_state->status_);
                 break;
@@ -447,23 +425,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = std::move(create_index_prepare_output_state->result_msg_);
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            auto *create_index_do_output_state = static_cast<CreateIndexDoOperatorState *>(task_operator_state);
-            message_sink_state->message_ = std::move(create_index_do_output_state->result_msg_);
-            break;
-        }
         case PhysicalOperatorType::kCompact: {
             // auto *compact_output_state = static_cast<CompactOperatorState *>(task_operator_state);
-            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
-            break;
-        }
-        case PhysicalOperatorType::kCompactIndexPrepare: {
-            // auto *compact_index_output_state = static_cast<CompactIndexOperatorState *>(task_operator_state);
-            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
-            break;
-        }
-        case PhysicalOperatorType::kCompactIndexDo: {
-            // auto *compact_index_output_state = static_cast<CompactIndexOperatorState *>(task_operator_state);
             message_sink_state->message_ = MakeUnique<String>("Tmp for test");
             break;
         }

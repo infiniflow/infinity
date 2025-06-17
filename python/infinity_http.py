@@ -564,6 +564,13 @@ class table_http:
                 index_list.append(t)
         return database_result(index_list=index_list)
 
+    def dump_index(self, index_name):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "put", h)
+        self.net.raise_exception(r)
+        return database_result()
+
     def optimize(self, index_name="", optimize_options={}):
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.net.set_up_header(

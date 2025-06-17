@@ -29,8 +29,6 @@ import operator_state;
 import default_values;
 import third_party;
 import infinity_exception;
-import block_entry;
-import block_column_entry;
 import logger;
 import column_vector;
 import query_context;
@@ -71,7 +69,7 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
         }
     } else {
         for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
-            for (auto &block_meta : segment_info.block_map_) {
+            for (auto &block_meta : segment_info.block_map()) {
                 global_blocks.emplace_back(segment_id, block_meta->block_id());
             }
         }

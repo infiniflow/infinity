@@ -49,7 +49,6 @@ import meta_info;
 import column_def;
 import embedding_info;
 import block_index;
-import block_column_entry;
 import mlas_matrix_multiply;
 import physical_match_tensor_scan;
 import physical_knn_scan;

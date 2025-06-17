@@ -15,7 +15,7 @@
 module;
 
 namespace infinity {
-struct SegmentEntry;
+struct ChunkIndexMetaInfo;
 }
 
 export module bmp_handler;
@@ -32,17 +32,12 @@ import internal_types;
 import buffer_handle;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import sparse_util;
 import infinity_exception;
-import chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
-struct ChunkIndexEntry;
-struct SegmentIndexEntry;
-struct BlockColumnEntry;
 class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
@@ -148,13 +143,7 @@ public:
 
     static UniquePtr<BMPHandler> Make(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
-    SizeT AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count);
-
     SizeT AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
-
-    void AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts);
-
-    void AddDocs(int row_count, const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts);
 
     template <typename ResultType, typename DistFunc, typename Filter = NoneType, typename MergeHeap = NoneType>
     void SearchIndex(const auto &query,
@@ -208,19 +197,13 @@ export using BMPHandlerPtr = BMPHandler *;
 export struct BMPIndexInMem final : public BaseMemIndex {
 public:
     BMPIndexInMem() : bmp_handler_(nullptr) {}
-    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry)
-        : begin_row_id_(begin_row_id), bmp_handler_(BMPHandler::Make(index_base, column_def).release()), segment_index_entry_(segment_index_entry) {}
+    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
+        : begin_row_id_(begin_row_id), bmp_handler_(BMPHandler::Make(index_base, column_def).release()) {}
     ~BMPIndexInMem();
     BMPIndexInMem(const BMPIndexInMem &) = delete;
     BMPIndexInMem &operator=(const BMPIndexInMem &) = delete;
 
-    void AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count);
-
     void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
-
-    void AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts);
-
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
     void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
 
@@ -229,7 +212,6 @@ public:
     SizeT GetRowCount() const;
     SizeT GetSizeInBytes() const;
     MemIndexTracerInfo GetInfo() const override;
-    TableIndexEntry *table_index_entry() const override;
     RowID GetBeginRowID() const { return begin_row_id_; }
     const BMPHandlerPtr &get() const { return bmp_handler_; }
     BMPHandlerPtr &get_ref() { return bmp_handler_; }
@@ -239,7 +221,6 @@ private:
     BMPHandlerPtr bmp_handler_ = nullptr;
     mutable bool own_memory_ = true;
     mutable BufferHandle chunk_handle_{};
-    SegmentIndexEntry *segment_index_entry_;
 };
 
 } // namespace infinity

@@ -68,6 +68,8 @@ import virtual_store;
 import local_file_handle;
 import mem_usage_change;
 import bg_task;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -549,8 +551,6 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
 
     return MemIndexTracerInfo(index_name, table_name, db_name, MemUsed(), doc_count_);
 }
-
-TableIndexEntry *MemoryIndexer::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
 const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
 
