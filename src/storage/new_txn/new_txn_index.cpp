@@ -147,6 +147,10 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         txn_store->chunk_infos_in_segments_.emplace(segment_id, chunk_infos);
     }
 
+    if (txn_store->chunk_infos_in_segments_.empty()) {
+        base_txn_store_ = nullptr; // No mem index to dump.
+    }
+
     return Status::OK();
 }
 
@@ -979,7 +983,16 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
         }
         {
-            Status status = DumpSegmentMemIndex(*segment_index_meta, new_chunk_id);
+            Status status = segment_index_meta->GetNextChunkID(new_chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+            status = segment_index_meta->SetNextChunkID(new_chunk_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+
+            status = DumpSegmentMemIndex(*segment_index_meta, new_chunk_id);
             if (!status.ok()) {
                 return status;
             }
