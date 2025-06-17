@@ -22,8 +22,6 @@ import operator_state;
 import physical_operator_type;
 import base_table_ref;
 import meta_info;
-import block_column_entry;
-import segment_index_entry;
 import load_meta;
 import knn_expression;
 import data_type;
@@ -92,8 +90,6 @@ public:
     Vector<Pair<u32, u32>> block_parallel_options_;
     u32 block_column_entries_size_ = 0; // need this value because block_column_entries_ will be moved into KnnScanSharedData
     u32 index_entries_size_ = 0;
-    UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
-    UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
     SharedPtr<TableIndexMeeta> table_index_meta_{};

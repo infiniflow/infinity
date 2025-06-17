@@ -42,8 +42,6 @@ import third_party;
 import base_table_ref;
 import block_index;
 import load_meta;
-import block_entry;
-import block_column_entry;
 import logical_type;
 import search_options;
 import status;
