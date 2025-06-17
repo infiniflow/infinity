@@ -266,7 +266,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &exp
                 segment_filter_result_ptr = &(it->second);
             } else {
                 auto &bitmap_ref = expr->segment_results_[segment_id];
-                bitmap_ref = expr->filter_fulltext_evaluator_->Evaluate(segment_id, segment_row_count, expr->txn_);
+                bitmap_ref = expr->filter_fulltext_evaluator_->Evaluate(segment_id, segment_row_count, nullptr);
                 segment_filter_result_ptr = &bitmap_ref;
             }
         }
