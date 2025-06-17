@@ -866,9 +866,6 @@ export struct WalCmdDumpIndexV2 final : public WalCmd {
 
     // Redudant but useful in commit phase.
     String table_key_{};
-
-    // Only used in commit phase. Don't need to write to WAL.
-    bool clear_mem_index_{};
     DumpIndexCause dump_cause_{DumpIndexCause::kInvalid};
 };
 

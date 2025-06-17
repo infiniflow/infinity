@@ -249,15 +249,6 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
         return status;
     }
 
-    // Clean Mem Index
-    if (dump_index_cmd->clear_mem_index_) {
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
-        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index != nullptr) {
-            mem_index->ClearMemIndex();
-        }
-    }
-
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto [index_base, status2] = table_index_meta->GetIndexBase();
     if (!status2.ok()) {
@@ -2040,13 +2031,6 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
 
     const String &index_id_str_ = dump_index_cmd->index_id_;
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);
-    if (dump_index_cmd->clear_mem_index_) {
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index != nullptr) {
-            mem_index->ClearMemIndex();
-        }
-    }
 
     auto [index_base, status] = table_index_meta.GetIndexBase();
     if (!status.ok()) {
