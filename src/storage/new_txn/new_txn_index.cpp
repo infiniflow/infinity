@@ -853,7 +853,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), nullptr, true /*trace*/);
+                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), true /*trace*/);
                 }
                 memory_hnsw_index = mem_index->memory_hnsw_index_;
             }
@@ -869,7 +869,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base.get(), column_def.get(), nullptr);
+                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base.get(), column_def.get());
                 }
                 memory_bmp_index = mem_index->memory_bmp_index_;
             }
@@ -1380,7 +1380,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             UnrecoverableError("Not implemented yet");
         }
 
-        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get(), nullptr);
+        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get());
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             SizeT block_row_cnt = 0;
@@ -1403,7 +1403,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
 
         memory_hnsw_index->Dump(buffer_obj);
     } else if (index_base->index_type_ == IndexType::kBMP) {
-        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get(), nullptr);
+        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get());
 
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
