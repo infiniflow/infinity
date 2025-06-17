@@ -1561,3 +1561,36 @@ class TestInfinity:
         res = db_obj.drop_table("test_index_comment" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_dump_index(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_dump_index" + suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_dump_index" + suffix, {
+                "c1": {"type": "int"}, "body": {"type": "varchar"}
+            }, ConflictType.Error)
+        assert table_obj is not None
+        res = table_obj.create_index("my_index_1",
+                                     index.IndexInfo("c1",
+                                                     index.IndexType.Secondary),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        table_obj.insert([{"c1": 1, "body": "hello"}])
+        res = table_obj.create_index("my_index_2",
+                                     index.IndexInfo("body",
+                                                     index.IndexType.Secondary),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        table_obj.insert([{"c1": 2, "body": "world"}])
+
+        res = table_obj.dump_index("my_index_1")
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.dump_index("my_index_2")
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index_1")
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.drop_index("my_index_2")
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_dump_index" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

@@ -395,7 +395,7 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT ADD RENAME
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT ADD RENAME DUMP
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX TASKS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
@@ -2334,6 +2334,19 @@ command_statement: USE IDENTIFIER {
 | CLEAN DATA {
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_shared<infinity::CleanupCmd>();
+}
+| DUMP INDEX IDENTIFIER ON table_name {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($5->schema_name_ptr_);
+    ParserHelper::ToLower($5->table_name_ptr_);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::DumpIndexCmd>($5->schema_name_ptr_, $5->table_name_ptr_, $3);
+    free($3);
+    if ($5->schema_name_ptr_ != nullptr) {
+        free($5->schema_name_ptr_);
+    }
+    free($5->table_name_ptr_);
+    delete $5;
 }
 
 compact_statement: COMPACT TABLE table_name {
