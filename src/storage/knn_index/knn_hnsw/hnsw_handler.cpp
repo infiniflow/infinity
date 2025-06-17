@@ -121,10 +121,10 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *co
 
 HnswHandler::~HnswHandler() {
     std::visit(
-        [&](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                delete arg;
+                delete index;
             }
         },
         hnsw_);
@@ -443,6 +443,7 @@ void HnswHandler::Load(LocalFileHandle &file_handle) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = IndexT::Load(file_handle).release();
                 } else {
                     UnrecoverableError("Invalid index type.");
@@ -461,6 +462,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
+                    delete index;
                     index = IndexT::LoadFromPtr(file_handle, file_size).release();
                 } else {
                     UnrecoverableError("Invalid index type.");
@@ -481,6 +483,7 @@ void HnswHandler::LoadFromPtr(const char *ptr, SizeT size) {
                 if constexpr (IndexT::kOwnMem) {
                     UnrecoverableError("Invalid index type.");
                 } else {
+                    delete index;
                     index = IndexT::LoadFromPtr(ptr, size).release();
                 }
             }
@@ -667,16 +670,9 @@ void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
 
 void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) { hnsw_handler_->SetLSGParam(alpha, std::move(avg)); }
 
-TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
-
 SizeT HnswIndexInMem::GetRowCount() const { return hnsw_handler_->GetRowCount(); }
 
 SizeT HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
-
-void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
-    segment_index_entry_ = segment_index_entry;
-    begin_row_id_ = RowID(segment_index_entry->segment_id(), 0);
-}
 
 const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
     return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};

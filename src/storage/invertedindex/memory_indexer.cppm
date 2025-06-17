@@ -135,8 +135,6 @@ public:
 
     MemIndexTracerInfo GetInfo() const override;
 
-    TableIndexEntry *table_index_entry() const override;
-
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
     SizeT MemUsed() const;

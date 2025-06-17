@@ -90,11 +90,13 @@ using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOf
                                   KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false> *,
                                   std::nullptr_t>;
 
-export class HnswHandler {
+export struct HnswHandler {
 public:
     HnswHandler() : hnsw_(nullptr) {}
     HnswHandler(const void *ptr) : hnsw_(*reinterpret_cast<const AbstractHnsw *>(ptr)) {}
-    ~HnswHandler();
+    virtual ~HnswHandler();
+    HnswHandler(const HnswHandler &) = delete;
+    HnswHandler &operator=(const HnswHandler &) = delete;
 
     static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
@@ -220,12 +222,12 @@ public:
     }
 
     SizeT InsertVecs(int row_count,
-                        const SegmentEntry *segment_entry,
-                        BufferManager *buffer_mgr,
-                        SizeT column_id,
-                        TxnTimeStamp begin_ts,
-                        const HnswInsertConfig &config = kDefaultHnswInsertConfig,
-                        SizeT kBuildBucketSize = 1024);
+                     const SegmentEntry *segment_entry,
+                     BufferManager *buffer_mgr,
+                     SizeT column_id,
+                     TxnTimeStamp begin_ts,
+                     const HnswInsertConfig &config = kDefaultHnswInsertConfig,
+                     SizeT kBuildBucketSize = 1024);
 
     template <typename LabelT>
     Pair<VertexType, VertexType> StoreData(const auto *data, SizeT dim, SizeT vec_num, const HnswInsertConfig &option = kDefaultHnswInsertConfig) {
@@ -339,10 +341,8 @@ public:
     const HnswHandlerPtr &get() const { return hnsw_handler_; }
     HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
     void SetLSGParam(float alpha, UniquePtr<float[]> avg);
-    TableIndexEntry *table_index_entry() const override;
     SizeT GetRowCount() const;
     SizeT GetSizeInBytes() const;
-    void SetSegmentEntry(SegmentIndexEntry *segment_index_entry);
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 

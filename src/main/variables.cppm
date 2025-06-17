@@ -43,7 +43,6 @@ export enum class GlobalVariable {
     kOpenFileCount,           // global
     kCPUUsage,                // global
     kJeProf,                  // global
-    kCleanupTrace,            // global
     kFollowerNum,             // global
     kResultCache,             // global
     kCacheResultCapacity,     // global

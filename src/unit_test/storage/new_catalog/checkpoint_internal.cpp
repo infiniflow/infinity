@@ -67,7 +67,6 @@ import index_filter_evaluators;
 import index_emvb;
 import constant_expr;
 import infinity;
-import table_entry;
 
 using namespace infinity;
 

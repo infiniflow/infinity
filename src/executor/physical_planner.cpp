@@ -80,8 +80,6 @@ import physical_match_tensor_scan;
 import physical_match_sparse_scan;
 import physical_fusion;
 import physical_create_index_prepare;
-import physical_create_index_do;
-import physical_create_index_finish;
 import physical_read_cache;
 import physical_unnest;
 import physical_unnest_aggregate;
@@ -377,43 +375,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
     SharedPtr<String> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
     SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
     const auto &index_def_ptr = logical_create_index->index_definition();
-    if (index_def_ptr->index_type_ != IndexType::kHnsw) {
-        // TODO: support other index types build in parallel.
-        return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
-                                                      logical_create_index->base_table_ref(),
-                                                      logical_create_index->index_definition(),
-                                                      logical_create_index->conflict_type(),
-                                                      logical_create_index->GetOutputNames(),
-                                                      logical_create_index->GetOutputTypes(),
-                                                      logical_create_index->load_metas(),
-                                                      false);
+
+    bool parallel = false;
+    if (index_def_ptr->index_type_ == IndexType::kHnsw) {
+        parallel = true;
     }
 
-    // use new `PhysicalCreateIndexPrepare` `PhysicalCreateIndexDo` `PhysicalCreateIndexFinish`
-    auto create_index_prepare = MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
-                                                                       logical_create_index->base_table_ref(),
-                                                                       logical_create_index->index_definition(),
-                                                                       logical_create_index->conflict_type(),
-                                                                       logical_create_index->GetOutputNames(),
-                                                                       logical_create_index->GetOutputTypes(),
-                                                                       logical_create_index->load_metas(),
-                                                                       true);
-    auto create_index_do = MakeUnique<PhysicalCreateIndexDo>(logical_create_index->node_id(),
-                                                             std::move(create_index_prepare),
-                                                             logical_create_index->base_table_ref(),
-                                                             logical_create_index->index_definition()->index_name_,
-                                                             logical_create_index->GetOutputNames(),
-                                                             logical_create_index->GetOutputTypes(),
-                                                             logical_create_index->load_metas());
-    auto create_index_finish = MakeUnique<PhysicalCreateIndexFinish>(logical_create_index->node_id(),
-                                                                     std::move(create_index_do),
-                                                                     schema_name,
-                                                                     table_name,
-                                                                     logical_create_index->index_definition(),
-                                                                     logical_create_index->GetOutputNames(),
-                                                                     logical_create_index->GetOutputTypes(),
-                                                                     logical_create_index->load_metas());
-    return create_index_finish;
+    return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
+                                                  logical_create_index->base_table_ref(),
+                                                  logical_create_index->index_definition(),
+                                                  logical_create_index->conflict_type(),
+                                                  logical_create_index->GetOutputNames(),
+                                                  logical_create_index->GetOutputTypes(),
+                                                  logical_create_index->load_metas(),
+                                                  parallel);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -645,7 +620,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                          logical_aggregate->aggregate_index_,
                                                          logical_operator->load_metas());
 
-    if (tasklet_count == 1) {
+    if (tasklet_count <= 1) {
         return physical_agg_op;
     } else {
         return MakeUnique<PhysicalMergeAggregate>(query_context_ptr_->GetNextNodeID(),

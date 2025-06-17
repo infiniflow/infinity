@@ -23,7 +23,6 @@ export module storage;
 
 namespace infinity {
 
-class CleanupInfoTracer;
 class ResultCacheManager;
 class NewCatalog;
 class Catalog;
@@ -78,8 +77,6 @@ public:
 
     [[nodiscard]] inline MemIndexAppender *mem_index_appender() const noexcept { return mem_index_appender_.get(); }
 
-    [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
-
     UniquePtr<KVInstance> KVInstance();
 
     [[nodiscard]] KVStore *kv_store() const { return kv_store_.get(); }
@@ -118,7 +115,6 @@ public:
 
 private:
     Config *config_ptr_{};
-    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<ObjectStorageProcess> object_storage_processor_{};
     UniquePtr<PersistenceManager> persistence_manager_{};

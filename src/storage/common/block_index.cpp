@@ -39,18 +39,36 @@ import segment_index_meta;
 
 namespace infinity {
 
+SegmentOffset NewSegmentSnapshot::segment_offset() const {
+    auto [segment_offset_, status] = segment_meta_->GetRowCnt1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    return segment_offset_;
+}
+
+const Vector<UniquePtr<BlockMeta>> &NewSegmentSnapshot::block_map() const {
+    if (block_map_.size()) {
+        return block_map_;
+    }
+    auto [block_ids_ptr, status] = segment_meta_->GetBlockIDs1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    for (BlockID block_id : *block_ids_ptr) {
+        auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_meta_);
+        block_map_.emplace_back(std::move(block_meta));
+    }
+    return block_map_;
+}
+
 BlockIndex::BlockIndex() = default;
 
 BlockIndex::~BlockIndex() = default;
 
-void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &table_name) {
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(), table_meta->table_id_str(), table_meta->kv_instance(), table_meta->begin_ts(), table_meta->commit_ts());
+void BlockIndex::NewInit(UniquePtr<TableMeeta> table_meta) {
+    table_meta_ = std::move(table_meta);
+    Status status = Status::OK();
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();
     if (!status.ok()) {
@@ -59,20 +77,6 @@ void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &t
     for (SegmentID segment_id : *segment_ids_ptr) {
         NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
         segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
-        std::tie(segment_snapshot.segment_offset_, status) = segment_snapshot.segment_meta_->GetRowCnt1();
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_snapshot.segment_meta_->GetBlockIDs1();
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        for (BlockID block_id : *block_ids_ptr) {
-            auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_snapshot.segment_meta_);
-            segment_snapshot.block_map_.emplace_back(std::move(block_meta));
-        }
     }
 }
 
@@ -104,7 +108,7 @@ SizeT BlockIndex::BlockCount() const {
         }
     else
         for (const auto &[_, segment_info] : new_segment_block_index_) {
-            count += segment_info.block_map_.size();
+            count += segment_info.block_map().size();
         }
     return count;
 }
@@ -126,7 +130,7 @@ SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
         auto seg_it = new_segment_block_index_.find(segment_id);
         if (seg_it != new_segment_block_index_.end()) {
             const auto &blocks_info = seg_it->second;
-            return blocks_info.segment_offset_;
+            return blocks_info.segment_offset();
         }
     }
     return 0;
@@ -164,10 +168,10 @@ BlockMeta *BlockIndex::GetBlockMeta(u32 segment_id, u16 block_id) const {
         return nullptr;
     }
     const auto &blocks_info = seg_it->second;
-    if (blocks_info.block_map_.size() <= block_id) {
+    if (blocks_info.block_map().size() <= block_id) {
         return nullptr;
     }
-    return blocks_info.block_map_[block_id].get();
+    return blocks_info.block_map()[block_id].get();
 }
 
 void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {

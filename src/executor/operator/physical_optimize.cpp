@@ -29,7 +29,6 @@ import status;
 import logger;
 import base_table_ref;
 import table_index_meta;
-import table_entry;
 
 import wal_manager;
 import infinity_context;

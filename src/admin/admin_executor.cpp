@@ -39,16 +39,6 @@ import virtual_store;
 import wal_entry;
 import buffer_manager;
 import new_catalog;
-import db_meta;
-import db_entry;
-import table_meta;
-import table_entry;
-import segment_entry;
-import block_entry;
-import table_index_meta;
-import table_index_entry;
-import segment_index_entry;
-import chunk_index_entry;
 import memory_indexer;
 import config;
 import default_values;
@@ -59,7 +49,6 @@ import utility;
 import peer_task;
 import infinity_exception;
 import node_info;
-import catalog_delta_entry;
 import persistence_manager;
 
 namespace infinity {
@@ -953,28 +942,6 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext *query_context, const AdminS
                                                checkpoint_cmd->catalog_name_);
                 SizeT file_size = VirtualStore::GetFileSize(file_path);
                 Value value = Value::MakeVarchar(std::to_string(file_size));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-        }
-
-        {
-            SizeT column_id = 0;
-            {
-                Value value = Value::MakeVarchar("operation");
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-
-            ++column_id;
-            {
-                String file_path = fmt::format("{}/{}/{}",
-                                               InfinityContext::instance().config()->DataDir(),
-                                               checkpoint_cmd->catalog_path_,
-                                               checkpoint_cmd->catalog_name_);
-                auto *pm_ptr{InfinityContext::instance().persistence_manager()};
-                UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(file_path, pm_ptr);
-                Value value = Value::MakeVarchar(catalog_delta_entry->ToString());
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }

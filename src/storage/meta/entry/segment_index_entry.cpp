@@ -253,12 +253,12 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kSecondary: {
-            if (memory_secondary_index_.get() == nullptr) {
-                std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, this, begin_row_id);
-            }
-            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-            memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+            //            if (memory_secondary_index_.get() == nullptr) {
+            //                std::unique_lock<std::shared_mutex> lck(rw_locker_);
+            //                memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, begin_row_id);
+            //            }
+            //            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
+            //            memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
         case IndexType::kIVF: {
@@ -358,14 +358,14 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             break;
         }
         case IndexType::kSecondary: {
-            if (memory_secondary_index_.get() == nullptr) {
-                break;
-            }
-            chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
-            chunk_index_entry->SaveIndexFile();
-            std::unique_lock lck(rw_locker_);
-            chunk_index_entries_.push_back(chunk_index_entry);
-            memory_secondary_index_.reset();
+            //            if (memory_secondary_index_.get() == nullptr) {
+            //                break;
+            //            }
+            //            chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
+            //            chunk_index_entry->SaveIndexFile();
+            //            std::unique_lock lck(rw_locker_);
+            //            chunk_index_entries_.push_back(chunk_index_entry);
+            //            memory_secondary_index_.reset();
             break;
         }
         case IndexType::kIVF: {
@@ -517,16 +517,16 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kSecondary: {
-            memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, this, base_row_id);
-            u64 column_id = column_def->id();
-            SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
-            auto block_entry_iter = BlockEntryIter(segment_entry);
-            for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                const auto block_offset = block_entry->segment_offset();
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
-                memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_mgr, 0, block_entry->row_count());
-            }
-            dumped_memindex_entry = MemIndexDump();
+            //            memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, this, base_row_id);
+            //            u64 column_id = column_def->id();
+            //            SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
+            //            auto block_entry_iter = BlockEntryIter(segment_entry);
+            //            for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+            //                const auto block_offset = block_entry->segment_offset();
+            //                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
+            //                memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_mgr, 0, block_entry->row_count());
+            //            }
+            //            dumped_memindex_entry = MemIndexDump();
             break;
         }
         case IndexType::kIVF: {

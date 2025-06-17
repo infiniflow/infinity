@@ -24,8 +24,6 @@ import physical_operator;
 import physical_operator_type;
 import third_party;
 import constant_expr;
-import segment_entry;
-import block_entry;
 import zsv;
 import load_meta;
 import infinity_exception;

@@ -18,7 +18,6 @@ export module compaction_alg;
 
 import stl;
 import segment_entry;
-import txn;
 
 namespace infinity {
 

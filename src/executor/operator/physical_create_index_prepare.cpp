@@ -40,8 +40,6 @@ import base_table_ref;
 import extra_ddl_info;
 import wal_manager;
 import infinity_context;
-import table_entry;
-import table_index_entry;
 import new_txn;
 
 namespace infinity {

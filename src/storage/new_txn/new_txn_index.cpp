@@ -769,7 +769,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, nullptr, base_row_id);
+                    mem_index->memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
                 }
                 memory_secondary_index = mem_index->memory_secondary_index_;
             }
@@ -1766,14 +1766,12 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
 
     RowID start_row_id(segment_id, 0);
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
-        if (chunk_index_meta_info.base_row_id_ < start_row_id) {
-            UnrecoverableError("chunk index range overlap");
-        } else {
-            if (chunk_index_meta_info.base_row_id_ > start_row_id) {
-                UnrecoverableError("Not implemented");
-            }
-            start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
+        if (chunk_index_meta_info.base_row_id_ != start_row_id) {
+            UnrecoverableError(fmt::format("Chunk index row alignment error: Expected {} but got {}",
+                                           chunk_index_meta_info.base_row_id_.segment_id_,
+                                           start_row_id.segment_id_));
         }
+        start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
     }
 
     Vector<BlockID> *block_ids_ptr = nullptr;
@@ -1787,15 +1785,9 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
     BlockID start_block_id = start_row_id.segment_offset_ / block_capacity;
     BlockOffset block_offset = start_row_id.segment_offset_ % block_capacity;
     {
-        SizeT i = 0;
-        while (i < block_ids.size() && block_ids[i] != start_block_id) {
-            ++i;
-        }
+        SizeT i = start_block_id;
         if (i >= block_ids.size()) {
             return Status::OK();
-        }
-        if (block_ids[i] != start_block_id) {
-            UnrecoverableError(fmt::format("block id {} not found in segment {}", start_block_id, segment_id));
         }
         for (; i < block_ids.size(); ++i) {
             BlockID block_id = block_ids[i];
@@ -1803,7 +1795,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
-            if (!status.ok()) {
+            if (!status.ok() || block_row_cnt == block_offset) {
                 return status;
             }
             append_ranges.emplace_back(RowID(segment_id, (u32(block_id) << BLOCK_OFFSET_SHIFT) + block_offset), block_row_cnt - block_offset);

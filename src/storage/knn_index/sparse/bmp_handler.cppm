@@ -229,7 +229,6 @@ public:
     SizeT GetRowCount() const;
     SizeT GetSizeInBytes() const;
     MemIndexTracerInfo GetInfo() const override;
-    TableIndexEntry *table_index_entry() const override;
     RowID GetBeginRowID() const { return begin_row_id_; }
     const BMPHandlerPtr &get() const { return bmp_handler_; }
     BMPHandlerPtr &get_ref() { return bmp_handler_; }

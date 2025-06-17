@@ -51,7 +51,7 @@ public:
 
     ~PhysicalKnnScan() override;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 
@@ -96,7 +96,7 @@ public:
     UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
-    UniquePtr<TableIndexMeeta> table_index_meta_{};
+    SharedPtr<TableIndexMeeta> table_index_meta_{};
     UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
 
 private:

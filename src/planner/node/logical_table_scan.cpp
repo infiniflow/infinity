@@ -25,7 +25,6 @@ import logical_node;
 
 import match_expression;
 import base_table_ref;
-import table_entry;
 import logical_type;
 import base_expression;
 import default_values;

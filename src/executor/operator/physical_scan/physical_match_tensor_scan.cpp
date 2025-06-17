@@ -51,9 +51,6 @@ import logger;
 import physical_index_scan;
 import filter_value_type_classification;
 import roaring_bitmap;
-import segment_entry;
-import segment_index_entry;
-import chunk_index_entry;
 import emvb_index_in_mem;
 import emvb_index;
 import knn_filter;
@@ -281,7 +278,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
             segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
         } else {
-            const auto &block_map = segment_info.block_map_;
+            const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
                 block_metas_->emplace_back(block_meta.get());
             }
@@ -1006,7 +1003,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
             column_vec = block_entry->GetConstColumnVector(buffer_mgr, column_id);
 
         } else {
-            BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map_.at(block_id).get();
+            BlockMeta *block_meta = block_index->new_segment_block_index_.at(segment_id).block_map().at(block_id).get();
             ColumnMeta column_meta(column_id, *block_meta);
             auto [block_row_cnt, status] = block_meta->GetRowCnt1();
             if (!status.ok()) {

@@ -80,8 +80,6 @@ public:
 
     MemIndexTracerInfo GetInfo() const override;
 
-    TableIndexEntry *table_index_entry() const override;
-
 private:
     template <typename DataType, typename IndexType, BMPOwnMem OwnMem>
     static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {

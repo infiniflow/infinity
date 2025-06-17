@@ -143,10 +143,6 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MergeAggregate";
         case PhysicalOperatorType::kCreateIndexPrepare:
             return "CreateIndexPrepare";
-        case PhysicalOperatorType::kCreateIndexDo:
-            return "CreateIndexDo";
-        case PhysicalOperatorType::kCreateIndexFinish:
-            return "CreateIndexFinish";
         case PhysicalOperatorType::kReadCache:
             return "ReadCache";
         case PhysicalOperatorType::kUnnest:

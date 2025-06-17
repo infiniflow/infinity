@@ -25,7 +25,6 @@ import query_context;
 import operator_state;
 import load_meta;
 import infinity_exception;
-import table_entry;
 import command_statement;
 import data_type;
 import logger;
