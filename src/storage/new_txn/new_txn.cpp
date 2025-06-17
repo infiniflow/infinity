@@ -4049,7 +4049,7 @@ Status NewTxn::Cleanup() {
         }
     }
 
-    Status status = buffer_mgr_->RemoveClean(kv_instance);
+    status = buffer_mgr_->RemoveClean(kv_instance);
 
     auto data_dir_str = buffer_mgr_->GetFullDataDir();
     auto data_dir = static_cast<Path>(*data_dir_str);
