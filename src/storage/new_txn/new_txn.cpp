@@ -15,7 +15,6 @@
 module;
 
 #include <string>
-#include <sys/stat.h>
 #include <tuple>
 #include <vector>
 
