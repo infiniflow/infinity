@@ -31,7 +31,6 @@ import filter_fulltext_expression;
 import table_entry;
 import query_node;
 import column_index_reader;
-import txn;
 import infinity_exception;
 import status;
 import internal_types;
@@ -299,7 +298,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 
     Vector<Pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>> secondary_index_start_end_pairs_;
 
-    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const override;
+    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
 
     bool IsValid() const override { return !secondary_index_start_end_pairs_.empty(); }
 
@@ -491,7 +490,7 @@ void IndexFilterEvaluatorFulltext::OptimizeQueryTree() {
     after_optimize_.test_and_set(std::memory_order_release);
 }
 
-Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const {
+Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     if (!after_optimize_.test(std::memory_order_acquire)) {
         UnrecoverableError(std::format("{}: Not optimized!", __func__));
     }
@@ -516,11 +515,11 @@ Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const
     return result;
 }
 
-Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const {
+Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     Bitmask result(segment_row_count);
     // 1.
     for (const auto &child : secondary_index_evaluators_) {
-        const auto child_result = child->Evaluate(segment_id, segment_row_count, txn);
+        const auto child_result = child->Evaluate(segment_id, segment_row_count);
         result.MergeAnd(child_result);
         if (result.CountTrue() == 0) {
             // empty now
@@ -530,7 +529,7 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
     // 2.
     if (fulltext_evaluator_) {
         if (result.IsAllTrue()) {
-            result = fulltext_evaluator_->Evaluate(segment_id, segment_row_count, txn);
+            result = fulltext_evaluator_->Evaluate(segment_id, segment_row_count);
         } else {
             auto roaring_begin = result.Begin();
             const auto &roaring_end = result.End();
@@ -578,18 +577,18 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
             // empty now
             return result;
         }
-        const auto child_result = child->Evaluate(segment_id, segment_row_count, txn);
+        const auto child_result = child->Evaluate(segment_id, segment_row_count);
         result.MergeAnd(child_result);
     }
     return result;
 }
 
-Bitmask IndexFilterEvaluatorOR::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const {
+Bitmask IndexFilterEvaluatorOR::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     Bitmask result(segment_row_count);
     result.SetAllFalse();
     // 1.
     for (const auto &child : secondary_index_evaluators_) {
-        const auto child_result = child->Evaluate(segment_id, segment_row_count, txn);
+        const auto child_result = child->Evaluate(segment_id, segment_row_count);
         result.MergeOr(child_result);
         if (result.CountFalse() == 0) {
             // full now
@@ -599,7 +598,7 @@ Bitmask IndexFilterEvaluatorOR::Evaluate(const SegmentID segment_id, const Segme
     }
     // 2.
     if (fulltext_evaluator_) {
-        const auto child_result = fulltext_evaluator_->Evaluate(segment_id, segment_row_count, txn);
+        const auto child_result = fulltext_evaluator_->Evaluate(segment_id, segment_row_count);
         result.MergeOr(child_result);
     }
     // 3. complex part
@@ -609,7 +608,7 @@ Bitmask IndexFilterEvaluatorOR::Evaluate(const SegmentID segment_id, const Segme
             result.RunOptimize();
             return result;
         }
-        const auto child_result = child->Evaluate(segment_id, segment_row_count, txn);
+        const auto child_result = child->Evaluate(segment_id, segment_row_count);
         result.MergeOr(child_result);
     }
     result.RunOptimize();
@@ -750,45 +749,30 @@ struct TrunkReaderM final : TrunkReader<ColumnValueType> {
 
 template <typename ColumnValueType>
 Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
-                            SegmentIndexEntry *index_entry,
                             SegmentIndexMeta *index_meta,
-                            const SegmentOffset segment_row_count,
-                            Txn *txn) {
+                            const SegmentOffset segment_row_count) {
     Vector<UniquePtr<TrunkReader<ColumnValueType>>> trunk_readers;
-    if (index_entry) {
-        Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> chunks_snapshot = index_entry->GetSecondaryIndexSnapshot();
-        auto &[chunk_index_entries, memory_secondary_index] = chunks_snapshot;
-        for (const auto &chunk_index_entry : chunk_index_entries) {
-            if (chunk_index_entry->CheckVisible(txn)) {
-                BufferObj *index_buffer = chunk_index_entry->GetBufferObj();
-                trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
-            }
-        }
-        if (memory_secondary_index) {
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, memory_secondary_index));
-        }
-    } else {
-        auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
+    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    for (ChunkID chunk_id : *chunk_ids_ptr) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
+        BufferObj *index_buffer = nullptr;
+        Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        for (ChunkID chunk_id : *chunk_ids_ptr) {
-            ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-            BufferObj *index_buffer = nullptr;
-            Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
-        }
-        SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
-        if (mem_index) {
-            SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
-            if (secondary_index) {
-                trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, secondary_index));
-            }
+        trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
+    }
+    SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
+    if (mem_index) {
+        SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
+        if (secondary_index) {
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, secondary_index));
         }
     }
+
     // output result
     Bitmask part_result(segment_row_count);
     part_result.SetAllFalse();
@@ -803,19 +787,13 @@ Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, Co
 }
 
 template <typename ColumnValueT>
-Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const {
-    SegmentIndexEntry *index_entry = nullptr;
+Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     Optional<SegmentIndexMeta> index_meta;
-    if (secondary_index_) {
-        auto const &index_by_segment = secondary_index_->GetSegmentIndexesGuard();
-        index_entry = index_by_segment.index_by_segment_.at(segment_id).get();
-    } else {
-        index_meta.emplace(segment_id, *new_secondary_index_);
-    }
+    index_meta.emplace(segment_id, *new_secondary_index_);
     Bitmask result(segment_row_count);
     result.SetAllFalse();
     for (const auto rng : secondary_index_start_end_pairs_) {
-        const auto part_result = ExecuteSingleRangeT<ColumnValueT>(rng, index_entry, &*index_meta, segment_row_count, txn);
+        const auto part_result = ExecuteSingleRangeT<ColumnValueT>(rng, &*index_meta, segment_row_count);
         result.MergeOr(part_result);
     }
     result.RunOptimize();

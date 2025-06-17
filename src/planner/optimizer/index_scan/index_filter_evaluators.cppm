@@ -27,7 +27,6 @@ import base_expression;
 import meta_info;
 import query_node;
 import column_index_reader;
-import txn;
 import logical_type;
 import value;
 import doc_iterator;
@@ -38,7 +37,7 @@ namespace infinity {
 
 export struct IndexFilterEvaluatorAllTrue : IndexFilterEvaluator {
     IndexFilterEvaluatorAllTrue() : IndexFilterEvaluator(Type::kAllTrue) {}
-    Bitmask Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const override {
+    Bitmask Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const override {
         Bitmask result(segment_row_count);
         return result;
     }
@@ -46,7 +45,7 @@ export struct IndexFilterEvaluatorAllTrue : IndexFilterEvaluator {
 
 export struct IndexFilterEvaluatorAllFalse : IndexFilterEvaluator {
     IndexFilterEvaluatorAllFalse() : IndexFilterEvaluator(Type::kAllFalse) {}
-    Bitmask Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const override {
+    Bitmask Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const override {
         Bitmask result(segment_row_count);
         result.SetAllFalse();
         return result;
@@ -116,7 +115,7 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
           early_term_algo_(early_term_algo), index_reader_(std::move(index_reader)), query_tree_(std::move(query_tree)),
           minimum_should_match_option_(std::move(minimum_should_match_option)), score_threshold_(std::max(score_threshold, 0.0f)),
           ft_similarity_(ft_similarity), bm25_params_(bm25_params), index_names_(std::move(index_names)) {}
-    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const override;
+    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
     bool HaveMinimumShouldMatchOption() const { return !minimum_should_match_option_.empty(); }
     void OptimizeQueryTree();
 };
@@ -139,13 +138,13 @@ protected:
 // maybe combined from multiple AND
 struct IndexFilterEvaluatorAND final : IndexFilterEvaluatorLogicalChildren {
     IndexFilterEvaluatorAND() : IndexFilterEvaluatorLogicalChildren(Type::kAnd) {}
-    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const override;
+    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
 };
 
 // maybe combined from multiple OR
 struct IndexFilterEvaluatorOR final : IndexFilterEvaluatorLogicalChildren {
     IndexFilterEvaluatorOR() : IndexFilterEvaluatorLogicalChildren(Type::kOr) {}
-    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count, Txn *txn) const override;
+    Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
 };
 
 } // namespace infinity
