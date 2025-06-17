@@ -21,6 +21,7 @@ import status;
 import default_values;
 import meta_info;
 import new_catalog;
+import snapshot_info;
 
 namespace infinity {
 
@@ -77,6 +78,8 @@ public:
     Status GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter);
 
     Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
+
+    Tuple<SharedPtr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
     TxnTimeStamp begin_ts_ = 0;

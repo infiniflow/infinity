@@ -282,7 +282,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> Catalog::GetTableSnapshot(const Stri
         LOG_ERROR(fmt::format("Fail to get table {} from database: {}, error message: {}.", table_name, db_name, table_status.message()));
         return {nullptr, table_status};
     }
-    return {table_entry->GetSnapshotInfo(txn_ptr), Status::OK()};
+    return {nullptr, Status::OK()};
 }
 
 Status Catalog::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
@@ -295,7 +295,8 @@ Status Catalog::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_sna
         return status;
     }
 
-    return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr->TxnID(), txn_ptr->BeginTS());
+    // return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr->TxnID(), txn_ptr->BeginTS());
+    return status;
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {

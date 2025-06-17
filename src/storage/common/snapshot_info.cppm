@@ -105,7 +105,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnTimeStamp max_commit_ts_{};
-    String table_entry_dir_{};
+    String table_entry_dir_{}; // no longer in use
     ColumnID next_column_id_{};
     SegmentID unsealed_id_{};
     SegmentID next_segment_id_{};

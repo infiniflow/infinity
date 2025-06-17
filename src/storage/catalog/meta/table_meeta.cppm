@@ -22,6 +22,7 @@ import stl;
 import status;
 import column_def;
 import new_catalog;
+import snapshot_info;
 
 namespace infinity {
 
@@ -141,6 +142,8 @@ public:
     Tuple<String, Status> GetNextIndexID();
 
     Status SetNextIndexID(const String &index_id_str);
+
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
     Status LoadComment();

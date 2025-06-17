@@ -33,7 +33,7 @@ import block_entry;
 import table_index_meta;
 import compaction_alg;
 import meta_map;
-import snapshot_info;
+// import snapshot_info;
 
 import cleanup_scanner;
 import random;
@@ -43,7 +43,7 @@ import block_entry;
 import column_index_reader;
 import value;
 import infinity_exception;
-import snapshot_info;
+// import snapshot_info;
 import txn;
 
 namespace infinity {
@@ -118,8 +118,8 @@ public:
                                                   SegmentID next_segment_id,
                                                   ColumnID next_column_id) noexcept;
 
-    static SharedPtr<TableEntry>
-    ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
+    // static SharedPtr<TableEntry>
+    // ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
     SharedPtr<TableInfo> GetTableInfo(Txn *txn);
@@ -415,7 +415,7 @@ public:
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 
-    SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
+    // SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 };
 
 } // namespace infinity

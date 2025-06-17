@@ -337,4 +337,27 @@ String ColumnMeta::GetColumnTag(const String &tag) const {
                                                            tag);
 }
 
+Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotInfo(){
+    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
+    block_column_snapshot_info->column_id_ = column_idx_;
+    Vector<String> column_file_paths;
+    auto status = FilePaths(column_file_paths);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    block_column_snapshot_info->filename_ = column_file_paths[0];
+    status = this->GetChunkOffset(block_column_snapshot_info->last_chunk_offset_);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots;
+    for (const String &outline_filename : column_file_paths) {
+        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
+        outline_snapshot_info->filename_ = outline_filename;
+        outline_snapshots.push_back(outline_snapshot_info);
+    }
+    block_column_snapshot_info->outline_snapshots_ = outline_snapshots;
+    return {block_column_snapshot_info, Status::OK()};
+}
+
 } // namespace infinity

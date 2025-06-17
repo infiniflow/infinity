@@ -931,13 +931,44 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
     return block_meta.GetBlockColumnInfo(column_id);
 }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
-    this->CheckTxn(db_name);
-    return catalog_->GetTableSnapshot(db_name, table_name, nullptr);
-}
+// Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
+//     this->CheckTxn(db_name);
+//     return catalog_->GetTableSnapshot(db_name, table_name, nullptr);
+// }
 
-Status NewTxn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
-    return catalog_->ApplyTableSnapshot(table_snapshot_info, nullptr);
+// Status NewTxn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
+//     return catalog_->ApplyTableSnapshot(table_snapshot_info, nullptr);
+// }
+
+Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshotInfo (const String &db_name, const String &table_name) {
+    // Check if the DB is valid
+    this->CheckTxn(db_name);
+
+    SharedPtr<TableSnapshotInfo> table_snapshot_info;
+
+    // First, get the meta info of the table
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    Optional<SegmentMeta> segment_meta_opt;
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    std::tie(table_snapshot_info, status) = table_meta_opt->MapMetaToSnapShotInfo();
+
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    // update table name and db name
+    table_snapshot_info->table_name_ = table_name;
+    table_snapshot_info->db_name_ = db_name;
+
+
+    return {std::move(table_snapshot_info), Status::OK()}; // Success
 }
 
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {

@@ -367,93 +367,93 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
     //    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
-    String meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
+    // String meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
 
-    if (!VirtualStore::Exists(meta_path)) {
-        return {nullptr, Status::FileNotFound(meta_path)};
-    }
-    auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
+    // if (!VirtualStore::Exists(meta_path)) {
+    //     return {nullptr, Status::FileNotFound(meta_path)};
+    // }
+    // auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
 
-    i64 file_size = meta_file_handle->FileSize();
-    String json_str(file_size, 0);
-    auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
-    if (!status.ok()) {
-        RecoverableError(status_read);
-    }
-    if ((SizeT)file_size != n_bytes) {
-        Status status = Status::FileCorrupted(meta_path);
-        RecoverableError(status);
-    }
+    // i64 file_size = meta_file_handle->FileSize();
+    // String json_str(file_size, 0);
+    // auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
+    // if (!status.ok()) {
+    //     RecoverableError(status_read);
+    // }
+    // if ((SizeT)file_size != n_bytes) {
+    //     Status status = Status::FileCorrupted(meta_path);
+    //     RecoverableError(status);
+    // }
 
-    nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+    // nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
 
-    //    LOG_INFO(snapshot_meta_json.dump());
+    // //    LOG_INFO(snapshot_meta_json.dump());
 
     SharedPtr<TableSnapshotInfo> table_snapshot = MakeShared<TableSnapshotInfo>();
 
-    table_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
-    SnapshotScope scope = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
-    if (scope != SnapshotScope::kTable) {
-        return {nullptr, Status::Unknown("Invalid snapshot scope")};
-    }
+    // table_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
+    // SnapshotScope scope = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
+    // if (scope != SnapshotScope::kTable) {
+    //     return {nullptr, Status::Unknown("Invalid snapshot scope")};
+    // }
 
-    table_snapshot->scope_ = SnapshotScope::kTable;
-    table_snapshot->version_ = snapshot_meta_json["version"];
-    table_snapshot->db_name_ = snapshot_meta_json["database_name"];
-    table_snapshot->table_name_ = snapshot_meta_json["table_name"];
-    table_snapshot->table_comment_ = snapshot_meta_json["table_comment"];
+    // table_snapshot->scope_ = SnapshotScope::kTable;
+    // table_snapshot->version_ = snapshot_meta_json["version"];
+    // table_snapshot->db_name_ = snapshot_meta_json["database_name"];
+    // table_snapshot->table_name_ = snapshot_meta_json["table_name"];
+    // table_snapshot->table_comment_ = snapshot_meta_json["table_comment"];
 
-    table_snapshot->txn_id_ = snapshot_meta_json["txn_id"];
-    table_snapshot->begin_ts_ = snapshot_meta_json["begin_ts"];
-    table_snapshot->commit_ts_ = snapshot_meta_json["commit_ts"];
-    table_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
-    table_snapshot->table_entry_dir_ = snapshot_meta_json["table_entry_dir"];
-    table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
-    table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
-    table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
-    table_snapshot->row_count_ = snapshot_meta_json["row_count"];
+    // table_snapshot->txn_id_ = snapshot_meta_json["txn_id"];
+    // table_snapshot->begin_ts_ = snapshot_meta_json["begin_ts"];
+    // table_snapshot->commit_ts_ = snapshot_meta_json["commit_ts"];
+    // table_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
+    // table_snapshot->table_entry_dir_ = snapshot_meta_json["table_entry_dir"];
+    // table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
+    // table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
+    // table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
+    // table_snapshot->row_count_ = snapshot_meta_json["row_count"];
 
-    for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
-        SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
-        i64 column_id = column_def_json["column_id"];
-        String column_name = column_def_json["column_name"];
+    // for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
+    //     SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
+    //     i64 column_id = column_def_json["column_id"];
+    //     String column_name = column_def_json["column_name"];
 
-        std::set<ConstraintType> constraints;
-        if (column_def_json.contains("constraints")) {
-            for (const auto &column_constraint : column_def_json["constraints"]) {
-                ConstraintType constraint = column_constraint;
-                constraints.emplace(constraint);
-            }
-        }
+    //     std::set<ConstraintType> constraints;
+    //     if (column_def_json.contains("constraints")) {
+    //         for (const auto &column_constraint : column_def_json["constraints"]) {
+    //             ConstraintType constraint = column_constraint;
+    //             constraints.emplace(constraint);
+    //         }
+    //     }
 
-        String comment;
-        if (column_def_json.contains("column_comment")) {
-            comment = column_def_json["column_comment"];
-        }
+    //     String comment;
+    //     if (column_def_json.contains("column_comment")) {
+    //         comment = column_def_json["column_comment"];
+    //     }
 
-        SharedPtr<ParsedExpr> default_expr = nullptr;
-        if (column_def_json.contains("default")) {
-            default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
-        }
+    //     SharedPtr<ParsedExpr> default_expr = nullptr;
+    //     if (column_def_json.contains("default")) {
+    //         default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+    //     }
 
-        SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
-        table_snapshot->columns_.emplace_back(column_def);
-    }
+    //     SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
+    //     table_snapshot->columns_.emplace_back(column_def);
+    // }
 
-    for (const auto &segment_meta_json : snapshot_meta_json["segments"]) {
-        SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json);
-        table_snapshot->segment_snapshots_.emplace(segment_snapshot->segment_id_, segment_snapshot);
-    }
+    // for (const auto &segment_meta_json : snapshot_meta_json["segments"]) {
+    //     SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json);
+    //     table_snapshot->segment_snapshots_.emplace(segment_snapshot->segment_id_, segment_snapshot);
+    // }
 
-    for (const auto &table_index_meta_json : snapshot_meta_json["table_indexes"]) {
-        SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json);
-        table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
-    }
+    // for (const auto &table_index_meta_json : snapshot_meta_json["table_indexes"]) {
+    //     SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json);
+    //     table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
+    // }
 
-    //    LOG_INFO(table_snapshot->ToString());
+    // //    LOG_INFO(table_snapshot->ToString());
 
     return {table_snapshot, Status::OK()};
 }

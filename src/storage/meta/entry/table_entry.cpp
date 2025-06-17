@@ -222,37 +222,37 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
     return table_entry;
 }
 
-SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
-                                                     const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
-                                                     TransactionID txn_id,
-                                                     TxnTimeStamp begin_ts) {
+// SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
+//                                                      const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
+//                                                      TransactionID txn_id,
+//                                                      TxnTimeStamp begin_ts) {
 
-    SharedPtr<String> table_entry_dir_ptr = MakeShared<String>(table_snapshot_info->table_entry_dir_);
-    SharedPtr<String> table_name_ptr = MakeShared<String>(table_snapshot_info->table_name_);
-    SharedPtr<String> table_comment_ptr = MakeShared<String>(table_snapshot_info->table_comment_);
-    auto table_entry = MakeShared<TableEntry>(false,
-                                              std::move(table_entry_dir_ptr),
-                                              std::move(table_name_ptr),
-                                              std::move(table_comment_ptr),
-                                              table_snapshot_info->columns_,
-                                              TableEntryType::kTableEntry,
-                                              table_meta,
-                                              txn_id,
-                                              begin_ts,
-                                              table_snapshot_info->unsealed_id_,
-                                              table_snapshot_info->next_segment_id_,
-                                              table_snapshot_info->next_column_id_);
-    table_entry->row_count_.store(table_snapshot_info->row_count_);
+//     //SharedPtr<String> table_entry_dir_ptr = MakeShared<String>(table_snapshot_info->table_entry_dir_);
+//     SharedPtr<String> table_name_ptr = MakeShared<String>(table_snapshot_info->table_name_);
+//     SharedPtr<String> table_comment_ptr = MakeShared<String>(table_snapshot_info->table_comment_);
+//     auto table_entry = MakeShared<TableEntry>(false,
+//                                               std::move(table_entry_dir_ptr),
+//                                               std::move(table_name_ptr),
+//                                               std::move(table_comment_ptr),
+//                                               table_snapshot_info->columns_,
+//                                               TableEntryType::kTableEntry,
+//                                               table_meta,
+//                                               txn_id,
+//                                               begin_ts,
+//                                               table_snapshot_info->unsealed_id_,
+//                                               table_snapshot_info->next_segment_id_,
+//                                               table_snapshot_info->next_column_id_);
+//     table_entry->row_count_.store(table_snapshot_info->row_count_);
 
-    for (const auto &segment_pair : table_snapshot_info->segment_snapshots_) {
-        SegmentID segment_id = segment_pair.first;
-        SegmentSnapshotInfo *segment_snapshot = segment_pair.second.get();
-        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::ApplySegmentSnapshot(table_entry.get(), segment_snapshot, txn_id, begin_ts);
-        table_entry->segment_map_.emplace(segment_id, segment_entry);
-    }
+//     for (const auto &segment_pair : table_snapshot_info->segment_snapshots_) {
+//         SegmentID segment_id = segment_pair.first;
+//         SegmentSnapshotInfo *segment_snapshot = segment_pair.second.get();
+//         SharedPtr<SegmentEntry> segment_entry = SegmentEntry::ApplySegmentSnapshot(table_entry.get(), segment_snapshot, txn_id, begin_ts);
+//         table_entry->segment_map_.emplace(segment_id, segment_entry);
+//     }
 
-    return table_entry;
-}
+//     return table_entry;
+// }
 
 SharedPtr<TableInfo> TableEntry::GetTableInfo(Txn *txn) {
     SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
@@ -1795,41 +1795,41 @@ void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *
     }
 }
 
-SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn *txn_ptr) const {
-    std::shared_lock lock(rw_locker_);
-    SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
-    table_snapshot_info->db_name_ = *GetDBName();
-    table_snapshot_info->table_name_ = *table_name_;
-    table_snapshot_info->table_comment_ = *table_comment_;
-    table_snapshot_info->txn_id_ = txn_id_;
-    table_snapshot_info->begin_ts_ = begin_ts_;
-    table_snapshot_info->commit_ts_ = commit_ts_;
-    table_snapshot_info->max_commit_ts_ = max_commit_ts_;
-    table_snapshot_info->next_column_id_ = next_column_id_;
-    table_snapshot_info->unsealed_id_ = unsealed_id_;
-    table_snapshot_info->next_segment_id_ = next_segment_id_;
-    table_snapshot_info->columns_ = columns_;
+// SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+//     std::shared_lock lock(rw_locker_);
+//     SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
+//     table_snapshot_info->db_name_ = *GetDBName();
+//     table_snapshot_info->table_name_ = *table_name_;
+//     table_snapshot_info->table_comment_ = *table_comment_;
+//     table_snapshot_info->txn_id_ = txn_id_;
+//     table_snapshot_info->begin_ts_ = begin_ts_;
+//     table_snapshot_info->commit_ts_ = commit_ts_;
+//     table_snapshot_info->max_commit_ts_ = max_commit_ts_;
+//     table_snapshot_info->next_column_id_ = next_column_id_;
+//     table_snapshot_info->unsealed_id_ = unsealed_id_;
+//     table_snapshot_info->next_segment_id_ = next_segment_id_;
+//     table_snapshot_info->columns_ = columns_;
 
-    Vector<SharedPtr<SegmentEntry>> segments = GetVisibleSegments(txn_ptr);
+//     Vector<SharedPtr<SegmentEntry>> segments = GetVisibleSegments(txn_ptr);
 
-    for (const auto &segment_ptr : segments) {
-        SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_ptr->GetSnapshotInfo();
-        table_snapshot_info->segment_snapshots_.emplace(segment_ptr->segment_id(), segment_snapshot_info);
-    }
+//     for (const auto &segment_ptr : segments) {
+//         SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_ptr->GetSnapshotInfo();
+//         table_snapshot_info->segment_snapshots_.emplace(segment_ptr->segment_id(), segment_snapshot_info);
+//     }
 
-    {
-        auto map_guard = this->IndexMetaMap();
-        for (const auto &[index_name, index_meta] : *map_guard) {
-            auto [table_index_entry, status] = index_meta->GetEntryNolock(txn_ptr->TxnID(), txn_ptr->BeginTS());
-            if (!status.ok()) {
-                // Index isn't found.
-                continue;
-            }
-            SharedPtr<TableIndexSnapshotInfo> table_index_snapshot_info = table_index_entry->GetSnapshotInfo(txn_ptr);
-            table_snapshot_info->table_index_snapshots_.emplace(index_name, table_index_snapshot_info);
-        }
-    }
-    return table_snapshot_info;
-}
+//     {
+//         auto map_guard = this->IndexMetaMap();
+//         for (const auto &[index_name, index_meta] : *map_guard) {
+//             auto [table_index_entry, status] = index_meta->GetEntryNolock(txn_ptr->TxnID(), txn_ptr->BeginTS());
+//             if (!status.ok()) {
+//                 // Index isn't found.
+//                 continue;
+//             }
+//             SharedPtr<TableIndexSnapshotInfo> table_index_snapshot_info = table_index_entry->GetSnapshotInfo(txn_ptr);
+//             table_snapshot_info->table_index_snapshots_.emplace(index_name, table_index_snapshot_info);
+//         }
+//     }
+//     return table_snapshot_info;
+// }
 
 } // namespace infinity

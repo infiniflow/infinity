@@ -18,6 +18,8 @@ module snapshot;
 
 import stl;
 import txn;
+import new_txn;
+import new_txn_manager;
 import query_context;
 import table_entry;
 import status;
@@ -29,15 +31,16 @@ import snapshot_info;
 namespace infinity {
 
 Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
-    Txn *txn_ptr = query_context->GetTxn();
+    auto *txn_ptr = query_context->GetNewTxn();
     const String &db_name = query_context->schema_name();
 
     SharedPtr<TableSnapshotInfo> table_snapshot;
     Status status;
-    std::tie(table_snapshot, status) = txn_ptr->GetTableSnapshot(db_name, table_name);
+    std::tie(table_snapshot, status) = txn_ptr->GetTableSnapshotInfo(db_name, table_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
+
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
     table_snapshot->Serialize(snapshot_dir);

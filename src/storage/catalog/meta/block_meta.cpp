@@ -38,6 +38,8 @@ import fast_rough_filter;
 import kv_code;
 import kv_utility;
 import logger;
+import snapshot_info;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -208,6 +210,10 @@ Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
                                                              block_id_,
                                                              begin_ts_);
     }
+    auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
+
+    new_txn_mgr->PrintAllKeyValue();
+
     return {&*column_ids1_, Status::OK()};
 }
 
@@ -346,4 +352,48 @@ Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filte
     return Status::OK();
 }
 
+Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
+    SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
+    Status status;
+    block_snapshot_info->block_id_ = block_id_;
+
+    // Get row count
+    std::tie(block_snapshot_info->row_count_, status) = GetRowCnt1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    block_snapshot_info->row_capacity_ = this->block_capacity();
+
+    // Get block dir
+    // TODO: FIGURE OUT WHAT BlockDir do
+    SharedPtr<String> block_dir_ptr;
+    block_dir_ptr = this->GetBlockDir();
+    block_snapshot_info->block_dir_ = *block_dir_ptr;
+
+    // Get fast rough filter if exists
+    SharedPtr<FastRoughFilter> fast_rough_filter;
+    status = GetFastRoughFilter(fast_rough_filter);
+    // serialize fast rough filter if exists
+    if (status.ok()) {
+        block_snapshot_info->fast_rough_filter_ = fast_rough_filter->SerializeToString();
+    }
+    
+
+    // Get column ids
+    Vector<ColumnID> *column_ids_ptr = nullptr;
+    std::tie(column_ids_ptr, status) = GetBlockColumnIDs1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    for (ColumnID column_id : *column_ids_ptr) {
+        ColumnMeta column_meta(column_id, *this);
+        auto [column_snapshot_info, status] = column_meta.MapMetaToSnapShotInfo();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+        block_snapshot_info->column_block_snapshots_.push_back(column_snapshot_info);
+    }
+
+    return {block_snapshot_info, Status::OK()};
+}
 } // namespace infinity

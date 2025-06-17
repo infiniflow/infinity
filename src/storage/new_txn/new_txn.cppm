@@ -252,9 +252,9 @@ public:
     Tuple<SharedPtr<BlockColumnInfo>, Status>
     GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
 
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
+    // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
-    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
+    // Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
     // Index OPs
 
@@ -271,6 +271,13 @@ public:
     Status OptimizeTableIndexes(const String &db_name, const String &table_name);
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+    // // Snapshot OPs
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
+
+    Status DropTableSnapShot(const String &db_name, const String &table_name);
+
+    Status GetTableSnapShot(const String &db_name, const String &table_name); // need output
 
 private:
     Status OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
