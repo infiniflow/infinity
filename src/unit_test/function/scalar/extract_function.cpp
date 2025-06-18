@@ -198,5 +198,4 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
             EXPECT_EQ(v.value_.big_int, i % 28 + 1);
         }
     }
-    kv_store_ptr->Uninit();
 }

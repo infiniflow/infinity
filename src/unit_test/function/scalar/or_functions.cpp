@@ -121,5 +121,4 @@ TEST_F(OrFunctionsTest, or_func) {
             EXPECT_EQ(v.value_.boolean, true);
         }
     }
-    kv_store_ptr->Uninit();
 }

@@ -342,6 +342,4 @@ TEST_F(AbsFunctionsTest, abs_func) {
 
         EXPECT_STREQ("ABS(Float)->Float", func.ToString().c_str());
     }
-
-    kv_store_ptr->Uninit();
 }
