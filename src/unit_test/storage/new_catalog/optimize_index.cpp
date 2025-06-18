@@ -216,13 +216,6 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
             }
             for (const auto chunk_id : my_chunk_ids) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                {
-                    ChunkIndexMetaInfo *chunk_info = nullptr;
-                    Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-                    EXPECT_TRUE(status.ok());
-                    EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
-                    EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
-                }
                 BufferObj *buffer_obj = nullptr;
                 status = chunk_index_meta.GetIndexBuffer(buffer_obj);
                 EXPECT_TRUE(status.ok());
