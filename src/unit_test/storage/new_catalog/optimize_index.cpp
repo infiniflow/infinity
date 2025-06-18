@@ -191,7 +191,6 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_rollback) {
     {
         auto check_opt_index = [this](const Vector<ChunkID> &my_chunk_ids) { // check optimize index
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
-            SizeT block_row_cnt = 8192;
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Optional<TableIndexMeeta> table_index_meta;
