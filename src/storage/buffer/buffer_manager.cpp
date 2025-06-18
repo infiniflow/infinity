@@ -188,7 +188,7 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
         clean_list.swap(clean_list_);
     }
     for (auto *buffer_obj : clean_list) {
-        status = buffer_obj->CleanupFile(kv_instance);
+        status = buffer_obj->CleanupFile();
         if (!status.ok()) {
             return status;
         }

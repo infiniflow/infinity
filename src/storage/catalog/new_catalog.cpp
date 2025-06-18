@@ -271,7 +271,7 @@ void NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
     segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
-void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
+Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
     auto GetCleanedMetaImpl = [&](const Vector<String> &keys) {
         const String &type_str = keys[1];
         const String &meta_str = keys[2];
@@ -336,9 +336,14 @@ void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &met
         // delete from kv_instance
         Status status = kv_instance->Delete(drop_key);
         if (!status.ok()) {
-            UnrecoverableError(fmt::format("Remove clean meta failed. {}", *status.msg_));
+            return status;
         }
     }
+    // Delete entities at lower hierarchy level first to avoid missing them when removing higher-level entities.
+    std::sort(metas.begin(), metas.end(), [&](const UniquePtr<MetaKey> &lhs, const UniquePtr<MetaKey> &rhs) {
+        return static_cast<SizeT>(lhs->type_) > static_cast<SizeT>(rhs->type_);
+    });
+    return Status::OK();
 }
 
 Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {

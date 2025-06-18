@@ -169,13 +169,14 @@ struct NewTxnCompactState {
     }
 
     TxnTimeStamp commit_ts_{};
+
     Optional<SegmentMeta> new_segment_meta_{};
     Optional<BlockMeta> block_meta_{};
 
-    Vector<SizeT> block_row_cnts_{};
+    Vector<SizeT> block_row_cnts_;
     SizeT segment_row_cnt_{};
     BlockOffset cur_block_row_cnt_{};
-    Vector<ColumnVector> column_vectors_{};
+    Vector<ColumnVector> column_vectors_;
     SizeT column_cnt_{};
 };
 
