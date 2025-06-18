@@ -5430,7 +5430,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
     //    t1      import                                   commit (fail)
     //    |----------|-----------------------------------------------|
     //                    |-------------|-----------------------|
@@ -5463,7 +5462,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
         Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(), make_input_block()};
         status = txn3->Import(*db_name, *table_name, input_blocks1);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // drop index idx1
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
@@ -5473,7 +5472,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -5481,7 +5480,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {});
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -5545,7 +5544,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {});
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -5607,7 +5606,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {});
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -5670,7 +5669,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_table(*table_meta, txn5, {});
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -5681,7 +5680,6 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
     }
-    */
 
     //                                                           t1                  import                             commit (success)
     //                                                          |--------------------|------------------------------------------|

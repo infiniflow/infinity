@@ -402,9 +402,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
     // dump index and drop db
-    //  t1            dump index                             commit (success)
+    //  t1            dump index                             commit (fail)
     //  |--------------|------------------------------------------|
     //                         |------------------|----------|
     //                        t2                drop db    commit
@@ -428,7 +427,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
@@ -438,7 +437,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     }
 
     // dump index and drop db
-    //  t1            dump index                             commit (success)
+    //  t1            dump index                             commit (fail)
     //  |--------------|------------------------------------------|
     //         |------------------|----------|
     //         t2                drop db    commit
@@ -464,7 +463,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
@@ -474,7 +473,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     }
 
     // dump index and drop db
-    //  t1                                  dump index                             commit (success)
+    //  t1                                  dump index                             commit (fail)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|----------|
     //         t2                drop db    commit
@@ -498,7 +497,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
@@ -508,7 +507,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     }
 
     // dump index and drop db
-    //                                 t1                    dump index                             commit (success)
+    //                                 t1                    dump index                             commit (fail)
     //                                 |----------------------|------------------------------------------|
     //         |------------------|----------|
     //         t2                drop db    commit
@@ -533,7 +532,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
         auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
@@ -541,7 +540,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->RollBackTxn(txn7);
         EXPECT_TRUE(status.ok());
     }
-    */
 
     // dump index and drop db
     //                                            t1                    dump index                             commit (success)
@@ -929,9 +927,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         drop_db(*db_name);
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
     // dump index and drop db
-    //  t1            dump index                             commit (success)
+    //  t1            dump index                             commit (fail)
     //  |--------------|------------------------------------------|
     //                         |------------------|----------|
     //                        t2                drop table    commit
@@ -961,13 +958,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         drop_db(*db_name);
     }
 
     // dump index and drop db
-    //  t1            dump index                             commit (success)
+    //  t1            dump index                             commit (fail)
     //  |--------------|------------------------------------------|
     //         |------------------|-------------|
     //         t2                drop table    commit
@@ -993,7 +990,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
@@ -1005,7 +1002,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     }
 
     // dump index and drop db
-    //  t1                                  dump index                             commit (success)
+    //  t1                                  dump index                             commit (fail)
     //  |---------------------------------------|------------------------------------------|
     //         |------------------|----------|
     //         t2                drop table    commit
@@ -1030,7 +1027,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
@@ -1042,7 +1039,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     }
 
     // dump index and drop db
-    //                                 t1                    dump index                             commit (success)
+    //                                 t1                    dump index                             commit (fail)
     //                                 |----------------------|------------------------------------------|
     //         |------------------|----------|
     //         t2                drop table    commit
@@ -1068,7 +1065,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
         auto [table_info, table_status] = txn7->GetTableInfo(*db_name, *table_name);
@@ -1078,7 +1075,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         drop_db(*db_name);
     }
-    */
 
     // dump index and drop db
     //                                            t1                    dump index                             commit (success)
@@ -3546,7 +3542,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         drop_db(*db_name);
     }
 
-    /* FIXME: PostRollback() for dump index is not implemented.
     //  t1            dump index                                               commit (fail)
     //  |--------------|--------------------------------------------------------------|
     //                         |------------------|--------------------|
@@ -3696,7 +3691,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         drop_db(*db_name);
     }
-    */
 
     //                                            t1                    dump index                             commit (success)
     //                                            |----------------------|------------------------------------------|

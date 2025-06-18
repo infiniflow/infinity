@@ -1547,7 +1547,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
     };
 
-    auto CheckWithNoIndex = [&] {
+    auto CheckWithNoIndex = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
@@ -1558,7 +1558,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
+        EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
         Vector<String> *index_ids_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
@@ -1601,10 +1601,10 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
-    /* FIXME: PostRollback() for dump index is not implemented.
+
     {
         PrepareForCompact();
 
@@ -1627,7 +1627,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({0,1});
         DropDB();
     }
     {
@@ -1652,7 +1652,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({0,1});
         DropDB();
     }
     {
@@ -1676,10 +1676,10 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
-    */
+
     {
         PrepareForCompact();
 
@@ -1703,7 +1703,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
     {
@@ -1727,7 +1727,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
     {
@@ -1752,7 +1752,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
     {
@@ -1775,7 +1775,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
 }

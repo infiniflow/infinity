@@ -169,14 +169,15 @@ struct NewTxnCompactState {
     }
 
     TxnTimeStamp commit_ts_{};
-    Optional<SegmentMeta> new_segment_meta_;
-    Optional<BlockMeta> block_meta_;
+
+    Optional<SegmentMeta> new_segment_meta_{};
+    Optional<BlockMeta> block_meta_{};
 
     Vector<SizeT> block_row_cnts_;
-    SizeT segment_row_cnt_ = 0;
-    BlockOffset cur_block_row_cnt_ = 0;
+    SizeT segment_row_cnt_{};
+    BlockOffset cur_block_row_cnt_{};
     Vector<ColumnVector> column_vectors_;
-    SizeT column_cnt_ = 0;
+    SizeT column_cnt_{};
 };
 
 Status NewTxn::Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks) {
