@@ -28,7 +28,6 @@ struct MemIndex;
 struct ColumnVector;
 class BaseMemIndex;
 class EMVBIndexInMem;
-struct ChunkIndexEntry;
 class NewTxn;
 
 export struct BGTask {

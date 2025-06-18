@@ -37,7 +37,6 @@ import utility;
 import block_version;
 import data_type;
 import parsed_expr;
-import segment_entry;
 
 namespace infinity {
 

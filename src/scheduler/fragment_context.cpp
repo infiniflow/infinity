@@ -67,7 +67,6 @@ import column_def;
 import explain_statement;
 import global_resource_usage;
 import block_index;
-import segment_entry;
 
 import table_index_meeta;
 import segment_index_meta;
@@ -180,15 +179,12 @@ UniquePtr<OperatorState> MakeCompactState(PhysicalCompact *physical_compact, Fra
         String error_message = "Expect compact source state";
         UnrecoverableError(error_message);
     }
-    auto *compact_source_state = static_cast<CompactSourceState *>(source_state);
-
     if (fragment_ctx->ContextType() != FragmentType::kParallelMaterialize) {
         String error_message = "Compact operator should be in parallel materialized fragment.";
         UnrecoverableError(error_message);
     }
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    auto compact_operator_state =
-        MakeUnique<CompactOperatorState>(std::move(compact_source_state->segment_groups_), parallel_materialize_fragment_ctx->compact_state_data_);
+    auto compact_operator_state = MakeUnique<CompactOperatorState>(parallel_materialize_fragment_ctx->compact_state_data_);
     return compact_operator_state;
 }
 
@@ -804,10 +800,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                 UnrecoverableError(
                     fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
-            auto *physical_compact = static_cast<PhysicalCompact *>(first_operator);
-            Vector<Vector<Vector<SegmentEntry *>>> segment_groups_list = physical_compact->PlanCompact(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<CompactSourceState>(std::move(segment_groups_list[task_id]));
+                tasks_[task_id]->source_state_ = MakeUnique<CompactSourceState>();
             }
             break;
         }

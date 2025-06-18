@@ -87,15 +87,6 @@ void MemIndexTracer::DumpFail(BaseMemIndex *mem_index) {
     proposed_dump_.erase(iter);
 }
 
-Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(Txn *txn) {
-    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
-    Vector<MemIndexTracerInfo> info_vec;
-    for (auto *mem_index : mem_indexes) {
-        info_vec.push_back(mem_index->GetInfo());
-    }
-    return info_vec;
-}
-
 Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(NewTxn *txn) {
     Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
     Vector<MemIndexTracerInfo> info_vec;
@@ -103,19 +94,6 @@ Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(NewTxn *txn) {
         info_vec.push_back(mem_index->GetInfo());
     }
     return info_vec;
-}
-
-Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(Txn *txn) {
-    Vector<BaseMemIndex *> results;
-    Vector<BaseMemIndex *> mem_indexes = GetAllMemIndexes(txn);
-    for (auto *mem_index : mem_indexes) {
-        if (auto iter = proposed_dump_.find(mem_index); iter == proposed_dump_.end()) {
-            auto info = mem_index->GetInfo();
-            proposed_dump_.emplace(mem_index, info.mem_used_);
-            results.push_back(mem_index);
-        }
-    }
-    return results;
 }
 
 Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(NewTxn *new_txn) {
@@ -208,24 +186,6 @@ NewTxn *BGMemIndexTracer::GetTxn() {
     }
     NewTxn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
     return txn;
-}
-
-Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(Txn *scan_txn) {
-    Vector<BaseMemIndex *> mem_indexes;
-    //    TransactionID txn_id = scan_txn->TxnID();
-    //    TxnTimeStamp begin_ts = scan_txn->BeginTS();
-    //    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
-    //    for (auto *db_entry : db_entries) {
-    //        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
-    //        for (auto *table_entry : table_entries) {
-    //            Vector<TableIndexEntry *> table_index_entries = table_entry->TableIndexes(txn_id, begin_ts);
-    //            for (auto *table_index_entry : table_index_entries) {
-    //                Vector<BaseMemIndex *> memindex_list = table_index_entry->GetMemIndex();
-    //                mem_indexes.insert(mem_indexes.end(), memindex_list.begin(), memindex_list.end());
-    //            }
-    //        }
-    //    }
-    return mem_indexes;
 }
 
 Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {

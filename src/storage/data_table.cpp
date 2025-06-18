@@ -25,7 +25,6 @@ import infinity_exception;
 import third_party;
 import data_block;
 import table_def;
-import table_entry_type;
 import value;
 import logger;
 
@@ -141,8 +140,7 @@ SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
 }
 
 DataTable::DataTable(SharedPtr<TableDef> table_def_ptr, TableType type)
-    : BaseTable(TableEntryType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(std::move(table_def_ptr)),
-      row_count_(0), type_(type) {}
+    : BaseTable(table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
 
 SizeT DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
 

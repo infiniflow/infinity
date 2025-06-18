@@ -49,7 +49,6 @@ import log_file;
 import query_context;
 import infinity_context;
 import memindex_tracer;
-import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
 import virtual_store;

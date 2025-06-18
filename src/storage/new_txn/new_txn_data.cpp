@@ -63,6 +63,7 @@ import dump_index_process;
 import mem_index;
 import base_memindex;
 import emvb_index_in_mem;
+import txn_context;
 
 namespace infinity {
 
@@ -756,101 +757,8 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-
-    auto [segment_row_count, segment_status] = block_meta.segment_meta().GetRowCnt1();
-    if (!segment_status.ok()) {
-        return segment_status;
-    }
-
-    while (append_state->current_block_ < append_state->blocks_.size()) {
-        DataBlock *input_block = append_state->blocks_[append_state->current_block_].get();
-        SizeT to_append_rows = input_block->row_count() - append_state->current_block_offset_;
-        if (to_append_rows == 0) {
-            ++append_state->current_block_;
-            append_state->current_block_offset_ = 0;
-            continue;
-        }
-
-        auto [version_buffer, status] = block_meta.GetVersionBuffer();
-        if (!status.ok()) {
-            return status;
-        }
-        BufferHandle buffer_handle = version_buffer->Load();
-        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
-
-        // auto [block_row_count, block_status] = block_meta.GetRowCnt();
-        // auto [block_row_count, block_status] = block_meta.GetRowCnt1(begin_ts);
-        auto [block_row_count, block_status] = block_version->GetRowCountForUpdate(begin_ts);
-        if (!block_status.ok()) {
-            return block_status;
-        }
-
-        SizeT actual_append = std::min(to_append_rows, block_meta.block_capacity() - block_row_count);
-        if (actual_append) {
-            SegmentID segment_id = block_meta.segment_meta().segment_id();
-            BlockID block_id = block_meta.block_id();
-            AppendRange range(segment_id,
-                              block_id,
-                              block_row_count,
-                              actual_append,
-                              append_state->current_block_,
-                              append_state->current_block_offset_);
-            append_state->append_ranges_.push_back(range);
-            //            LOG_INFO(fmt::format("actual to append rows: {}, from block: {} and offset {} to target block id: {} and offset: {}",
-            //                                 to_append_rows,
-            //                                 append_state->current_block_,
-            //                                 append_state->current_block_offset_,
-            //                                 block_id,
-            //                                 block_row_count));
-            // Status status = block_meta.SetRowCnt(block_row_count + actual_append);
-            // if (!status.ok()) {
-            //     return status;
-            // }
-        }
-
-        block_full = block_row_count + actual_append >= block_meta.block_capacity();
-
-        // auto [segment_row_count, segment_status] = block_meta.segment_meta().GetRowCnt();
-        // if (!segment_status.ok()) {
-        //     return segment_status;
-        // }
-
-        if (actual_append) {
-            // Status status = block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
-            // if (!status.ok()) {
-            //     return status;
-            // }
-            segment_row_count += actual_append;
-        }
-        // segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
-        segment_full = segment_row_count >= block_meta.segment_meta().segment_capacity();
-
-        if (actual_append) {
-            append_state->current_count_ += actual_append;
-            append_state->current_block_offset_ += actual_append;
-            if (append_state->current_block_offset_ == input_block->row_count()) {
-                ++append_state->current_block_;
-                append_state->current_block_offset_ = 0;
-            }
-        }
-        break;
-    }
-    return Status::OK();
-}
-
 Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset) {
     SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    // BufferObj *version_buffer = nullptr;
-    // {
-    //     String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-    //     version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-    //     if (version_buffer == nullptr) {
-    //         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-    //     }
-    // }
     auto [version_buffer, status] = block_meta.GetVersionBuffer();
     if (!status.ok()) {
         return status;

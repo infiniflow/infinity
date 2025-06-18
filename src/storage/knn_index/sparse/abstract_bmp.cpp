@@ -24,7 +24,6 @@ import infinity_exception;
 import third_party;
 import logger;
 import buffer_obj;
-import chunk_index_meta;
 
 namespace infinity {
 
@@ -45,12 +44,11 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
             }
         },
         bmp_);
+
     return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem_used, row_cnt);
 }
 
-const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const {
-    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()};
-}
+const ChunkIndexMetaInfo BMPIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), GetSizeInBytes()}; }
 
 BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
     : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)) {

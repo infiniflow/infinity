@@ -43,44 +43,6 @@ NewTxnTableStore1::NewTxnTableStore1() = default;
 
 NewTxnTableStore1::~NewTxnTableStore1() = default;
 
-Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
-    if (input_block->row_count() == 0) {
-        UnrecoverableError("Attempt to append empty data block into transaction table store");
-    }
-
-    // const Vector<SharedPtr<DataType>> &column_types = input_block->types();
-
-    // DataBlock *current_block{nullptr};
-    if (append_state_ == nullptr) {
-        append_state_ = MakeUnique<AppendState>();
-    }
-
-    // if (append_state_->blocks_.empty()) {
-    //     append_state_->blocks_.emplace_back(DataBlock::Make());
-    //     append_state_->blocks_.back()->Init(column_types);
-    // }
-    // current_block = append_state_->blocks_.back().get();
-
-    // if (current_block->row_count() + input_block->row_count() > current_block->capacity()) {
-    //     SizeT to_append = current_block->capacity() - current_block->row_count();
-    //     current_block->AppendWith(input_block.get(), 0, to_append);
-    //     current_block->Finalize();
-
-    //     append_state_->blocks_.emplace_back(DataBlock::Make());
-    //     append_state_->blocks_.back()->Init(column_types);
-    //     current_block = append_state_->blocks_.back().get();
-    //     current_block->AppendWith(input_block.get(), to_append, input_block->row_count() - to_append);
-    // } else {
-    //     SizeT to_append = input_block->row_count();
-    //     current_block->AppendWith(input_block.get(), 0, to_append);
-    // }
-    // current_block->Finalize();
-
-    append_state_->blocks_.emplace_back(input_block);
-
-    return Status::OK();
-}
-
 Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
     if (!delete_state_) {
         delete_state_ = MakeUnique<DeleteState>();

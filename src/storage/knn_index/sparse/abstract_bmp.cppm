@@ -14,10 +14,6 @@
 
 module;
 
-namespace infinity {
-struct ChunkIndexMetaInfo;
-}
-
 export module abstract_bmp;
 
 import stl;
@@ -32,7 +28,7 @@ import internal_types;
 import buffer_handle;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
+import chunk_index_meta;
 
 namespace infinity {
 

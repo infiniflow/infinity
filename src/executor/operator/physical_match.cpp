@@ -60,7 +60,6 @@ import filter_value_type_classification;
 import common_analyzer;
 import analyzer_pool;
 import roaring_bitmap;
-import segment_entry;
 import knn_filter;
 import highlighter;
 import parse_fulltext_options;

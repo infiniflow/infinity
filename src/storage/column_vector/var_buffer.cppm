@@ -80,8 +80,6 @@ export class VarBufferManager {
 public:
     VarBufferManager() : type_(BufferType::kBuffer), mem_buffer_(nullptr) {}
 
-    VarBufferManager(BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr);
-
     VarBufferManager(BufferObj *outline_buffer_obj);
 
     SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
@@ -107,14 +105,11 @@ private:
 
     enum class BufferType {
         kBuffer,
-        kBufferObj,
         kNewCatalog,
     } type_;
 
     UniquePtr<VarBuffer> mem_buffer_;
     Optional<BufferHandle> buffer_handle_;
-    BlockColumnEntry *block_column_entry_ = nullptr;
-    BufferManager *buffer_mgr_ = nullptr;
     BufferObj *outline_buffer_obj_ = nullptr;
 };
 

@@ -17,7 +17,6 @@ module;
 export module create_index_data;
 
 import stl;
-import segment_entry;
 import third_party;
 import infinity_exception;
 import logger;

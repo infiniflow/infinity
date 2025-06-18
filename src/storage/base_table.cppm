@@ -17,7 +17,6 @@ module;
 export module base_table;
 
 import stl;
-import table_entry_type;
 import logger;
 import infinity_exception;
 import global_resource_usage;
@@ -49,8 +48,8 @@ inline String ToString(BaseTableType type) {
 
 export class BaseTable {
 public:
-    explicit BaseTable(TableEntryType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
-        : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
+    explicit BaseTable(SharedPtr<String> schema_name, SharedPtr<String> table_name)
+        : schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("BaseTable");
 #endif
@@ -64,10 +63,6 @@ public:
         GlobalResourceUsage::DecrObjectCount("BaseTable");
 #endif
     }
-
-    [[nodiscard]] inline TableEntryType kind() const { return kind_; }
-
-    TableEntryType kind_{TableEntryType::kTableEntry};
 
     [[nodiscard]] inline const SharedPtr<String> &schema_name() const { return schema_name_; }
 

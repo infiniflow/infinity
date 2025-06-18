@@ -39,7 +39,6 @@ class KVInstance;
 struct WalSegmentInfo;
 struct WalCmdDumpIndexV2;
 
-struct AppendState;
 struct DeleteState;
 struct AccessState;
 
@@ -49,19 +48,14 @@ public:
 
     ~NewTxnTableStore1();
 
-    Status Append(const SharedPtr<DataBlock> &input_block);
-
     Status Delete(const Vector<RowID> &row_ids);
 
     void GetAccessState(const Vector<RowID> &row_ids, AccessState &access_state);
-
-    AppendState *append_state() const { return append_state_.get(); }
 
     DeleteState &delete_state() const { return *delete_state_; }
     DeleteState &undo_delete_state();
 
 private:
-    UniquePtr<AppendState> append_state_{};
     UniquePtr<DeleteState> delete_state_{};      // Used for commit delete operation
     UniquePtr<DeleteState> undo_delete_state_{}; // Used for rollback delete operation
 };

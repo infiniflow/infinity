@@ -40,7 +40,6 @@ import table_meeta;
 import segment_meta;
 import block_meta;
 import column_meta;
-import table_index_meta;
 import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;

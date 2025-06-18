@@ -2078,16 +2078,6 @@ show_statement: SHOW DATABASES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kLogs;
 }
-| SHOW CATALOG {
-      $$ = new infinity::ShowStatement();
-      $$->show_type_ = infinity::ShowStmtType::kCatalog;
-}
-| SHOW CATALOG TO file_path {
-      $$ = new infinity::ShowStatement();
-      $$->show_type_ = infinity::ShowStmtType::kCatalogToFile;
-      $$->file_path_ = $4;
-      free($4);
-}
 | SHOW PERSISTENCE FILES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kPersistenceFiles;
@@ -2362,16 +2352,7 @@ compact_statement: COMPACT TABLE table_name {
     delete $3;
 }
 
-admin_statement: ADMIN SHOW CATALOGS {
-     $$ = new infinity::AdminStatement();
-     $$->admin_type_ = infinity::AdminStmtType::kListCatalogs;
-}
-| ADMIN SHOW CATALOG LONG_VALUE {
-     $$ = new infinity::AdminStatement();
-     $$->admin_type_ = infinity::AdminStmtType::kShowCatalog;
-     $$->catalog_file_index_ = $4;
-}
-| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
+admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListDatabases;
      $$->catalog_file_start_index_ = $4;
