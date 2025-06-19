@@ -212,6 +212,12 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        third_party_cpp
+        CONFIGURE_DEPENDS
+        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
+)
+
+file(GLOB_RECURSE
         admin_cppm
         CONFIGURE_DEPENDS
         admin/*.cppm
@@ -229,6 +235,7 @@ add_library(infinity_core
         ${common_cpp}
         ${admin_cpp}
         ${network_cpp}
+        ${third_party_cpp}
 )
 
 target_sources(infinity_core
@@ -287,6 +294,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
 
 
@@ -549,7 +557,6 @@ add_executable(unit_test
         ${ut_planner_cpp}
         ${ut_function_cpp}
         ${ut_parallel_cpp}
-
         ${infinity_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
@@ -643,7 +650,7 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cur
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
-
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if(X86_64)
