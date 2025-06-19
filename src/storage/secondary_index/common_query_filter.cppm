@@ -26,12 +26,10 @@ class BaseTableRef;
 class BaseExpression;
 class QueryContext;
 class BufferManager;
-class Txn;
 struct TableIndexEntry;
 class NewTxn;
 
 export struct CommonQueryFilter {
-    Txn* txn_ptr_;
     NewTxn *new_txn_ptr_ = nullptr;
     SharedPtr<BaseExpression> original_filter_;
     SharedPtr<BaseTableRef> base_table_ref_;
@@ -64,8 +62,6 @@ export struct CommonQueryFilter {
     atomic_u32 end_task_num_ = 0;
 
 public:
-    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, Txn* txn);
-
     CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, NewTxn* new_txn);
 
     // 1. try to finish building the filter
@@ -85,7 +81,7 @@ public:
                 }
                 task_id = begin_task_num_++;
             }
-            BuildFilter(task_id);
+            NewBuildFilter(task_id);
             if (++end_task_num_ == total_task_num_) {
                 finish_build_.test_and_set(std::memory_order_release);
                 break;

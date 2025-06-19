@@ -529,14 +529,14 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kIVF: {
-            const u32 row_count = segment_entry->row_count();
-            SharedPtr<ChunkIndexEntry> ivf_chunk_index_entry = CreateIVFIndexChunkIndexEntry(base_row_id, row_count, buffer_mgr);
-            this->AddChunkIndexEntry(ivf_chunk_index_entry);
-            BufferHandle handle = ivf_chunk_index_entry->GetIndex();
-            auto data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
-            data_ptr->BuildIVFIndex(base_row_id, row_count, segment_entry, column_def, buffer_mgr);
-            ivf_chunk_index_entry->SaveIndexFile();
-            dumped_memindex_entry = std::move(ivf_chunk_index_entry);
+            //            const u32 row_count = segment_entry->row_count();
+            //            SharedPtr<ChunkIndexEntry> ivf_chunk_index_entry = CreateIVFIndexChunkIndexEntry(base_row_id, row_count, buffer_mgr);
+            //            this->AddChunkIndexEntry(ivf_chunk_index_entry);
+            //            BufferHandle handle = ivf_chunk_index_entry->GetIndex();
+            //            auto data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
+            //            data_ptr->BuildIVFIndex(base_row_id, row_count, segment_entry, column_def, buffer_mgr);
+            //            ivf_chunk_index_entry->SaveIndexFile();
+            //            dumped_memindex_entry = std::move(ivf_chunk_index_entry);
             break;
         }
         case IndexType::kEMVB: {
@@ -961,15 +961,15 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     const IndexBase *index_base = table_index_entry_->index_base();
     SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
 
-    BufferManager *buffer_mgr = txn->buffer_mgr();
+    //    BufferManager *buffer_mgr = txn->buffer_mgr();
     Vector<ChunkIndexEntry *> old_chunks;
     Vector<ChunkID> old_ids;
-    u32 row_count = 0;
+    //    u32 row_count = 0;
     {
         std::shared_lock lock(rw_locker_);
         for (const auto &chunk_index_entry : chunk_index_entries_) {
             if (chunk_index_entry->CheckVisible(txn)) {
-                row_count += chunk_index_entry->row_count_;
+                //                row_count += chunk_index_entry->row_count_;
                 old_chunks.push_back(chunk_index_entry.get());
                 old_ids.push_back(chunk_index_entry->chunk_id_);
             }
@@ -1061,10 +1061,10 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             break;
         }
         case IndexType::kSecondary: {
-            merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
-            BufferHandle handle = merged_chunk_index_entry->GetIndex();
-            auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-            data_ptr->InsertMergeData(old_chunks);
+            //            merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
+            //            BufferHandle handle = merged_chunk_index_entry->GetIndex();
+            //            auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
+            //            data_ptr->InsertMergeData(old_chunks);
             break;
         }
         case IndexType::kEMVB: {
@@ -1077,10 +1077,10 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
         case IndexType::kIVF: {
             // rebuild
-            merged_chunk_index_entry = CreateIVFIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
-            BufferHandle handle = merged_chunk_index_entry->GetIndex();
-            auto data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
-            data_ptr->BuildIVFIndex(base_rowid, row_count, segment_entry, column_def, buffer_mgr);
+            //            merged_chunk_index_entry = CreateIVFIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
+            //            BufferHandle handle = merged_chunk_index_entry->GetIndex();
+            //            auto data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
+            //            data_ptr->BuildIVFIndex(base_rowid, row_count, segment_entry, column_def, buffer_mgr);
             break;
         }
         default: {
