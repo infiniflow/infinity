@@ -56,7 +56,6 @@ import global_block_id;
 import block_index;
 import column_def;
 import internal_types;
-import fix_heap;
 import type_info;
 import embedding_info;
 import buffer_manager;

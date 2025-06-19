@@ -19,7 +19,6 @@ import infinity_exception;
 
 import logger;
 import var_heap;
-import fix_heap;
 import third_party;
 import stl;
 import global_resource_usage;
@@ -102,7 +101,7 @@ TEST_F(VectorHeapTest, var_heap2) {
     std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
     std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
-#endif
+
 
 TEST_F(VectorHeapTest, fix_heap1) {
     using namespace infinity;
@@ -166,3 +165,4 @@ TEST_F(VectorHeapTest, fix_heap2) {
     //    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
     //    std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
+#endif

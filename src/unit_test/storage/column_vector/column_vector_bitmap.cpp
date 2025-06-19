@@ -138,7 +138,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 //    EXPECT_EQ(column_vector.tail_index_, 0);
 //    //    EXPECT_EQ(column_vector.data_type_size_, 0);
 //    EXPECT_NE(column_vector.buffer_, nullptr);
-//    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+//
 //    EXPECT_NE(column_vector.data_ptr_, nullptr);
 //    EXPECT_EQ(column_vector.initialized, false);
 //
@@ -271,7 +271,7 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
     EXPECT_EQ(column_vector.tail_index_, 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 

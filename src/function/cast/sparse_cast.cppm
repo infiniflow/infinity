@@ -28,7 +28,7 @@ import internal_types;
 import column_vector;
 import third_party;
 import vector_buffer;
-import fix_heap;
+
 import sparse_info;
 import embedding_cast;
 import logger;
