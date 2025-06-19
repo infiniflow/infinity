@@ -124,7 +124,7 @@ export struct MetaPmObject final : public MetaObject {
 };
 
 export struct MetaTree {
-    static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
+    static SharedPtr<MetaTree> MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys);
 
 public:
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
