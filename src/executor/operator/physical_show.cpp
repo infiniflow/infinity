@@ -59,7 +59,6 @@ import variables;
 import default_values;
 import wal_manager;
 import logger;
-import chunk_index_entry;
 import memory_indexer;
 import background_process;
 import compaction_process;

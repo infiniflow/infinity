@@ -46,7 +46,6 @@ import background_process;
 import base_table_ref;
 import compact_statement;
 import default_values;
-import chunk_index_entry;
 import memory_indexer;
 import persistence_manager;
 import persist_result_handler;
@@ -3726,16 +3725,15 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kImport: {
             ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-
             for (auto &[_, blocks] : import_txn_store->input_blocks_in_imports_) {
                 std::for_each(blocks.begin(), blocks.end(), [](auto &block) { block->UnInit(); });
             }
 
             const Vector<SegmentID> &segment_ids = import_txn_store->segment_ids_;
             Vector<UniquePtr<MetaKey>> metas;
+            auto &db_id_str = import_txn_store->db_id_str_;
+            auto &table_id_str = import_txn_store->table_id_str_;
             auto index_names_size = import_txn_store->index_names_.size();
-            auto db_id_str = import_txn_store->db_id_str_;
-            auto table_id_str = import_txn_store->table_id_str_;
             for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
                 auto index_id_str = import_txn_store->index_ids_str_[i];
@@ -3752,13 +3750,13 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             if (!status.ok()) {
                 UnrecoverableError("During PostRollback, cleanup failed.");
             }
+            break;
         }
         case TransactionType::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-
             Vector<UniquePtr<MetaKey>> metas;
-            auto db_id_str = compact_txn_store->db_id_str_;
-            auto table_id_str = compact_txn_store->table_id_str_;
+            auto &db_id_str = compact_txn_store->db_id_str_;
+            auto &table_id_str = compact_txn_store->table_id_str_;
             auto index_names_size = compact_txn_store->index_names_.size();
             for (SizeT i = 0; i < index_names_size; ++i) {
                 // Restore memory index here
@@ -3777,6 +3775,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             if (!status.ok()) {
                 UnrecoverableError("During PostRollback, cleanup failed.");
             }
+            break;
         }
         case TransactionType::kCreateIndex: {
             break;
@@ -3789,10 +3788,27 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kOptimizeIndex: {
             OptimizeIndexTxnStore *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+            Vector<UniquePtr<MetaKey>> metas;
+            auto &entries = optimize_index_txn_store->entries_;
 
-            if (optimize_index_txn_store->entries_.size() > 0) {
-                // Restore memory index here
-                UnrecoverableError("Not implemented");
+            for (const auto &entry : entries) {
+                auto &db_id_str = entry.db_id_str_;
+                auto &table_id_str = entry.table_id_str_;
+                auto &index_id_str = entry.index_id_str_;
+                auto segment_id = entry.segment_id_;
+                auto &new_chunk_infos = entry.new_chunk_infos_;
+                for (const auto &new_chunk_info : new_chunk_infos) {
+                    auto chunk_id = new_chunk_info.chunk_id_;
+                    metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, chunk_id));
+                }
+            }
+
+            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            // if (status.code_ == ErrorCode::kIOError) {
+            //     // TODO: move metas to kv_store
+            // } else
+            if (!status.ok()) {
+                UnrecoverableError("During PostRollback, cleanup failed.");
             }
             break;
         }
@@ -3824,75 +3840,6 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         default: {
-        }
-    }
-
-    // We will remove buffer objects for block, blockColumn and chunkIndex added in this txn.
-    for (auto &meta : object_meta_keys_) {
-        switch (meta->type_) {
-            case MetaType::kBlock: {
-                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-
-                auto [version_buffer, status1] = block_meta.GetVersionBuffer();
-                if (!status1.ok()) {
-                    return status1;
-                }
-                Vector<String> object_paths{version_buffer->GetFilename()};
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-
-                String block_lock_key = block_meta.GetBlockTag("lock");
-                Status status = new_catalog_->DropBlockLockByBlockKey(block_lock_key);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kBlockColumn: {
-                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
-                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-
-                BufferObj *buffer_obj = nullptr;
-                BufferObj *outline_buffer_obj = nullptr;
-                Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-
-                Vector<String> object_paths;
-                object_paths.reserve(2);
-                object_paths.push_back(buffer_obj->GetFilename());
-                if (outline_buffer_obj != nullptr) {
-                    object_paths.push_back(outline_buffer_obj->GetFilename());
-                }
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-                break;
-            }
-            case MetaType::kChunkIndex: {
-                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, abort_ts, MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
-                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
-                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
-
-                BufferObj *index_buffer = nullptr;
-                Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
-                if (!status.ok()) {
-                    return status;
-                }
-                Vector<String> object_paths{index_buffer->GetFilename()};
-                buffer_mgr_->RemoveBufferObjects(object_paths);
-                break;
-            }
-            default: {
-                UnrecoverableError("Unexpected meta key type for buffer object.");
-                break;
-            }
         }
     }
 

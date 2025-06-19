@@ -304,9 +304,7 @@ public:
 
     SharedPtr<IndexReader> GetFullTextIndexReader(Txn *txn);
 
-    void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
-    }
+    void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {}
 
     void InvalidateFullTextIndexCache();
 
@@ -339,9 +337,6 @@ private:
     SharedPtr<SegmentEntry> unsealed_segment_{};
     SegmentID unsealed_id_{};
     Atomic<SegmentID> next_segment_id_{};
-
-    // for full text search cache
-    TableIndexReaderCache fulltext_column_index_cache_;
 
     TxnTimeStamp max_commit_ts_ = 0;
 

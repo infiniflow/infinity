@@ -25,11 +25,9 @@ import column_def;
 import index_base;
 import embedding_info;
 import internal_types;
-import segment_entry;
 import buffer_manager;
 import infinity_exception;
 import status;
-import block_entry;
 import data_type;
 import default_values;
 import column_vector;
@@ -45,46 +43,6 @@ import new_catalog;
 import kv_store;
 
 namespace infinity {
-
-class IVFDataAccessor : public IVFDataAccessorBase {
-public:
-    IVFDataAccessor(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, ColumnID column_id)
-        : buffer_mgr_(buffer_mgr), column_id_(column_id) {
-        {
-            const BlocksGuard blocks_guard = segment_entry->GetBlocksGuard();
-            block_entries_ = blocks_guard.block_entries_;
-        }
-    }
-
-    const_ptr_t GetEmbedding(SizeT offset) override {
-        SizeT block_offset = UpdateColumnVector(offset);
-        return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
-    }
-
-    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
-        SizeT block_offset = UpdateColumnVector(offset);
-        return cur_column_vector_.GetMultiVectorRaw(block_offset);
-    }
-
-private:
-    SizeT UpdateColumnVector(SizeT offset) {
-        SizeT block_offset = offset % DEFAULT_BLOCK_CAPACITY;
-        BlockID block_id = offset / DEFAULT_BLOCK_CAPACITY;
-        if (block_id != last_block_id_) {
-            last_block_id_ = block_id;
-            cur_column_vector_ = block_entries_[block_id]->GetConstColumnVector(buffer_mgr_, column_id_);
-        }
-        return block_offset;
-    }
-
-private:
-    Vector<SharedPtr<BlockEntry>> block_entries_;
-    BufferManager *buffer_mgr_;
-    ColumnID column_id_;
-
-    BlockID last_block_id_ = std::numeric_limits<BlockID>::max();
-    ColumnVector cur_column_vector_;
-};
 
 class NewIVFDataAccessor : public IVFDataAccessorBase {
 public:
@@ -129,21 +87,6 @@ private:
     BlockID last_block_id_ = std::numeric_limits<BlockID>::max();
     ColumnVector cur_column_vector_;
 };
-
-void IVFIndexInChunk::BuildIVFIndex(const RowID base_rowid,
-                                    const u32 row_count,
-                                    const SegmentEntry *segment_entry,
-                                    const SharedPtr<ColumnDef> &column_def,
-                                    BufferManager *buffer_mgr) {
-    if (segment_entry->segment_id() != base_rowid.segment_id_) {
-        UnrecoverableError(std::format("{}: segment_id mismatch: segment_entry_id: {}, row_id_segment_id: {}.",
-                                       __func__,
-                                       segment_entry->segment_id(),
-                                       base_rowid.segment_id_));
-    }
-    IVFDataAccessor data_accessor(segment_entry, buffer_mgr, column_def->id());
-    BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
-}
 
 void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
     RowID base_rowid(segment_meta.segment_id(), 0);

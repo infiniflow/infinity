@@ -603,7 +603,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
     };
 
     validity_function_ = [this] {
-        { // check dump index
+        { // check optimize index
             auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
             SizeT block_row_cnt = 2;
             Optional<DBMeeta> db_meta;

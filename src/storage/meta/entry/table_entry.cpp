@@ -112,8 +112,7 @@ TableEntry::TableEntry(bool is_delete,
                        ColumnID next_column_id)
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
       table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)), columns_(columns),
-      next_column_id_(next_column_id), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
-      fulltext_column_index_cache_(this) {
+      next_column_id_(next_column_id), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -127,7 +126,7 @@ TableEntry::TableEntry(bool is_delete,
 TableEntry::TableEntry(const TableEntry &other)
     : BaseEntry(other), table_meta_(other.table_meta_), table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_),
       table_comment_(other.table_comment_), columns_(other.columns_), next_column_id_(other.next_column_id_),
-      table_entry_type_(other.table_entry_type_), fulltext_column_index_cache_(this) {
+      table_entry_type_(other.table_entry_type_) {
     row_count_ = other.row_count_.load();
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
@@ -995,10 +994,10 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                                                         buffer_manager,
                                                         nullptr);
                 }
-                //segment_index_entry->MemIndexWaitInflightTasks();
-//                InfinityContext::instance().storage()->catalog()->all_memindex_recover_segment_.push_back(segment_index_entry);
-//                message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
-//                LOG_INFO(message);
+                // segment_index_entry->MemIndexWaitInflightTasks();
+                //                InfinityContext::instance().storage()->catalog()->all_memindex_recover_segment_.push_back(segment_index_entry);
+                //                message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name,
+                //                segment_id); LOG_INFO(message);
             }
         }
     }
@@ -1232,26 +1231,26 @@ String TableEntry::GetPathNameTail() const {
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
-    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-
-    // Add segment that is not deprecated
-    for (const auto &segment_pair : this->segment_map_) {
-        result->Insert(segment_pair.second.get(), txn);
-    }
+    //    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    //
+    //    // Add segment that is not deprecated
+    //    for (const auto &segment_pair : this->segment_map_) {
+    //        result->Insert(segment_pair.second.get(), txn);
+    //    }
 
     return result;
 }
 
 SharedPtr<IndexIndex> TableEntry::GetIndexIndex(Txn *txn) {
     SharedPtr<IndexIndex> result = MakeShared<IndexIndex>();
-    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-        if (!status.ok()) {
-            continue;
-        }
-        result->Insert(table_index_entry, txn);
-    }
+    //    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    //    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
+    //        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+    //        if (!status.ok()) {
+    //            continue;
+    //        }
+    //        result->Insert(table_index_entry, txn);
+    //    }
     return result;
 }
 
@@ -1585,53 +1584,49 @@ Vector<String> TableEntry::GetFilePath(Txn *txn) const {
     return res;
 }
 
-SharedPtr<IndexReader> TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
+SharedPtr<IndexReader> TableEntry::GetFullTextIndexReader(Txn *txn) { return nullptr; }
 
 void TableEntry::InvalidateFullTextIndexCache() {
     LOG_DEBUG(fmt::format("Invalidate fulltext index cache: table_name: {}", *table_name_));
-    fulltext_column_index_cache_.Invalidate();
 }
 
 void TableEntry::InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry) {
-    const IndexBase *index_base = table_index_entry->index_base();
-    String index_name = *table_index_entry->GetIndexName();
-    String column_name = index_base->column_name();
-    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}, column_name: {}, table_name: {}", index_name, column_name, *table_name_));
-    ColumnID column_id = GetColumnIdByName(column_name);
-    fulltext_column_index_cache_.InvalidateColumn(column_id, column_name);
+    //    const IndexBase *index_base = table_index_entry->index_base();
+    //    String index_name = *table_index_entry->GetIndexName();
+    //    String column_name = index_base->column_name();
+    //    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}, column_name: {}, table_name: {}", index_name, column_name, *table_name_));
+    //    ColumnID column_id = GetColumnIdByName(column_name);
 }
 
 void TableEntry::InvalidateFullTextSegmentIndexCache(SegmentIndexEntry *segment_index_entry) {
-    SegmentID segment_id = segment_index_entry->segment_id();
-    TableIndexEntry *table_index_entry = segment_index_entry->table_index_entry();
-    const IndexBase *index_base = table_index_entry->index_base();
-    String index_name = *table_index_entry->GetIndexName();
-    String column_name = index_base->column_name();
-    LOG_DEBUG(fmt::format("Invalidate fulltext segment index cache: {}, column_name: {}, table_name: {}, segment_id: {}",
-                          index_name,
-                          column_name,
-                          *table_name_,
-                          segment_id));
-    ColumnID column_id = GetColumnIdByName(column_name);
-    fulltext_column_index_cache_.InvalidateSegmentColumn(column_id, segment_id);
+    //    SegmentID segment_id = segment_index_entry->segment_id();
+    //    TableIndexEntry *table_index_entry = segment_index_entry->table_index_entry();
+    //    const IndexBase *index_base = table_index_entry->index_base();
+    //    String index_name = *table_index_entry->GetIndexName();
+    //    String column_name = index_base->column_name();
+    //    LOG_DEBUG(fmt::format("Invalidate fulltext segment index cache: {}, column_name: {}, table_name: {}, segment_id: {}",
+    //                          index_name,
+    //                          column_name,
+    //                          *table_name_,
+    //                          segment_id));
+    //    ColumnID column_id = GetColumnIdByName(column_name);
 }
 
 void TableEntry::InvalidateFullTextChunkIndexCache(ChunkIndexEntry *chunk_index_entry) {
-    ChunkID chunk_id = chunk_index_entry->chunk_id_;
-    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
-    SegmentID segment_id = segment_index_entry->segment_id();
-    TableIndexEntry *table_index_entry = segment_index_entry->table_index_entry();
-    const IndexBase *index_base = table_index_entry->index_base();
-    String index_name = *table_index_entry->GetIndexName();
-    String column_name = index_base->column_name();
-    LOG_DEBUG(fmt::format("Invalidate fulltext chunk index cache: {}, column_name: {}, table_name: {}, segment_id: {}, chunk_id: {}",
-                          index_name,
-                          column_name,
-                          *table_name_,
-                          segment_id,
-                          chunk_id));
-    ColumnID column_id = GetColumnIdByName(column_name);
-    fulltext_column_index_cache_.InvalidateChunkColumn(column_id, segment_id, chunk_id);
+    //    ChunkID chunk_id = chunk_index_entry->chunk_id_;
+    //    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    //    SegmentID segment_id = segment_index_entry->segment_id();
+    //    TableIndexEntry *table_index_entry = segment_index_entry->table_index_entry();
+    //    const IndexBase *index_base = table_index_entry->index_base();
+    //    String index_name = *table_index_entry->GetIndexName();
+    //    String column_name = index_base->column_name();
+    //    LOG_DEBUG(fmt::format("Invalidate fulltext chunk index cache: {}, column_name: {}, table_name: {}, segment_id: {}, chunk_id: {}",
+    //                          index_name,
+    //                          column_name,
+    //                          *table_name_,
+    //                          segment_id,
+    //                          chunk_id));
+    //    ColumnID column_id = GetColumnIdByName(column_name);
 }
 
 Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
