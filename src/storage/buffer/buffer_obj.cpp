@@ -256,7 +256,7 @@ void BufferObj::PickForCleanup() {
     }
 }
 
-Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
+Status BufferObj::CleanupFile() const {
     if (status_ != BufferStatus::kClean) {
         String error_message = "Invalid status";
         UnrecoverableError(error_message);
@@ -265,7 +265,7 @@ Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
         String error_message = "Buffer is not freed.";
         UnrecoverableError(error_message);
     }
-    return file_worker_->CleanupFile(kv_instance);
+    return file_worker_->CleanupFile();
 }
 
 void BufferObj::CleanupTempFile() const {

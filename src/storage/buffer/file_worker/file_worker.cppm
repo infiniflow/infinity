@@ -64,7 +64,7 @@ public:
     // Get an absolute file path. As key of a buffer handle.
     String GetFilePath() const;
 
-    Status CleanupFile(KVInstance *kv_instance) const;
+    Status CleanupFile() const;
 
     void CleanupTempFile() const;
 
