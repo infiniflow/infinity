@@ -20,21 +20,25 @@ import stl;
 import buffer_manager;
 import txn_state;
 import default_values;
-import txn_context;
-import txn_manager;
 import status;
 
 namespace infinity {
 
 class TxnAllocator;
-class TxnCommitter;
 class TxnAllocatorTask;
-class TxnCommitterTask;
 class WalManager;
 class Storage;
 class NewTxn;
 class KVStore;
 struct WalEntry;
+class SystemCache;
+struct TxnContext;
+struct BGTaskInfo;
+
+export struct TxnInfo {
+    TransactionID txn_id_;
+    SharedPtr<String> txn_text_;
+};
 
 export class NewTxnManager {
 public:
@@ -46,20 +50,14 @@ public:
 
     void Stop();
 
-    bool Stopped();
-
     SharedPtr<NewTxn> BeginTxnShared(UniquePtr<String> txn_text, TransactionType txn_type);
     NewTxn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
     UniquePtr<NewTxn> BeginReplayTxn(const SharedPtr<WalEntry> &replay_entries);
     UniquePtr<NewTxn> BeginRecoveryTxn();
 
-    bool SetTxnCheckpoint(NewTxn *txn);
-
     NewTxn *GetTxn(TransactionID txn_id) const;
 
     TxnState GetTxnState(TransactionID txn_id) const;
-
-    bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     inline void Lock() { locker_.lock(); }
 
@@ -70,8 +68,6 @@ public:
     TxnTimeStamp GetReadCommitTS(NewTxn *txn);
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
-
-    TxnTimeStamp GetReplayWriteCommitTS(NewTxn *txn);
 
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
@@ -96,13 +92,15 @@ public:
     // This function is only used for unit test.
     void SetNewSystemTS(TxnTimeStamp new_system_ts);
 
+    void SetCurrentTransactionID(TransactionID latest_transaction_id);
+
+    TransactionID current_transaction_id() const { return current_transaction_id_; }
+
     TxnTimeStamp CurrentTS() const { return current_ts_; }
 
     TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
 
-    TxnTimeStamp GetNewTimeStamp();
-
-    TxnTimeStamp GetCleanupScanTS1();
+    TxnTimeStamp GetOldestAliveTS();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
 
@@ -115,16 +113,16 @@ public:
     WalManager *wal_manager() const { return wal_mgr_; }
     Storage *storage() const { return storage_; }
 
-    void CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id);
+    void CommitBottom(NewTxn *txn);
 
 private:
-    void CleanupTxn(NewTxn *txn, bool commit);
+    void UpdateCatalogCache(NewTxn *txn);
+
+    void CleanupTxn(NewTxn *txn);
+
+    void CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    u64 NextSequence() { return ++sequence_; }
-
-    bool InCheckpointProcess(TxnTimeStamp commit_ts);
-
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 
@@ -142,7 +140,9 @@ public:
 
     void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
-    void SubmitForCommit(const SharedPtr<TxnCommitterTask> &txn_committer_task);
+    void SetSystemCache();
+
+    void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr);
 
 private:
     mutable std::mutex locker_{};
@@ -155,30 +155,38 @@ private:
 
     KVStore *kv_store_;
 
-    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
-    Deque<SharedPtr<NewTxn>> check_txns_; //
+    Map<TxnTimeStamp, u64> begin_txn_map_{};               // Used for clean up TS and txn conflict check txns
+    Map<TxnTimeStamp, SharedPtr<NewTxn>> check_txn_map_{}; // sorted by commit ts
+    Map<TxnTimeStamp, SharedPtr<NewTxn>> bottom_txns_;     // sorted by commit ts
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
+    TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
+    TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
-    Atomic<TxnTimeStamp> ckp_begin_ts_ =
-        UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
+    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
     atomic_bool is_running_{false};
-    bool enable_compaction_{};
-
-    u64 sequence_{};
 
     Atomic<u64> total_committed_txn_count_{0};
     Atomic<u64> total_rollbacked_txn_count_{0};
+
+    SharedPtr<SystemCache> system_cache_{};
 
 private:
     // Also protected by locker_, to contain append / import / create index / dump mem index txn.
     Map<TxnTimeStamp, SharedPtr<TxnAllocatorTask>> allocator_map_{};
     SharedPtr<TxnAllocator> txn_allocator_{};
-    SharedPtr<TxnCommitter> txn_committer_{};
+
+public:
+    // Background task info list
+    void AddTaskInfo(SharedPtr<BGTaskInfo> task_info);
+    Vector<SharedPtr<BGTaskInfo>> GetTaskInfoList() const;
+
+private:
+    mutable std::mutex task_lock_{};
+    Deque<SharedPtr<BGTaskInfo>> task_info_list_{};
 };
 
 } // namespace infinity

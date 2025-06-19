@@ -26,12 +26,11 @@ import secondary_index_pgm;
 import logical_type;
 import internal_types;
 import data_type;
-import segment_entry;
 import buffer_handle;
 import logger;
 
 namespace infinity {
-struct ChunkIndexEntry;
+
 class BufferObj;
 
 template <typename T>
@@ -167,8 +166,6 @@ public:
     virtual void ReadIndexInner(LocalFileHandle &file_handle) = 0;
 
     virtual void InsertData(const void *ptr) = 0;
-
-    virtual void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks) = 0;
 
     virtual void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) = 0;
 };

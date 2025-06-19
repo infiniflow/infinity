@@ -24,6 +24,7 @@ import kv_store;
 import third_party;
 import infinity_exception;
 import meta_info;
+import default_values;
 
 namespace infinity {
 
@@ -37,6 +38,14 @@ Status DBMeeta::InitSet(const String *comment) {
             return status;
         }
     }
+
+    // Create next table id;
+    String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
+    Status status = kv_instance_.Put(next_table_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -58,6 +67,13 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
 
     String db_comment_key = GetDBTag("comment");
     status = kv_instance_.Delete(db_comment_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Delete table comment
+    String db_next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
+    status = kv_instance_.Delete(db_next_table_id_key);
     if (!status.ok()) {
         return status;
     }
@@ -101,6 +117,42 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     return Status::OK();
 }
 
+Status DBMeeta::GetTableName(const String &table_id_str, String &table_key, String &table_name) const {
+    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);
+
+    size_t start, end;
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(db_table_prefix);
+    while (iter->Valid() && iter->Key().starts_with(db_table_prefix)) {
+        table_key = iter->Key().ToString();
+        start = db_table_prefix.size();
+        end = table_key.find('|', start);
+        if (table_id_str == iter->Value().ToString()) {
+            table_name = table_key.substr(start, end - start);
+            return Status::OK();
+        }
+        iter->Next();
+    }
+    table_key = "";
+    return Status::TableNotExist(table_id_str);
+}
+
+Status DBMeeta::GetDBName(const String &db_id_str, String &db_name) const {
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(KeyEncode::kCatalogDbHeader);
+    while (iter->Valid() && iter->Key().starts_with(KeyEncode::kCatalogDbHeader)) {
+        String key_str = iter->Key().ToString();
+        size_t start = KeyEncode::kCatalogDbHeader.size();
+        size_t end = key_str.find('|', start);
+        if (db_id_str == iter->Value().ToString()) {
+            db_name = key_str.substr(start, end - start);
+            return Status::OK();
+        }
+        iter->Next();
+    }
+    return Status::DBNotExist(db_id_str);
+}
+
 Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
     Status status;
 
@@ -114,6 +166,23 @@ Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
     db_info.db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id_str_));
 
     return Status::OK();
+}
+
+Tuple<String, Status> DBMeeta::GetNextTableID() {
+    String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
+    String next_table_id_str;
+    Status status = kv_instance_.Get(next_table_id_key, next_table_id_str);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to get next table id from kv store, key: {}, cause: {}", next_table_id_key, status.message()));
+    }
+    u64 next_table_id = std::stoull(next_table_id_str);
+    ++next_table_id;
+    String new_next_table_id_str = std::to_string(next_table_id);
+    status = kv_instance_.Put(next_table_id_key, new_next_table_id_str);
+    if (!status.ok()) {
+        return {"", status};
+    }
+    return {next_table_id_str, Status::OK()};
 }
 
 Status DBMeeta::LoadComment() {
@@ -149,5 +218,14 @@ Status DBMeeta::LoadTableIDs() {
 }
 
 String DBMeeta::GetDBTag(const String &tag) const { return KeyEncode::CatalogDbTagKey(db_id_str_, tag); }
+
+Status DBMeeta::SetNextTableID(const String &table_id_str) {
+    String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
+    Status status = kv_instance_.Put(next_table_id_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
 
 } // namespace infinity

@@ -1,0 +1,106 @@
+---
+sidebar_position: 1
+slug: /
+---
+
+# Quickstart
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+A quickstart guide.
+
+## Prerequisites
+
+- CPU: x86_64 with AVX2 support.
+- OS:
+  - Linux with glibc 2.17+.
+  - Windows 10+ with WSL/WSL2.
+  - MacOS
+- Python: Python 3.10+.
+
+## Deploy Infinity using Docker 
+
+This section provides guidance on deploying the Infinity database using Docker, with the client and server as separate processes. 
+
+### Install Infinity server
+
+<Tabs
+  defaultValue="linux_mac"
+  values={[
+    {label: 'Linux x86_64 & MacOS x86_64', value: 'linux_mac'},
+    {label: 'Windows', value: 'windows'},
+  ]}>
+   <TabItem value="linux_mac">
+
+```bash
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+docker pull infiniflow/infinity:nightly
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+```
+  </TabItem>
+  <TabItem value="windows">
+
+If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using Docker. Suppose you've installed Ubuntu in WSL2:
+
+1. Follow [this](https://learn.microsoft.com/en-us/windows/wsl/systemd) to enable systemd inside WSL2.
+2. Install docker-ce according to the [instructions here](https://docs.docker.com/engine/install/ubuntu).
+3. If you have installed Docker Desktop version 4.29+ for Windows: **Settings** **>** **Features in development**, then select **Enable host networking**.
+4. Pull the Docker image and start Infinity: 
+
+   ```bash
+   sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+   docker pull infiniflow/infinity:nightly
+   docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+   ```
+
+  </TabItem>
+</Tabs>
+
+### Install Infinity client
+
+```
+pip install infinity-sdk==0.6.0.dev3
+```
+
+### Run a vector search
+
+```python
+import infinity
+
+infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+db_object = infinity_object.get_database("default_db")
+table_object = db_object.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+res = table_object.output(["*"])
+                  .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                  .to_pl()
+print(res)
+```
+
+:::tip NOTE
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+:::
+
+:::info NOTE
+If you wish to deploy Infinity *using binary* with the server and client as separate processes, see the [Deploy infinity using binary](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+:::
+
+## Build from Source
+
+If you wish to build Infinity from source, see the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
+
+### Try our Python examples
+
+Try the following links to explore practical examples of using Infinity in Python:
+
+- [Create table, insert data, and search](https://github.com/infiniflow/infinity/blob/main/example/simple_example.py)
+- [Import file and export data](https://github.com/infiniflow/infinity/blob/main/example/import_data.py)
+- [Delete or update data](https://github.com/infiniflow/infinity/blob/main/example/delete_update_data.py)
+- [Conduct a vector search](https://github.com/infiniflow/infinity/blob/main/example/vector_search.py)
+- [Conduct a full-text search](https://github.com/infiniflow/infinity/blob/main/example/fulltext_search.py)
+- [Conduct a hybrid search](https://github.com/infiniflow/infinity/blob/main/example/hybrid_search.py)
+
+## Python API reference
+
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).

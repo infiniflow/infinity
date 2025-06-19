@@ -83,9 +83,9 @@ import match_sparse_expr;
 import fusion_expr;
 import data_type;
 import expression_type;
-import catalog;
 import meta_info;
 import column_vector;
+import new_catalog;
 
 namespace infinity {
 
@@ -164,7 +164,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
     auto lower_ptr = BuildExpression(*expr.lower_bound_, bind_context_ptr, depth, false);
     auto upper_ptr = BuildExpression(*expr.upper_bound_, bind_context_ptr, depth, false);
 
-    Catalog *catalog = query_context_->storage()->catalog();
+    NewCatalog *catalog = query_context_->storage()->new_catalog();
     SharedPtr<FunctionExpression> left_function_expr{nullptr}, right_function_expr{nullptr};
 
     {
@@ -173,7 +173,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
         arguments.reserve(2);
         arguments.emplace_back(value_ptr);
         arguments.emplace_back(lower_ptr);
-        SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, left_func);
+        SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, left_func);
         CheckFuncType(function_set_ptr->type_);
         auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -186,7 +186,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
         arguments.reserve(2);
         arguments.emplace_back(value_ptr);
         arguments.emplace_back(upper_ptr);
-        SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, left_func);
+        SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, left_func);
         CheckFuncType(function_set_ptr->type_);
         auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -199,7 +199,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
     arguments.emplace_back(left_function_expr);
     arguments.emplace_back(right_function_expr);
 
-    SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, and_func);
+    SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, and_func);
     CheckFuncType(function_set_ptr->type_);
     auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
     ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
@@ -449,7 +449,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         return special_function.value();
     }
 
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), expr);
 
     CheckFuncType(function_set_ptr->type_);
 
@@ -472,7 +472,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
     }
 
     Vector<SharedPtr<BaseExpression>> arguments;
-    if(expr.arguments_ != nullptr) {
+    if (expr.arguments_ != nullptr) {
         arguments.reserve(expr.arguments_->size());
         for (const auto *arg_expr : *expr.arguments_) {
             // The argument expression isn't root expression.
@@ -547,8 +547,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, 
         SharedPtr<BaseExpression> left_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
 
         String function_name = "=";
-        Catalog *catalog = query_context_->storage()->catalog();
-        SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, function_name);
+        NewCatalog *catalog = query_context_->storage()->new_catalog();
+        SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
         auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
         for (const WhenThen *when_then_expr : *expr.case_check_array_) {
@@ -1101,7 +1101,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const FunctionExpr &
 }
 
 Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
-    auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
+    auto [special_function_ptr, status] = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->new_catalog(), expr.func_name_);
     if (status.ok()) {
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistanceFactors:

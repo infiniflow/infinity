@@ -8,9 +8,11 @@ log_level = "trace"
 log_to_stdout = true
 
 [storage]
+persistence_dir = ""
 mem_index_capacity = 1048576
 
 [buffer]
 [wal]
+full_checkpoint_interval = "0s"
 
 [resource]

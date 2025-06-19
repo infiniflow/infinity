@@ -37,16 +37,12 @@ import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
 import physical_create_index_prepare;
-import physical_create_index_do;
 import physical_sort;
 import physical_top;
 import physical_merge_top;
 import physical_match_tensor_scan;
 import physical_match_sparse_scan;
 import physical_compact;
-import physical_compact_index_prepare;
-import physical_compact_index_do;
-import physical_compact_finish;
 
 import global_block_id;
 import knn_expression;
@@ -69,10 +65,9 @@ import aggregate_expression;
 import expression_state;
 import column_def;
 import explain_statement;
-import table_entry;
-import segment_entry;
 import global_resource_usage;
 import block_index;
+import segment_entry;
 
 import table_index_meeta;
 import segment_index_meta;
@@ -84,13 +79,6 @@ template <typename OperatorStateType>
 UniquePtr<OperatorState> MakeTaskStateTemplate(PhysicalOperator *physical_op) {
 
     return MakeUnique<OperatorStateType>();
-}
-
-UniquePtr<OperatorState> MakeCreateIndexDoState(PhysicalCreateIndexDo *physical_create_index_do, FragmentTask *task, FragmentContext *fragment_ctx) {
-    UniquePtr<CreateIndexDoOperatorState> operator_state = MakeUnique<CreateIndexDoOperatorState>();
-    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    operator_state->create_index_shared_data_ = parallel_materialize_fragment_ctx->create_index_shared_data_.get();
-    return operator_state;
 }
 
 UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_scan, FragmentTask *task) {
@@ -202,42 +190,6 @@ UniquePtr<OperatorState> MakeCompactState(PhysicalCompact *physical_compact, Fra
     auto compact_operator_state =
         MakeUnique<CompactOperatorState>(std::move(compact_source_state->segment_groups_), parallel_materialize_fragment_ctx->compact_state_data_);
     return compact_operator_state;
-}
-
-UniquePtr<OperatorState>
-MakeCompactIndexPrepareState(PhysicalCompactIndexPrepare *physical_compact_index_prepare, FragmentTask *task, FragmentContext *fragment_ctx) {
-    if (fragment_ctx->ContextType() != FragmentType::kSerialMaterialize) {
-        String error_message = "Compact index prepare operator should be in parallel materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
-    auto compact_index_prepare_operator_state =
-        MakeUnique<CompactIndexPrepareOperatorState>(serial_materialize_fragment_ctx->compact_state_data_,
-                                                     serial_materialize_fragment_ctx->create_index_shared_data_array_);
-    return compact_index_prepare_operator_state;
-}
-
-UniquePtr<OperatorState>
-MakeCompactIndexDoState(PhysicalCompactIndexDo *physical_compact_index_do, FragmentTask *task, FragmentContext *fragment_ctx) {
-    if (fragment_ctx->ContextType() != FragmentType::kParallelMaterialize) {
-        String error_message = "Compact index do operator should be in parallel materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    auto compact_index_do_operator_state =
-        MakeUnique<CompactIndexDoOperatorState>(parallel_materialize_fragment_ctx->compact_state_data_,
-                                                parallel_materialize_fragment_ctx->create_index_shared_data_array_);
-    return compact_index_do_operator_state;
-}
-
-UniquePtr<OperatorState> MakeCompactFinishState(PhysicalCompactFinish *physical_compact_finish, FragmentContext *fragment_ctx) {
-    if (fragment_ctx->ContextType() != FragmentType::kSerialMaterialize) {
-        String error_message = "Compact finish operator should be in serial materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
-    auto compact_finish_operator_state = MakeUnique<CompactFinishOperatorState>(serial_materialize_fragment_ctx->compact_state_data_);
-    return compact_finish_operator_state;
 }
 
 UniquePtr<OperatorState> MakeAggregateState(PhysicalAggregate *physical_aggregate, FragmentTask *task) {
@@ -428,13 +380,6 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kCreateIndexPrepare: {
             return MakeTaskStateTemplate<CreateIndexPrepareOperatorState>(physical_ops[operator_id]);
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            auto *physical_create_index_do = static_cast<PhysicalCreateIndexDo *>(physical_ops[operator_id]);
-            return MakeCreateIndexDoState(physical_create_index_do, task, fragment_ctx);
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            return MakeTaskStateTemplate<CreateIndexFinishOperatorState>(physical_ops[operator_id]);
-        }
         case PhysicalOperatorType::kCreateCollection: {
             return MakeTaskStateTemplate<CreateCollectionOperatorState>(physical_ops[operator_id]);
         }
@@ -466,18 +411,6 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             auto *physical_compact = static_cast<PhysicalCompact *>(physical_ops[operator_id]);
             return MakeCompactState(physical_compact, task, fragment_ctx);
         }
-        case PhysicalOperatorType::kCompactIndexPrepare: {
-            auto *physical_compact_index_prepare = static_cast<PhysicalCompactIndexPrepare *>(physical_ops[operator_id]);
-            return MakeCompactIndexPrepareState(physical_compact_index_prepare, task, fragment_ctx);
-        }
-        case PhysicalOperatorType::kCompactIndexDo: {
-            auto *physical_compact_index_do = static_cast<PhysicalCompactIndexDo *>(physical_ops[operator_id]);
-            return MakeCompactIndexDoState(physical_compact_index_do, task, fragment_ctx);
-        }
-        case PhysicalOperatorType::kCompactFinish: {
-            auto *physical_compact_finish = static_cast<PhysicalCompactFinish *>(physical_ops[operator_id]);
-            return MakeCompactFinishState(physical_compact_finish, fragment_ctx);
-        }
         case PhysicalOperatorType::kExplain: {
             return MakeTaskStateTemplate<ExplainOperatorState>(physical_ops[operator_id]);
         }
@@ -495,6 +428,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         }
         case PhysicalOperatorType::kReadCache: {
             return MakeTaskStateTemplate<ReadCacheState>(physical_ops[operator_id]);
+        }
+        case PhysicalOperatorType::kCheck: {
+            return MakeTaskStateTemplate<CheckOperatorState>(physical_ops[operator_id]);
         }
         default: {
             String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type()));
@@ -721,71 +657,29 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     SizeT task_n = knn_scan_operator->TaskletCount();
     KnnExpression *knn_expr = knn_scan_operator->knn_expression_.get();
 
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-
-    if (use_new_catalog) {
-        switch (fragment_context->ContextType()) {
-            case FragmentType::kSerialMaterialize: {
-                SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-                serial_materialize_fragment_ctx->knn_scan_shared_data_ =
-                    MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                  std::move(knn_scan_operator->block_metas_),
-                                                  std::move(knn_scan_operator->table_index_meta_),
-                                                  std::move(knn_scan_operator->segment_index_metas_),
-                                                  std::move(knn_expr->opt_params_),
-                                                  knn_expr->topn_,
-                                                  knn_expr->dimension_,
-                                                  1,
-                                                  knn_scan_operator->real_knn_query_embedding_ptr_,
-                                                  knn_scan_operator->real_knn_query_elem_type_,
-                                                  knn_expr->distance_type_);
-                break;
-            }
-            case FragmentType::kParallelMaterialize: {
-                ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
-                parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
-                    MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                  std::move(knn_scan_operator->block_metas_),
-                                                  std::move(knn_scan_operator->table_index_meta_),
-                                                  std::move(knn_scan_operator->segment_index_metas_),
-                                                  std::move(knn_expr->opt_params_),
-                                                  knn_expr->topn_,
-                                                  knn_expr->dimension_,
-                                                  1,
-                                                  knn_scan_operator->real_knn_query_embedding_ptr_,
-                                                  knn_scan_operator->real_knn_query_elem_type_,
-                                                  knn_expr->distance_type_);
-                break;
-            }
-            default: {
-                String error_message = "Invalid fragment type.";
-                UnrecoverableError(error_message);
-            }
-        }
-        return task_n;
-    }
     switch (fragment_context->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-            serial_materialize_fragment_ctx->knn_scan_shared_data_ =
-                MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              std::move(knn_scan_operator->block_column_entries_),
-                                              std::move(knn_scan_operator->index_entries_),
-                                              std::move(knn_expr->opt_params_),
-                                              knn_expr->topn_,
-                                              knn_expr->dimension_,
-                                              1,
-                                              knn_scan_operator->real_knn_query_embedding_ptr_,
-                                              knn_scan_operator->real_knn_query_elem_type_,
-                                              knn_expr->distance_type_);
+            serial_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                                                                   std::move(knn_scan_operator->block_metas_),
+                                                                                                   std::move(knn_scan_operator->table_index_meta_),
+                                                                                                   std::move(knn_scan_operator->segment_index_metas_),
+                                                                                                   std::move(knn_expr->opt_params_),
+                                                                                                   knn_expr->topn_,
+                                                                                                   knn_expr->dimension_,
+                                                                                                   1,
+                                                                                                   knn_scan_operator->real_knn_query_embedding_ptr_,
+                                                                                                   knn_scan_operator->real_knn_query_elem_type_,
+                                                                                                   knn_expr->distance_type_);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              std::move(knn_scan_operator->block_column_entries_),
-                                              std::move(knn_scan_operator->index_entries_),
+                                              std::move(knn_scan_operator->block_metas_),
+                                              std::move(knn_scan_operator->table_index_meta_),
+                                              std::move(knn_scan_operator->segment_index_metas_),
                                               std::move(knn_expr->opt_params_),
                                               knn_expr->topn_,
                                               knn_expr->dimension_,
@@ -802,16 +696,6 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     }
 
     return task_n;
-}
-
-SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index_do_operator, FragmentContext *fragment_ctx) {
-    auto *table_ref = create_index_do_operator->base_table_ref_.get();
-    // FIXME: to create index on unsealed_segment
-    SizeT segment_cnt = table_ref->block_index_->SegmentCount();
-
-    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    parallel_materialize_fragment_ctx->create_index_shared_data_ = MakeUnique<CreateIndexSharedData>(table_ref->block_index_.get());
-    return segment_cnt;
 }
 
 SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentContext *fragment_context, FragmentContext *parent_context) {
@@ -841,59 +725,6 @@ SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentCont
     auto &compact_state_data = parent_serial_materialize_fragment_ctx->compact_state_data_;
     parallel_materialize_fragment_ctx->compact_state_data_ = compact_state_data;
     return task_n;
-}
-
-SizeT InitCompactIndexPrepareFragmentContext(PhysicalCompactIndexPrepare *compact_index_prepare_operator,
-                                             FragmentContext *fragment_context,
-                                             FragmentContext *parent_context) {
-    SizeT task_n = compact_index_prepare_operator->TaskletCount();
-    if (fragment_context->ContextType() != FragmentType::kSerialMaterialize) {
-        String error_message = "Compact index prepare operator should be in parallel materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-    if (parent_context->ContextType() == FragmentType::kSerialMaterialize) {
-        auto *parent_serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(parent_context);
-        serial_materialize_fragment_ctx->compact_state_data_ = parent_serial_materialize_fragment_ctx->compact_state_data_;
-    } else {
-        auto *parent_parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(parent_context);
-        serial_materialize_fragment_ctx->compact_state_data_ = parent_parallel_materialize_fragment_ctx->compact_state_data_;
-        serial_materialize_fragment_ctx->create_index_shared_data_array_ = parent_parallel_materialize_fragment_ctx->create_index_shared_data_array_;
-    }
-
-    return task_n;
-}
-
-void InitCompactIndexDoFragmentContext(PhysicalCompactIndexDo *compact_index_do_operator,
-                                       FragmentContext *fragment_context,
-                                       FragmentContext *parent_context) {
-    if (fragment_context->ContextType() != FragmentType::kParallelMaterialize) {
-        String error_message = "Compact index do operator should be in parallel materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
-    if (parent_context->ContextType() != FragmentType::kSerialMaterialize) {
-        String error_message = "Compact index do operator parent should be in serial materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *parent_serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(parent_context);
-    parallel_materialize_fragment_ctx->compact_state_data_ = parent_serial_materialize_fragment_ctx->compact_state_data_;
-
-    auto *table_ref = compact_index_do_operator->base_table_ref_.get();
-    SizeT index_size = table_ref->index_index_->index_snapshots_vec_.size();
-    parallel_materialize_fragment_ctx->create_index_shared_data_array_ = MakeShared<Vector<UniquePtr<CreateIndexSharedData>>>();
-    for (SizeT i = 0; i < index_size; ++i) {
-        parallel_materialize_fragment_ctx->create_index_shared_data_array_->emplace_back(MakeUnique<CreateIndexSharedData>());
-    }
-}
-
-void InitCompactFinishFragmentContext(PhysicalCompactFinish *compact_finish_operator, FragmentContext *fragment_context) {
-    if (fragment_context->ContextType() != FragmentType::kSerialMaterialize) {
-        String error_message = "Compact finish operator should be in serial materialized fragment.";
-        UnrecoverableError(error_message);
-    }
-    auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-    serial_materialize_fragment_ctx->compact_state_data_ = MakeShared<CompactStateData>(compact_finish_operator->base_table_ref_->table_info_);
 }
 
 void FragmentContext::MakeSourceState(i64 parallel_count) {
@@ -977,17 +808,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             Vector<Vector<Vector<SegmentEntry *>>> segment_groups_list = physical_compact->PlanCompact(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<CompactSourceState>(std::move(segment_groups_list[task_id]));
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexDo:
-        case PhysicalOperatorType::kCompactIndexDo: {
-            if (fragment_type_ != FragmentType::kParallelMaterialize) {
-                UnrecoverableError(
-                    fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
-            }
-            for (auto &task : tasks_) {
-                task->source_state_ = MakeUnique<EmptySourceState>();
             }
             break;
         }
@@ -1088,7 +908,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndexPrepare:
-        case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -1102,9 +921,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kOptimize:
         case PhysicalOperatorType::kFlush:
-        case PhysicalOperatorType::kCompactFinish:
-        case PhysicalOperatorType::kCompactIndexPrepare:
-        case PhysicalOperatorType::kReadCache: {
+        case PhysicalOperatorType::kReadCache:
+        case PhysicalOperatorType::kCheck: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -1215,7 +1033,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kExplain:
-        case PhysicalOperatorType::kShow: {
+        case PhysicalOperatorType::kShow:
+        case PhysicalOperatorType::kCheck: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -1329,16 +1148,12 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kCreateIndexPrepare: {
-            auto *create_index_prepare_operator = static_cast<const PhysicalCreateIndexPrepare *>(last_operator);
-            if (!create_index_prepare_operator->prepare_) {
-                tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
-                break;
-            }
+            tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
+            break;
         }
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kCompactIndexPrepare: {
+        case PhysicalOperatorType::kExport: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -1352,9 +1167,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo:
-        case PhysicalOperatorType::kCompact:
-        case PhysicalOperatorType::kCompactIndexDo: {
+        case PhysicalOperatorType::kCompact: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -1367,7 +1180,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kCreateTable:
-        case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -1377,8 +1189,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:
         case PhysicalOperatorType::kOptimize:
-        case PhysicalOperatorType::kFlush:
-        case PhysicalOperatorType::kCompactFinish: {
+        case PhysicalOperatorType::kFlush: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -1433,12 +1244,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
             parallel_count = 1;
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            const auto *create_index_do_operator = static_cast<const PhysicalCreateIndexDo *>(first_operator);
-            InitCreateIndexDoFragmentContext(create_index_do_operator, this);
-            parallel_count = std::max(parallel_count, (i64)1l);
-            break;
-        }
         case PhysicalOperatorType::kCompact: {
             auto *compact_operator = static_cast<PhysicalCompact *>(first_operator);
             SizeT task_n = InitCompactFragmentContext(compact_operator, this, parent_context);
@@ -1447,26 +1252,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
                 parallel_count = 1;
             }
             break;
-        }
-        case PhysicalOperatorType::kCompactIndexPrepare: {
-            auto *compact_index_prepare_operator = static_cast<PhysicalCompactIndexPrepare *>(first_operator);
-            SizeT task_n = InitCompactIndexPrepareFragmentContext(compact_index_prepare_operator, this, parent_context);
-            parallel_count = std::min(parallel_count, (i64)task_n);
-            if (parallel_count == 0) {
-                parallel_count = 1;
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCompactIndexDo: {
-            auto *compact_index_do_operator = static_cast<PhysicalCompactIndexDo *>(first_operator);
-            InitCompactIndexDoFragmentContext(compact_index_do_operator, this, parent_context);
-            parallel_count = std::max(parallel_count, (i64)1l);
-            break;
-        }
-        case PhysicalOperatorType::kCompactFinish: {
-            auto *compact_finish_operator = static_cast<PhysicalCompactFinish *>(first_operator);
-            InitCompactFinishFragmentContext(compact_finish_operator, this);
-            parallel_count = 1;
         }
         default: {
             break;

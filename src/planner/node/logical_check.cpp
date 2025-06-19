@@ -16,41 +16,47 @@ module;
 
 #include <sstream>
 
-module logical_compact_index;
+module logical_check;
 
 import stl;
+import internal_types;
+import infinity_exception;
 import column_binding;
-import data_type;
-import table_entry;
-import logical_type;
+import logger;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCompactIndex::GetColumnBindings() const { return {}; }
-
-SharedPtr<Vector<String>> LogicalCompactIndex::GetOutputNames() const {
-    auto result = MakeShared<Vector<String>>();
-    result->push_back("OK");
-    return result;
+String ToString(CheckStmtType type) {
+    switch (type) {
+        case CheckStmtType::kSystem:
+            return "Check system";
+        case CheckStmtType::kTable:
+            return "Check table";
+        case CheckStmtType::kInvalid: {
+            String error_message = "Invalid chunk scan type";
+            UnrecoverableError(error_message);
+        }
+    }
+    return {};
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalCompactIndex::GetOutputTypes() const {
-    auto result = MakeShared<Vector<SharedPtr<DataType>>>();
-    result->push_back(MakeShared<DataType>(LogicalType::kInteger));
-    return result;
-}
+Vector<ColumnBinding> LogicalCheck::GetColumnBindings() const { return {}; }
 
-String LogicalCompactIndex::ToString(i64 &space) const {
+SharedPtr<Vector<String>> LogicalCheck::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalCheck::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+
+String LogicalCheck::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "COMPACT INDEX";
-    auto *table_info = base_table_ref_->table_info_.get();
-    ss << *table_info->db_name_ << "." << *table_info->table_name_;
+    ss << String(space, ' ') << "-> "
+       << "Check: ";
     space += arrow_str.size();
+
     return ss.str();
 }
 

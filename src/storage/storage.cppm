@@ -15,31 +15,31 @@
 module;
 
 import stl;
-import config;
-import catalog;
-import txn_manager;
-import buffer_manager;
 import wal_manager;
-import object_storage_process;
 import log_file;
-import persistence_manager;
-import virtual_store;
 import status;
 
 export module storage;
 
 namespace infinity {
 
-class CleanupInfoTracer;
 class ResultCacheManager;
 class NewCatalog;
+class Catalog;
 class NewTxnManager;
+class TxnManager;
 class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;
 class CompactionProcessor;
+class DumpIndexProcessor;
+class MemIndexAppender;
 class BGTaskProcessor;
 class BGMemIndexTracer;
+class ObjectStorageProcess;
+class Config;
+class BufferManager;
+class PersistenceManager;
 
 export enum class ReaderInitPhase {
     kInvalid,
@@ -53,15 +53,11 @@ public:
 
     ~Storage();
 
-    [[nodiscard]] inline Catalog *catalog() noexcept { return catalog_.get(); }
-
     [[nodiscard]] inline NewCatalog *new_catalog() noexcept { return new_catalog_.get(); }
 
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
-
-    [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
 
     [[nodiscard]] inline NewTxnManager *new_txn_manager() const noexcept { return new_txn_mgr_.get(); }
 
@@ -77,7 +73,9 @@ public:
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
-    [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
+    [[nodiscard]] inline DumpIndexProcessor *dump_index_processor() const noexcept { return dump_index_processor_.get(); }
+
+    [[nodiscard]] inline MemIndexAppender *mem_index_appender() const noexcept { return mem_index_appender_.get(); }
 
     UniquePtr<KVInstance> KVInstance();
 
@@ -107,11 +105,8 @@ public:
     Status WriterToReader();
     Status UnInitFromWriter();
 
-    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void AttachCatalog(TxnTimeStamp checkpoint_ts);
     void RecoverMemIndex();
-    void LoadFullCheckpoint(const String &checkpoint_path);
-    void AttachDeltaCheckpoint(const String &checkpoint_path);
 
     Config *config() const { return config_ptr_; }
     ReaderInitPhase reader_init_phase() const { return reader_init_phase_; }
@@ -120,19 +115,18 @@ public:
 
 private:
     Config *config_ptr_{};
-    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<ObjectStorageProcess> object_storage_processor_{};
     UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<ResultCacheManager> result_cache_manager_{};
     UniquePtr<BufferManager> buffer_mgr_{};
-    UniquePtr<Catalog> catalog_{};
     UniquePtr<NewCatalog> new_catalog_{};
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
-    UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<NewTxnManager> new_txn_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
+    UniquePtr<DumpIndexProcessor> dump_index_processor_{};
+    UniquePtr<MemIndexAppender> mem_index_appender_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
     UniquePtr<KVStore> kv_store_{};
 

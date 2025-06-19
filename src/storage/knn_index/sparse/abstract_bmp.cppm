@@ -33,6 +33,7 @@ import buffer_handle;
 import base_memindex;
 import memindex_tracer;
 import table_index_entry;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -78,8 +79,6 @@ public:
     BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry);
 
     MemIndexTracerInfo GetInfo() const override;
-
-    TableIndexEntry *table_index_entry() const override;
 
 private:
     template <typename DataType, typename IndexType, BMPOwnMem OwnMem>
@@ -168,6 +167,8 @@ public:
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
     void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
 private:
     RowID begin_row_id_ = {};

@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     command_failed = False
     try:
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(run_command, cmd) for cmd in commands]
             for future in as_completed(futures):
                 try:

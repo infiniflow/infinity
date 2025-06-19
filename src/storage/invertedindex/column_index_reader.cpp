@@ -52,6 +52,7 @@ import mem_index;
 import kv_store;
 
 import new_catalog;
+import buffer_handle;
 
 namespace infinity {
 
@@ -112,7 +113,15 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
+        SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
+        Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        RowID ft_info_next_rowid = RowID(segment_index_meta.segment_id(), ft_info_ptr->ft_column_len_cnt_);
+
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -138,35 +147,43 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
 
             chunk_index_meta_infos_.emplace_back(
                 ColumnReaderChunkInfo{index_buffer, chunk_info_ptr->base_row_id_, u32(chunk_info_ptr->row_cnt_), chunk_id, segment_id});
+            if (chunk_info_ptr->base_row_id_ >= ft_info_next_rowid) {
+                // KV ft_info doesn't cover this chunk due to shutdown before checkpoint.
+                // NewCatalog::LoadFlushedChunkIndex1 isn't responsible to rectify it.
+                // So we need to rectify it here just before query.
+                // Refers to FullTextColumnLengthReader::SeekFile(RowID row_id)
+                u64 chunk_column_len_sum = 0;
+                BufferHandle chunk_buffer_handle = index_buffer->Load();
+                auto column_lengths = (const u32 *)chunk_buffer_handle.GetData();
+                for (SizeT i = 0; i < chunk_info_ptr->row_cnt_; i++) {
+                    chunk_column_len_sum += column_lengths[i];
+                }
+                status = segment_index_meta.UpdateFtInfo(chunk_column_len_sum, chunk_info_ptr->row_cnt_);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
         }
 
-        SharedPtr<MemoryIndexer> memory_indexer;
-        {
-            SharedPtr<MemIndex> mem_index;
-            Status status = segment_index_meta.GetMemIndex(mem_index);
-            if (!status.ok()) {
-                return status;
-            }
-            memory_indexer = mem_index->memory_indexer_;
-        }
-        if (memory_indexer && memory_indexer->GetDocCount() != 0) {
-            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
-            segment_readers_.push_back(std::move(segment_reader));
-            // for loading column length file
-            assert(memory_indexer_.get() == nullptr);
-            memory_indexer_ = memory_indexer;
-        }
-
-        SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
-        {
-            Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
-            if (!status.ok()) {
-                return status;
-            }
+        status = segment_index_meta.GetFtInfo(ft_info_ptr);
+        if (!status.ok()) {
+            return status;
         }
         column_len_sum += ft_info_ptr->ft_column_len_sum_;
         column_len_cnt += ft_info_ptr->ft_column_len_cnt_;
 
+        {
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            SharedPtr<MemoryIndexer> memory_indexer = mem_index == nullptr ? nullptr : mem_index->GetFulltextIndex();
+            if (memory_indexer && memory_indexer->GetDocCount() != 0) {
+                SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
+                segment_readers_.push_back(std::move(segment_reader));
+                // for loading column length file
+                memory_indexer_ = memory_indexer;
+                column_len_sum += memory_indexer_->GetColumnLengthSum();
+                column_len_cnt += memory_indexer_->GetDocCount();
+            }
+        }
         segment_index_ft_infos_.emplace(segment_id, std::move(ft_info_ptr));
     }
     if (column_len_cnt != 0) {
@@ -269,6 +286,7 @@ void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mut
 
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
     // TransactionID txn_id = txn->TxnID();
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
@@ -283,7 +301,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
         // result.column2analyzer_ = MakeShared<Map<String, String>>();
 
-        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance(), begin_ts);
+        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance(), begin_ts, commit_ts);
         Vector<String> *index_id_strs = nullptr;
         {
             Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
@@ -310,7 +328,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
             }
             auto column_index_map = (*index_reader->column_index_readers_)[column_id];
 
-            // assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
+            // assert(table_index_entry->GetFulltextSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
                 target_ts = begin_ts;

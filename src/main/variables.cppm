@@ -27,7 +27,6 @@ export enum class GlobalVariable {
     kSessionCount,            // global
     kBufferPoolUsage,         // global
     kSchedulePolicy,          // global
-    kDeltaLogCount,           // global
     kNextTxnID,               // global
     kBufferedObjectCount,     // global
     kUnusedBufferObjectCount, // global
@@ -44,7 +43,6 @@ export enum class GlobalVariable {
     kOpenFileCount,           // global
     kCPUUsage,                // global
     kJeProf,                  // global
-    kCleanupTrace,            // global
     kFollowerNum,             // global
     kResultCache,             // global
     kCacheResultCapacity,     // global

@@ -18,6 +18,7 @@ import base_test;
 import stl;
 import memindex_tracer;
 import base_memindex;
+import emvb_index_in_mem;
 import bg_task;
 import blocking_queue;
 import third_party;
@@ -27,6 +28,7 @@ import table_index_entry;
 import new_txn;
 import compilation_config;
 import infinity_context;
+import chunk_index_meta;
 
 using namespace infinity;
 
@@ -43,8 +45,6 @@ public:
         return MemIndexTracerInfo(index_name_, table_name_, db_name_, mem_used_, row_count_);
     }
 
-    TableIndexEntry *table_index_entry() const override { return nullptr; }
-
     void IncreaseMemoryUsage(SizeT usage, SizeT row_cnt);
 
     void Dump(SizeT &usage, SizeT &row_cnt) && {
@@ -55,6 +55,8 @@ public:
         row_count_ = 0;
         trace_ = false;
     }
+
+    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override {return ChunkIndexMetaInfo{"", {}, row_count_, 0};}
 
 public:
     SharedPtr<String> db_name_;
@@ -169,6 +171,8 @@ public:
 
     Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override { return {}; }
 
+    Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) override { return {}; }
+
     void HandleDump(UniquePtr<DumpIndexTask> task);
 
 private:
@@ -231,7 +235,8 @@ void TestMemIndexTracer::DumpRoutine() {
 class MemIndexTracerTest : public BaseTest {};
 
 TEST_F(MemIndexTracerTest, test1) {
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();
@@ -252,7 +257,8 @@ TEST_F(MemIndexTracerTest, test1) {
 }
 
 TEST_F(MemIndexTracerTest, test2) {
-
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::InfinityContext::instance().UnInit();
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();

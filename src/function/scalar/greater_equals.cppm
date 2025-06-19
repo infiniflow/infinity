@@ -20,8 +20,8 @@ export module greater_equals;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterGreaterEqualsFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

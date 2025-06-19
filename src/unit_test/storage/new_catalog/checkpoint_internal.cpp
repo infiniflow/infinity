@@ -48,7 +48,6 @@ import data_access_state;
 import kv_code;
 import kv_store;
 import new_txn;
-import new_txn_store;
 import buffer_obj;
 import buffer_handle;
 import secondary_index_in_mem;
@@ -67,9 +66,7 @@ import roaring_bitmap;
 import index_filter_evaluators;
 import index_emvb;
 import constant_expr;
-import txn;
 import infinity;
-import table_entry;
 
 using namespace infinity;
 

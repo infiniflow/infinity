@@ -21,7 +21,6 @@ module var_buffer;
 import stl;
 import infinity_exception;
 import third_party;
-import block_column_entry;
 import buffer_manager;
 import var_file_worker;
 import logger;

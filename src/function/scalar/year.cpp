@@ -14,7 +14,7 @@
 module;
 module year;
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import logical_type;
 import infinity_exception;
@@ -55,7 +55,7 @@ inline bool YearFunction::Run(TimestampT left, BigIntT &result) {
     return true;
 }
 
-void RegisterYearFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterYearFunction(NewCatalog *catalog_ptr) {
     String func_name = "year";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -78,7 +78,7 @@ void RegisterYearFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_timestamp_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

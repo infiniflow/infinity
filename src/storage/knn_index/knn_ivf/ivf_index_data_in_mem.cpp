@@ -20,11 +20,8 @@ module ivf_index_data_in_mem;
 import stl;
 import ivf_index_storage;
 import internal_types;
-import block_column_entry;
 import buffer_manager;
 import column_def;
-import chunk_index_entry;
-import segment_index_entry;
 import index_base;
 import index_ivf;
 import embedding_info;
@@ -42,10 +39,11 @@ import knn_scan_data;
 import ivf_index_util_func;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import infinity_context;
 import third_party;
 import buffer_obj;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 
@@ -71,6 +69,8 @@ u32 IVFIndexInMem::GetInputRowCount() const {
     std::shared_lock lock(rw_mutex_);
     return input_row_count_;
 }
+
+const ChunkIndexMetaInfo IVFIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, input_row_count_, 0}; }
 
 template <LogicalType column_logical_type, EmbeddingDataType embedding_data_type>
 struct InMemStorage;
@@ -121,7 +121,11 @@ public:
     MemIndexTracerInfo GetInfo() const override {
         const auto mem = MemoryUsed();
         if (segment_index_entry_ == nullptr) {
-            return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem, input_row_count_);
+            return MemIndexTracerInfo(MakeShared<String>(index_name_),
+                                      MakeShared<String>(table_name_),
+                                      MakeShared<String>(db_name_),
+                                      mem,
+                                      input_row_count_);
         }
 
         auto *table_index_entry = segment_index_entry_->table_index_entry();
@@ -132,8 +136,6 @@ public:
 
         return MemIndexTracerInfo(index_name, table_name, db_name, mem, input_row_count_);
     }
-
-    TableIndexEntry *table_index_entry() const override { return segment_index_entry_->table_index_entry(); }
 
     IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 embedding_dimension, SegmentIndexEntry *segment_index_entry)
         : IVFIndexInMem(begin_row_id, ivf_option, column_logical_type, embedding_data_type, embedding_dimension, segment_index_entry) {
@@ -154,7 +156,8 @@ public:
         InsertBlockData(block_offset, column_vector, row_offset, row_count);
     }
 
-    void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &column_vector, BlockOffset row_offset, BlockOffset row_count) override {
+    void
+    InsertBlockData(const SegmentOffset block_offset, const ColumnVector &column_vector, BlockOffset row_offset, BlockOffset row_count) override {
         std::unique_lock lock(rw_mutex_);
         SizeT mem1 = MemoryUsed();
         if (have_ivf_index_.test(std::memory_order_acquire)) {

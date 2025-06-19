@@ -312,19 +312,6 @@ export struct CreateIndexPrepareOperatorState : public OperatorState {
     UniquePtr<String> result_msg_{};
 };
 
-export struct CreateIndexDoOperatorState : public OperatorState {
-    inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
-
-    UniquePtr<String> result_msg_{};
-    CreateIndexSharedData *create_index_shared_data_;
-};
-
-export struct CreateIndexFinishOperatorState : public OperatorState {
-    inline explicit CreateIndexFinishOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexFinish) {}
-
-    UniquePtr<String> error_message_{};
-};
-
 // Create Collection
 export struct CreateCollectionOperatorState : public OperatorState {
     inline explicit CreateCollectionOperatorState() : OperatorState(PhysicalOperatorType::kCreateCollection) {}
@@ -421,33 +408,6 @@ export struct CompactOperatorState : public OperatorState {
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
-export struct CompactIndexPrepareOperatorState : public OperatorState {
-    CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
-                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data);
-    ~CompactIndexPrepareOperatorState();
-
-    SharedPtr<CompactStateData> compact_state_data_{};
-    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
-    SizeT create_index_idx_{};
-};
-
-export struct CompactIndexDoOperatorState : public OperatorState {
-    CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
-                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data);
-    ~CompactIndexDoOperatorState();
-
-    SharedPtr<CompactStateData> compact_state_data_{};
-    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
-    SizeT create_index_idx_{};
-};
-
-export struct CompactFinishOperatorState : public OperatorState {
-    CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data);
-    ~CompactFinishOperatorState();
-
-    SharedPtr<CompactStateData> compact_state_data_{};
-};
-
 // Unnest
 export struct UnnestOperatorState : public OperatorState {
     inline explicit UnnestOperatorState() : OperatorState(PhysicalOperatorType::kUnnest) {}
@@ -456,6 +416,13 @@ export struct UnnestOperatorState : public OperatorState {
 // Unnest
 export struct UnnestAggregateOperatorState : public OperatorState {
     inline explicit UnnestAggregateOperatorState() : OperatorState(PhysicalOperatorType::kUnnestAggregate) {}
+};
+
+//Check
+export struct CheckOperatorState : public OperatorState {
+    inline explicit CheckOperatorState() : OperatorState(PhysicalOperatorType::kCheck) {}
+
+    Vector<UniquePtr<DataBlock>> output_{};
 };
 
 // Source

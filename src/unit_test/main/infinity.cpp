@@ -38,6 +38,8 @@ class InfinityTest : public BaseTest {};
 
 TEST_F(InfinityTest, test1) {
     using namespace infinity;
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    infinity::Infinity::LocalUnInit();
     String path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);
@@ -251,6 +253,8 @@ TEST_F(InfinityTest, test1) {
 
 TEST_F(InfinityTest, test2) {
     using namespace infinity;
+    // Earlier cases may leave a dirty infinity instance. Destroy it first.
+    Infinity::LocalUnInit();
     String path = GetHomeDir();
     RemoveDbDirs();
     Infinity::LocalInit(path);
@@ -284,11 +288,6 @@ TEST_F(InfinityTest, test2) {
 
     {
         QueryResult result = infinity->ShowVariable("next_transaction_id", SetScope::kGlobal);
-        EXPECT_EQ(result.IsOk(), true);
-    }
-
-    {
-        QueryResult result = infinity->ShowVariable("delta_log_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 

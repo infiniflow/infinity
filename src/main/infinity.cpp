@@ -815,24 +815,6 @@ QueryResult Infinity::ShowLogs() {
     return result;
 }
 
-QueryResult Infinity::ShowDeltaCheckpoint() {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
-    show_statement->show_type_ = ShowStmtType::kDeltaLogs;
-    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
-    return result;
-}
-
-QueryResult Infinity::ShowFullCheckpoint() {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
-    show_statement->show_type_ = ShowStmtType::kCatalogs;
-    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
-    return result;
-}
-
 QueryResult Infinity::ShowObjects() {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
@@ -901,9 +883,11 @@ QueryResult Infinity::ShowFunction(const String &function_name) {
 QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *&insert_rows) {
     DeferFn free_insert_rows([&]() {
         if (insert_rows != nullptr) {
-            for (auto *insert_row : *insert_rows) {
-                delete insert_row;
-                insert_row = nullptr;
+            for (auto &insert_row : *insert_rows) {
+                if (insert_row != nullptr) {
+                    delete insert_row;
+                    insert_row = nullptr;
+                }
             }
             delete insert_rows;
             insert_rows = nullptr;
@@ -924,6 +908,7 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
         insert_statement->insert_rows_.emplace_back(insert_row_expr_ptr);
         insert_row_expr_ptr = nullptr;
     }
+    delete insert_rows;
     insert_rows = nullptr;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;

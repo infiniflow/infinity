@@ -53,8 +53,11 @@ CASE            { return CASE; }
 CAST            { return CAST; }
 CATALOG         { return CATALOG; }
 CATALOGS        { return CATALOGS; }
+CHECK           { return CHECK; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
+CLEAN           { return CLEAN; }
+DUMP            { return DUMP; }
 COLLECTION      { return COLLECTION; }
 COLUMN          { return COLUMN; }
 COLUMNS         { return COLUMNS; }
@@ -79,7 +82,6 @@ DECIMAL         { return DECIMAL; }
 DEFAULT         { return DEFAULT; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
-DELTA           { return DELTA; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }
@@ -131,7 +133,6 @@ LEFT            { return LEFT; }
 LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
-LOCK            { return LOCK; }
 LOG             { return LOG; }
 LOGS            { return LOGS; }
 LSEG            { return LSEG; }
@@ -192,6 +193,7 @@ STANDALONE      { return STANDALONE; }
 SYSTEM          { return SYSTEM; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
+TASKS           { return TASKS; }
 TENSOR          { return TENSOR; }
 TENSORARRAY     { return TENSORARRAY; }
 TEXT            { return TEXT; }
@@ -206,7 +208,6 @@ TRUE            { return TRUE; }
 TUPLE           { return TUPLE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
-UNLOCK          { return UNLOCK; }
 UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }
@@ -218,7 +219,6 @@ VARIABLES       { return VARIABLES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }
-VIEWS           { return VIEWS; }
 WHEN            { return WHEN; }
 WHERE           { return WHERE; }
 WITH            { return WITH; }

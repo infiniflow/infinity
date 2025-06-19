@@ -386,16 +386,20 @@ class TestIndexParallel(TestSdk):
             while time.time() < end_time:
                 table_name = f"{table_name_prefix}_{thread_id}_{table_counter}"
                 table_counter += 1
-                db_obj.create_table(table_name, {"id": {"type": "int"}, "value": {"type": "varchar"}},
+                try:
+                    db_obj.create_table(table_name, {"id": {"type": "int"}, "value": {"type": "varchar"}},
                                     ConflictType.Ignore)
-                print(f"thread {thread_id}: table {table_name} created")
-                time.sleep(0.5)
-                res = db_obj.drop_table(table_name, ConflictType.Ignore)
-                if res.error_code == ErrorCode.OK:
-                    print(f"thread {thread_id}: table {table_name} deleted")
+                except Exception as e:
+                    print(f"thread {thread_id}: table {table_name} create failed. {e}")
                 else:
-                    print(f"thread {thread_id}: delete table {table_name} failed: {res.error_msg}")
-                time.sleep(0.5)
+                    print(f"thread {thread_id}: table {table_name} created")
+                    time.sleep(0.5)
+                    res = db_obj.drop_table(table_name, ConflictType.Ignore)
+                    if res.error_code == ErrorCode.OK:
+                        print(f"thread {thread_id}: table {table_name} deleted")
+                    else:
+                        print(f"thread {thread_id}: delete table {table_name} failed: {res.error_msg}")
+                    time.sleep(0.5)
             connection_pool.release_conn(infinity_obj)
 
         connection_pool = get_infinity_connection_pool

@@ -22,6 +22,7 @@ log_level               = "info"
 [storage]
 persistence_dir         = "/var/infinity/persistence"
 data_dir                = "/var/infinity/data"
+catalog_dir             = "/var/infinity/catalog"
 # periodically activates garbage collection:
 # 0 means real-time,
 # s means seconds, for example "60s", 60 seconds
@@ -55,8 +56,6 @@ memindex_memory_quota    = "1GB"
 [wal]
 wal_dir                       = "/var/infinity/wal"
 full_checkpoint_interval      = "86400s"
-delta_checkpoint_interval     = "60s"
-# delta_checkpoint_threshold  = 1000000000
 wal_compact_threshold         = "1GB"
 
 # flush_at_once: write and flush log each commit

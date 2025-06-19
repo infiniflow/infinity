@@ -27,7 +27,6 @@ import config;
 import task_scheduler;
 import storage;
 import resource_manager;
-import txn;
 import sql_parser;
 import profiler;
 import infinity_exception;
@@ -62,7 +61,6 @@ import txn_state;
 
 import new_txn;
 import new_txn_manager;
-import catalog;
 import new_catalog;
 
 namespace infinity {
@@ -293,7 +291,8 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         if (new_txn != nullptr) {
             StopProfile();
             StartProfile(QueryPhase::kRollback);
-            if (new_txn->GetTxnState() == TxnState::kRollbacking) {
+            TxnState txn_state = new_txn->GetTxnState();
+            if (txn_state == TxnState::kRollbacking or txn_state == TxnState::kStarted) {
                 this->RollbackTxn();
             }
             StopProfile(QueryPhase::kRollback);
@@ -341,20 +340,11 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
 
 void QueryContext::CreateQueryProfiler() {
     bool query_profiler_flag = false;
-    bool use_new_catalog = global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
-        if (catalog == nullptr) {
-            return;
-        }
-        query_profiler_flag = catalog->GetProfile();
-    } else {
-        Catalog *catalog = InfinityContext::instance().storage()->catalog();
-        if (catalog == nullptr) {
-            return;
-        }
-        query_profiler_flag = catalog->GetProfile();
+    NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+    if (catalog == nullptr) {
+        return;
     }
+    query_profiler_flag = catalog->GetProfile();
 
     if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
@@ -365,14 +355,8 @@ void QueryContext::CreateQueryProfiler() {
 
 void QueryContext::RecordQueryProfiler(const StatementType &type) {
     if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-        bool use_new_catalog = global_config()->UseNewCatalog();
-        if (use_new_catalog) {
-            NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
-            catalog->AppendProfileRecord(query_profiler_);
-        } else {
-            Catalog *catalog = InfinityContext::instance().storage()->catalog();
-            catalog->AppendProfileRecord(query_profiler_);
-        }
+        NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+        catalog->AppendProfileRecord(query_profiler_);
     }
 }
 
@@ -494,20 +478,13 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
-    if (global_config_->UseNewCatalog()) {
-        NewTxn *new_txn = session_ptr_->GetNewTxn();
-        Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        session_ptr_->IncreaseRollbackedTxnCount();
-        return;
+    NewTxn *new_txn = session_ptr_->GetNewTxn();
+    Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
+    if (!status.ok()) {
+        RecoverableError(status);
     }
-    Txn *txn = session_ptr_->GetTxn();
-    storage_->txn_manager()->RollBackTxn(txn);
-    session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();
-    storage_->txn_manager()->IncreaseRollbackedTxnCount();
+    return;
 }
 
 NewTxn *QueryContext::GetNewTxn() const { return session_ptr_->GetNewTxn(); }

@@ -18,7 +18,6 @@ export module base_table_ref;
 
 import stl;
 import table_ref;
-import txn;
 import table_function;
 import internal_types;
 import infinity_exception;
@@ -48,8 +47,6 @@ public:
     BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex> block_index, SharedPtr<IndexIndex> index_index);
 
     ~BaseTableRef() override;
-
-    static SharedPtr<BaseTableRef> FakeTableRef(Txn *txn, const String &db_name, const String &table_name);
 
     void RetainColumnByIndices(const Vector<SizeT> &indices) {
         replace_field(column_ids_, indices);

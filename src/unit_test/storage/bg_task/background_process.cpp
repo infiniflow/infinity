@@ -27,8 +27,6 @@ import value;
 
 import data_block;
 import default_values;
-import txn_manager;
-import txn;
 import status;
 import background_process;
 import bg_task;
@@ -42,7 +40,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, BGProcessTest, ::testing::Valu
 TEST_P(BGProcessTest, test1) {
     using namespace infinity;
 
-    BGTaskProcessor processor(infinity::InfinityContext::instance().storage()->wal_manager(), nullptr);
+    BGTaskProcessor processor;
 
     processor.Start();
 

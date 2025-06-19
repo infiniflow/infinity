@@ -60,7 +60,7 @@ std::string ShowStatement::ToString() const {
             ss << "Show collections, database: " << schema_name_;
             break;
         }
-        case ShowStmtType::kViews: {
+        case ShowStmtType::kTasks: {
             ss << "Show views, database: " << schema_name_;
             break;
         }
@@ -146,14 +146,6 @@ std::string ShowStatement::ToString() const {
         }
         case ShowStmtType::kLogs: {
             ss << "Show config";
-            break;
-        }
-        case ShowStmtType::kDeltaLogs: {
-            ss << "Show config";
-            break;
-        }
-        case ShowStmtType::kCatalogs: {
-            ss << "Show catalogs";
             break;
         }
         case ShowStmtType::kCatalog: {

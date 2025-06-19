@@ -498,8 +498,10 @@ void InfinityContext::UnInit() {
     //    commiting_thread_pool_.stop(true);
     //    hnsw_build_thread_pool_.stop(true);
 
+    VirtualStore::MunmapAllFiles();
     session_mgr_.reset();
     resource_manager_.reset();
+    LOG_INFO("Infinity context is un-initialized.");
     Logger::Shutdown();
     config_.reset();
 }
@@ -545,6 +547,10 @@ void InfinityContext::StopThriftServers() {
     // close all thrift sessions
     const auto removed_session_count = InfinityThriftService::ClearSessionMap();
     LOG_INFO(fmt::format("Removed {} thrift sessions", removed_session_count));
+}
+
+void InfinityContext::SetConfig(UniquePtr<Config> &&config) {
+    config_ = std::move(config);
 }
 
 } // namespace infinity

@@ -52,6 +52,8 @@ public:
 
     Status LoadSet(TxnTimeStamp checkpoint_ts);
 
+    Status RestoreSet();
+
     Status UninitSet(UsageFlag usage_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();
@@ -78,6 +80,7 @@ public:
 
 private:
     TxnTimeStamp begin_ts_ = 0;
+    TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;

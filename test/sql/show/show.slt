@@ -14,14 +14,14 @@ SHOW TABLES;
 statement ok
 
 CREATE TABLE tb1 (
-num INT,
-name VARCHAR,
-age INT,
-score DOUBLE,
-document VARCHAR,
-vector1 EMBEDDING(FLOAT,128),
-tensor_vector TENSOR(FLOAT,128),
-sparse_vector SPARSE(FLOAT,30000)
+    num INT,
+    name VARCHAR,
+    age INT,
+    score DOUBLE,
+    document VARCHAR,
+    vector1 EMBEDDING(FLOAT,128),
+    tensor_vector TENSOR(FLOAT,128),
+    sparse_vector SPARSE(FLOAT,30000)
 );
 
 statement ok
@@ -60,6 +60,9 @@ INSERT INTO tb1 VALUES (
 );
 
 statement ok
+FLUSH DATA;
+
+statement ok
 SHOW TABLE tb1 COLUMNS;
 
 statement ok
@@ -82,6 +85,21 @@ CREATE INDEX idx4 ON tb1 (document) USING FULLTEXT WITH (analyzer=standard);
 
 statement ok
 CREATE INDEX idx5 ON tb1 (age);
+
+statement ok
+DROP DATABASE IF EXISTS db1;
+
+statement ok
+CREATE database db1;
+
+statement ok
+CREATE TABLE db1.tb1 (
+    a int,
+    b int
+);
+
+statement ok
+FLUSH DATA;
 
 statement ok
 SHOW TABLE tb1 INDEXES;
@@ -145,3 +163,36 @@ SHOW BUFFER;
 
 statement ok
 SHOW TRANSACTIONS;
+
+statement ok
+SHOW CATALOG;
+
+statement ok
+SHOW LOGS;
+
+statement ok
+SHOW PERSISTENCE FILES;
+
+statement ok
+SHOW PERSISTENCE OBJECTS;
+
+statement ok
+SHOW MEMORY;
+
+statement ok
+SHOW MEMORY OBJECTS;
+
+statement ok
+SHOW MEMORY ALLOCATION;
+
+statement ok
+SHOW MEMORY ALLOCATION;
+
+statement ok
+CHECK SYSTEM;
+
+statement ok
+CHECK TABLE tb1;
+
+statement ok
+CHECK TABLE db1.tb1;

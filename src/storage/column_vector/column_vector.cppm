@@ -46,7 +46,6 @@ import sparse_util;
 namespace infinity {
 
 class BufferManager;
-struct BlockColumnEntry;
 class BufferObj;
 
 export enum class ColumnVectorTipe : i8 {
@@ -208,13 +207,6 @@ private:
 
 public:
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, SizeT capacity = DEFAULT_VECTOR_SIZE);
-
-    void Initialize(BufferManager *buffer_mgr,
-                    BlockColumnEntry *block_column_entry,
-                    SizeT current_row_count,
-                    ColumnVectorTipe vector_tipe = ColumnVectorTipe::kReadWrite,
-                    ColumnVectorType vector_type = ColumnVectorType::kFlat,
-                    SizeT capacity = DEFAULT_VECTOR_SIZE);
 
     void Initialize(BufferObj *buffer_obj,
                     BufferObj *outline_buffer_obj,

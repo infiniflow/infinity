@@ -35,18 +35,6 @@ export default async function ProductsPage() {
           <p> data_dir: {configs['data_dir']} </p>
           <p>
             {' '}
-            delta_checkpoint_interval: {
-              configs['delta_checkpoint_interval']
-            }{' '}
-          </p>
-          <p>
-            {' '}
-            delta_checkpoint_threshold: {
-              configs['delta_checkpoint_threshold']
-            }{' '}
-          </p>
-          <p>
-            {' '}
             full_checkpoint_interval: {configs['full_checkpoint_interval']}{' '}
           </p>
           <p> http_port: {configs['http_port']} </p>

@@ -14,10 +14,6 @@
 
 module;
 
-// #include "rocksdb/db.h"
-// #include "rocksdb/options.h"
-// #include "rocksdb/slice.h"
-// #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 
 module kv_store;
@@ -72,7 +68,7 @@ KVInstance::~KVInstance() {
 }
 
 Status KVInstance::Put(const String &key, const String &value) {
-    //    LOG_INFO(fmt::format("Put key: {}, value: {}", key, value));
+    //    LOG_TRACE(fmt::format("To put key: {}, value: {}", key, value));
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
         String msg = fmt::format("rocksdb::Transaction::Put key: {}, value: {}", key, value);
@@ -83,6 +79,7 @@ Status KVInstance::Put(const String &key, const String &value) {
 }
 
 Status KVInstance::Delete(const String &key) {
+    //    LOG_TRACE(fmt::format("To delete key: {}", key));
     rocksdb::Status s = transaction_->Delete(key);
     if (!s.ok()) {
         String msg = fmt::format("rocksdb::Transaction::Delete key: {}", key);
@@ -141,12 +138,11 @@ UniquePtr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const
 Vector<Pair<String, String>> KVInstance::GetAllKeyValue() {
     Vector<Pair<String, String>> result;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_->GetIterator(read_options_);
+    UniquePtr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});
     }
-    delete iter;
     return result;
 }
 
@@ -197,7 +193,7 @@ Status KVStore::Init(const String &db_path) {
 Status KVStore::Uninit() {
     delete transaction_db_;
     transaction_db_ = nullptr;
-
+    LOG_INFO("KV store is stopped.");
     return Status::OK();
 }
 
@@ -298,31 +294,35 @@ Status KVStore::Merge(const String &key, const String &value) {
 String KVStore::ToString() const {
     std::stringstream ss;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_db_->NewIterator(read_option);
+    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
-        ss << iter->key().ToString() << " : " << iter->value().ToString() << std::endl;
+        auto key = iter->key().ToString();
+        auto value = iter->value().ToString();
+        if (key.find("fast_rough_filter") == std::string::npos) {
+            ss << key << " : " << value << '\n';
+        } else {
+            ss << key << '\n';
+        }
     }
-    delete iter;
     return ss.str();
 }
 
 SizeT KVStore::KeyValueNum() const {
     SizeT cnt = 0;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_db_->NewIterator(read_option);
+    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         ++cnt;
     }
-    delete iter;
     return cnt;
 }
 
 Vector<Pair<String, String>> KVStore::GetAllKeyValue() {
     Vector<Pair<String, String>> result;
     rocksdb::ReadOptions read_option;
-    auto iter = transaction_db_->NewIterator(read_option);
+    UniquePtr<rocksdb::Iterator> iter{transaction_db_->NewIterator(read_option)};
     iter->SeekToFirst();
     for (; iter->Valid(); iter->Next()) {
         result.push_back({iter->key().ToString(), iter->value().ToString()});

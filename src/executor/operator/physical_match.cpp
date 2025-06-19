@@ -23,7 +23,6 @@ module;
 module physical_match;
 
 import stl;
-import txn;
 import query_context;
 import operator_state;
 import physical_operator;
@@ -43,8 +42,6 @@ import third_party;
 import base_table_ref;
 import block_index;
 import load_meta;
-import block_entry;
-import block_column_entry;
 import logical_type;
 import search_options;
 import status;
@@ -111,6 +108,8 @@ QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
                 auto new_iter = MakeUnique<ScoreThresholdIterator>(std::move(iter), score_threshold);
                 iter = std::move(new_iter);
             }
+        } else {
+            LOG_WARN("physical_match: iter is nullptr");
         }
         return iter;
     };
@@ -408,15 +407,8 @@ String PhysicalMatch::ToString(i64 &space) const {
 }
 
 void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
-    TxnTimeStamp begin_ts = 0;
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxn *new_txn = query_context->GetNewTxn();
-        begin_ts = new_txn->BeginTS();
-    } else {
-        Txn *txn = query_context->GetTxn();
-        begin_ts = txn->BeginTS();
-    }
+    NewTxn *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
 
     TableInfo *table_info = base_table_ref_->table_info_.get();
     TxnTimeStamp query_ts = std::min(begin_ts, table_info->max_commit_ts_);

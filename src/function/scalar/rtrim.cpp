@@ -5,7 +5,7 @@ module;
 module rtrim;
 
 import stl;
-import catalog;
+import new_catalog;
 import status;
 import infinity_exception;
 import scalar_function;
@@ -44,7 +44,7 @@ inline void RtrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
-void RegisterRtrimFunction(const UniquePtr<Catalog> &catalog_ptr) {
+void RegisterRtrimFunction(NewCatalog *catalog_ptr) {
     String func_name = "rtrim";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -55,7 +55,7 @@ void RegisterRtrimFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, RtrimFunction>);
     function_set_ptr->AddFunction(rtrim_function);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 } // namespace infinity

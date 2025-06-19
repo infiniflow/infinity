@@ -27,13 +27,12 @@ import column_def;
 import profiler;
 import third_party;
 import storage;
-import catalog_delta_entry;
 import meta_tree;
 
 namespace infinity {
 
 class NewTxn;
-class MemIndex;
+struct MemIndex;
 class TableIndexReaderCache;
 class DBMeeta;
 class TableMeeta;
@@ -57,20 +56,16 @@ struct WalChunkIndexInfo;
 class Config;
 struct MemIndexID;
 class TableCache;
+class DbCache;
+class SystemCache;
+class FunctionSet;
+class SpecialFunction;
 
 enum class ColumnVectorTipe;
 
 template <bool init_all_true>
 struct RoaringBitmap;
 using Bitmask = RoaringBitmap<true>;
-
-export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
-
-export struct TableMemoryContext {
-    LockType locker{LockType::kUnlocked};
-    TransactionID locked_txn_{MAX_TXN_ID};
-    SizeT write_txn_num_{0};
-};
 
 export struct TableLockForMemIndex {
     std::mutex mtx_;
@@ -104,7 +99,7 @@ export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
 
-    void Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts);
+    void Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
 
     bool Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range);
 
@@ -114,12 +109,16 @@ public:
 
     BlockOffset block_offset_end() const { return block_offset_end_; }
 
+    bool end() const { return end_; }
+
 private:
     SharedPtr<BlockLock> block_lock_;
     BufferHandle version_buffer_handle_;
     TxnTimeStamp begin_ts_ = 0;
+    TxnTimeStamp commit_ts_ = 0;
     BlockOffset block_offset_begin_ = 0;
     BlockOffset block_offset_end_ = 0;
+    bool end_ = false;
 };
 
 export class NewTxnBlockVisitor {
@@ -146,85 +145,26 @@ export enum class UsageFlag {
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
-    ~NewCatalog();
-
-public:
-    Status TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_paths);
-    static String GetPathNameTail(const String &path);
+    virtual ~NewCatalog();
     static Status Init(KVStore *kv_store);
 
-private:
-    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance, const String &db_path, bool is_vfs);
-    Status TransformCatalogTable(DBMeeta &db_meta, const nlohmann::json &table_meta_json, String const &db_name, const String &db_path, bool is_vfs);
-    Status TransformCatalogSegment(TableMeeta &table_meta, const nlohmann::json &segment_entry_json, const String &db_path, bool is_vfs);
-    Status TransformCatalogBlock(SegmentMeta &segment_meta, const nlohmann::json &block_entry_json, const String &db_path, bool is_vfs);
-    Status TransformCatalogBlockColumn(BlockMeta &block_meta, const nlohmann::json &block_column_entry_json);
-    Status TransformCatalogTableIndex(TableMeeta &table_meta, const nlohmann::json &table_index_entry_json);
-    Status TransformCatalogSegmentIndex(TableIndexMeeta &table_meta, const nlohmann::json &table_index_entry_json);
-    Status TransformCatalogChunkIndex(SegmentIndexMeta &segment_index_meta, const nlohmann::json &chunk_index_entry_json);
-    Status TransformDeltaMeta(Config *config, const Vector<String> &delta_ckp_paths, KVInstance *kv_instance, bool is_vfs);
-    Status RefactorPath(const String &path_key, String &fine_path, char delimiter);
-    Status TransformData(const String &data_path, KVInstance *kv_instance, nlohmann::json *full_ckp_json, bool is_vfs);
-    Map<String, String> dbname_to_idstr_;
-    Set<String> dir_set_;
-    static constexpr SizeT db_prefix_len_ = 14;    // XXXXXXXXXX_db_
-    static constexpr SizeT table_prefix_len_ = 17; // XXXXXXXXXX_table_
-    // // Database related functions
-    // Status CreateDatabase(const SharedPtr<String> &db_name,
-    //                       const SharedPtr<String> &comment,
-    //                       NewTxn *txn,
-    //                       ConflictType conflict_type = ConflictType::kError);
-
-    // Status DropDatabase(const SharedPtr<String> &db_name, NewTxn *txn, ConflictType conflict_type = ConflictType::kError);
-
-    // bool CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *txn);
-
-    // Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, NewTxn *txn);
-
-    //    void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
-    //
-    //    // replay
-    //    void
-    //    CreateDatabaseReplay(const SharedPtr<String> &db_name,
-    //                         const SharedPtr<String> &comment,
-    //                         std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, SharedPtr<String>, TransactionID, TxnTimeStamp)>
-    //                         &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
-    //
-    //    void DropDatabaseReplay(const String &db_name,
-    //                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    //                            TransactionID txn_id,
-    //                            TxnTimeStamp begin_ts);
-    //
-    //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
-
 public:
-    Status LockTable(const String &table_key, TransactionID txn_id);
-    Status CommitLockTable(const String &table_key, TransactionID txn_id);
-    Status RollbackLockTable(const String &table_key, TransactionID txn_id);
-
-    Status UnlockTable(const String &table_key, TransactionID txn_id);
-    Status CommitUnlockTable(const String &table_key, TransactionID txn_id);
-    Status RollbackUnlockTable(const String &table_key, TransactionID txn_id);
-
-    Status IncreaseTableWriteCount(const String &table_key);
-    Status DecreaseTableWriteCount(const String &table_key, SizeT count);
-    SizeT GetTableWriteCount() const;
-
     SharedPtr<MetaTree> MakeMetaTree() const;
+    Vector<SharedPtr<MetaKey>> MakeMetaKeys() const;
     Status RestoreCatalogCache(Storage *storage_ptr);
-    SharedPtr<TableCache> GetTableCache(u64 db_id, u64 table_id) const; // used by append in allocation
-    Tuple<SharedPtr<TableCache>, Status> AddNewTableCache(u64 db_id, u64 table_id);                   // used by append in allocation
-    Status DropDbCache(u64 db_id);                                      // used by drop db in post commit
-    Status DropTableCache(u64 db_id, u64 table_id);                     // used by drop table in post commit
+
+    SharedPtr<SystemCache> GetSystemCache() const;
+    SystemCache *GetSystemCachePtr() const;
+
+    KVStore *kv_store() const;
+
 private:
     KVStore *kv_store_{};
 
-    mutable std::mutex table_cache_mtx_{};
-    HashMap<u64, SharedPtr<HashMap<u64, SharedPtr<TableCache>>>> table_cache_map_{};
+    mutable std::mutex catalog_cache_mtx_{};
 
-private:
-    mutable std::mutex mtx_{};
-    HashMap<String, SharedPtr<TableMemoryContext>> table_memory_context_map_{};
+    HashMap<u64, SharedPtr<HashMap<u64, SharedPtr<TableCache>>>> table_cache_map_{};
+    SharedPtr<SystemCache> system_cache_{};
 
 public:
     Status AddBlockLock(String block_key);
@@ -237,23 +177,14 @@ private:
     HashMap<String, SharedPtr<BlockLock>> block_lock_map_{};
 
 public:
-    Status AddMemIndex(String mem_index_key, SharedPtr<MemIndex> mem_index);
-    Status GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
+    SharedPtr<MemIndex> GetMemIndex(const String &mem_index_key);
+    bool GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
-
-    Status IncreaseTableReferenceCountForMemIndex(const String &table_key);
-    Status DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count);
-    Status SetMemIndexDump(const String &table_key);
-    Status UnsetMemIndexDump(const String &table_key);
-    bool IsMemIndexDump(const String &table_key);
-    SizeT GetTableReferenceCountForMemIndex(const String &table_key);
-    SizeT GetTableReferenceCountForMemIndex() const;
 
 private:
     mutable std::shared_mutex mem_index_mtx_{};
     HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
-    HashMap<String, SharedPtr<TableLockForMemIndex>> table_lock_for_mem_index_{};
 
 public:
     Status AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache);
@@ -265,27 +196,22 @@ private:
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 
 public:
-    Status AddSegmentIndexFtInfo(String segment_index_key, SharedPtr<SegmentIndexFtInfo> segment_index_ft_info);
-    Status GetSegmentIndexFtInfo(const String &segment_index_key, SharedPtr<SegmentIndexFtInfo> &segment_index_ft_info);
-    Status DropSegmentIndexFtInfoByKey(const String &segment_index_key);
-
-private:
-    std::shared_mutex segment_index_ft_info_mtx_{};
-    HashMap<String, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_info_map_{};
-
-public:
     Status AddSegmentUpdateTS(String segment_update_ts_key, SharedPtr<SegmentUpdateTS> segment_update_ts);
     Status GetSegmentUpdateTS(const String &segment_update_ts_key, SharedPtr<SegmentUpdateTS> &segment_update_ts);
-    Status DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
+    void DropSegmentUpdateTSByKey(const String &segment_update_ts_key);
 
 private:
     std::shared_mutex segment_update_ts_mtx_{};
     HashMap<String, SharedPtr<SegmentUpdateTS>> segment_update_ts_map_{};
 
 public:
-    void AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta);
+    // Currently, these function or function set can't be changed and also will not be persistent.
+    HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
+    HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
+    HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
-    void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas);
+public:
+    Status GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
 
     // Profile related methods
     void SetProfile(bool flag) { enable_profile_ = flag; }
@@ -304,12 +230,14 @@ public:
 
     Status IncrLatestID(String &id_str, std::string_view id_name);
 
-private:
-    std::mutex cleaned_meta_mtx_{};
-    MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
+    void SetLastCleanupTS(TxnTimeStamp cleanup_ts);
+    TxnTimeStamp GetLastCleanupTS() const;
 
+private:
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
     atomic_bool enable_profile_{false};
+    // bool is_vfs_{false};
+    Atomic<TxnTimeStamp> last_cleanup_ts_{0};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
@@ -318,8 +246,7 @@ public:
 
     static Status MemIndexCommit(NewTxn *txn);
 
-    static Status
-    GetAllMemIndexes(KVInstance *kv_instance, TxnTimeStamp begin_ts, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
+    static Status GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
@@ -328,7 +255,7 @@ public:
                            const String *db_comment,
                            Optional<DBMeeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -337,7 +264,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
                             String &index_id_str,
@@ -345,22 +272,25 @@ public:
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UsageFlag usage_flag);
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta,
-                                  const String &index_name,
-                                  const Vector<ChunkInfoForCreateIndex> &meta_infos,
-                                  UsageFlag usage_flag);
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
+
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
 
+    static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id);
+
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
+
+    static Status LoadFlushedSegment2(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
     static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
+
+    static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
 
     static Status AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 
@@ -406,13 +336,13 @@ public:
 
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
 
-    static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state);
+    static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 
     static Status GetCreateTSVector(BlockMeta &block_meta, SizeT offset, SizeT row_count, ColumnVector &column_vector);
 
     static Status GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT row_count, ColumnVector &column_vector);
 
-    static Status GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths);
+    static Status GetDBFilePaths(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, DBMeeta &db_meta, Vector<String> &file_paths);
 
     static Status
     GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def = nullptr);
@@ -436,8 +366,20 @@ public:
 
     static Status CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete);
 
-    static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
+    static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
-    static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
+    static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
+
+public:
+    // Function related methods
+    static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
+
+    static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
+    static void AppendToScalarFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
+    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
+
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
 };
 } // namespace infinity

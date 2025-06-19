@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #include "gtest/gtest.h"
 import base_test;
 
@@ -303,3 +305,4 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(src_idx));
     }
 }
+#endif

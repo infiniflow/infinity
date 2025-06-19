@@ -72,19 +72,16 @@ import join_reference;
 import cross_product_reference;
 import data_type;
 import logical_type;
-import base_entry;
-import view_entry;
-import table_entry;
-import txn;
 import logger;
 import defer_op;
 import highlighter;
-import txn_store;
 
 import meta_info;
 import new_txn;
 import db_meeta;
 import table_meeta;
+import new_catalog;
+import kv_store;
 
 namespace infinity {
 
@@ -438,32 +435,26 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     const String &table_name = from_table->table_name_;
 
     SharedPtr<TableInfo> table_info;
-    Txn *txn = nullptr;
-    NewTxn *new_txn = nullptr;
     Status status;
-    bool use_new_meta = query_context->global_config()->UseNewCatalog();
-    if (use_new_meta) {
-        new_txn = query_context->GetNewTxn();
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        table_info = MakeShared<TableInfo>();
-        status = table_meta->GetTableInfo(*table_info);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        table_info->db_name_ = MakeShared<String>(db_name);
-        table_info->table_name_ = MakeShared<String>(table_name);
-    } else {
-        txn = query_context->GetTxn();
-        std::tie(table_info, status) = txn->GetTableInfo(db_name, from_table->table_name_);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
+    NewTxn *new_txn = query_context->GetNewTxn();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> tmp_table_meta;
+    status = new_txn->GetTableMeta(db_name, table_name, db_meta, tmp_table_meta);
+    if (!status.ok()) {
+        RecoverableError(status);
     }
+    auto table_meta = MakeUnique<TableMeeta>(tmp_table_meta->db_id_str(),
+                                             tmp_table_meta->table_id_str(),
+                                             tmp_table_meta->kv_instance(),
+                                             tmp_table_meta->begin_ts(),
+                                             tmp_table_meta->commit_ts());
+    table_info = MakeShared<TableInfo>();
+    status = table_meta->GetTableInfo(*table_info);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    table_info->db_name_ = MakeShared<String>(db_name);
+    table_info->table_name_ = MakeShared<String>(table_name);
 
     if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
         Status status = Status::SyntaxError("Currently, collection isn't supported.");
@@ -486,7 +477,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         columns.emplace_back(idx);
     }
     if (!update) {
-        const auto *catalog = query_context_ptr_->storage()->catalog();
+        NewCatalog *catalog = query_context_ptr_->storage()->new_catalog();
         for (const auto &[name, column_def] : catalog->special_columns_) {
             types_ptr->emplace_back(column_def->column_type_);
             names_ptr->emplace_back(name);
@@ -495,12 +486,8 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     }
 
     SharedPtr<BlockIndex> block_index;
-    if (use_new_meta) {
-        block_index = MakeShared<BlockIndex>();
-        block_index->NewInit(new_txn, db_name, table_name);
-    } else {
-        block_index = txn->GetBlockIndexFromTable(db_name, from_table->table_name_);
-    }
+    block_index = MakeShared<BlockIndex>();
+    block_index->NewInit(std::move(table_meta));
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);
@@ -512,44 +499,40 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 }
 
 SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
-    BaseEntry *base_view_entry{nullptr};
-    Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
-
-    // Build view scan operator
-    if (this->bind_context_ptr_->IsViewBound(from_table->table_name_)) {
-        Status status = Status::SyntaxError(fmt::format("View: {} is bound before!", from_table->table_name_));
-        RecoverableError(status);
-    }
-    this->bind_context_ptr_->BoundView(from_table->table_name_);
-
-    const SelectStatement *select_stmt_ptr = view_entry->GetSQLStatement();
-
-    // Create new bind context and add into context array;
-    SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
-
-    // Create bound select node and subquery table reference
-    QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
-    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
-
-    // View table index is the output index of view.
-    u64 view_index = bound_statement_ptr->result_index_;
-
-    // Add binding into bind context
-    this->bind_context_ptr_->AddViewBinding(from_table->table_name_, view_index, view_entry->column_types(), view_entry->column_names());
-
-    // Use view name as the subquery table reference name
-    auto subquery_table_ref_ptr =
-        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
-
-    // TODO: Not care about the correlated expression
-
-    // return subquery table reference
-    return subquery_table_ref_ptr;
+    //    BaseEntry *base_view_entry{nullptr};
+    //    ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
+    //
+    //    // Build view scan operator
+    //    if (this->bind_context_ptr_->IsViewBound(from_table->table_name_)) {
+    //        Status status = Status::SyntaxError(fmt::format("View: {} is bound before!", from_table->table_name_));
+    //        RecoverableError(status);
+    //    }
+    //    this->bind_context_ptr_->BoundView(from_table->table_name_);
+    //
+    //    const SelectStatement *select_stmt_ptr = view_entry->GetSQLStatement();
+    //
+    //    // Create new bind context and add into context array;
+    //    SharedPtr<BindContext> view_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
+    //
+    //    // Create bound select node and subquery table reference
+    //    QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
+    //    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
+    //
+    //    // View table index is the output index of view.
+    //    u64 view_index = bound_statement_ptr->result_index_;
+    //
+    //    // Add binding into bind context
+    //    this->bind_context_ptr_->AddViewBinding(from_table->table_name_, view_index, view_entry->column_types(), view_entry->column_names());
+    //
+    //    // Use view name as the subquery table reference name
+    //    auto subquery_table_ref_ptr =
+    //        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+    //
+    //    // TODO: Not care about the correlated expression
+    //
+    //    // return subquery table reference
+    //    return subquery_table_ref_ptr;
+    return nullptr;
 }
 
 SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, const CrossProductReference *from_table) {
@@ -1035,15 +1018,6 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
         RecoverableError(status);
     }
 
-    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
-    if (!use_new_catalog) {
-        Txn *txn = query_context_ptr_->GetTxn();
-        Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-    }
-
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -1067,15 +1041,6 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
-    }
-
-    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
-    if (!use_new_catalog) {
-        Txn *txn = query_context_ptr_->GetTxn();
-        Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -1157,56 +1122,14 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
 }
 
 UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {
-    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        SharedPtr<BaseTableRef> base_table_ref = nullptr;
-        if (statement.compact_type_ == CompactStatementType::kManual) {
-            const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
-            base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
-        } else {
-            const auto &compact_statement = static_cast<const AutoCompactStatement &>(statement);
-            base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
-        }
-        return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
-    }
-
-    Txn *txn = query_context_ptr_->GetTxn();
     SharedPtr<BaseTableRef> base_table_ref = nullptr;
     if (statement.compact_type_ == CompactStatementType::kManual) {
         const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
         base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
     } else {
         const auto &compact_statement = static_cast<const AutoCompactStatement &>(statement);
-        auto block_index = MakeShared<BlockIndex>();
-        for (auto *segment_entry : compact_statement.segments_to_compact_) {
-            block_index->Insert(segment_entry, txn);
-        }
-        auto [table_info, status] = txn->GetTableInfo(statement.db_name_, statement.table_name_);
-        base_table_ref = MakeShared<BaseTableRef>(table_info, std::move(block_index));
+        base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
     }
-
-    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    {
-        TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
-        txn_table_store->SetCompactType(statement.compact_type_);
-    }
-
-    status = table_entry->AddWriteTxnNum(txn);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    {
-        TableEntry::TableStatus table_status;
-        if (!table_entry->SetCompact(table_status, txn)) {
-            RecoverableError(Status::NotSupport(fmt::format("Cannot compact when table_status is {}", u8(table_status))));
-        }
-    }
-    base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
-
     return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
 }
 

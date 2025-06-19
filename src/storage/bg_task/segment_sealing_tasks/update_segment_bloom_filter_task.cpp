@@ -19,42 +19,37 @@ module update_segment_bloom_filter_task;
 import stl;
 import bg_task;
 import background_process;
-import txn_manager;
-import segment_entry;
-import table_entry;
 import buffer_manager;
 import infinity_exception;
 import logger;
-import wal_entry;
 import third_party;
 import build_fast_rough_filter_task;
-import catalog_delta_entry;
 import infinity_context;
 
 namespace infinity {
 
-void UpdateSegmentBloomFilterTask::CreateAndSubmitTask(SegmentEntry *segment_entry, TableEntry *table_entry, TxnManager *txn_mgr) {
-    if (SegmentStatus status = segment_entry->status(); status != SegmentStatus::kSealed) {
-        LOG_WARN("UpdateSegmentBloomFilterTask::CreateAndSubmitTask: Segment status not sealed, skip job");
-        return;
-    }
-    LOG_TRACE(fmt::format("UpdateSegmentBloomFilterTask: create task for segment: {}", segment_entry->segment_id()));
-    auto update_bloom_filter_task = MakeShared<UpdateSegmentBloomFilterTask>(segment_entry, table_entry, txn_mgr);
-    BGTaskProcessor *bg_processor = InfinityContext::instance().storage()->bg_processor();
-    bg_processor->Submit(std::move(update_bloom_filter_task));
+void UpdateSegmentBloomFilterTask::CreateAndSubmitTask() {
+    //    if (SegmentStatus status = segment_entry->status(); status != SegmentStatus::kSealed) {
+    //        LOG_WARN("UpdateSegmentBloomFilterTask::CreateAndSubmitTask: Segment status not sealed, skip job");
+    //        return;
+    //    }
+    //    LOG_TRACE(fmt::format("UpdateSegmentBloomFilterTask: create task for segment: {}", segment_entry->segment_id()));
+    //    auto update_bloom_filter_task = MakeShared<UpdateSegmentBloomFilterTask>(segment_entry, table_entry, txn_mgr);
+    //    BGTaskProcessor *bg_processor = InfinityContext::instance().storage()->bg_processor();
+    //    bg_processor->Submit(std::move(update_bloom_filter_task));
 }
 
 void UpdateSegmentBloomFilterTask::Execute() {
     // check segment status
-    if (SegmentStatus status = segment_->status(); status != SegmentStatus::kSealed) {
-        LOG_WARN("UpdateSegmentBloomFilterTask::Execute: Segment status not sealed, abort task");
-        return;
-    }
-    ExecuteInner(segment_, txn_mgr_);
+    //    if (SegmentStatus status = segment_->status(); status != SegmentStatus::kSealed) {
+    //        LOG_WARN("UpdateSegmentBloomFilterTask::Execute: Segment status not sealed, abort task");
+    //        return;
+    //    }
+    //    ExecuteInner(segment_, txn_mgr_);
 }
 
 // deprecated temporary
-void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManager *txn_mgr) {
+void UpdateSegmentBloomFilterTask::ExecuteInner() {
     // create txn
     // auto update_bloom_filter_txn = txn_mgr->BeginTxn();
     // // begin txn

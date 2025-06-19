@@ -24,6 +24,7 @@ import select_statement;
 import show_statement;
 import flush_statement;
 import optimize_statement;
+import check_statement;
 import base_table_reference;
 import status;
 
@@ -55,6 +56,8 @@ public:
     static Status BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size);
 
     static Status BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64);
+
+    static Status BuildCheck(const CheckStatement *check_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size);
 };
 
 } // namespace infinity

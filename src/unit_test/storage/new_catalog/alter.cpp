@@ -43,15 +43,8 @@ import internal_types;
 import data_block;
 import column_vector;
 import value;
-// import data_access_state;
-// import kv_code;
-// import kv_store;
 import new_txn;
-// import new_txn_store;
 import buffer_obj;
-// import buffer_handle;
-// import secondary_index_in_mem;
-// import secondary_index_data;
 import segment_meta;
 import block_meta;
 import column_meta;
@@ -60,16 +53,7 @@ import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
 import db_meeta;
-// import catalog_meta;
-// import mem_index;
-// import roaring_bitmap;
-// import index_filter_evaluators;
-// import index_emvb;
 import constant_expr;
-// import config;
-// import virtual_store;
-// import default_values;
-// import parsed_expr;
 import logger;
 
 using namespace infinity;
@@ -141,6 +125,7 @@ TEST_P(TestTxnAlter, add_column0) {
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -160,7 +145,7 @@ TEST_P(TestTxnAlter, add_column0) {
 
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -269,6 +254,7 @@ TEST_P(TestTxnAlter, drop_column0) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -288,7 +274,7 @@ TEST_P(TestTxnAlter, drop_column0) {
 
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
-            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;

@@ -30,6 +30,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
 #include "statement/admin_statement.h"
+#include "statement/check_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -125,6 +126,7 @@ struct SQL_LTYPE {
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
     infinity::AdminStatement* admin_stmt;
+    infinity::CheckStatement* check_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -393,9 +395,9 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK ADD RENAME
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT ADD RENAME DUMP
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK SYSTEM
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX TASKS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
@@ -405,10 +407,10 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
-%token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
+%token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE
-%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY
+%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK CLEAN
 
 %token NUMBER
 
@@ -431,6 +433,7 @@ struct SQL_LTYPE {
 %type <compact_stmt>      compact_statement
 %type <admin_stmt>        admin_statement
 %type <alter_stmt>        alter_statement
+%type <check_stmt>        check_statement
 
 %type <stmt_array>        statement_list
 
@@ -546,6 +549,7 @@ statement : create_statement { $$ = $1; }
 | compact_statement { $$ = $1; }
 | admin_statement { $$ = $1; }
 | alter_statement { $$ = $1; }
+| check_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -1853,9 +1857,9 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kTables;
 }
-| SHOW VIEWS {
+| SHOW TASKS {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kViews;
+    $$->show_type_ = infinity::ShowStmtType::kTasks;
 }
 | SHOW CONFIGS {
     $$ = new infinity::ShowStatement();
@@ -2074,14 +2078,6 @@ show_statement: SHOW DATABASES {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kLogs;
 }
-| SHOW DELTA LOGS {
-      $$ = new infinity::ShowStatement();
-      $$->show_type_ = infinity::ShowStmtType::kDeltaLogs;
-}
-| SHOW CATALOGS {
-      $$ = new infinity::ShowStatement();
-      $$->show_type_ = infinity::ShowStmtType::kCatalogs;
-}
 | SHOW CATALOG {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kCatalog;
@@ -2295,24 +2291,6 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 }
-| LOCK TABLE table_name {
-    $$ = new infinity::CommandStatement();
-    ParserHelper::ToLower($3->schema_name_ptr_);
-    ParserHelper::ToLower($3->table_name_ptr_);
-    $$->command_info_ = std::make_shared<infinity::LockCmd>($3->schema_name_ptr_, $3->table_name_ptr_);
-    free($3->schema_name_ptr_);
-    free($3->table_name_ptr_);
-    delete $3;
-}
-| UNLOCK TABLE table_name {
-    $$ = new infinity::CommandStatement();
-    ParserHelper::ToLower($3->schema_name_ptr_);
-    ParserHelper::ToLower($3->table_name_ptr_);
-    $$->command_info_ = std::make_shared<infinity::UnlockCmd>($3->schema_name_ptr_, $3->table_name_ptr_);
-    free($3->schema_name_ptr_);
-    free($3->table_name_ptr_);
-    delete $3;
-}
 | CREATE SNAPSHOT IDENTIFIER ON TABLE IDENTIFIER {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($6);
@@ -2352,6 +2330,23 @@ command_statement: USE IDENTIFIER {
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kRestore, infinity::SnapshotScope::kTable);
     free($4);
+}
+| CLEAN DATA {
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::CleanupCmd>();
+}
+| DUMP INDEX IDENTIFIER ON table_name {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($5->schema_name_ptr_);
+    ParserHelper::ToLower($5->table_name_ptr_);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::DumpIndexCmd>($5->schema_name_ptr_, $5->table_name_ptr_, $3);
+    free($3);
+    if ($5->schema_name_ptr_ != nullptr) {
+        free($5->schema_name_ptr_);
+    }
+    free($5->table_name_ptr_);
+    delete $5;
 }
 
 compact_statement: COMPACT TABLE table_name {
@@ -2671,6 +2666,22 @@ alter_statement : ALTER TABLE table_name RENAME TO IDENTIFIER {
     }
     delete $7;
     free($3->schema_name_ptr_);
+    free($3->table_name_ptr_);
+    delete $3;
+}
+
+check_statement : CHECK SYSTEM {
+    $$ = new infinity::CheckStatement();
+    $$->check_type_ = infinity::CheckStmtType::kSystem;
+}
+| CHECK TABLE table_name {
+    $$ = new infinity::CheckStatement();
+    $$->check_type_ = infinity::CheckStmtType::kTable;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
 }

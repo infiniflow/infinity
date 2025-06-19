@@ -17,17 +17,15 @@ module;
 export module compaction_process;
 
 import stl;
-import txn;
-import bg_task;
+import bg_task_type;
 import blocking_queue;
-import base_statement;
+import status;
 
 namespace infinity {
 
-class Catalog;
 class TxnManager;
-class SessionManager;
 class NewTxn;
+class BGTask;
 
 class TestCommander {
 public:
@@ -54,7 +52,7 @@ private:
 
 export class CompactionProcessor {
 public:
-    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    CompactionProcessor();
     ~CompactionProcessor();
 
     void Start();
@@ -63,31 +61,16 @@ public:
 
     void Submit(SharedPtr<BGTask> bg_task);
 
-    void DoCompact();
-
     void NewDoCompact();
 
-    void NewManualCompact(NewTxn *new_txn, const String &db_name, const String &table_name);
+    Status NewManualCompact(const String &db_name, const String &table_name);
 
     u64 RunningTaskCount() const { return task_count_; }
-
-    TxnTimeStamp ManualDoCompact(const String &schema_name,
-                                 const String &table_name,
-                                 bool rollback,
-                                 Optional<std::function<void()>> mid_func = None); // false unit test
 
     void AddTestCommand(BGTaskType type, const String &command) { test_commander_.Add(type, command); }
 
 private:
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
-
-    void ScanAndOptimize();
-
     void NewScanAndOptimize();
-
-    void DoDump(DumpIndexTask *dump_task);
-
-    void DoDumpByline(DumpIndexBylineTask *dump_task);
 
     void Process();
 
@@ -95,10 +78,6 @@ private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_{"CompactionProcessor"};
 
     Thread processor_thread_{};
-
-    Catalog *catalog_{};
-    TxnManager *txn_mgr_{};
-    SessionManager *session_mgr_{};
 
     Atomic<u64> task_count_{};
 

@@ -17,35 +17,17 @@ module;
 export module bg_task;
 
 import stl;
-import txn;
-import catalog;
-import catalog_delta_entry;
-import buffer_manager;
 import third_party;
 import global_resource_usage;
 import status;
+import bg_task_type;
 
 namespace infinity {
 
-export enum class BGTaskType {
-    kStopProcessor,
-    kAddDeltaEntry,
-    kCheckpoint,
-    kNewCheckpoint,
-    kForceCheckpoint, // Manually triggered by PhysicalFlush
-    kNotifyCompact,
-    kNewCompact,
-    kNotifyOptimize,
-    kCleanup,
-    kNewCleanup,
-    kUpdateSegmentBloomFilterData, // Not used
-    kDumpIndex,
-    kDumpIndexByline,
-    kTestCommand,
-    kInvalid
-};
-
+struct MemIndex;
+struct ColumnVector;
 class BaseMemIndex;
+class EMVBIndexInMem;
 struct ChunkIndexEntry;
 class NewTxn;
 
@@ -86,6 +68,8 @@ export struct BGTask {
         cv_.notify_one();
     }
 
+    Status result_status_{};
+
     virtual String ToString() const = 0;
 };
 
@@ -97,30 +81,8 @@ export struct StopProcessorTask final : public BGTask {
     String ToString() const final { return "Stop Task"; }
 };
 
-export struct AddDeltaEntryTask final : public BGTask {
-    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry) : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)) {}
-
-    String ToString() const final { return fmt::format("DeltaLog: {}", delta_entry_->ToString()); }
-
-    UniquePtr<CatalogDeltaEntry> delta_entry_{};
-};
-
 export struct CheckpointTaskBase : public BGTask {
     CheckpointTaskBase(BGTaskType type, bool async) : BGTask(type, async) {}
-};
-
-export struct CheckpointTask final : public CheckpointTaskBase {
-    CheckpointTask(bool full_checkpoint) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
-
-    String ToString() const final {
-        if (is_full_checkpoint_) {
-            return "Full checkpoint";
-        } else {
-            return "Delta checkpoint";
-        }
-    }
-
-    bool is_full_checkpoint_{};
 };
 
 export struct NewCheckpointTask final : public CheckpointTaskBase {
@@ -133,47 +95,6 @@ export struct NewCheckpointTask final : public CheckpointTaskBase {
 
     NewTxn *new_txn_{};
     i64 wal_size_{};
-};
-
-export struct ForceCheckpointTask final : public CheckpointTaskBase {
-    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
-    explicit ForceCheckpointTask(NewTxn *new_txn, bool full_checkpoint = true, TxnTimeStamp cleanup_ts = 0);
-
-    ~ForceCheckpointTask();
-
-    String ToString() const override {
-        if (is_full_checkpoint_) {
-            return fmt::format("Force full checkpoint, txn: ", txn_->TxnID());
-        } else {
-            return fmt::format("Force delta checkpoint, txn: ", txn_->TxnID());
-        }
-    }
-
-    Txn *txn_{};
-    NewTxn *new_txn_{};
-    bool is_full_checkpoint_{};
-    TxnTimeStamp cleanup_ts_ = 0;
-};
-
-export class CleanupTask final : public BGTask {
-public:
-    // Try clean up is async task?
-    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
-        : BGTask(BGTaskType::kCleanup, false), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
-
-public:
-    ~CleanupTask() override = default;
-
-    String ToString() const override { return fmt::format("CleanupTask, visible timestamp: {}", visible_ts_); }
-
-    void Execute();
-
-private:
-    Catalog *const catalog_;
-
-    const TxnTimeStamp visible_ts_;
-
-    BufferManager *buffer_mgr_;
 };
 
 export class NewCleanupTask final : public BGTask {
@@ -189,13 +110,11 @@ private:
 
 export class NotifyCompactTask final : public BGTask {
 public:
-    NotifyCompactTask(bool new_compact = false) : BGTask(BGTaskType::kNotifyCompact, true), new_compact_(new_compact) {}
+    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
 
     ~NotifyCompactTask() override = default;
 
     String ToString() const override { return "NotifyCompactTask"; }
-
-    bool new_compact_ = false;
 };
 
 export class NewCompactTask final : public BGTask {
@@ -223,8 +142,8 @@ public:
 
 export class DumpIndexTask final : public BGTask {
 public:
-    DumpIndexTask(BaseMemIndex *mem_index, Txn *txn);
-    DumpIndexTask(BaseMemIndex *mem_index, NewTxn *new_txn);
+    DumpIndexTask(BaseMemIndex *mem_index, SharedPtr<NewTxn> &new_txn_shared);
+    DumpIndexTask(EMVBIndexInMem *emvb_mem_index, SharedPtr<NewTxn> &new_txn_shared);
 
     ~DumpIndexTask() override = default;
 
@@ -232,28 +151,35 @@ public:
 
 public:
     BaseMemIndex *mem_index_{};
-    Txn *txn_{};
-    NewTxn *new_txn_{};
+    EMVBIndexInMem *emvb_mem_index_{};
+    SharedPtr<NewTxn> new_txn_shared_{};
 };
 
-export class DumpIndexBylineTask final : public BGTask {
+export class AppendMemIndexTask final : public BGTask {
 public:
-    DumpIndexBylineTask(SharedPtr<String> db_name,
-                        SharedPtr<String> table_name,
-                        SharedPtr<String> index_name,
-                        SegmentID segment_id,
-                        SharedPtr<ChunkIndexEntry> dumped_chunk);
+    AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index, const SharedPtr<ColumnVector> &input_column, BlockOffset offset, BlockOffset row_cnt);
 
-    ~DumpIndexBylineTask() override = default;
+    ~AppendMemIndexTask() override = default;
 
-    String ToString() const override { return "DumpIndexBylineTask"; }
+    String ToString() const override { return "AppendMemIndexTask"; }
 
 public:
-    SharedPtr<String> db_name_;
-    SharedPtr<String> table_name_;
-    SharedPtr<String> index_name_;
-    SegmentID segment_id_;
-    SharedPtr<ChunkIndexEntry> dumped_chunk_;
+    SharedPtr<MemIndex> mem_index_{};
+    SharedPtr<ColumnVector> input_column_{};
+    BlockOffset offset_{};
+    BlockOffset row_cnt_{};
+    u64 seq_inserted_{};
+    u32 doc_count_{};
+};
+
+export struct AppendMemIndexBatch {
+    void InsertTask(AppendMemIndexTask *);
+    void WaitForCompletion();
+
+    Vector<AppendMemIndexTask *> append_tasks_{};
+    u64 task_count_{};
+    mutable std::mutex mtx_{};
+    std::condition_variable cv_{};
 };
 
 export class TestCommandTask final : public BGTask {
@@ -266,6 +192,14 @@ public:
 
 public:
     String command_content_{};
+};
+
+export struct BGTaskInfo {
+    explicit BGTaskInfo(BGTaskType type);
+    Vector<String> task_info_list_{};
+    Vector<String> status_list_{};
+    BGTaskType type_{BGTaskType::kInvalid};
+    std::chrono::system_clock::time_point task_time_{};
 };
 
 } // namespace infinity

@@ -2,7 +2,6 @@ import importlib
 import sys
 import os
 import infinity
-import infinity_embedded
 import time
 import infinity.index as index
 import pandas
@@ -20,30 +19,14 @@ from infinity_http import infinity_http
 
 TEST_DATA_DIR = "/test/data/"
 
-
-@pytest.fixture(scope="class")
-def local_infinity(request):
-    return request.config.getoption("--local-infinity")
-
-
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
 
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity, http):
-    if local_infinity:
-        module = importlib.import_module("infinity_embedded.index")
-        globals()["index"] = module
-        module = importlib.import_module("infinity_embedded.common")
-        func = getattr(module, 'ConflictType')
-        globals()['ConflictType'] = func
-        func = getattr(module, 'InfinityException')
-        globals()['InfinityException'] = func
-        uri = common_values.TEST_LOCAL_PATH
-        request.cls.infinity_obj = infinity_embedded.connect(uri)
-    elif http:
+def setup_class(request, http):
+    if http:
         uri = common_values.TEST_LOCAL_HOST
         request.cls.infinity_obj = infinity_http()
     else:
@@ -1578,3 +1561,36 @@ class TestInfinity:
         res = db_obj.drop_table("test_index_comment" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_dump_index(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_dump_index" + suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_dump_index" + suffix, {
+                "c1": {"type": "int"}, "body": {"type": "varchar"}
+            }, ConflictType.Error)
+        assert table_obj is not None
+        res = table_obj.create_index("my_index_1",
+                                     index.IndexInfo("c1",
+                                                     index.IndexType.Secondary),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        table_obj.insert([{"c1": 1, "body": "hello"}])
+        res = table_obj.create_index("my_index_2",
+                                     index.IndexInfo("body",
+                                                     index.IndexType.Secondary),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        table_obj.insert([{"c1": 2, "body": "world"}])
+
+        res = table_obj.dump_index("my_index_1")
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.dump_index("my_index_2")
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index_1")
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.drop_index("my_index_2")
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_dump_index" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

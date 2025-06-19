@@ -131,14 +131,12 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
 
     SizeT src_size = fs::file_size(src_fp, ec);
     if (ec) {
-        String error_message = fmt::format("Failed to get file size of {}", file_path);
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Failed to get file size of {}", file_path));
     }
     if (src_size == 0) {
-        String error_message = fmt::format("Persist empty local path {}", file_path);
-        LOG_WARN(error_message);
+        LOG_WARN(fmt::format("Persist empty local path {}", file_path));
         ObjAddr obj_addr(ObjAddr::KeyEmpty, 0, 0);
-        fs::remove(tmp_file_path, ec);
+        fs::remove(tmp_file_path, ec); // This may cause the issue
         if (ec) {
             String error_message = fmt::format("Failed to remove {}", tmp_file_path);
             UnrecoverableError(error_message);
@@ -150,14 +148,14 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         result.persist_keys_.push_back(ObjAddr::KeyEmpty);
         result.obj_addr_ = obj_addr;
         return result;
-    } else if (!try_compose || src_size >= object_size_limit_) {
+    }
+    if (!try_compose || src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
         fs::rename(src_fp, dst_fp, ec);
         if (ec) {
-            String error_message = fmt::format("Failed to rename {} to {}", src_fp.string(), dst_fp.string());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Failed to rename {} to {}", src_fp.string(), dst_fp.string()));
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
@@ -175,31 +173,30 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         result.persist_keys_.push_back(obj_key);
         result.obj_addr_ = obj_addr;
         return result;
-    } else {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (int(src_size) >= CurrentObjRoomNoLock()) {
-            CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
-        }
-        current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
-        ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
-        CurrentObjAppendNoLock(tmp_file_path, src_size);
-        fs::remove(tmp_file_path, ec);
-        if (ec) {
-            String error_message = fmt::format("Failed to remove {}", tmp_file_path);
-            UnrecoverableError(error_message);
-        }
-
-        local_path_obj_[local_path] = obj_addr;
-        AddObjAddrToKVStore(file_path, obj_addr);
-
-        LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
-                              local_path,
-                              obj_addr.obj_key_,
-                              obj_addr.part_offset_,
-                              obj_addr.part_size_));
-        result.obj_addr_ = obj_addr;
-        return result;
     }
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (int(src_size) >= CurrentObjRoomNoLock()) {
+        CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
+    }
+    current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
+    ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
+    CurrentObjAppendNoLock(tmp_file_path, src_size);
+    fs::remove(tmp_file_path, ec);
+    if (ec) {
+        String error_message = fmt::format("Failed to remove {}", tmp_file_path);
+        UnrecoverableError(error_message);
+    }
+
+    local_path_obj_[local_path] = obj_addr;
+    AddObjAddrToKVStore(file_path, obj_addr);
+
+    LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
+                          local_path,
+                          obj_addr.obj_key_,
+                          obj_addr.part_offset_,
+                          obj_addr.part_size_));
+    result.obj_addr_ = obj_addr;
+    return result;
 }
 
 // TODO:
@@ -584,7 +581,8 @@ void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &
 String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
-    } else if (!path.starts_with("/")) {
+    }
+    if (!path.starts_with("/")) {
         return path;
     }
     return "";

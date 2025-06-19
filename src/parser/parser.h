@@ -76,6 +76,7 @@ extern int sqldebug;
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
 #include "statement/admin_statement.h"
+#include "statement/check_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -117,7 +118,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 121 "parser.h"
+#line 122 "parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -149,189 +150,189 @@ struct SQL_LTYPE {
     ALL = 276,                     /* ALL  */
     INTERSECT = 277,               /* INTERSECT  */
     COMPACT = 278,                 /* COMPACT  */
-    LOCK = 279,                    /* LOCK  */
-    UNLOCK = 280,                  /* UNLOCK  */
-    ADD = 281,                     /* ADD  */
-    RENAME = 282,                  /* RENAME  */
-    EXCEPT = 283,                  /* EXCEPT  */
-    FLUSH = 284,                   /* FLUSH  */
-    USE = 285,                     /* USE  */
-    OPTIMIZE = 286,                /* OPTIMIZE  */
-    PROPERTIES = 287,              /* PROPERTIES  */
-    DATABASE = 288,                /* DATABASE  */
-    TABLE = 289,                   /* TABLE  */
-    COLLECTION = 290,              /* COLLECTION  */
-    TABLES = 291,                  /* TABLES  */
-    INTO = 292,                    /* INTO  */
-    VALUES = 293,                  /* VALUES  */
-    VIEW = 294,                    /* VIEW  */
-    INDEX = 295,                   /* INDEX  */
-    VIEWS = 296,                   /* VIEWS  */
-    DATABASES = 297,               /* DATABASES  */
-    SEGMENT = 298,                 /* SEGMENT  */
-    SEGMENTS = 299,                /* SEGMENTS  */
-    BLOCK = 300,                   /* BLOCK  */
-    BLOCKS = 301,                  /* BLOCKS  */
-    COLUMN = 302,                  /* COLUMN  */
-    COLUMNS = 303,                 /* COLUMNS  */
-    INDEXES = 304,                 /* INDEXES  */
-    CHUNK = 305,                   /* CHUNK  */
-    SYSTEM = 306,                  /* SYSTEM  */
-    GROUP = 307,                   /* GROUP  */
-    BY = 308,                      /* BY  */
-    HAVING = 309,                  /* HAVING  */
-    AS = 310,                      /* AS  */
-    NATURAL = 311,                 /* NATURAL  */
-    JOIN = 312,                    /* JOIN  */
-    LEFT = 313,                    /* LEFT  */
-    RIGHT = 314,                   /* RIGHT  */
-    OUTER = 315,                   /* OUTER  */
-    FULL = 316,                    /* FULL  */
-    ON = 317,                      /* ON  */
-    INNER = 318,                   /* INNER  */
-    CROSS = 319,                   /* CROSS  */
-    DISTINCT = 320,                /* DISTINCT  */
-    WHERE = 321,                   /* WHERE  */
-    ORDER = 322,                   /* ORDER  */
-    LIMIT = 323,                   /* LIMIT  */
-    OFFSET = 324,                  /* OFFSET  */
-    ASC = 325,                     /* ASC  */
-    DESC = 326,                    /* DESC  */
-    IF = 327,                      /* IF  */
-    NOT = 328,                     /* NOT  */
-    EXISTS = 329,                  /* EXISTS  */
-    IN = 330,                      /* IN  */
-    FROM = 331,                    /* FROM  */
-    TO = 332,                      /* TO  */
-    WITH = 333,                    /* WITH  */
-    DELIMITER = 334,               /* DELIMITER  */
-    FORMAT = 335,                  /* FORMAT  */
-    HEADER = 336,                  /* HEADER  */
-    HIGHLIGHT = 337,               /* HIGHLIGHT  */
-    CAST = 338,                    /* CAST  */
-    END = 339,                     /* END  */
-    CASE = 340,                    /* CASE  */
-    ELSE = 341,                    /* ELSE  */
-    THEN = 342,                    /* THEN  */
-    WHEN = 343,                    /* WHEN  */
-    BOOLEAN = 344,                 /* BOOLEAN  */
-    INTEGER = 345,                 /* INTEGER  */
-    INT = 346,                     /* INT  */
-    TINYINT = 347,                 /* TINYINT  */
-    SMALLINT = 348,                /* SMALLINT  */
-    BIGINT = 349,                  /* BIGINT  */
-    HUGEINT = 350,                 /* HUGEINT  */
-    VARCHAR = 351,                 /* VARCHAR  */
-    FLOAT = 352,                   /* FLOAT  */
-    DOUBLE = 353,                  /* DOUBLE  */
-    REAL = 354,                    /* REAL  */
-    DECIMAL = 355,                 /* DECIMAL  */
-    DATE = 356,                    /* DATE  */
-    TIME = 357,                    /* TIME  */
-    DATETIME = 358,                /* DATETIME  */
-    FLOAT16 = 359,                 /* FLOAT16  */
-    BFLOAT16 = 360,                /* BFLOAT16  */
-    UNSIGNED = 361,                /* UNSIGNED  */
-    TIMESTAMP = 362,               /* TIMESTAMP  */
-    UUID = 363,                    /* UUID  */
-    POINT = 364,                   /* POINT  */
-    LINE = 365,                    /* LINE  */
-    LSEG = 366,                    /* LSEG  */
-    BOX = 367,                     /* BOX  */
-    PATH = 368,                    /* PATH  */
-    POLYGON = 369,                 /* POLYGON  */
-    CIRCLE = 370,                  /* CIRCLE  */
-    BLOB = 371,                    /* BLOB  */
-    BITMAP = 372,                  /* BITMAP  */
-    ARRAY = 373,                   /* ARRAY  */
-    TUPLE = 374,                   /* TUPLE  */
-    EMBEDDING = 375,               /* EMBEDDING  */
-    VECTOR = 376,                  /* VECTOR  */
-    MULTIVECTOR = 377,             /* MULTIVECTOR  */
-    TENSOR = 378,                  /* TENSOR  */
-    SPARSE = 379,                  /* SPARSE  */
-    TENSORARRAY = 380,             /* TENSORARRAY  */
-    BIT = 381,                     /* BIT  */
-    TEXT = 382,                    /* TEXT  */
-    PRIMARY = 383,                 /* PRIMARY  */
-    KEY = 384,                     /* KEY  */
-    UNIQUE = 385,                  /* UNIQUE  */
-    NULLABLE = 386,                /* NULLABLE  */
-    IS = 387,                      /* IS  */
-    DEFAULT = 388,                 /* DEFAULT  */
-    COMMENT = 389,                 /* COMMENT  */
-    IGNORE = 390,                  /* IGNORE  */
-    TRUE = 391,                    /* TRUE  */
-    FALSE = 392,                   /* FALSE  */
-    INTERVAL = 393,                /* INTERVAL  */
-    SECOND = 394,                  /* SECOND  */
-    SECONDS = 395,                 /* SECONDS  */
-    MINUTE = 396,                  /* MINUTE  */
-    MINUTES = 397,                 /* MINUTES  */
-    HOUR = 398,                    /* HOUR  */
-    HOURS = 399,                   /* HOURS  */
-    DAY = 400,                     /* DAY  */
-    DAYS = 401,                    /* DAYS  */
-    MONTH = 402,                   /* MONTH  */
-    MONTHS = 403,                  /* MONTHS  */
-    YEAR = 404,                    /* YEAR  */
-    YEARS = 405,                   /* YEARS  */
-    EQUAL = 406,                   /* EQUAL  */
-    NOT_EQ = 407,                  /* NOT_EQ  */
-    LESS_EQ = 408,                 /* LESS_EQ  */
-    GREATER_EQ = 409,              /* GREATER_EQ  */
-    BETWEEN = 410,                 /* BETWEEN  */
-    AND = 411,                     /* AND  */
-    OR = 412,                      /* OR  */
-    EXTRACT = 413,                 /* EXTRACT  */
-    LIKE = 414,                    /* LIKE  */
-    DATA = 415,                    /* DATA  */
-    LOG = 416,                     /* LOG  */
-    BUFFER = 417,                  /* BUFFER  */
-    TRANSACTIONS = 418,            /* TRANSACTIONS  */
-    TRANSACTION = 419,             /* TRANSACTION  */
-    MEMINDEX = 420,                /* MEMINDEX  */
-    USING = 421,                   /* USING  */
-    SESSION = 422,                 /* SESSION  */
-    GLOBAL = 423,                  /* GLOBAL  */
-    OFF = 424,                     /* OFF  */
-    EXPORT = 425,                  /* EXPORT  */
-    CONFIGS = 426,                 /* CONFIGS  */
-    CONFIG = 427,                  /* CONFIG  */
-    PROFILES = 428,                /* PROFILES  */
-    VARIABLES = 429,               /* VARIABLES  */
-    VARIABLE = 430,                /* VARIABLE  */
-    DELTA = 431,                   /* DELTA  */
-    LOGS = 432,                    /* LOGS  */
-    CATALOGS = 433,                /* CATALOGS  */
-    CATALOG = 434,                 /* CATALOG  */
-    SEARCH = 435,                  /* SEARCH  */
-    MATCH = 436,                   /* MATCH  */
-    MAXSIM = 437,                  /* MAXSIM  */
-    QUERY = 438,                   /* QUERY  */
-    QUERIES = 439,                 /* QUERIES  */
-    FUSION = 440,                  /* FUSION  */
-    ROWLIMIT = 441,                /* ROWLIMIT  */
-    ADMIN = 442,                   /* ADMIN  */
-    LEADER = 443,                  /* LEADER  */
-    FOLLOWER = 444,                /* FOLLOWER  */
-    LEARNER = 445,                 /* LEARNER  */
-    CONNECT = 446,                 /* CONNECT  */
-    STANDALONE = 447,              /* STANDALONE  */
-    NODES = 448,                   /* NODES  */
-    NODE = 449,                    /* NODE  */
-    REMOVE = 450,                  /* REMOVE  */
-    SNAPSHOT = 451,                /* SNAPSHOT  */
-    SNAPSHOTS = 452,               /* SNAPSHOTS  */
-    RECOVER = 453,                 /* RECOVER  */
-    RESTORE = 454,                 /* RESTORE  */
-    PERSISTENCE = 455,             /* PERSISTENCE  */
-    OBJECT = 456,                  /* OBJECT  */
-    OBJECTS = 457,                 /* OBJECTS  */
-    FILES = 458,                   /* FILES  */
-    MEMORY = 459,                  /* MEMORY  */
-    ALLOCATION = 460,              /* ALLOCATION  */
-    HISTORY = 461,                 /* HISTORY  */
+    ADD = 279,                     /* ADD  */
+    RENAME = 280,                  /* RENAME  */
+    DUMP = 281,                    /* DUMP  */
+    EXCEPT = 282,                  /* EXCEPT  */
+    FLUSH = 283,                   /* FLUSH  */
+    USE = 284,                     /* USE  */
+    OPTIMIZE = 285,                /* OPTIMIZE  */
+    PROPERTIES = 286,              /* PROPERTIES  */
+    DATABASE = 287,                /* DATABASE  */
+    TABLE = 288,                   /* TABLE  */
+    COLLECTION = 289,              /* COLLECTION  */
+    TABLES = 290,                  /* TABLES  */
+    INTO = 291,                    /* INTO  */
+    VALUES = 292,                  /* VALUES  */
+    VIEW = 293,                    /* VIEW  */
+    INDEX = 294,                   /* INDEX  */
+    TASKS = 295,                   /* TASKS  */
+    DATABASES = 296,               /* DATABASES  */
+    SEGMENT = 297,                 /* SEGMENT  */
+    SEGMENTS = 298,                /* SEGMENTS  */
+    BLOCK = 299,                   /* BLOCK  */
+    BLOCKS = 300,                  /* BLOCKS  */
+    COLUMN = 301,                  /* COLUMN  */
+    COLUMNS = 302,                 /* COLUMNS  */
+    INDEXES = 303,                 /* INDEXES  */
+    CHUNK = 304,                   /* CHUNK  */
+    SYSTEM = 305,                  /* SYSTEM  */
+    GROUP = 306,                   /* GROUP  */
+    BY = 307,                      /* BY  */
+    HAVING = 308,                  /* HAVING  */
+    AS = 309,                      /* AS  */
+    NATURAL = 310,                 /* NATURAL  */
+    JOIN = 311,                    /* JOIN  */
+    LEFT = 312,                    /* LEFT  */
+    RIGHT = 313,                   /* RIGHT  */
+    OUTER = 314,                   /* OUTER  */
+    FULL = 315,                    /* FULL  */
+    ON = 316,                      /* ON  */
+    INNER = 317,                   /* INNER  */
+    CROSS = 318,                   /* CROSS  */
+    DISTINCT = 319,                /* DISTINCT  */
+    WHERE = 320,                   /* WHERE  */
+    ORDER = 321,                   /* ORDER  */
+    LIMIT = 322,                   /* LIMIT  */
+    OFFSET = 323,                  /* OFFSET  */
+    ASC = 324,                     /* ASC  */
+    DESC = 325,                    /* DESC  */
+    IF = 326,                      /* IF  */
+    NOT = 327,                     /* NOT  */
+    EXISTS = 328,                  /* EXISTS  */
+    IN = 329,                      /* IN  */
+    FROM = 330,                    /* FROM  */
+    TO = 331,                      /* TO  */
+    WITH = 332,                    /* WITH  */
+    DELIMITER = 333,               /* DELIMITER  */
+    FORMAT = 334,                  /* FORMAT  */
+    HEADER = 335,                  /* HEADER  */
+    HIGHLIGHT = 336,               /* HIGHLIGHT  */
+    CAST = 337,                    /* CAST  */
+    END = 338,                     /* END  */
+    CASE = 339,                    /* CASE  */
+    ELSE = 340,                    /* ELSE  */
+    THEN = 341,                    /* THEN  */
+    WHEN = 342,                    /* WHEN  */
+    BOOLEAN = 343,                 /* BOOLEAN  */
+    INTEGER = 344,                 /* INTEGER  */
+    INT = 345,                     /* INT  */
+    TINYINT = 346,                 /* TINYINT  */
+    SMALLINT = 347,                /* SMALLINT  */
+    BIGINT = 348,                  /* BIGINT  */
+    HUGEINT = 349,                 /* HUGEINT  */
+    VARCHAR = 350,                 /* VARCHAR  */
+    FLOAT = 351,                   /* FLOAT  */
+    DOUBLE = 352,                  /* DOUBLE  */
+    REAL = 353,                    /* REAL  */
+    DECIMAL = 354,                 /* DECIMAL  */
+    DATE = 355,                    /* DATE  */
+    TIME = 356,                    /* TIME  */
+    DATETIME = 357,                /* DATETIME  */
+    FLOAT16 = 358,                 /* FLOAT16  */
+    BFLOAT16 = 359,                /* BFLOAT16  */
+    UNSIGNED = 360,                /* UNSIGNED  */
+    TIMESTAMP = 361,               /* TIMESTAMP  */
+    UUID = 362,                    /* UUID  */
+    POINT = 363,                   /* POINT  */
+    LINE = 364,                    /* LINE  */
+    LSEG = 365,                    /* LSEG  */
+    BOX = 366,                     /* BOX  */
+    PATH = 367,                    /* PATH  */
+    POLYGON = 368,                 /* POLYGON  */
+    CIRCLE = 369,                  /* CIRCLE  */
+    BLOB = 370,                    /* BLOB  */
+    BITMAP = 371,                  /* BITMAP  */
+    ARRAY = 372,                   /* ARRAY  */
+    TUPLE = 373,                   /* TUPLE  */
+    EMBEDDING = 374,               /* EMBEDDING  */
+    VECTOR = 375,                  /* VECTOR  */
+    MULTIVECTOR = 376,             /* MULTIVECTOR  */
+    TENSOR = 377,                  /* TENSOR  */
+    SPARSE = 378,                  /* SPARSE  */
+    TENSORARRAY = 379,             /* TENSORARRAY  */
+    BIT = 380,                     /* BIT  */
+    TEXT = 381,                    /* TEXT  */
+    PRIMARY = 382,                 /* PRIMARY  */
+    KEY = 383,                     /* KEY  */
+    UNIQUE = 384,                  /* UNIQUE  */
+    NULLABLE = 385,                /* NULLABLE  */
+    IS = 386,                      /* IS  */
+    DEFAULT = 387,                 /* DEFAULT  */
+    COMMENT = 388,                 /* COMMENT  */
+    IGNORE = 389,                  /* IGNORE  */
+    TRUE = 390,                    /* TRUE  */
+    FALSE = 391,                   /* FALSE  */
+    INTERVAL = 392,                /* INTERVAL  */
+    SECOND = 393,                  /* SECOND  */
+    SECONDS = 394,                 /* SECONDS  */
+    MINUTE = 395,                  /* MINUTE  */
+    MINUTES = 396,                 /* MINUTES  */
+    HOUR = 397,                    /* HOUR  */
+    HOURS = 398,                   /* HOURS  */
+    DAY = 399,                     /* DAY  */
+    DAYS = 400,                    /* DAYS  */
+    MONTH = 401,                   /* MONTH  */
+    MONTHS = 402,                  /* MONTHS  */
+    YEAR = 403,                    /* YEAR  */
+    YEARS = 404,                   /* YEARS  */
+    EQUAL = 405,                   /* EQUAL  */
+    NOT_EQ = 406,                  /* NOT_EQ  */
+    LESS_EQ = 407,                 /* LESS_EQ  */
+    GREATER_EQ = 408,              /* GREATER_EQ  */
+    BETWEEN = 409,                 /* BETWEEN  */
+    AND = 410,                     /* AND  */
+    OR = 411,                      /* OR  */
+    EXTRACT = 412,                 /* EXTRACT  */
+    LIKE = 413,                    /* LIKE  */
+    DATA = 414,                    /* DATA  */
+    LOG = 415,                     /* LOG  */
+    BUFFER = 416,                  /* BUFFER  */
+    TRANSACTIONS = 417,            /* TRANSACTIONS  */
+    TRANSACTION = 418,             /* TRANSACTION  */
+    MEMINDEX = 419,                /* MEMINDEX  */
+    USING = 420,                   /* USING  */
+    SESSION = 421,                 /* SESSION  */
+    GLOBAL = 422,                  /* GLOBAL  */
+    OFF = 423,                     /* OFF  */
+    EXPORT = 424,                  /* EXPORT  */
+    CONFIGS = 425,                 /* CONFIGS  */
+    CONFIG = 426,                  /* CONFIG  */
+    PROFILES = 427,                /* PROFILES  */
+    VARIABLES = 428,               /* VARIABLES  */
+    VARIABLE = 429,                /* VARIABLE  */
+    LOGS = 430,                    /* LOGS  */
+    CATALOGS = 431,                /* CATALOGS  */
+    CATALOG = 432,                 /* CATALOG  */
+    SEARCH = 433,                  /* SEARCH  */
+    MATCH = 434,                   /* MATCH  */
+    MAXSIM = 435,                  /* MAXSIM  */
+    QUERY = 436,                   /* QUERY  */
+    QUERIES = 437,                 /* QUERIES  */
+    FUSION = 438,                  /* FUSION  */
+    ROWLIMIT = 439,                /* ROWLIMIT  */
+    ADMIN = 440,                   /* ADMIN  */
+    LEADER = 441,                  /* LEADER  */
+    FOLLOWER = 442,                /* FOLLOWER  */
+    LEARNER = 443,                 /* LEARNER  */
+    CONNECT = 444,                 /* CONNECT  */
+    STANDALONE = 445,              /* STANDALONE  */
+    NODES = 446,                   /* NODES  */
+    NODE = 447,                    /* NODE  */
+    REMOVE = 448,                  /* REMOVE  */
+    SNAPSHOT = 449,                /* SNAPSHOT  */
+    SNAPSHOTS = 450,               /* SNAPSHOTS  */
+    RECOVER = 451,                 /* RECOVER  */
+    RESTORE = 452,                 /* RESTORE  */
+    PERSISTENCE = 453,             /* PERSISTENCE  */
+    OBJECT = 454,                  /* OBJECT  */
+    OBJECTS = 455,                 /* OBJECTS  */
+    FILES = 456,                   /* FILES  */
+    MEMORY = 457,                  /* MEMORY  */
+    ALLOCATION = 458,              /* ALLOCATION  */
+    HISTORY = 459,                 /* HISTORY  */
+    CHECK = 460,                   /* CHECK  */
+    CLEAN = 461,                   /* CLEAN  */
     NUMBER = 462                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
@@ -341,7 +342,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 104 "parser.y"
+#line 105 "parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -366,6 +367,7 @@ union SQLSTYPE
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
     infinity::AdminStatement* admin_stmt;
+    infinity::CheckStatement* check_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -421,7 +423,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 425 "parser.h"
+#line 427 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

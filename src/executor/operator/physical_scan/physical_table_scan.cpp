@@ -19,7 +19,6 @@ module;
 module physical_table_scan;
 
 import stl;
-import txn;
 import query_context;
 import table_def;
 import data_table;
@@ -39,7 +38,6 @@ import logger;
 import column_vector;
 import logical_type;
 import meta_info;
-import block_entry;
 
 import new_txn;
 import block_meta;
@@ -117,13 +115,8 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         return;
     }
 
-    TxnTimeStamp begin_ts;
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (!use_new_catalog) {
-        begin_ts = query_context->GetTxn()->BeginTS();
-    } else {
-        begin_ts = query_context->GetNewTxn()->BeginTS();
-    }
+    TxnTimeStamp begin_ts = query_context->GetNewTxn()->BeginTS();
+    TxnTimeStamp commit_ts = query_context->GetNewTxn()->CommitTS();
 
 #ifdef INFINITY_DEBUG
     // This part has performance issue
@@ -142,152 +135,87 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
         u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
-        if (use_new_catalog) {
-            BlockMeta *current_block_meta = block_index->GetBlockMeta(segment_id, block_id);
+        BlockMeta *current_block_meta = block_index->GetBlockMeta(segment_id, block_id);
 
-            Optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
-            if (!range_state) {
-                // TODO
-                range_state = NewTxnGetVisibleRangeState();
-                Status status = NewCatalog::GetBlockVisibleRange(*current_block_meta, begin_ts, *range_state);
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-
-                // new block, check FastRoughFilter
-                SharedPtr<FastRoughFilter> block_filter;
-                status = current_block_meta->GetFastRoughFilter(block_filter);
-                if (status.ok()) {
-                    if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *block_filter)) {
-                        // skip this block
-                        LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
-                                              block_ids_idx,
-                                              block_ids_count));
-                        ++block_ids_idx;
-                        continue;
-                    } else {
-                        LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
-                                              block_ids_idx,
-                                              block_ids_count));
-                    }
-                }
+        Optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
+        if (!range_state) {
+            // TODO
+            range_state = NewTxnGetVisibleRangeState();
+            Status status = NewCatalog::GetBlockVisibleRange(*current_block_meta, begin_ts, commit_ts, *range_state);
+            if (!status.ok()) {
+                RecoverableError(status);
             }
 
-            Pair<BlockOffset, BlockOffset> visible_range;
-            bool has_next = range_state->Next(visible_range);
-            if (!has_next || visible_range.first == visible_range.second) {
-                // we have read all data from current block, move to next block
-                ++block_ids_idx;
-                range_state.reset();
-                continue;
-            }
-            if (write_capacity == 0) {
-                // output is full
-                break;
-            }
-
-            auto write_size = std::min(write_capacity, SizeT(visible_range.second - visible_range.first));
-            SizeT output_column_id{0};
-            for (auto column_id : column_ids) {
-                switch (column_id) {
-                    case COLUMN_IDENTIFIER_ROW_ID: {
-                        u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + visible_range.first;
-                        output_ptr->column_vectors[output_column_id]->AppendWith(RowID(segment_id, segment_offset), write_size);
-                        break;
-                    }
-                    case COLUMN_IDENTIFIER_CREATE: {
-                        Status status = NewCatalog::GetCreateTSVector(*current_block_meta,
-                                                                      visible_range.first,
-                                                                      write_size,
-                                                                      *output_ptr->column_vectors[output_column_id]);
-                        if (!status.ok()) {
-                            RecoverableError(status);
-                        }
-                        break;
-                    }
-                    case COLUMN_IDENTIFIER_DELETE: {
-                        Status status = NewCatalog::GetDeleteTSVector(*current_block_meta,
-                                                                      visible_range.first,
-                                                                      write_size,
-                                                                      *output_ptr->column_vectors[output_column_id]);
-                        if (!status.ok()) {
-                            RecoverableError(status);
-                        }
-                        break;
-                    }
-                    default: {
-                        ColumnVector column_vector;
-                        ColumnMeta column_meta(column_id, *current_block_meta);
-                        SizeT row_cnt = range_state->block_offset_end();
-                        Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
-                        if (!status.ok()) {
-                            RecoverableError(status);
-                        }
-                        output_ptr->column_vectors[output_column_id]->AppendWith(column_vector, visible_range.first, write_size);
-                    }
-                }
-                ++output_column_id;
-            }
-
-            // write_size = already read size = already write size
-            write_capacity -= write_size;
-            range_state->SetBlockOffsetBegin(visible_range.first + write_size);
-            continue;
-        }
-        SizeT &read_offset = table_scan_function_data_ptr->current_read_offset_;
-        BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-        if (read_offset == 0) {
             // new block, check FastRoughFilter
-            const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
-            if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
-                // skip this block
-                LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
-                                      block_ids_idx,
-                                      block_ids_count));
-                ++block_ids_idx;
-                continue;
-            } else {
-                LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
-                                      block_ids_idx,
-                                      block_ids_count));
+            SharedPtr<FastRoughFilter> block_filter;
+            status = current_block_meta->GetFastRoughFilter(block_filter);
+            if (status.ok()) {
+                if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, *block_filter)) {
+                    // skip this block
+                    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
+                                          block_ids_idx,
+                                          block_ids_count));
+                    ++block_ids_idx;
+                    continue;
+                } else {
+                    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
+                                          block_ids_idx,
+                                          block_ids_count));
+                }
             }
         }
-        auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
-        if (row_begin == row_end) {
+
+        Pair<BlockOffset, BlockOffset> visible_range;
+        bool has_next = range_state->Next(visible_range);
+        if (!has_next || visible_range.first == visible_range.second) {
             // we have read all data from current block, move to next block
             ++block_ids_idx;
-            read_offset = 0;
+            range_state.reset();
             continue;
         }
         if (write_capacity == 0) {
             // output is full
             break;
         }
-        auto write_size = std::min(write_capacity, SizeT(row_end - row_begin));
 
-        read_offset = row_begin;
+        auto write_size = std::min(write_capacity, SizeT(visible_range.second - visible_range.first));
         SizeT output_column_id{0};
-        auto *buffer_mgr = query_context->storage()->buffer_manager();
         for (auto column_id : column_ids) {
             switch (column_id) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
-                    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
+                    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + visible_range.first;
                     output_ptr->column_vectors[output_column_id]->AppendWith(RowID(segment_id, segment_offset), write_size);
                     break;
                 }
                 case COLUMN_IDENTIFIER_CREATE: {
-                    ColumnVector create_ts_vec = current_block_entry->GetCreateTSVector(buffer_mgr, read_offset, write_size);
-                    output_ptr->column_vectors[output_column_id]->AppendWith(create_ts_vec);
+                    Status status = NewCatalog::GetCreateTSVector(*current_block_meta,
+                                                                  visible_range.first,
+                                                                  write_size,
+                                                                  *output_ptr->column_vectors[output_column_id]);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
                     break;
                 }
                 case COLUMN_IDENTIFIER_DELETE: {
-                    ColumnVector delete_ts_vec = current_block_entry->GetDeleteTSVector(buffer_mgr, read_offset, write_size);
-                    output_ptr->column_vectors[output_column_id]->AppendWith(delete_ts_vec);
+                    Status status = NewCatalog::GetDeleteTSVector(*current_block_meta,
+                                                                  visible_range.first,
+                                                                  write_size,
+                                                                  *output_ptr->column_vectors[output_column_id]);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
                     break;
                 }
                 default: {
-                    ColumnVector column_vector = current_block_entry->GetConstColumnVector(buffer_mgr, column_id);
-                    output_ptr->column_vectors[output_column_id]->AppendWith(column_vector, read_offset, write_size);
+                    ColumnVector column_vector;
+                    ColumnMeta column_meta(column_id, *current_block_meta);
+                    SizeT row_cnt = range_state->block_offset_end();
+                    Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    output_ptr->column_vectors[output_column_id]->AppendWith(column_vector, visible_range.first, write_size);
                 }
             }
             ++output_column_id;
@@ -295,7 +223,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
         // write_size = already read size = already write size
         write_capacity -= write_size;
-        read_offset += write_size;
+        range_state->SetBlockOffsetBegin(visible_range.first + write_size);
     }
 
     LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids_count));

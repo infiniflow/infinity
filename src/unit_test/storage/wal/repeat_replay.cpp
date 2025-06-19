@@ -21,7 +21,6 @@ import global_resource_usage;
 import storage;
 import infinity_context;
 import compilation_config;
-import txn_manager;
 import extra_ddl_info;
 import infinity_exception;
 import log_file;
@@ -37,10 +36,6 @@ import data_type;
 import logical_type;
 import table_def;
 import data_block;
-import block_entry;
-import txn;
-import catalog;
-import segment_entry;
 import value;
 import internal_types;
 import buffer_manager;
@@ -168,6 +163,9 @@ TEST_P(RepeatReplayTest, append) {
     };
 
     {
+        // Ealier test may leave dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
 
@@ -283,6 +281,9 @@ TEST_P(RepeatReplayTest, import) {
     };
 
     {
+        // Earlier cases may leave dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();

@@ -1,6 +1,4 @@
-import importlib
 import sys
-import os
 import os
 import time
 import pandas as pd
@@ -8,7 +6,6 @@ import pytest
 from numpy import dtype
 from common import common_values
 import infinity
-import infinity_embedded
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException, SparseVector
 from common.utils import trace_expected_exceptions
@@ -18,28 +15,13 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 from infinity_http import infinity_http
 
-
-@pytest.fixture(scope="class")
-def local_infinity(request):
-    return request.config.getoption("--local-infinity")
-
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity, http):
-    if local_infinity:
-        module = importlib.import_module("infinity_embedded.common")
-        func = getattr(module, 'ConflictType')
-        globals()['ConflictType'] = func
-        func = getattr(module, 'InfinityException')
-        globals()['InfinityException'] = func
-        func = getattr(module, 'SparseVector')
-        globals()['SparseVector'] = func
-        uri = common_values.TEST_LOCAL_PATH
-        request.cls.infinity_obj = infinity_embedded.connect(uri)
-    elif http:
+def setup_class(request, http):
+    if http:
         uri = common_values.TEST_LOCAL_HOST
         request.cls.infinity_obj = infinity_http()
     else:
@@ -266,6 +248,33 @@ class TestInfinity:
         res = db_obj.drop_table("test_update_table_with_one_block"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_update_table_with_two_blocks(self, suffix):
+        # connect
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_update_table_with_two_blocks"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_table_with_two_blocks"+suffix,
+                                        {"c1": {"type": "int"}, "c2": {"type": "int"}},
+                                        ConflictType.Error)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(6000)]
+        table_obj.insert(values)
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        values = [{"c1": 1, "c2": 2} for _ in range(5000)]
+        table_obj.insert(values)
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # update
+        table_obj.update("c1 = 1", {"c2": 20})
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        res = db_obj.drop_table("test_update_table_with_two_blocks"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_update_table_with_one_segment(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -337,7 +346,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def test_update_inserted_long_before(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")

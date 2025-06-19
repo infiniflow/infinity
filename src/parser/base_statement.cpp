@@ -74,6 +74,9 @@ std::string StatementType2Str(StatementType statement_type) {
         case StatementType::kAdmin: {
             return "ADMIN";
         }
+        case StatementType::kCheck: {
+            return "Check";
+        }
     }
 
     return "Error";

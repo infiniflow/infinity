@@ -26,7 +26,6 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[SESSION_COUNT_VAR_NAME.data()] = GlobalVariable::kSessionCount;
     global_name_map_[BUFFER_USAGE_VAR_NAME.data()] = GlobalVariable::kBufferPoolUsage;
     global_name_map_[SCHEDULE_POLICY_VAR_NAME.data()] = GlobalVariable::kSchedulePolicy;
-    global_name_map_[DELTA_LOG_COUNT_VAR_NAME.data()] = GlobalVariable::kDeltaLogCount;
     global_name_map_[NEXT_TXN_ID_VAR_NAME.data()] = GlobalVariable::kNextTxnID;
     global_name_map_[BUFFER_OBJECT_COUNT_VAR_NAME.data()] = GlobalVariable::kBufferedObjectCount;
     global_name_map_[UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME.data()] = GlobalVariable::kUnusedBufferObjectCount;
@@ -43,7 +42,6 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[OPEN_FILE_COUNT_VAR_NAME.data()] = GlobalVariable::kOpenFileCount;
     global_name_map_[CPU_USAGE_VAR_NAME.data()] = GlobalVariable::kCPUUsage;
     global_name_map_["jeprof"] = GlobalVariable::kJeProf;
-    global_name_map_["cleanup_trace"] = GlobalVariable::kCleanupTrace;
     global_name_map_[FOLLOWER_NUMBER_VAR_NAME.data()] = GlobalVariable::kFollowerNum;
     global_name_map_[RESULT_CACHE_OPTION_NAME.data()] = GlobalVariable::kResultCache;
     global_name_map_[CACHE_RESULT_CAPACITY_OPTION_NAME.data()] = GlobalVariable::kCacheResultCapacity;

@@ -47,7 +47,6 @@ import data_access_state;
 import kv_code;
 import kv_store;
 import new_txn;
-import new_txn_store;
 import buffer_obj;
 import buffer_handle;
 import secondary_index_in_mem;
@@ -66,8 +65,13 @@ import secondary_index_in_mem;
 import ivf_index_data_in_mem;
 import emvb_index_in_mem;
 import memory_indexer;
+#ifdef INDEX_HANDLER
+import hnsw_handler;
+import bmp_handler;
+#else
 import abstract_hnsw;
 import abstract_bmp;
+#endif
 import roaring_bitmap;
 import index_filter_evaluators;
 import index_emvb;
@@ -178,9 +182,8 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -237,9 +240,8 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, 2 * block_row_cnt));
@@ -478,9 +480,8 @@ TEST_P(TestTxnIndexInternal, test_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, block_row_cnt));
@@ -579,9 +580,8 @@ TEST_P(TestTxnIndexInternal, test_index) {
         SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, 2 * block_row_cnt));
@@ -985,9 +985,8 @@ TEST_P(TestTxnIndexInternal, test_populate_index) {
         }
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        ASSERT_NE(mem_index, nullptr);
         {
             auto [row_id, row_cnt] = check_mem_index(mem_index);
             EXPECT_EQ(row_id, RowID(0, 2 * block_row_cnt));

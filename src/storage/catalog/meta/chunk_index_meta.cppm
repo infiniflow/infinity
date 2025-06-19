@@ -29,10 +29,13 @@ class SegmentIndexMeta;
 class BufferObj;
 
 export struct ChunkIndexMetaInfo {
-    String base_name_;
-    RowID base_row_id_;
-    SizeT row_cnt_;
-    SizeT index_size_;
+    ChunkIndexMetaInfo() = default;
+    ChunkIndexMetaInfo(String base_name, RowID base_row_id, SizeT row_cnt, SizeT index_size)
+        : base_name_(base_name), base_row_id_(base_row_id), row_cnt_(row_cnt), index_size_(index_size) {}
+    String base_name_{};
+    RowID base_row_id_{};
+    SizeT row_cnt_{};
+    SizeT index_size_{};
 
     void ToJson(nlohmann::json &json) const;
 
@@ -64,9 +67,13 @@ public:
 
     Status LoadSet();
 
+    Status RestoreSet();
+
     Status UninitSet(UsageFlag usage_flag);
 
     Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
+
+    Status SetChunkInfoNoPutKV(const ChunkIndexMetaInfo &chunk_info);
 
     Status FilePaths(Vector<String> &paths);
 

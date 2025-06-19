@@ -7,8 +7,7 @@ time_zone = "utc-8"
 log_level               = "info"
 
 [wal]
-# make delta and full checkpoint manual to test recyle
-delta_checkpoint_interval = "0s"
+# make full checkpoint manual to test recycle
 full_checkpoint_interval = "0s"
 wal_compact_threshold            = "10KB"
 

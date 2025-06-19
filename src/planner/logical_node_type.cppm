@@ -77,11 +77,11 @@ export enum class LogicalNodeType : u8 {
     kPrepare,
     kFlush,
     kOptimize,
+    kCheck,
 
     // Compact
     kCompact,
     kCompactIndex,
-    kCompactFinish,
 
     kReadCache,
     kMock,

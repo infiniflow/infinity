@@ -20,7 +20,6 @@ import global_resource_usage;
 import storage;
 import infinity_context;
 import compilation_config;
-import txn_manager;
 import extra_ddl_info;
 import infinity_exception;
 import log_file;
@@ -56,6 +55,9 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     {
+        // Earlier cases may leave a dirty infinity instance. Destroy it first.
+        infinity::InfinityContext::instance().UnInit();
+        CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

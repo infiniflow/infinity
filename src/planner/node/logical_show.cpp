@@ -40,7 +40,7 @@ String ToString(ShowStmtType type) {
             return "Show index chunk";
         case ShowStmtType::kTables:
             return "Show tables";
-        case ShowStmtType::kViews:
+        case ShowStmtType::kTasks:
             return "Show views";
         case ShowStmtType::kColumns:
             return "Show column";
@@ -75,7 +75,7 @@ String ToString(ShowStmtType type) {
         case ShowStmtType::kBuffer:
             return "Show buffer";
         case ShowStmtType::kMemIndex:
-            return "Sow memindex";
+            return "Show memindex";
         case ShowStmtType::kQueries:
             return "Show queries";
         case ShowStmtType::kQuery:
@@ -88,10 +88,6 @@ String ToString(ShowStmtType type) {
             return "Show transaction history";
         case ShowStmtType::kLogs:
             return "Show logs";
-        case ShowStmtType::kDeltaLogs:
-            return "Show delta logs";
-        case ShowStmtType::kCatalogs:
-            return "Show catalogs";
         case ShowStmtType::kCatalog:
             return "Show catalog";
         case ShowStmtType::kCatalogToFile:

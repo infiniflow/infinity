@@ -28,8 +28,6 @@ enum class CommandType {
     kSet,
     kExport,
     kCheckTable,
-    kLockTable,
-    kUnlockTable,
     kCleanup,
     kDumpIndex,
     kTestCommand,
@@ -178,44 +176,6 @@ private:
     std::string table_name_;
 };
 
-class LockCmd final : public CommandInfo {
-public:
-    explicit LockCmd(const char *db_name, const char *table_name)
-        : CommandInfo(CommandType::kLockTable), db_name_(db_name == nullptr ? "" : db_name), table_name_(table_name) {}
-
-    ~LockCmd() final = default;
-
-    [[nodiscard]] std::string ToString() const final;
-
-    const std::string &db_name() const { return db_name_; }
-    const std::string &table_name() const { return table_name_; }
-
-    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
-
-private:
-    std::string db_name_;
-    std::string table_name_;
-};
-
-class UnlockCmd final : public CommandInfo {
-public:
-    explicit UnlockCmd(const char *db_name, const char *table_name)
-        : CommandInfo(CommandType::kUnlockTable), db_name_(db_name == nullptr ? "" : db_name), table_name_(table_name) {}
-
-    ~UnlockCmd() final = default;
-
-    [[nodiscard]] std::string ToString() const final;
-
-    const std::string &db_name() const { return db_name_; }
-    const std::string &table_name() const { return table_name_; }
-
-    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
-
-private:
-    std::string db_name_;
-    std::string table_name_;
-};
-
 class CleanupCmd final : public CommandInfo {
 public:
     explicit CleanupCmd() : CommandInfo(CommandType::kCleanup) {}
@@ -228,7 +188,7 @@ public:
 class DumpIndexCmd final : public CommandInfo {
 public:
     explicit DumpIndexCmd(const char *db_name, const char *table_name, const char *index_name)
-        : CommandInfo(CommandType::kDumpIndex), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+        : CommandInfo(CommandType::kDumpIndex), db_name_(db_name == nullptr ? "" : db_name), table_name_(table_name), index_name_(index_name) {}
 
     ~DumpIndexCmd() final = default;
 
@@ -237,6 +197,8 @@ public:
     const std::string &db_name() const { return db_name_; }
     const std::string &table_name() const { return table_name_; }
     const std::string &index_name() const { return index_name_; }
+
+    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
 private:
     std::string db_name_{};

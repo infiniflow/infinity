@@ -303,8 +303,42 @@ String KeyEncode::PMObjectKey(const String &key) { return fmt::format("pm|object
 
 String KeyEncode::PMObjectStatKey(const String &key) { return fmt::format("pm|object_stat|{}", key); }
 
-String KeyEncode::PMObjectPathKeyPrefix() { return "pm|path|"; }
+String KeyEncode::DropDBKey(const String &db_id_str, const String &db_name) { return fmt::format("drop|db|{}/{}", db_id_str, db_name); }
 
-String KeyEncode::PMObjectPathKey(const String &path) { return fmt::format("pm|path|{}", path); }
+String KeyEncode::DropTableKey(const String &db_id_str, const String &table_id_str, const String &table_name) {
+    return fmt::format("drop|tbl|{}/{}/{}", db_id_str, table_id_str, table_name);
+}
+
+String KeyEncode::DropSegmentKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id) {
+    return fmt::format("drop|seg|{}/{}/{}", db_id_str, table_id_str, segment_id);
+}
+
+String KeyEncode::DropBlockKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) {
+    return fmt::format("drop|blk|{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id);
+}
+
+String KeyEncode::DropBlockColumnKey(const String &db_id_str,
+                                     const String &table_id_str,
+                                     SegmentID segment_id,
+                                     BlockID block_id,
+                                     const SharedPtr<ColumnDef> &column_def) {
+    return fmt::format("drop|blk_col|{}/{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id, column_def->ToJson().dump());
+}
+
+String KeyEncode::DropTableIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, const String &index_name) {
+    return fmt::format("drop|idx|{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, index_name);
+}
+
+String KeyEncode::DropSegmentIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) {
+    return fmt::format("drop|idx_seg|{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id);
+}
+
+String KeyEncode::DropChunkIndexKey(const String &db_id_str,
+                                    const String &table_id_str,
+                                    const String &index_id_str,
+                                    SegmentID segment_id,
+                                    ChunkID chunk_id) {
+    return fmt::format("drop|idx_chunk|{}/{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
+}
 
 } // namespace infinity

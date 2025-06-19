@@ -23,11 +23,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import third_party;
-import txn;
-import txn_store;
 import constant_expr;
-import segment_entry;
-import block_entry;
 import zsv;
 import load_meta;
 import infinity_exception;
@@ -41,30 +37,7 @@ import meta_info;
 
 namespace infinity {
 
-class DataBlock;
-
-class ZxvParserCtx {
-public:
-    ZsvParser parser_;
-    SizeT row_count_{};
-    SharedPtr<String> err_msg_{};
-    TableInfo *const table_info_{};
-    Txn *const txn_{};
-    SharedPtr<SegmentEntry> segment_entry_{};
-    UniquePtr<BlockEntry> block_entry_{};
-    Vector<ColumnVector> column_vectors_{};
-    const char delimiter_{};
-
-public:
-    ZxvParserCtx(TableInfo *table_info,
-                 Txn *txn,
-                 SharedPtr<SegmentEntry> segment_entry,
-                 UniquePtr<BlockEntry> block_entry,
-                 Vector<ColumnVector> &&column_vectors,
-                 char delimiter)
-        : row_count_(0), err_msg_(nullptr), table_info_(table_info), txn_(txn), segment_entry_(segment_entry), block_entry_(std::move(block_entry)),
-          column_vectors_(std::move(column_vectors)), delimiter_(delimiter) {}
-};
+struct DataBlock;
 
 export class PhysicalImport : public PhysicalOperator {
 public:
@@ -88,15 +61,9 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
-
     void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
 
-    void ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state);
-
     void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
-
-    void ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
 
@@ -105,21 +72,11 @@ public:
                            EmbeddingDataType embedding_data_type,
                            Vector<SharedPtr<DataBlock>> &data_blocks);
 
-    /// for push based execution
-    void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
-
     void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
-
-    /// for push based execution
-    void ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
 
-    void ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
-
     void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
-
-    void ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
 
@@ -132,14 +89,7 @@ public:
     inline bool header() const { return header_; }
 
     inline char delimiter() const { return delimiter_; }
-
-    static void SaveSegmentData(TableInfo *table_info, Txn *txn, SharedPtr<SegmentEntry> segment_entry);
-
 private:
-    static void CSVHeaderHandler(void *);
-
-    static void CSVRowHandler(void *);
-
     static void NewCSVHeaderHandler(void *);
 
     static void NewCSVRowHandler(void *);

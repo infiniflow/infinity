@@ -14,20 +14,19 @@
 
 module;
 
-#include <cassert>
-
 export module file_worker;
 
 import stl;
-import local_file_handle;
 import third_party;
 import file_worker_type;
 import persistence_manager;
-import global_resource_usage;
-import infinity_exception;
 import defer_op;
 
 namespace infinity {
+
+class KVInstance;
+class LocalFileHandle;
+class Status;
 
 export struct FileWorkerSaveCtx {};
 
@@ -38,14 +37,7 @@ public:
                         SharedPtr<String> temp_dir,
                         SharedPtr<String> file_dir,
                         SharedPtr<String> file_name,
-                        PersistenceManager *persistence_manager)
-        : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)),
-          persistence_manager_(persistence_manager) {
-        assert(!std::filesystem::path(*file_dir_).is_absolute());
-#ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount("FileWorker");
-#endif
-    }
+                        PersistenceManager *persistence_manager);
 
     // No destruct here
     virtual ~FileWorker();
@@ -69,10 +61,10 @@ public:
 
     void SetData(void *data);
 
-    // Get absolute file path. As key of buffer handle.
+    // Get an absolute file path. As key of a buffer handle.
     String GetFilePath() const;
 
-    void CleanupFile() const;
+    Status CleanupFile() const;
 
     void CleanupTempFile() const;
 
@@ -107,12 +99,9 @@ public:
     void MmapNotNeed();
 
 protected:
-    virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] SizeT size) {
-        UnrecoverableError("Not implemented");
-        return false;
-    }
+    virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] SizeT size);
 
-    virtual void FreeFromMmapImpl() { UnrecoverableError("Not implemented"); }
+    virtual void FreeFromMmapImpl();
 
 protected:
     u8 *mmap_addr_{nullptr};

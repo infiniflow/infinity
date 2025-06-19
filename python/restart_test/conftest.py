@@ -1,6 +1,16 @@
 from infinity_runner import InfinityRunner
 from restart_timeout import *
 
+import logging
+
+
+def pytest_configure():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(process)d-%(thread)d %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
 
 def pytest_addoption(parser):
     parser.addoption(

@@ -20,9 +20,9 @@ import stl;
 
 namespace infinity {
 
-class Catalog;
+class NewCatalog;
 
-export void RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr);
-export void AppendRegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterMinusFunction(NewCatalog *catalog_ptr);
+export void AppendRegisterMinusFunction(NewCatalog *catalog_ptr);
 
 } // namespace infinity

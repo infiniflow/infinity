@@ -25,16 +25,10 @@ import column_def;
 import roaring_bitmap;
 import default_values;
 import buffer_manager;
-import block_column_entry;
 import block_column_iter;
 import infinity_exception;
 import emvb_index;
 import index_emvb;
-import chunk_index_entry;
-import segment_index_entry;
-import segment_entry;
-import block_entry;
-import block_column_entry;
 import buffer_handle;
 import index_base;
 import logger;
@@ -50,6 +44,7 @@ import segment_meta;
 import new_txn;
 import buffer_obj;
 import kv_store;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -72,41 +67,6 @@ u32 EMVBIndexInMem::GetRowCount() const {
     return row_count_;
 }
 
-void EMVBIndexInMem::Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count) {
-    const ColumnVector column_vector = block_entry->GetConstColumnVector(buffer_manager, column_idx);
-    std::unique_lock lock(rw_mutex_);
-    const auto income_segment_entry = block_entry->GetSegmentEntry();
-    if (segment_entry_ == nullptr) {
-        segment_entry_ = income_segment_entry;
-    } else if (segment_entry_ != income_segment_entry) {
-        UnrecoverableError("EMVBIndexInMem Insert segment_entry_ not consistent!");
-    }
-    if (is_built_.test(std::memory_order_acquire)) {
-        for (u32 i = 0; i < row_count; ++i) {
-            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
-            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
-            ++row_count_;
-            embedding_count_ += embedding_num;
-        }
-    } else {
-        for (u32 i = 0; i < row_count; ++i) {
-            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
-            ++row_count_;
-            embedding_count_ += embedding_num;
-        }
-        // build index if have enough data
-        if (embedding_count_ >= build_index_threshold_) {
-            emvb_index_ =
-                MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
-            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_entry_, column_def_, buffer_manager);
-            if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
-                UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
-            }
-            is_built_.test_and_set(std::memory_order_release);
-        }
-    }
-}
-
 void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts) {
     std::unique_lock lock(rw_mutex_);
     if (is_built_.test(std::memory_order_acquire)) {
@@ -127,7 +87,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
             emvb_index_ =
                 MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
 
-            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts);
+            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
             SegmentMeta segment_meta(segment_id_, table_meta);
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
@@ -136,20 +96,6 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
             is_built_.test_and_set(std::memory_order_release);
         }
     }
-}
-
-SharedPtr<ChunkIndexEntry> EMVBIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
-    std::unique_lock lock(rw_mutex_);
-    if (!is_built_.test(std::memory_order_acquire)) {
-        UnrecoverableError("EMVBIndexInMem Dump: index not built yet!");
-    }
-    is_built_.clear(std::memory_order_release);
-    auto new_chunk_index_entry = segment_index_entry->CreateEMVBIndexChunkIndexEntry(begin_row_id_, row_count_, buffer_mgr);
-    BufferHandle handle = new_chunk_index_entry->GetIndex();
-    auto data_ptr = static_cast<EMVBIndex *>(handle.GetDataMut());
-    *data_ptr = std::move(*emvb_index_); // call move in lock
-    emvb_index_.reset();
-    return new_chunk_index_entry;
 }
 
 void EMVBIndexInMem::Dump(BufferObj *buffer_obj) {
@@ -216,4 +162,5 @@ std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWit
     return std::make_pair(begin_row_id_.segment_offset_, row_count_);
 }
 
+const ChunkIndexMetaInfo EMVBIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0}; }
 } // namespace infinity

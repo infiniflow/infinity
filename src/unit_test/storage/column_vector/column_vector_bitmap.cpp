@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #include "gtest/gtest.h"
 import base_test;
 
@@ -30,7 +32,7 @@ import global_resource_usage;
 import infinity_context;
 import internal_types;
 import logical_type;
-#if 0
+
 
 using namespace infinity;
 class ColumnVectorBitmapTest : public BaseTest {};
@@ -200,8 +202,7 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 //        column_constant.Reset();
 //    }
 }
-#endif
-#if 0
+
 TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     using namespace infinity;

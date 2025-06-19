@@ -57,12 +57,6 @@ export class EMVBIndex {
 public:
     EMVBIndex(u32 start_segment_offset, u32 embedding_dimension, u32 residual_pq_subspace_num, u32 residual_pq_subspace_bits);
 
-    void BuildEMVBIndex(RowID base_rowid,
-                        u32 row_count,
-                        const SegmentEntry *segment_entry,
-                        const SharedPtr<ColumnDef> &column_def,
-                        BufferManager *buffer_mgr);
-
     void BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const SharedPtr<ColumnDef> &column_def);
 
     void Train(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 20);

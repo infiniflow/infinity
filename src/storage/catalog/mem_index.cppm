@@ -41,8 +41,39 @@ export struct MemIndex {
     void ClearMemIndex();
 
     BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
+    const BaseMemIndex *GetBaseMemIndex() const;
+    void SetBaseMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
 
-    std::mutex mtx_; // Used by append / mem index dump / clear
+    void SetEMVBMemIndexInfo(const String &db_name, const String &table_name, const String &index_name, const SegmentID &segment_id);
+    EMVBIndexInMem *GetEMVBMemIndex(const MemIndexID &mem_index_id);
+
+    SharedPtr<HnswIndexInMem> GetHnswIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_hnsw_index_;
+    }
+    SharedPtr<IVFIndexInMem> GetIVFIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_ivf_index_;
+    }
+    SharedPtr<MemoryIndexer> GetFulltextIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_indexer_;
+    }
+    SharedPtr<SecondaryIndexInMem> GetSecondaryIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_secondary_index_;
+    }
+    SharedPtr<EMVBIndexInMem> GetEMVBIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_emvb_index_;
+    }
+
+    SharedPtr<BMPIndexInMem> GetBMPIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_bmp_index_;
+    }
+
+    mutable std::mutex mtx_; // Used by append / mem index dump / clear
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<IVFIndexInMem> memory_ivf_index_{};

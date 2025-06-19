@@ -34,6 +34,8 @@ namespace infinity {
 TxnAllocator::TxnAllocator(Storage *storage) : storage_(storage) {}
 TxnAllocator::~TxnAllocator() = default;
 
+void TxnAllocator::SetSystemCache(const SharedPtr<SystemCache> &system_cache) { system_cache_ = system_cache; }
+
 void TxnAllocator::Start() {
     processor_thread_ = Thread([this] { Process(); });
     LOG_INFO("Transaction allocator is started.");
@@ -45,6 +47,7 @@ void TxnAllocator::Stop() {
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
+    system_cache_.reset();
     LOG_INFO("Transaction allocator is stopped.");
 }
 
@@ -56,7 +59,6 @@ void TxnAllocator::Submit(SharedPtr<TxnAllocatorTask> task) {
 void TxnAllocator::Process() {
     bool running{true};
     Deque<SharedPtr<TxnAllocatorTask>> tasks;
-    NewCatalog *catalog = storage_->new_catalog();
     while (running) {
         task_queue_.DequeueBulk(tasks);
         // LOG_INFO(fmt::format("Receive tasks: {}", tasks.size()));
@@ -66,48 +68,42 @@ void TxnAllocator::Process() {
                 running = false;
             } else {
                 NewTxn *txn = txn_allocator_task->txn_ptr();
-                TransactionType txn_type = txn->GetTxnType();
                 BaseTxnStore *base_txn_store = txn->GetTxnStore();
+                TransactionType txn_type = base_txn_store->type_;
                 switch (txn_type) {
                     case TransactionType::kAppend: {
-                        AppendTxnStore *append_txn_store = static_cast<AppendTxnStore *>(base_txn_store);
-                        LOG_INFO(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
-                                             append_txn_store->db_name_,
-                                             append_txn_store->db_id_,
-                                             append_txn_store->table_name_,
-                                             append_txn_store->table_id_,
-                                             append_txn_store->input_block_->row_count()));
-                        SharedPtr<TableCache> table_cache = catalog->GetTableCache(append_txn_store->db_id_, append_txn_store->table_id_);
-                        if (table_cache.get() == nullptr) {
-                            Status status;
-                            std::tie(table_cache, status) = catalog->AddNewTableCache(append_txn_store->db_id_, append_txn_store->table_id_);
-                        }
-                        append_txn_store->row_ranges_ = table_cache->PrepareAppendRanges(append_txn_store->input_block_->row_count(), txn->TxnID());
+                        AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
+                        SizeT row_count = txn_store->input_block_->row_count();
+                        LOG_TRACE(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
+                                              txn_store->db_name_,
+                                              txn_store->db_id_,
+                                              txn_store->table_name_,
+                                              txn_store->table_id_,
+                                              row_count));
+                        SharedPtr<AppendPrepareInfo> append_info =
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
+                        txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
                     case TransactionType::kUpdate: {
-                        break;
-                    }
-                    case TransactionType::kImport: {
-                        break;
-                    }
-                    case TransactionType::kDumpMemIndex: {
-                        break;
-                    }
-                    case TransactionType::kOptimizeIndex: {
-                        break;
-                    }
-                    case TransactionType::kCreateIndex: {
-                        break;
-                    }
-                    case TransactionType::kCompact: {
+                        UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
+                        SizeT row_count = txn_store->RowCount();
+                        LOG_TRACE(fmt::format("TxnAllocator: Update txn: db: {}, {}, table: {}, {}, data size: {}",
+                                              txn_store->db_name_,
+                                              txn_store->db_id_,
+                                              txn_store->table_name_,
+                                              txn_store->table_id_,
+                                              row_count));
+                        SharedPtr<AppendPrepareInfo> append_info =
+                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
+                        txn_store->row_ranges_ = append_info->ranges_;
                         break;
                     }
                     default: {
                         UnrecoverableError(fmt::format("Transaction type {} is not supported", TransactionType2Str(txn_type)));
                     }
                 }
-                LOG_INFO(*txn->GetTxnText());
+                // LOG_INFO(*txn->GetTxnText());
             }
             txn_allocator_task->Complete();
         }

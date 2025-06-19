@@ -22,7 +22,6 @@ import buffer_obj;
 import buffer_manager;
 import buffer_handle;
 import infinity_exception;
-import block_column_entry;
 import default_values;
 import logger;
 import third_party;
@@ -42,26 +41,6 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(const SizeT data_type_size, const Siz
         }
         default: {
             buffer_ptr->Initialize(data_type_size, capacity);
-            break;
-        }
-    }
-    return buffer_ptr;
-}
-
-SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
-                                           BlockColumnEntry *block_column_entry,
-                                           const SizeT data_type_size,
-                                           const SizeT capacity,
-                                           const VectorBufferType buffer_type) {
-    SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
-    buffer_ptr->buffer_type_ = buffer_type;
-    switch (buffer_type) {
-        case VectorBufferType::kCompactBit: {
-            buffer_ptr->InitializeCompactBit(buffer_mgr, block_column_entry, capacity);
-            break;
-        }
-        default: {
-            buffer_ptr->Initialize(buffer_mgr, block_column_entry, data_type_size, capacity);
             break;
         }
     }
@@ -110,51 +89,6 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     }
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = MakeUnique<VarBufferManager>();
-    }
-    initialized_ = true;
-    data_size_ = data_size;
-    capacity_ = capacity;
-}
-
-void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity) {
-    if (initialized_) {
-        String error_message = "Vector buffer is already initialized.";
-        UnrecoverableError(error_message);
-    }
-    SizeT data_size = (capacity + 7) / 8;
-    auto *buffer_obj = block_column_entry->buffer();
-    if (buffer_obj == nullptr) {
-        String error_message = "Buffer object is nullptr.";
-        UnrecoverableError(error_message);
-    }
-    if (buffer_obj->GetBufferSize() != data_size) {
-        String error_message = "Buffer object size is not equal to data size.";
-        UnrecoverableError(error_message);
-    }
-    ptr_ = buffer_obj->Load();
-    initialized_ = true;
-    data_size_ = data_size;
-    capacity_ = capacity;
-}
-
-void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity) {
-    if (initialized_) {
-        String error_message = "Vector buffer is already initialized.";
-        UnrecoverableError(error_message);
-    }
-    SizeT data_size = type_size * capacity;
-    auto *buffer_obj = block_column_entry->buffer();
-    if (buffer_obj == nullptr) {
-        String error_message = "Buffer object is nullptr.";
-        UnrecoverableError(error_message);
-    }
-    if (buffer_obj->GetBufferSize() != data_size) {
-        String error_message = "Buffer object size is not equal to data size.";
-        UnrecoverableError(error_message);
-    }
-    ptr_ = buffer_obj->Load();
-    if (buffer_type_ == VectorBufferType::kVarBuffer) {
-        var_buffer_mgr_ = MakeUnique<VarBufferManager>(block_column_entry, buffer_mgr);
     }
     initialized_ = true;
     data_size_ = data_size;

@@ -17,11 +17,9 @@ module;
 export module session;
 
 import stl;
-import txn;
 import config;
 import options;
 import profiler;
-import catalog;
 import global_resource_usage;
 
 namespace infinity {
@@ -42,9 +40,6 @@ public:
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
-
-    [[nodiscard]] inline Txn *GetTxn() const { return nullptr; }
-    inline void SetTxn(Txn *txn) { txn_ = nullptr; }
 
     [[nodiscard]] inline NewTxn *GetNewTxn() const { return new_txn_.get(); }
     inline void SetNewTxn(const SharedPtr<NewTxn> &new_txn) { new_txn_ = new_txn; }
@@ -70,7 +65,6 @@ protected:
     String current_database_{};
 
     // Txn is session level.
-    Txn *txn_{};
     SharedPtr<NewTxn> new_txn_{};
 
     SessionType session_type_{SessionType::kRemote};

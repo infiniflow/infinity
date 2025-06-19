@@ -134,7 +134,7 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src)
 FIND_PACKAGE( BZip2 )
 FIND_PACKAGE( ZLIB )
 FIND_PACKAGE( Readline )
-FIND_PACKAGE( Editline )
+# FIND_PACKAGE( Editline )
 
 # Configuration checks
 

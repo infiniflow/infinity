@@ -14,39 +14,46 @@
 
 module;
 
-export module txn_committer;
+export module dump_index_process;
 
 import stl;
+import bg_task_type;
 import blocking_queue;
+import status;
 
 namespace infinity {
 
-class Storage;
+class TxnManager;
 class NewTxn;
-struct TxnCommitterTask;
+class BGTask;
+class DumpIndexTask;
 
-export class TxnCommitter {
+export class DumpIndexProcessor {
 public:
-    explicit TxnCommitter(Storage *storage);
-    virtual ~TxnCommitter();
+    DumpIndexProcessor();
+    ~DumpIndexProcessor();
 
     void Start();
+
     void Stop();
-    void Submit(SharedPtr<TxnCommitterTask> task);
+
+    void Submit(SharedPtr<BGTask> bg_task);
+
+    u64 RunningTaskCount() const { return task_count_; }
 
 private:
+    void NewScanAndOptimize();
+
+    void DoDump(DumpIndexTask *dump_task);
+
     void Process();
 
 private:
-    BlockingQueue<SharedPtr<TxnCommitterTask>> task_queue_{"TxnCommitterQueue"};
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"DumpIndexProcessor"};
 
     Thread processor_thread_{};
 
-    Storage *storage_{};
-
     Atomic<u64> task_count_{};
-
-    mutable std::mutex task_mutex_;
 };
 
 } // namespace infinity

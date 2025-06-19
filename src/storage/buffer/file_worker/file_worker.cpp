@@ -16,7 +16,7 @@ module;
 
 #include <cerrno>
 #include <cstring>
-#include <sys/mman.h>
+#include <filesystem>
 #include <tuple>
 
 module file_worker;
@@ -34,8 +34,27 @@ import infinity_context;
 import logger;
 import persist_result_handler;
 import global_resource_usage;
+import kv_code;
+import kv_store;
+import status;
 
 namespace infinity {
+
+FileWorker::FileWorker(SharedPtr<String> data_dir,
+                       SharedPtr<String> temp_dir,
+                       SharedPtr<String> file_dir,
+                       SharedPtr<String> file_name,
+                       PersistenceManager *persistence_manager)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), file_dir_(std::move(file_dir)), file_name_(std::move(file_name)),
+      persistence_manager_(persistence_manager) {
+    if (std::filesystem::path(*file_dir_).is_absolute()) {
+        String error_message = fmt::format("File directory {} is an absolute path.", *file_dir_);
+        UnrecoverableError(error_message);
+    }
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("FileWorker");
+#endif
+}
 
 FileWorker::~FileWorker() {
 #ifdef INFINITY_DEBUG
@@ -190,26 +209,29 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
     return {std::move(defer_fn), std::move(read_path)};
 }
 
-void FileWorker::CleanupFile() const {
+Status FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
         handler.HandleWriteResult(result);
-        return;
+        // Delete from RocksDB
+        auto *kv_store = InfinityContext::instance().storage()->kv_store();
+        String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
+        kv_store->Delete(relevant_full_path);
+        LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
+        return Status::OK();
     }
 
-    String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
-    if (VirtualStore::Exists(path)) {
-        LOG_INFO(fmt::format("Clean file: {}", path));
-        VirtualStore::DeleteFile(path);
-    }
+    String path_str = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+
+    return VirtualStore::DeleteFile(path_str);
 }
 
 void FileWorker::CleanupTempFile() const {
     String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     if (VirtualStore::Exists(path)) {
-        LOG_INFO(fmt::format("Clean file: {}", path));
+        LOG_TRACE(fmt::format("Clean temp file: {}", path));
         VirtualStore::DeleteFile(path);
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
@@ -256,5 +278,12 @@ void FileWorker::Munmap() {
 }
 
 void FileWorker::MmapNotNeed() {}
+
+bool FileWorker::ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] SizeT size) {
+    UnrecoverableError("Not implemented");
+    return false;
+}
+
+void FileWorker::FreeFromMmapImpl() { UnrecoverableError("Not implemented"); }
 
 } // namespace infinity

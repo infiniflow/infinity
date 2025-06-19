@@ -123,11 +123,6 @@ export {
     constexpr std::string_view DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
     constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30;          // 1 month
 
-    constexpr i64 MIN_DELTA_CHECKPOINT_INTERVAL_SEC = 0;                         // 0 means disable delta checkpoint
-    constexpr i64 DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC = 5;                     // 5 seconds
-    constexpr std::string_view DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR = "5s"; // 5 seconds
-    constexpr i64 MAX_DELTA_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30;         // 1 month
-
     constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024;                      // 1K
     constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l;      // 64 MB
     constexpr std::string_view DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR = "64MB"; // 64 MB
@@ -289,18 +284,16 @@ export {
     constexpr std::string_view DENSE_INDEX_BUILDING_WORKER_OPTION_NAME = "dense_index_building_worker";
     constexpr std::string_view SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME = "sparse_index_building_worker";
     constexpr std::string_view FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME = "fulltext_index_building_worker";
+    constexpr std::string_view BOTTOM_EXECUTOR_WORKER_OPTION_NAME = "bottom_executor_worker";
 
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
     constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";
 
-    constexpr std::string_view DELTA_CHECKPOINT_INTERVAL_OPTION_NAME = "delta_checkpoint_interval";
-    constexpr std::string_view DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME = "delta_checkpoint_threshold";
     constexpr std::string_view WAL_FLUSH_OPTION_NAME = "wal_flush";
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
-    constexpr std::string_view USE_NEW_CATALOG_OPTION_NAME = "use_new_catalog";
     constexpr std::string_view REPLAY_WAL_OPTION_NAME = "replay_wal";
 
     // Variable name
@@ -333,13 +326,11 @@ export {
     constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "profile";                          // global
 
     // Use for meta key encoding
-    constexpr std::string_view LATEST_DATABASE_ID = "latest_database_id";
-    constexpr std::string_view LATEST_TABLE_ID = "latest_table_id";
-    constexpr std::string_view LATEST_COLUMN_ID = "latest_column_id";
-    constexpr std::string_view LATEST_INDEX_ID = "latest_index_id";
-    constexpr std::string_view LATEST_SEGMENT_ID = "latest_segment_id";
-    constexpr std::string_view LATEST_BLOCK_ID = "latest_block_id";
-    constexpr std::string_view LATEST_CHUNK_ID = "latest_chunk_id";
+    constexpr std::string_view NEXT_DATABASE_ID = "next_database_id";
+    constexpr std::string_view NEXT_TABLE_ID = "next_table_id";
+    constexpr std::string_view NEXT_COLUMN_ID = "next_column_id";
+    constexpr std::string_view NEXT_INDEX_ID = "next_index_id";
+    constexpr std::string_view NEXT_BLOCK_ID = "next_block_id";
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;

@@ -67,6 +67,9 @@ import persist_result_handler;
 import virtual_store;
 import local_file_handle;
 import mem_usage_change;
+import bg_task;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -164,6 +167,69 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         }
         inverting_thread_pool_.push(std::move(func));
     }
+}
+
+void MemoryIndexer::AsyncInsertTop(AppendMemIndexTask *append_mem_index_task) {
+    if (is_spilled_) {
+        Load();
+    }
+
+    u64 seq_inserted(0);
+    u32 doc_count(0);
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        seq_inserted = seq_inserted_++;
+        doc_count = doc_count_;
+        doc_count_ += append_mem_index_task->row_cnt_;
+        ++inflight_tasks_;
+    }
+    append_mem_index_task->seq_inserted_ = seq_inserted;
+    append_mem_index_task->doc_count_ = doc_count;
+}
+
+void MemoryIndexer::AsyncInsertBottom(const SharedPtr<ColumnVector> &column_vector,
+                                      u32 row_offset,
+                                      u32 row_count,
+                                      u64 seq_inserted,
+                                      u32 doc_count,
+                                      AppendMemIndexBatch *append_batch) {
+    if (is_spilled_) {
+        Load();
+    }
+
+    //    u64 seq_inserted(0);
+    //    u32 doc_count(0);
+    //    {
+    //        std::unique_lock<std::mutex> lock(mutex_);
+    //        seq_inserted = seq_inserted_++;
+    //        doc_count = doc_count_;
+    //        doc_count_ += row_count;
+    //    }
+    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+
+    IncreaseMemoryUsage(sizeof(u32) * row_count);
+    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
+    auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+    inverter->InitAnalyzer(this->analyzer_);
+    auto func = [this, task, inverter, append_batch](int id) {
+        // LOG_INFO(fmt::format("online inverter {} begin", id));
+        SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+        column_length_sum_ += column_length_sum;
+        this->ring_inverted_.Put(task->task_seq_, inverter);
+        // LOG_INFO(fmt::format("online inverter {} end", id));
+        {
+            std::unique_lock lock(append_batch->mtx_);
+            --append_batch->task_count_;
+            if (append_batch->task_count_ == 0) {
+                append_batch->cv_.notify_one();
+            }
+        }
+    };
+    //    {
+    //        std::unique_lock<std::mutex> lock(mutex_);
+    //        inflight_tasks_++;
+    //    }
+    inverting_thread_pool_.push(std::move(func));
 }
 
 UniquePtr<std::binary_semaphore> MemoryIndexer::AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
@@ -396,6 +462,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
 
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
     file_handle->Append(&column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
+    file_handle->Sync();
     if (use_object_cache) {
         PersistResultHandler handler(pm);
         PersistWriteResult result1 = pm->Persist(posting_file, tmp_posting_file, false);
@@ -407,7 +474,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     is_spilled_ = spill;
-    Reset();
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting
@@ -486,7 +552,7 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
     return MemIndexTracerInfo(index_name, table_name, db_name, MemUsed(), doc_count_);
 }
 
-TableIndexEntry *MemoryIndexer::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
+const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }
 
 SizeT MemoryIndexer::MemUsed() const { return mem_used_; }
 

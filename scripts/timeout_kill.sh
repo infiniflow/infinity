@@ -47,7 +47,11 @@ while true; do
         for pid in "${@:2}"; do
             if ps -p $pid > /dev/null; then
                 echo "Pid: $pid didn't terminate"
-                kill -9 $pid
+                if [ -z $pid ]; then
+                  continue
+                fi
+                ppid=$(ps -o ppid= -p $pid)
+                kill -9 $ppid
             fi
         done
         exit 2  # Return a different value

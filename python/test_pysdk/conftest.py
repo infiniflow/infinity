@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from shutil import copyfile
 import sys
+
+import logging
+
+
+def pytest_configure():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(process)d-%(thread)d %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 parent = os.path.join(os.getcwd(), os.pardir)
@@ -45,12 +54,10 @@ from common import common_values
 def connect_infinity():
     return infinity.connect(common_values.TEST_LOCAL_HOST)
 
-
 @pytest.fixture(scope="function")
 def disconnect_infinity():
     res = ThriftInfinityClient(common_values.TEST_LOCAL_HOST).disconnect()
     assert res.error_code == ErrorCode.OK
-
 
 @pytest.fixture(scope="function")
 def get_infinity_db_param(request):
@@ -100,7 +107,6 @@ def get_infinity_connection_pool():
     yield connection_pool
     connection_pool.destroy()
 
-
 @pytest.fixture(scope="class")
 def check_data(request):
     file_name = request.param["file_name"]
@@ -113,16 +119,11 @@ def check_data(request):
         return False
     return True
 
-
 def disable_items_with_mark(items, mark, reason):
     skipper = pytest.mark.skip(reason=reason)
     for item in items:
         if mark in item.keywords:
             item.add_marker(skipper)
-
-@pytest.fixture
-def local_infinity(request):
-    return request.config.getoption("--local-infinity")
 
 @pytest.fixture
 def http(request):

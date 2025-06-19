@@ -35,13 +35,13 @@ import txn_state;
 import infinity_exception;
 import utility;
 import memory_indexer;
+import logger;
 
 namespace infinity {
 
 SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta)
-    : kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {
-    begin_ts_ = table_index_meta_.table_meta().begin_ts();
-}
+    : begin_ts_(table_index_meta.table_meta().begin_ts()), commit_ts_(table_index_meta.table_meta().commit_ts()),
+      kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
 
 SegmentIndexMeta::~SegmentIndexMeta() = default;
 
@@ -175,18 +175,6 @@ Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::SetFtInfo(const SharedPtr<SegmentIndexFtInfo> &ft_info) {
-    ft_info_ = ft_info;
-    String ft_info_key = GetSegmentIndexTag("ft_info");
-
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->AddSegmentIndexFtInfo(ft_info_key, ft_info);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     if (!ft_info_) {
         Status status = LoadFtInfo();
@@ -196,7 +184,17 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     }
     ft_info_->ft_column_len_sum_ += column_len_sum;
     ft_info_->ft_column_len_cnt_ += column_len_cnt;
-    return Status::OK();
+
+    String ft_info_key = GetSegmentIndexTag("ft_info");
+    Vector<u64> sum_cnt = {ft_info_->ft_column_len_sum_, ft_info_->ft_column_len_cnt_};
+    String ft_info_str = nlohmann::json(sum_cnt).dump();
+    Status status = kv_instance_.Put(ft_info_key, ft_info_str);
+    LOG_INFO(fmt::format("UpdateFtInfo: column_len_sum={}, column_len_cnt={}, ft_info_key={}, ft_info_str={}",
+                         column_len_sum,
+                         column_len_cnt,
+                         ft_info_key,
+                         ft_info_str));
+    return status;
 }
 
 Status SegmentIndexMeta::SetNoMemIndex() {
@@ -207,7 +205,6 @@ Status SegmentIndexMeta::SetNoMemIndex() {
     if (!status.ok()) {
         return status;
     }
-    has_mem_index_ = false;
     return Status::OK();
 }
 
@@ -227,28 +224,10 @@ Status SegmentIndexMeta::InitSet() {
     {
         String mem_index_key = GetSegmentIndexTag("mem_index");
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetNoMemIndex();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        auto [index_base, status] = table_index_meta_.GetIndexBase();
-        if (!status.ok()) {
-            return status;
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            auto ft_info = MakeShared<SegmentIndexFtInfo>();
-            Status status = this->SetFtInfo(ft_info);
-            if (!status.ok()) {
-                return status;
-            }
+        SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+        bool setted = new_catalog->GetOrSetMemIndex(mem_index_key, mem_index);
+        if (!setted) {
+            return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
         }
     }
     return Status::OK();
@@ -262,61 +241,34 @@ Status SegmentIndexMeta::InitSet1() {
         }
     }
     {
-        String mem_index_key = GetSegmentIndexTag("mem_index");
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetNoMemIndex();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        auto [index_base, status] = table_index_meta_.GetIndexBase();
-        if (!status.ok()) {
-            return status;
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            auto ft_info = MakeShared<SegmentIndexFtInfo>();
-            Status status = this->SetFtInfo(ft_info);
-            if (!status.ok()) {
-                return status;
-            }
+        SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+        bool setted = GetOrSetMemIndex(mem_index);
+        if (!setted) {
+            return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
         }
     }
     return Status::OK();
 }
 
 Status SegmentIndexMeta::LoadSet() {
-    {
-        String mem_index_key = GetSegmentIndexTag("mem_index");
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetNoMemIndex();
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     String mem_index_key = GetSegmentIndexTag("mem_index");
+    //     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    //     Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
+    // {
+    //     Status status = SetNoMemIndex();
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     {
         auto [index_base, status] = table_index_meta_.GetIndexBase();
         if (!status.ok()) {
             return status;
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            auto ft_info = MakeShared<SegmentIndexFtInfo>();
-            Status status = this->SetFtInfo(ft_info);
-            if (!status.ok()) {
-                return status;
-            }
         }
     }
     return Status::OK();
@@ -350,12 +302,11 @@ Status SegmentIndexMeta::UninitSet(UsageFlag usage_flag) {
         }
     }
     {
-        String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
-        Status status = kv_instance_.Delete(has_mem_index_key);
-        if (!status.ok()) {
-            return status;
-        }
-        has_mem_index_.reset();
+        // String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        // Status status = kv_instance_.Delete(has_mem_index_key);
+        // if (!status.ok()) {
+        //     return status;
+        // }
     }
     {
         String ft_info_key = GetSegmentIndexTag("ft_info");
@@ -392,24 +343,27 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
         next_chunk_id_.reset();
     }
     if (usage_flag == UsageFlag::kOther) {
-        {
-            // Remove mem index
-            String mem_index_key = GetSegmentIndexTag("mem_index");
-            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-            Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
-            if (!status.ok()) {
-                return status;
-            }
+        // Clear mem index
+        SharedPtr<MemIndex> mem_index = GetMemIndex();
+        if (mem_index != nullptr) {
+            mem_index->ClearMemIndex();
+        }
+
+        // Remove mem index
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+        if (!status.ok()) {
+            return status;
         }
     }
     {
         // Remove mem index indicator
-        String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
-        Status status = kv_instance_.Delete(has_mem_index_key);
-        if (!status.ok()) {
-            return status;
-        }
-        has_mem_index_.reset();
+        // String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        // Status status = kv_instance_.Delete(has_mem_index_key);
+        // if (!status.ok()) {
+        //     return status;
+        // }
     }
     {
         // Remove ft_info tag
@@ -423,107 +377,18 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
-    mem_index.reset();
-    bool has_mem_index = false;
-    {
-        Status status = GetHasMemIndex(has_mem_index);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    // append -> dump -> clear memindex -> new txn { append -> mem index(visible) -> put rocksdb has_mem_index before commit rocksdb.
-    // At same time, another full text commit thread will commit mem index, since rocksdb isn't commit has_mem_index flag, the memindex will be
-    // removed below following code.
-    if (!has_mem_index) {
-        mem_index = MakeShared<MemIndex>();
-        return Status::OK();
-    }
-
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+SharedPtr<MemIndex> SegmentIndexMeta::GetMemIndex() {
     String mem_index_key = GetSegmentIndexTag("mem_index");
-    Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
-    if (!status.ok()) {
-        return status;
-    }
-    if (!has_mem_index) {
-        mem_index->ClearMemIndex();
-    }
-
-    return Status::OK();
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    return new_catalog->GetMemIndex(mem_index_key);
 }
 
-Status SegmentIndexMeta::GetMemIndexRaw(SharedPtr<MemIndex> &mem_index) {
-    mem_index.reset();
-
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    String mem_index_key = GetSegmentIndexTag("mem_index");
-    Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
-Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
-    // Check has mem index key, if no, set the key.
-    // Clear mem index if no such key
+bool SegmentIndexMeta::GetOrSetMemIndex(SharedPtr<MemIndex> &mem_index) {
     // This function is used by populate index and append index (used by append or recover mem index)
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-
-    String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
-    bool has_mem_index = false;
-    {
-        String has_mem_index_str;
-        // block here when mem index is dumpping.
-        // Use GetForUpdate here. because if we use Get, when `has_mem_index_key` is true, we skip mem_index->Clear() here.
-        // when we dump mem index simultaneously, we do append and dump on the same mem index.
-        Status status = kv_instance_.Get(has_mem_index_key, has_mem_index_str);
-        if (!status.ok()) {
-            return status;
-        }
-        has_mem_index = std::stoi(has_mem_index_str);
-    }
-
-    if (!has_mem_index) {
-        String has_mem_index_str = "1";
-        {
-            Status status = kv_instance_.Put(has_mem_index_key, has_mem_index_str);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        has_mem_index_ = true;
-    }
-    {
-        String mem_index_key = GetSegmentIndexTag("mem_index");
-        Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    if (!has_mem_index) {
-        // Clear here because dump mem index may not clear after commit. Dump index might be conflict with AppendIndex, this is to clear the mem index
-        // before new append data is construct to new index
-        mem_index->ClearMemIndex();
-    }
-    return Status::OK();
-}
-
-Status SegmentIndexMeta::GetHasMemIndex(bool &has_mem_index) {
-    if (!has_mem_index_) {
-        String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
-        String has_mem_index_str;
-        Status status = kv_instance_.Get(has_mem_index_key, has_mem_index_str);
-        if (!status.ok()) {
-            return status;
-        }
-        has_mem_index_ = std::stoi(has_mem_index_str);
-    }
-    has_mem_index = *has_mem_index_;
-    return Status::OK();
+    String mem_index_key = GetSegmentIndexTag("mem_index");
+    bool setted = new_catalog->GetOrSetMemIndex(mem_index_key, mem_index);
+    return setted;
 }
 
 Status SegmentIndexMeta::LoadChunkIDs() {
@@ -578,22 +443,21 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 }
 
 Status SegmentIndexMeta::LoadFtInfo() {
-    String ft_info_key = GetSegmentIndexTag("ft_info");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    Status status = new_catalog->GetSegmentIndexFtInfo(ft_info_key, ft_info_);
-
-    if (ft_info_->ft_column_len_sum_ == 0) {
-        SharedPtr<MemIndex> mem_index;
-        Status status = GetMemIndex(mem_index);
-        if (status.ok() && mem_index && mem_index->memory_indexer_) {
-            ft_info_->ft_column_len_sum_ = mem_index->memory_indexer_->GetColumnLengthSum();
-            ft_info_->ft_column_len_cnt_ = mem_index->memory_indexer_->GetDocCount();
-        }
+    if (!ft_info_) {
+        ft_info_ = MakeShared<SegmentIndexFtInfo>(0, 0);
     }
-
+    String ft_info_key = GetSegmentIndexTag("ft_info");
+    String ft_info_str;
+    Status status = kv_instance_.Get(ft_info_key, ft_info_str);
     if (!status.ok()) {
+        if (status.code() == ErrorCode::kNotFound) {
+            return Status::OK();
+        }
         return status;
     }
+    Vector<u64> sum_cnt = nlohmann::json::parse(ft_info_str).get<Vector<u64>>();
+    ft_info_->ft_column_len_sum_ = sum_cnt[0];
+    ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();
 }
 

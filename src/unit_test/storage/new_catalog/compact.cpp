@@ -47,7 +47,6 @@ import data_access_state;
 import kv_code;
 import kv_store;
 import new_txn;
-import new_txn_store;
 import buffer_obj;
 import buffer_handle;
 import secondary_index_in_mem;
@@ -159,6 +158,46 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCompact,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
+TEST_P(TestTxnCompact, compact_with_index_rollback) {
+    Status status;
+    {
+        PrepareForCompact();
+        auto index_name1 = std::make_shared<std::string>("index1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto index_name2 = std::make_shared<String>("index2");
+        auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+        auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        };
+        create_index(index_def1);
+        create_index(index_def2);
+
+        //  t1            compact     commit (fail)
+        //  |--------------|---------------|
+        //         |-----|----------|
+        //        t2   drop db    commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn2->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+    }
+}
+
 TEST_P(TestTxnCompact, compact_and_drop_db) {
     Status status;
     {
@@ -230,7 +269,7 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
     {
         PrepareForCompact();
 
-        //  t1            compact     commit (success)
+        //  t1            compact     commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -248,12 +287,12 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
     }
     {
         PrepareForCompact();
 
-        //                  t1                     compact     commit (success)
+        //                  t1                     compact (fail)    rollback
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop db    commit
@@ -268,8 +307,8 @@ TEST_P(TestTxnCompact, compact_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
@@ -371,7 +410,7 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
     {
         PrepareForCompact();
 
-        //  t1            compact     commit (success)
+        //  t1            compact     commit (fail)
         //  |--------------|---------------|
         //         |-----|----------|
         //        t2   drop table    commit
@@ -389,14 +428,14 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         DropDB();
     }
     {
         PrepareForCompact();
 
-        //                  t1                     compact     commit (success)
+        //                  t1                     compact (fail)    rollback
         //                  |--------------------------|---------------|
         //         |-----|----------|
         //        t2   drop table    commit
@@ -411,8 +450,8 @@ TEST_P(TestTxnCompact, compact_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
 
         DropDB();
@@ -782,9 +821,6 @@ TEST_P(TestTxnCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
@@ -1511,7 +1547,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
     };
 
-    auto CheckWithNoIndex = [&] {
+    auto CheckWithNoIndex = [&](const Vector<SegmentID> &segment_ids) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
@@ -1522,7 +1558,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({2}));
+        EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
         Vector<String> *index_ids_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
@@ -1565,16 +1601,17 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
+
     {
         PrepareForCompact();
 
         //    t1      drop index       commit (success)
         //    |----------|---------|
         //                    |------------------|----------------|
-        //                    t2             compact       commit (success)
+        //                    t2             compact       commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
         status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
@@ -1588,9 +1625,9 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({0,1});
         DropDB();
     }
     {
@@ -1599,7 +1636,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         //    t1      drop index                       commit (success)
         //    |----------|--------------------------------|
         //                    |-----------------------|-------------------------|
-        //                    t2                  compact              commit (success)
+        //                    t2                  compact              commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
         status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
@@ -1613,9 +1650,9 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({0,1});
         DropDB();
     }
     {
@@ -1639,9 +1676,10 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
+
     {
         PrepareForCompact();
 
@@ -1665,7 +1703,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
     {
@@ -1689,7 +1727,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
     {
@@ -1714,7 +1752,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
     {
@@ -1737,7 +1775,7 @@ TEST_P(TestTxnCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckWithNoIndex();
+        CheckWithNoIndex({2});
         DropDB();
     }
 }

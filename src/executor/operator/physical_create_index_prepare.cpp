@@ -40,8 +40,6 @@ import base_table_ref;
 import extra_ddl_info;
 import wal_manager;
 import infinity_context;
-import table_entry;
-import table_index_entry;
 import new_txn;
 
 namespace infinity {
@@ -71,47 +69,14 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
     }
 
     auto *table_info = base_table_ref_->table_info_.get();
-    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
-    if (use_new_catalog) {
-        NewTxn *new_txn = query_context->GetNewTxn();
+    NewTxn *new_txn = query_context->GetNewTxn();
 
-        Status status = new_txn->CreateIndex(*table_info->db_name_, *table_info->table_name_, index_def_ptr_, conflict_type_);
-        if (!status.ok()) {
-            operator_state->status_ = status;
-            return false;
-        }
-
-        operator_state->SetComplete();
-        return true;
+    Status status = new_txn->CreateIndex(*table_info->db_name_, *table_info->table_name_, index_def_ptr_, conflict_type_);
+    if (!status.ok()) {
+        operator_state->status_ = status;
+        return false;
     }
 
-    auto *txn = query_context->GetTxn();
-    auto [table_entry, get_table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
-    if (!get_table_status.ok()) {
-        operator_state->status_ = get_table_status;
-        RecoverableError(get_table_status);
-    }
-
-    auto [table_index_entry, create_index_status] = txn->CreateIndexDef(table_entry, index_def_ptr_, conflict_type_);
-    if (!create_index_status.ok()) {
-        operator_state->status_ = create_index_status;
-    } else {
-        auto [segment_index_entries, prepare_status] = txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
-        if (!prepare_status.ok()) {
-            operator_state->status_ = prepare_status;
-            return true;
-        }
-        for (auto *segment_index_entry : segment_index_entries) {
-            base_table_ref_->index_index_->Insert(table_index_entry, segment_index_entry);
-        }
-        if (!prepare_) {
-            auto finish_status = txn->CreateIndexFinish(table_entry, table_index_entry);
-            if (!finish_status.ok()) {
-                operator_state->status_ = finish_status;
-                return true;
-            }
-        }
-    }
     operator_state->SetComplete();
     return true;
 }

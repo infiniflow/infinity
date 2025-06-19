@@ -20,8 +20,6 @@ import stl;
 import table_function;
 
 import global_block_id;
-import block_column_entry;
-import segment_index_entry;
 import merge_knn;
 import roaring_bitmap;
 import data_block;
@@ -42,19 +40,8 @@ class SegmentIndexMeta;
 export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
-                      UniquePtr<Vector<BlockColumnEntry *>> block_column_entries,
-                      UniquePtr<Vector<SegmentIndexEntry *>> index_entries,
-                      Vector<InitParameter> opt_params,
-                      i64 topk,
-                      i64 dimension,
-                      i64 query_embedding_count,
-                      void *query_embedding,
-                      EmbeddingDataType elem_type,
-                      KnnDistanceType knn_distance_type);
-
-    KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                       UniquePtr<Vector<BlockMeta *>> block_metas,
-                      UniquePtr<TableIndexMeeta> table_index_meta,
+                      SharedPtr<TableIndexMeeta> table_index_meta,
                       UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
                       Vector<InitParameter> opt_params,
                       i64 topk,
@@ -69,11 +56,8 @@ public:
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
 
-    const UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
-    const UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
-
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
-    UniquePtr<TableIndexMeeta> table_index_meta_{};
+    SharedPtr<TableIndexMeeta> table_index_meta_{};
     UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
 
     const Vector<InitParameter> opt_params_{};

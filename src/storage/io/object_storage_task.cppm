@@ -17,11 +17,6 @@ module;
 export module object_storage_task;
 
 import stl;
-// import txn;
-// import catalog;
-// import catalog_delta_entry;
-// import buffer_manager;
-// import third_party;
 
 namespace infinity {
 

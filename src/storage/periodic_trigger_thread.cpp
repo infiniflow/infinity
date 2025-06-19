@@ -57,16 +57,9 @@ void PeriodicTriggerThread::Run() {
         if (!running_) {
             break;
         }
-        if (cleanup_trigger_ != nullptr && cleanup_trigger_->Check()) {
-            cleanup_trigger_->Trigger();
-        }
 
-        if (full_checkpoint_trigger_ != nullptr && full_checkpoint_trigger_->Check()) {
-            full_checkpoint_trigger_->Trigger();
-        }
-
-        if (delta_checkpoint_trigger_ != nullptr && delta_checkpoint_trigger_->Check()) {
-            delta_checkpoint_trigger_->Trigger();
+        if (checkpoint_trigger_ != nullptr && checkpoint_trigger_->Check()) {
+            checkpoint_trigger_->Trigger();
         }
 
         if (compact_segment_trigger_ != nullptr && compact_segment_trigger_->Check()) {
@@ -75,6 +68,10 @@ void PeriodicTriggerThread::Run() {
 
         if (optimize_index_trigger_ != nullptr && optimize_index_trigger_->Check()) {
             optimize_index_trigger_->Trigger();
+        }
+
+        if (new_cleanup_trigger_ != nullptr && new_cleanup_trigger_->Check()) {
+            // new_cleanup_trigger_->Trigger();
         }
     }
 }

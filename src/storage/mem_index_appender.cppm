@@ -14,17 +14,42 @@
 
 module;
 
-module extra_command;
+export module mem_index_appender;
 
 import stl;
-import third_party;
+import bg_task_type;
+import blocking_queue;
+import status;
 
 namespace infinity {
 
-ExtraCommandType BaseExtraCommand::GetType() const { return type_; }
+class TxnManager;
+class NewTxn;
+class BGTask;
+class AppendMemIndexTask;
 
-String LockTableCommand::ToString() { return fmt::format("LockTableCommand: table_key: {}", table_key_); }
-String UnlockTableCommand::ToString() { return fmt::format("UnlockTableCommand: table_key: {}", table_key_); }
-String DropTableCommand::ToString() { return fmt::format("DropTableCommand: db_id: {}, table_id: {}, table_key: {}", db_id_, table_id_, table_key_); }
+export class MemIndexAppender {
+public:
+    MemIndexAppender();
+    ~MemIndexAppender();
+
+    void Start();
+
+    void Stop();
+
+    void Submit(SharedPtr<BGTask> bg_task);
+
+    u64 RunningTaskCount() const { return task_count_; }
+
+private:
+    void Process();
+
+private:
+    BlockingQueue<SharedPtr<BGTask>> task_queue_{"MemIndexAppender"};
+
+    Thread processor_thread_{};
+
+    Atomic<u64> task_count_{};
+};
 
 } // namespace infinity

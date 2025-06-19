@@ -43,7 +43,8 @@ TableIndexMeeta::~TableIndexMeeta() = default;
 
 Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     if (!index_def_) {
-        index_def_ = infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        index_def_ =
+            infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
     return {index_def_, Status::OK()};
 }
@@ -58,7 +59,7 @@ Status TableIndexMeeta::SetIndexBase(const SharedPtr<IndexBase> &index_base) {
 }
 
 SharedPtr<String> TableIndexMeeta::GetTableIndexDir() {
-    return MakeShared<String>(fmt::format("tbl_{}/idx_{}", table_meta_.GetTableDir()->c_str(), index_id_str_));
+    return MakeShared<String>(fmt::format("db_{}/tbl_{}/idx_{}", table_meta_.db_id_str(), table_meta_.GetTableDir()->c_str(), index_id_str_));
 }
 
 Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
@@ -72,9 +73,25 @@ Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
 
 Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
     if (!segment_ids_) {
-        segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_,
+                                                       table_meta_.db_id_str(),
+                                                       table_meta_.table_id_str(),
+                                                       index_id_str_,
+                                                       table_meta_.begin_ts());
     }
     return {&*segment_ids_, Status::OK()};
+}
+
+bool TableIndexMeeta::HasSegmentIndexID(SegmentID segment_id) {
+    auto [segment_ids_ptr, status] = GetSegmentIndexIDs1();
+    if (!status.ok()) {
+        return false;
+    }
+    auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id);
+    if (iter == segment_ids_ptr->end()) {
+        return false;
+    }
+    return true;
 }
 
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
@@ -203,10 +220,7 @@ Status TableIndexMeeta::UninitSet1(UsageFlag usage_flag) {
 
             NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
             String segment_update_ts_key = GetTableIndexTag("segment_update_ts");
-            status = new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
-            if (!status.ok()) {
-                return status;
-            }
+            new_catalog->DropSegmentUpdateTSByKey(segment_update_ts_key);
         }
     }
 
@@ -250,10 +264,15 @@ String TableIndexMeeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_ca
 Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     Status status;
     if (!segment_ids_) {
-        segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_,
+                                                       table_meta_.db_id_str(),
+                                                       table_meta_.table_id_str(),
+                                                       index_id_str_,
+                                                       table_meta_.begin_ts());
     }
     if (!index_def_) {
-        index_def_ = infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        index_def_ =
+            infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
     }
 
     SharedPtr<ColumnDef> column_def = nullptr;

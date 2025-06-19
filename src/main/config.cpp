@@ -384,18 +384,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
-        // Use new catalog
-        bool use_new_catalog = true;
-        if (default_config != nullptr) {
-            use_new_catalog = default_config->default_use_new_catalog_;
-        }
-        UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
-        status = global_options_.AddOption(std::move(use_new_catalog_option));
-        if (!status.ok()) {
-            fmt::print("Fatal: {}", status.message());
-            UnrecoverableError(status.message());
-        }
-
         // Data Dir
         String data_dir = "/var/infinity/data";
         if (default_config != nullptr) {
@@ -556,6 +544,19 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Bottom executor worker
+        i64 bottom_executor_worker = Thread::hardware_concurrency() / 2;
+        if (bottom_executor_worker < 2) {
+            bottom_executor_worker = 2;
+        }
+        UniquePtr<IntegerOption> bottom_executor_worker_option =
+            MakeUnique<IntegerOption>(BOTTOM_EXECUTOR_WORKER_OPTION_NAME, bottom_executor_worker, Thread::hardware_concurrency(), 1);
+        status = global_options_.AddOption(std::move(bottom_executor_worker_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Result Cache
         String result_cache(DEFAULT_RESULT_CACHE);
         auto result_cache_option = MakeUnique<StringOption>(RESULT_CACHE_OPTION_NAME, result_cache);
@@ -619,29 +620,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
-            UnrecoverableError(status.message());
-        }
-
-        // Delta Checkpoint Interval
-        i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-        UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                              delta_checkpoint_interval,
-                                                                                              MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
-                                                                                              MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
-        status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
-        if (!status.ok()) {
-            fmt::print("Fatal: {}", status.message());
-            UnrecoverableError(status.message());
-        }
-
-        // Delta Checkpoint Threshold
-        i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-        UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
-                                                                                               delta_checkpoint_threshold,
-                                                                                               MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
-                                                                                               MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
-        status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
-        if (!status.ok()) {
             UnrecoverableError(status.message());
         }
 
@@ -1549,21 +1527,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
 
                     switch (option_index) {
-                        case GlobalOptionIndex::kUseNewCatalog: {
-                            // Use new catalog
-                            bool use_new_catalog = true;
-                            if (elem.second.is_boolean()) {
-                                use_new_catalog = elem.second.value_or(use_new_catalog);
-                            } else {
-                                return Status::InvalidConfig("'use_new_catalog' field isn't boolean.");
-                            }
-                            UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
-                            Status status = global_options_.AddOption(std::move(use_new_catalog_option));
-                            if (!status.ok()) {
-                                UnrecoverableError(status.message());
-                            }
-                            break;
-                        }
                         case GlobalOptionIndex::kReplayWal: {
                             // Replay wal
                             bool replay_wal = true;
@@ -1942,19 +1905,29 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(fulltext_index_building_worker_option));
                             break;
                         }
+                        case GlobalOptionIndex::kBottomExecutorWorker: {
+                            i64 bottom_executor_worker = Thread::hardware_concurrency() / 2;
+                            if (bottom_executor_worker < 2) {
+                                bottom_executor_worker = 2;
+                            }
+                            if (elem.second.is_integer()) {
+                                bottom_executor_worker = elem.second.value_or(bottom_executor_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> bottom_executor_worker_option = MakeUnique<IntegerOption>(BOTTOM_EXECUTOR_WORKER_OPTION_NAME,
+                                                                                                               bottom_executor_worker,
+                                                                                                               Thread::hardware_concurrency(),
+                                                                                                               1);
+                            if (!bottom_executor_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid fulltext vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(bottom_executor_worker_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
-                    }
-                }
-
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kUseNewCatalog) == nullptr) {
-                    // Use new catalog
-                    bool use_new_catalog = true;
-                    UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
-                    Status status = global_options_.AddOption(std::move(use_new_catalog_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
                     }
                 }
 
@@ -2106,6 +2079,19 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                                   Thread::hardware_concurrency(),
                                                   1);
                     Status status = global_options_.AddOption(std::move(fulltext_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kBottomExecutorWorker) == nullptr) {
+                    // bottom executor worker
+                    i64 bottom_executor_worker = Thread::hardware_concurrency() / 2;
+                    if (bottom_executor_worker < 2) {
+                        bottom_executor_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> bottom_executor_worker_option =
+                        MakeUnique<IntegerOption>(BOTTOM_EXECUTOR_WORKER_OPTION_NAME, bottom_executor_worker, Thread::hardware_concurrency(), 1);
+                    Status status = global_options_.AddOption(std::move(bottom_executor_worker_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2371,62 +2357,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
-                        case GlobalOptionIndex::kDeltaCheckpointInterval: {
-                            // Delta Checkpoint Interval
-                            i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-                            if (elem.second.is_string()) {
-                                String delta_checkpoint_interval_str = elem.second.value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR.data());
-                                auto res = ParseTimeInfo(delta_checkpoint_interval_str, delta_checkpoint_interval);
-                                if (!res.ok()) {
-                                    return res;
-                                }
-                            } else {
-                                return Status::InvalidConfig("'delta_checkpoint_interval' field isn't string, such as \"30s\".");
-                            }
-
-                            UniquePtr<IntegerOption> delta_checkpoint_interval_option =
-                                MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                          delta_checkpoint_interval,
-                                                          MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
-                                                          MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
-                            if (!delta_checkpoint_interval_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid delta checkpoint interval: {}", delta_checkpoint_interval));
-                            }
-
-                            Status status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
-                            if (!status.ok()) {
-                                return status;
-                            }
-                            break;
-                        }
-                        case GlobalOptionIndex::kDeltaCheckpointThreshold: {
-                            // Delta Checkpoint Threshold
-                            i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-                            if (elem.second.is_string()) {
-                                String delta_checkpoint_threshold_str = elem.second.value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR.data());
-                                auto res = ParseByteSize(delta_checkpoint_threshold_str, delta_checkpoint_threshold);
-                                if (!res.ok()) {
-                                    return res;
-                                }
-                            } else {
-                                return Status::InvalidConfig("'delta_checkpoint_threshold' field isn't integer.");
-                            }
-
-                            UniquePtr<IntegerOption> delta_checkpoint_threshold_option =
-                                MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
-                                                          delta_checkpoint_threshold,
-                                                          MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
-                                                          MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
-                            if (!delta_checkpoint_threshold_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid delta checkpoint interval: {}", delta_checkpoint_threshold));
-                            }
-
-                            Status status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
-                            if (!status.ok()) {
-                                return status;
-                            }
-                            break;
-                        }
                         case GlobalOptionIndex::kFlushMethodAtCommit: {
                             // Flush Method At Commit
                             FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
@@ -2490,32 +2420,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                                                                                          MAX_FULL_CHECKPOINT_INTERVAL_SEC,
                                                                                                          MIN_FULL_CHECKPOINT_INTERVAL_SEC);
                     Status status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval) == nullptr) {
-                    // Delta Checkpoint Interval
-                    i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-                    UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                                          delta_checkpoint_interval,
-                                                                                                          MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
-                                                                                                          MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
-                    Status status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointThreshold) == nullptr) {
-                    // Delta Checkpoint Threshold
-                    i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-                    UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
-                                                                                                           delta_checkpoint_threshold,
-                                                                                                           MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
-                                                                                                           MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
-                    Status status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2762,11 +2666,6 @@ LogLevel Config::GetLogLevel() {
 }
 
 // Storage
-bool Config::UseNewCatalog() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetBoolValue(GlobalOptionIndex::kUseNewCatalog);
-}
-
 bool Config::ReplayWal() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetBoolValue(GlobalOptionIndex::kReplayWal);
@@ -2858,6 +2757,11 @@ i64 Config::FulltextIndexBuildingWorker() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kFulltextIndexBuildingWorker);
 }
 
+i64 Config::BottomExecutorWorker() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kBottomExecutorWorker);
+}
+
 StorageType Config::StorageType() {
     std::lock_guard<std::mutex> guard(mutex_);
     String storage_type_str = global_options_.GetStringValue(GlobalOptionIndex::kStorageType);
@@ -2898,6 +2802,12 @@ String Config::PersistenceDir() {
 i64 Config::PersistenceObjectSizeLimit() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPersistenceObjectSizeLimit);
+}
+
+bool Config::UseVFS() {
+    std::lock_guard guard(mutex_);
+    const auto persistence_dir = global_options_.GetStringValue(GlobalOptionIndex::kPersistenceDir);
+    return !persistence_dir.empty();
 }
 
 // Buffer
@@ -2968,28 +2878,6 @@ void Config::SetFullCheckpointInterval(i64 interval) {
     IntegerOption *full_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
     full_checkpoint_interval_option->value_ = interval;
     return;
-}
-
-i64 Config::DeltaCheckpointInterval() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval);
-}
-
-void Config::SetDeltaCheckpointInterval(i64 interval) {
-    std::lock_guard<std::mutex> guard(mutex_);
-    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval);
-    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
-        String error_message = "Attempt to set non-integer value to delta checkpoint interval";
-        UnrecoverableError(error_message);
-    }
-    IntegerOption *delta_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
-    delta_checkpoint_interval_option->value_ = interval;
-    return;
-}
-
-i64 Config::DeltaCheckpointThreshold() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointThreshold);
 }
 
 FlushOptionType Config::FlushMethodAtCommit() {
@@ -3117,8 +3005,6 @@ void Config::PrintAll() {
     fmt::print(" - wal_dir: {}\n", WALDir());
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(WALCompactThreshold()));
     fmt::print(" - full_checkpoint_interval: {}\n", Utility::FormatTimeInfo(FullCheckpointInterval()));
-    fmt::print(" - delta_checkpoint_interval: {}\n", Utility::FormatTimeInfo(DeltaCheckpointInterval()));
-    fmt::print(" - delta_checkpoint_threshold: {}\n", Utility::FormatByteSize(DeltaCheckpointThreshold()));
     fmt::print(" - flush_method_at_commit: {}\n", FlushOptionTypeToString(FlushMethodAtCommit()));
 
     // Resource dir

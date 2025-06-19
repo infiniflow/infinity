@@ -14,12 +14,14 @@
 
 module;
 
-#include <string>
+#include <filesystem>
+#include <ranges>
 
 module meta_tree;
 
 import stl;
 import third_party;
+import infinity_context;
 import infinity_exception;
 import internal_types;
 import default_values;
@@ -33,6 +35,11 @@ import buffer_handle;
 import new_catalog;
 import status;
 import kv_code;
+import catalog_cache;
+import check_statement;
+import kv_utility;
+import kv_store;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -43,52 +50,83 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
     // Get all dbs
     HashSet<String> db_names, db_ids;
     new_end = std::remove_if(meta_keys.begin(), new_end, [&](auto &meta_key) mutable {
-        if (meta_key->type_ == MetaType::kDB) {
-            auto db_key = static_cast<DBMetaKey *>(meta_key.get());
-            auto db_object = MakeShared<MetaDBObject>(meta_key);
-            meta_tree->db_map_.emplace(db_key->db_id_str_, db_object);
+        switch (meta_key->type_) {
+            case MetaType::kDB: {
+                auto db_key = static_cast<DBMetaKey *>(meta_key.get());
+                auto db_object = MakeShared<MetaDBObject>(meta_key);
+                meta_tree->db_map_.emplace(db_key->db_id_str_, db_object);
 
-            // Check if duplicated
-            if (db_names.contains(db_key->db_name_)) {
-                String error_message = fmt::format("Duplicate db name: {}", db_key->ToString());
-                UnrecoverableError(error_message);
-            } else {
-                db_names.emplace(db_key->db_name_);
-            }
+                // Check if duplicated
+                if (db_names.contains(db_key->db_name_)) {
+                    String error_message = fmt::format("Duplicate db name: {}, idx: {}", db_key->ToString(), idx);
+                    UnrecoverableError(error_message);
+                } else {
+                    db_names.emplace(db_key->db_name_);
+                }
 
-            if (db_ids.contains(db_key->db_id_str_)) {
-                String error_message = fmt::format("Duplicate db id: {}", db_key->ToString());
-                UnrecoverableError(error_message);
-            } else {
-                db_ids.emplace(db_key->db_id_str_);
+                if (db_ids.contains(db_key->db_id_str_)) {
+                    String error_message = fmt::format("Duplicate db id: {}, idx: {}", db_key->ToString(), idx);
+                    UnrecoverableError(error_message);
+                } else {
+                    db_ids.emplace(db_key->db_id_str_);
+                }
+                return true;
             }
-            return true;
+            case MetaType::kSystemTag: {
+                auto system_tag_key = static_cast<SystemTagMetaKey *>(meta_key.get());
+                meta_tree->system_tag_map_.emplace(system_tag_key->tag_name_, system_tag_key->value_);
+                return true;
+            }
+            default:
+                break;
         }
         return false;
     });
 
     // Get all tables and attach to the db
     new_end = std::remove_if(meta_keys.begin(), new_end, [&](auto &meta_key)  mutable{
-        if (meta_key->type_ == MetaType::kTable) {
-            auto table_key = static_cast<TableMetaKey *>(meta_key.get());
-            auto table_object = MakeShared<MetaTableObject>(meta_key);
+        switch (meta_key->type_) {
+            case MetaType::kTable: {
+                auto table_key = static_cast<TableMetaKey *>(meta_key.get());
+                auto table_object = MakeShared<MetaTableObject>(meta_key);
 
-            auto iter = meta_tree->db_map_.find(table_key->db_id_str_);
-            if (iter == meta_tree->db_map_.end()) {
-                String error_message = fmt::format("DB not found for table: {}", table_key->ToString());
-                LOG_WARN(error_message);
-                // DB is dropped
+                auto iter = meta_tree->db_map_.find(table_key->db_id_str_);
+                if (iter == meta_tree->db_map_.end()) {
+                    String error_message = fmt::format("DB not found for table: {}, idx: {}", table_key->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    return true;
+                }
+
+                auto &table_map = iter->second->table_map_;
+                if (table_map.contains(table_key->table_id_str_)) {
+                    String error_message = fmt::format("Duplicate table id: {}, idx: {}", table_key->ToString(), idx);
+                    UnrecoverableError(error_message);
+                }
+
+                table_map.emplace(table_key->table_id_str_, table_object);
                 return true;
             }
-
-            auto &table_map = iter->second->table_map_;
-            if (table_map.contains(table_key->table_id_str_)) {
-                String error_message = fmt::format("Duplicate table id: {}", table_key->ToString());
-                UnrecoverableError(error_message);
+            case MetaType::kDBTag: {
+                auto db_tag_key = static_cast<DBTagMetaKey *>(meta_key.get());
+                auto db_iter = meta_tree->db_map_.find(db_tag_key->db_id_str_);
+                if (db_iter == meta_tree->db_map_.end()) {
+                    String error_message = fmt::format("DB not found for tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    LOG_WARN(error_message);
+                    // DB is dropped
+                    return true;
+                }
+                auto &db_object = db_iter->second;
+                auto &tag_map = db_object->tag_map_;
+                if (tag_map.contains(db_tag_key->tag_name_)) {
+                    String error_message = fmt::format("Duplicate db tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    UnrecoverableError(error_message);
+                }
+                tag_map.emplace(db_tag_key->tag_name_, meta_key);
+                return true;
             }
-
-            table_map.emplace(table_key->table_id_str_, table_object);
-            return true;
+            default:
+                break;
         }
         return false;
     });
@@ -111,7 +149,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", segment_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -141,7 +179,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", table_tag_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
                 MetaTableObject *table_object = static_cast<MetaTableObject *>(table_iter->second.get());
@@ -157,7 +195,6 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                     LOG_WARN(error_message);
                     // DB is dropped
                     return true;
-                    ;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
@@ -165,7 +202,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", table_index_meta_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -190,7 +227,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", table_column_meta_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -216,7 +253,6 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                     LOG_WARN(error_message);
                     // DB is dropped
                     return true;
-                    ;
                 }
 
                 auto &table_map = db_iter->second->table_map_;
@@ -224,7 +260,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", block_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -258,7 +294,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", segment_tag->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -300,7 +336,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", block_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -333,7 +369,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", block_tag->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -341,8 +377,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 auto &segment_map = table_object->segment_map_;
                 auto segment_iter = segment_map.find(block_tag->segment_id_);
                 if (segment_iter == segment_map.end()) {
+                    // Segment is compacted
                     String error_message = fmt::format("Segment not found: {}", block_tag->ToString());
-                    UnrecoverableError(error_message);
+                    LOG_WARN(error_message);
+                    return true;
                 }
 
                 MetaSegmentObject *segment_object = static_cast<MetaSegmentObject *>(segment_iter->second.get());
@@ -364,7 +402,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
         return false;
     });
 
-    // Get all segment index and attach to table index
+    // Get all segment indexes and attach to table index
     new_end = std::remove_if(meta_keys.begin(), new_end, [&](auto &meta_key) mutable {
         switch (meta_key->type_) {
             case MetaType::kSegmentIndex: {
@@ -441,7 +479,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
         return false;
     });
 
-    // Get all chunk index and attach to segment index
+    // Get all chunk indexes and attach to segment index
     new_end = std::remove_if(meta_keys.begin(), new_end, [&](auto &meta_key) mutable {
         switch (meta_key->type_) {
             case MetaType::kChunkIndex: {
@@ -459,7 +497,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", chunk_index_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -469,7 +507,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_index_iter == index_map.end()) {
                     String error_message = fmt::format("Table index not found: {}", chunk_index_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
@@ -544,6 +582,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
 
 nlohmann::json MetaTree::ToJson() const {
     nlohmann::json json_res;
+    for (const auto &tag_pair : system_tag_map_) {
+        json_res["system_tags"].push_back({{"tag_name", tag_pair.first}, {"value", tag_pair.second}});
+    }
+
     for (const auto &db_pair : db_map_) {
         json_res["databases"].push_back(db_pair.second->ToJson());
     }
@@ -563,12 +605,58 @@ Vector<MetaTableObject *> MetaTree::ListTables() const {
     return tables;
 };
 
+SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
+    u64 next_db_id{0};
+    auto tag_iter = system_tag_map_.find(NEXT_DATABASE_ID.data());
+    if (tag_iter != system_tag_map_.end()) {
+        try {
+            next_db_id = std::stoull(tag_iter->second);
+        } catch (const std::exception &e) {
+            String error_message = fmt::format("Latest database id is invalid: {}, cause: {}", tag_iter->second, e.what());
+            UnrecoverableError(error_message);
+        }
+    } else {
+        String error_message = fmt::format("Can't find 'latest database id' in system tag");
+        UnrecoverableError(error_message);
+    }
+
+    SharedPtr<SystemCache> system_cache = MakeShared<SystemCache>(next_db_id);
+    for (const auto &db_pair : db_map_) {
+        MetaDBObject *meta_db_object = static_cast<MetaDBObject *>(db_pair.second.get());
+        SharedPtr<DbCache> db_cache = meta_db_object->RestoreDbCache(storage_ptr);
+        system_cache->AddDbCacheNolock(db_cache);
+    }
+    return system_cache;
+}
+
 nlohmann::json MetaDBObject::ToJson() const {
     nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &table_pair : table_map_) {
         json_res["tables"].push_back(table_pair.second->ToJson());
     }
+    for (const auto &tag_pair : tag_map_) {
+        json_res["tags"].push_back(tag_pair.second->ToJson());
+    }
     return json_res;
+}
+
+SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
+    auto db_key = static_cast<DBMetaKey *>(meta_key_.get());
+    u64 db_id{0};
+    try {
+        db_id = std::stoull(db_key->db_id_str_);
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("DB id is invalid: {}, cause: {}", db_key->db_id_str_, e.what());
+        UnrecoverableError(error_message);
+    }
+    SharedPtr<DbCache> db_cache = MakeShared<DbCache>(db_id, db_key->db_name_, 0);
+    for (const auto &table_pair : table_map_) {
+        MetaTableObject *meta_table_object = static_cast<MetaTableObject *>(table_pair.second.get());
+        SharedPtr<TableCache> table_cache = meta_table_object->RestoreTableCache(storage_ptr);
+        db_cache->AddTableCacheNolock(table_cache);
+    }
+
+    return db_cache;
 }
 
 nlohmann::json MetaTableObject::ToJson() const {
@@ -648,7 +736,7 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     BlockID current_block_id = segment_object->GetCurrentBlockID();
     BufferManager *buffer_mgr_ptr = storage_ptr->buffer_manager();
     Config *config_ptr = storage_ptr->config();
-    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/block_{}/{}",
+    String version_filepath = fmt::format("{}/db_{}/tbl_{}/seg_{}/blk_{}/{}",
                                           config_ptr->DataDir(),
                                           table_meta_key->db_id_str_,
                                           table_meta_key->table_id_str_,
@@ -679,6 +767,77 @@ SizeT MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     }
     SizeT segment_row_count = (block_count - 1) * DEFAULT_BLOCK_CAPACITY + row_cnt;
     return segment_row_count;
+}
+
+SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) const {
+    auto table_key = static_cast<TableMetaKey *>(meta_key_.get());
+    u64 db_id = 0;
+    u64 table_id = 0;
+    SegmentID unsealed_segment_id = 0;
+    SegmentOffset unsealed_segment_offset = 0;
+    SegmentID next_segment_id = 0;
+    try {
+        db_id = std::stoull(table_key->db_id_str_);
+        table_id = std::stoull(table_key->table_id_str_);
+        unsealed_segment_id = this->GetUnsealedSegmentID();
+        unsealed_segment_offset = this->GetCurrentSegmentRowCount(storage_ptr);
+        next_segment_id = this->GetNextSegmentID();
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_key->ToString(), e.what());
+        UnrecoverableError(error_message);
+    }
+
+    SharedPtr<TableCache> table_cache = nullptr;
+    if (unsealed_segment_id == 0 and unsealed_segment_offset == 0) {
+        table_cache = MakeShared<TableCache>(table_id, table_key->table_name_);
+    } else {
+        table_cache = MakeShared<TableCache>(table_id, unsealed_segment_id, unsealed_segment_offset, next_segment_id);
+    }
+
+    TxnTimeStamp current_ts = storage_ptr->new_txn_manager()->CurrentTS();
+    KVStore *kv_store = storage_ptr->new_catalog()->kv_store();
+    auto kv_instance_ptr = kv_store->GetInstance();
+    for (const auto &segment_pair : segment_map_) {
+        SegmentID segment_id = segment_pair.first;
+        SharedPtr<SegmentCache> segment_cache = nullptr;
+        if (segment_id == unsealed_segment_id) {
+            table_cache->unsealed_segment_cache_ = MakeShared<SegmentCache>(segment_id, unsealed_segment_offset);
+        } else {
+            SizeT segment_row_count = infinity::GetSegmentRowCount(kv_instance_ptr.get(),
+                                                                   table_key->db_id_str_,
+                                                                   table_key->table_id_str_,
+                                                                   segment_id,
+                                                                   current_ts,
+                                                                   MAX_TIMESTAMP);
+            segment_cache = MakeShared<SegmentCache>(segment_id, segment_row_count);
+        }
+        table_cache->segment_cache_map_.emplace(segment_id, segment_cache);
+    }
+
+    for (const auto &index_pair : index_map_) {
+        const String &index_name = index_pair.first;
+        MetaTableIndexObject *table_index_obj = static_cast<MetaTableIndexObject *>(index_pair.second.get());
+        TableIndexMetaKey *table_index_meta_key = static_cast<TableIndexMetaKey *>(table_index_obj->meta_key_.get());
+        u64 index_id = std::stoull(table_index_meta_key->index_id_str_);
+        SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, index_name);
+        for (const auto &segment_index_pair : table_index_obj->segment_map_) {
+            SegmentID segment_id = segment_index_pair.first;
+            MetaSegmentIndexObject *segment_index_obj = static_cast<MetaSegmentIndexObject *>(segment_index_pair.second.get());
+            SharedPtr<SegmentIndexCache> segment_index_cache = MakeShared<SegmentIndexCache>(segment_id);
+            ChunkID max_chunk_id = 0;
+            for (const auto &chunk_index_pair : segment_index_obj->chunk_map_) {
+                ChunkID chunk_id = chunk_index_pair.first;
+                if (chunk_id > max_chunk_id) {
+                    max_chunk_id = chunk_id;
+                }
+            }
+            segment_index_cache->next_chunk_id_ = max_chunk_id + 1;
+            table_index_cache->segment_index_cache_map_.emplace(segment_id, segment_index_cache);
+        }
+        table_cache->index_cache_map_.emplace(index_id, table_index_cache);
+    }
+
+    return table_cache;
 }
 
 nlohmann::json MetaSegmentObject::ToJson() const {
@@ -733,6 +892,23 @@ nlohmann::json MetaTableIndexObject::ToJson() const {
     return json_res;
 }
 
+SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage *storage_ptr) const {
+    auto table_index_key = static_cast<TableIndexMetaKey *>(meta_key_.get());
+    u64 db_id{};
+    u64 table_id{};
+    u64 index_id{};
+    try {
+        db_id = std::stoull(table_index_key->db_id_str_);
+        table_id = std::stoull(table_index_key->table_id_str_);
+        index_id = std::stoull(table_index_key->index_id_str_);
+    } catch (const std::exception &e) {
+        String error_message = fmt::format("DB id or table id is invalid: {}, cause: {}", table_index_key->ToString(), e.what());
+        UnrecoverableError(error_message);
+    }
+    SharedPtr<TableIndexCache> table_index_cache = MakeShared<TableIndexCache>(db_id, table_id, index_id, table_index_key->index_name_);
+    return table_index_cache;
+}
+
 nlohmann::json MetaSegmentIndexObject::ToJson() const {
     nlohmann::json json_res = meta_key_->ToJson();
     for (const auto &chunk_pair : chunk_map_) {
@@ -755,6 +931,80 @@ nlohmann::json MetaPmObject::ToJson() const {
         json_res["paths"].push_back(path_pair.second->ToJson());
     }
     return json_res;
+}
+
+bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str) {
+    switch (tag) {
+        case CheckStmtType::kSystem: {
+            return true;
+        }
+        case CheckStmtType::kTable: {
+            auto table_str = fmt::format("{}", db_table_str.value());
+            return path.find(table_str) != String::npos;
+        }
+        case CheckStmtType::kInvalid: {
+            UnrecoverableError("Invalid entity tag");
+        }
+        default:
+            return false;
+    }
+    return true;
+}
+
+HashSet<String> MetaTree::GetMetaPathSet() {
+    HashSet<String> meta_path_set;
+    for (auto &pm_obj : pm_object_map_ | std::views::values) {
+        for (auto &path : pm_obj->path_map_ | std::views::keys) {
+            // We don't need to check for duplicate paths since meta_tree has already done that.
+            meta_path_set.emplace(path);
+        }
+    }
+
+    return meta_path_set;
+}
+
+HashSet<String> MetaTree::GetDataVfsPathSet() {
+    HashSet<String> data_path_set;
+    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
+    for (auto files = pm->GetAllFiles(); const auto &path : files | std::views::keys) {
+        data_path_set.emplace(path);
+    }
+    return data_path_set;
+}
+
+HashSet<String> MetaTree::GetDataVfsOffPathSet() {
+    HashSet<String> data_path_set;
+    auto data_dir = InfinityContext::instance().config()->DataDir();
+    for (const auto &entry : std::filesystem::recursive_directory_iterator{data_dir}) {
+        if (std::filesystem::is_regular_file(entry)) {
+            data_path_set.emplace(entry.path().string());
+        }
+    }
+    return data_path_set;
+}
+
+Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str) {
+    auto meta_path_set = this->GetMetaPathSet();
+    auto data_path_set = is_vfs ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
+
+    meta_path_set.merge(data_path_set);
+
+    Pair<Vector<String>, Vector<String>> mismatch_entries_pair;
+    auto &[meta_mismatch_entry, data_mismatch_entry] = mismatch_entries_pair;
+
+    for (auto &path : meta_path_set) {
+        if (PathFilter(path, tag, db_table_str) && !data_path_set.contains(path)) {
+            meta_mismatch_entry.emplace_back(path);
+        }
+    }
+
+    for (auto &path : data_path_set) {
+        if (PathFilter(path, tag, db_table_str) && !meta_path_set.contains(path)) {
+            data_mismatch_entry.emplace_back(path);
+        }
+    }
+
+    return mismatch_entries_pair;
 }
 
 } // namespace infinity

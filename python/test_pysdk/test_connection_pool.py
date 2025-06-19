@@ -6,7 +6,6 @@ from infinity.connection_pool import ConnectionPool
 from infinity.common import ConflictType
 
 import infinity
-import infinity_embedded
 from infinity.errors import ErrorCode
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -15,16 +14,12 @@ if parent_dir not in sys.path:
 from infinity_http import infinity_http
 
 
-@pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
 @pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup(self, local_infinity, http):
-        if local_infinity:
-            self.uri = common_values.TEST_LOCAL_PATH
-            self.infinity_obj = infinity_embedded.connect(self.uri)
-        elif http:
+    def setup(self, http):
+        if http:
             self.uri = common_values.TEST_LOCAL_HOST
             self.infinity_obj = infinity_http()
         else:

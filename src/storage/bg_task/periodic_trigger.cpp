@@ -22,8 +22,6 @@ import infinity_exception;
 import background_process;
 import compaction_process;
 import bg_task;
-import catalog;
-import txn_manager;
 import third_party;
 
 import new_txn_manager;
@@ -45,41 +43,12 @@ bool PeriodicTrigger::Check() {
     return true;
 }
 
-SharedPtr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask(TxnTimeStamp visible_ts) {
-    LOG_DEBUG(fmt::format("Trigger cleanup task, after {} seconds", duration_.load()));
-    std::lock_guard lck(mtx_);
-    if (visible_ts == 0) {
-        visible_ts = txn_mgr_->GetCleanupScanTS() + 1;
-    }
-    if (visible_ts == last_visible_ts_) {
-        LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
-        return nullptr;
-    }
-    if (visible_ts < last_visible_ts_) {
-        UnrecoverableError("The visible timestamp is not monotonic.");
-        return nullptr;
-    }
-    last_visible_ts_ = visible_ts;
-    LOG_DEBUG(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-
-    auto buffer_mgr = txn_mgr_->GetBufferMgr();
-    return MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);
-}
-
-void CleanupPeriodicTrigger::Trigger() {
-    auto cleanup_task = CreateCleanupTask();
-    if (cleanup_task.get() == nullptr) {
-        return;
-    }
-    bg_processor_->Submit(std::move(cleanup_task));
-}
-
 SharedPtr<NewCleanupTask> NewCleanupPeriodicTrigger::CreateNewCleanupTask() {
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     TxnTimeStamp last_cleanup_ts = bg_processor->last_cleanup_ts();
-    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetCleanupScanTS1();
+    TxnTimeStamp cur_cleanup_ts = new_txn_mgr->GetOldestAliveTS();
     if (cur_cleanup_ts <= last_cleanup_ts) {
         return nullptr;
     }
@@ -97,7 +66,7 @@ void NewCleanupPeriodicTrigger::Trigger() {
 }
 
 void CheckpointPeriodicTrigger::Trigger() {
-    LOG_INFO(fmt::format("Trigger {} periodic checkpoint, after {} seconds", is_full_checkpoint_ ? "FULL" : "DELTA", duration_.load()));
+    LOG_INFO(fmt::format("Trigger periodic checkpoint, after {} seconds", duration_.load()));
 
     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
@@ -121,14 +90,9 @@ void CheckpointPeriodicTrigger::Trigger() {
 
 void CompactSegmentPeriodicTrigger::Trigger() {
     LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_.load()));
-    if (!new_compaction_) {
-        auto compact_task = MakeShared<NotifyCompactTask>();
-        compact_processor_->Submit(std::move(compact_task));
-    } else {
-        auto compact_task = MakeShared<NotifyCompactTask>(true);
-        auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
-        compact_processor->Submit(std::move(compact_task));
-    }
+    auto compact_task = MakeShared<NotifyCompactTask>();
+    auto *compact_processor = InfinityContext::instance().storage()->compaction_processor();
+    compact_processor->Submit(std::move(compact_task));
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {

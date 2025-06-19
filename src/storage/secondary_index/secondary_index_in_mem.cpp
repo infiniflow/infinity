@@ -26,13 +26,9 @@ import internal_types;
 import column_def;
 import default_values;
 import buffer_manager;
-import block_column_entry;
 import block_column_iter;
 import infinity_exception;
 import secondary_index_data;
-import chunk_index_entry;
-import segment_index_entry;
-import table_index_entry;
 import buffer_handle;
 import logger;
 import base_memindex;
@@ -57,42 +53,21 @@ protected:
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
-    SecondaryIndexInMemT(SegmentIndexEntry *segment_index_entry, const RowID begin_row_id)
-        : SecondaryIndexInMem(segment_index_entry), begin_row_id_(begin_row_id) {
-        IncreaseMemoryUsageBase(MemoryCostOfThis());
-    }
+    explicit SecondaryIndexInMemT(const RowID begin_row_id) : begin_row_id_(begin_row_id) { IncreaseMemoryUsageBase(MemoryCostOfThis()); }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
         std::shared_lock lock(map_mutex_);
         return in_mem_secondary_index_.size();
     }
-    void InsertBlockData(const SegmentOffset block_offset,
-                         BlockColumnEntry *block_column_entry,
-                         BufferManager *buffer_manager,
-                         const u32 row_offset,
-                         const u32 row_count) override {
-        MemIndexInserterIter<RawValueType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-        const auto inserted_rows = InsertInner(iter);
-        assert(inserted_rows == row_count);
-        IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
-    }
+
     void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) override {
         MemIndexInserterIter1<RawValueType> iter(block_offset, col, offset, row_count);
         const auto inserted_rows = InsertInner(iter);
         assert(inserted_rows == row_count);
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const override {
-        assert(segment_index_entry == segment_index_entry_);
-        std::shared_lock lock(map_mutex_);
-        const u32 row_count = GetRowCountNoLock();
-        auto new_chunk_index_entry = segment_index_entry->CreateSecondaryIndexChunkIndexEntry(begin_row_id_, row_count, buffer_mgr);
-        BufferHandle handle = new_chunk_index_entry->GetIndex();
-        auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-        data_ptr->InsertData(&in_mem_secondary_index_);
-        return new_chunk_index_entry;
-    }
+
     void Dump(BufferObj *buffer_obj) const override {
         BufferHandle handle = buffer_obj->Load();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
@@ -147,58 +122,48 @@ private:
 MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
     const auto row_cnt = GetRowCount();
     const auto mem = MemoryCostOfThis() + row_cnt * MemoryCostOfEachRow();
-    if (segment_index_entry_ == nullptr) {
-        return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), mem, row_cnt);
-    }
-
-    auto *table_index_entry = segment_index_entry_->table_index_entry();
-    SharedPtr<String> index_name = table_index_entry->GetIndexName();
-    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-    SharedPtr<String> table_name = table_entry->GetTableName();
-    SharedPtr<String> db_name = table_entry->GetDBName();
-    return MemIndexTracerInfo(std::move(index_name), std::move(table_name), std::move(db_name), mem, row_cnt);
+    return MemIndexTracerInfo(nullptr, nullptr, nullptr, mem, row_cnt);
 }
 
-TableIndexEntry *SecondaryIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
+const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0}; }
 
-SharedPtr<SecondaryIndexInMem>
-SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, SegmentIndexEntry *segment_index_entry, RowID begin_row_id) {
+SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
         UnrecoverableError("Column type can't build secondary index");
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
-            return MakeShared<SecondaryIndexInMemT<TinyIntT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<TinyIntT>>(begin_row_id);
         }
         case LogicalType::kSmallInt: {
-            return MakeShared<SecondaryIndexInMemT<SmallIntT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<SmallIntT>>(begin_row_id);
         }
         case LogicalType::kInteger: {
-            return MakeShared<SecondaryIndexInMemT<IntegerT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<IntegerT>>(begin_row_id);
         }
         case LogicalType::kBigInt: {
-            return MakeShared<SecondaryIndexInMemT<BigIntT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<BigIntT>>(begin_row_id);
         }
         case LogicalType::kFloat: {
-            return MakeShared<SecondaryIndexInMemT<FloatT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<FloatT>>(begin_row_id);
         }
         case LogicalType::kDouble: {
-            return MakeShared<SecondaryIndexInMemT<DoubleT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<DoubleT>>(begin_row_id);
         }
         case LogicalType::kDate: {
-            return MakeShared<SecondaryIndexInMemT<DateT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<DateT>>(begin_row_id);
         }
         case LogicalType::kTime: {
-            return MakeShared<SecondaryIndexInMemT<TimeT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<TimeT>>(begin_row_id);
         }
         case LogicalType::kDateTime: {
-            return MakeShared<SecondaryIndexInMemT<DateTimeT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<DateTimeT>>(begin_row_id);
         }
         case LogicalType::kTimestamp: {
-            return MakeShared<SecondaryIndexInMemT<TimestampT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<TimestampT>>(begin_row_id);
         }
         case LogicalType::kVarchar: {
-            return MakeShared<SecondaryIndexInMemT<VarcharT>>(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<VarcharT>>(begin_row_id);
         }
         default: {
             return nullptr;

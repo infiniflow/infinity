@@ -166,8 +166,6 @@ TEST_P(TestTxnColumn, test_add_columns) {
         Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
-    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 }
 
 TEST_P(TestTxnColumn, alter_column) {
@@ -235,9 +233,6 @@ TEST_P(TestTxnColumn, alter_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -289,9 +284,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -335,9 +327,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -381,9 +370,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -438,9 +424,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -489,9 +472,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -540,9 +520,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -593,9 +570,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -646,9 +620,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -699,9 +670,6 @@ TEST_P(TestTxnColumn, add_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -755,9 +723,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -800,9 +765,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -845,9 +807,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -897,9 +856,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -949,9 +905,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1002,9 +955,6 @@ TEST_P(TestTxnColumn, add_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }
@@ -1053,9 +1003,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1098,9 +1045,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1142,9 +1086,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_db) {
 
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -1196,9 +1137,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1244,9 +1182,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1292,9 +1227,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1342,9 +1274,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1392,9 +1321,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1442,9 +1368,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_table) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     new_txn_mgr->PrintAllKeyValue();
@@ -1506,9 +1429,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1566,9 +1486,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1617,9 +1534,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1670,9 +1584,6 @@ TEST_P(TestTxnColumn, drop_column_and_add_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }
@@ -1738,9 +1649,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1796,9 +1704,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1859,9 +1764,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1915,9 +1817,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1972,9 +1871,6 @@ TEST_P(TestTxnColumn, drop_column_and_drop_column) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
-
-        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }

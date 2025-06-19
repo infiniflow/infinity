@@ -14,41 +14,37 @@
 
 module;
 
-export module txn_committer_task;
+export module bottom_executor;
 
 import stl;
-import status;
-import new_txn;
+import blocking_queue;
 
 namespace infinity {
 
-export struct TxnCommitterTask {
+class NewTxn;
+
+// BottomExecutor has a pool of threads, and executes transactions of a same table with the same thread orderly.
+export class BottomExecutor {
 public:
-    TxnCommitterTask(NewTxn *txn, bool stop_task = false) : new_txn_(txn), stop_task_(stop_task) {}
+    BottomExecutor();
+    virtual ~BottomExecutor();
 
-    bool IsStopTask() const { return stop_task_; }
-    NewTxn *txn_ptr() const { return new_txn_; }
+    void Start(SizeT executor_size);
+    void Stop();
 
-    void Wait() {
-        std::unique_lock<std::mutex> locker(mutex_);
-        cv_.wait(locker, [this] { return complete_; });
-    }
-
-    void Complete() {
-        std::unique_lock<std::mutex> locker(mutex_);
-        complete_ = true;
-        cv_.notify_one();
-    }
-
-    Status status() { return status_; }
+    void Submit(NewTxn *txn);
 
 private:
-    NewTxn *new_txn_{};
-    bool stop_task_{false};
-    Status status_{};
+    void Process();
 
-    bool complete_{false};
+private:
+    Atomic<bool> running_{true};
+    Vector<SharedPtr<BlockingQueue<NewTxn *>>> txn_queues_{};
+    Vector<Thread> executors_{};
+
+    SizeT cnt_{0};
     std::mutex mutex_{};
     std::condition_variable cv_{};
 };
+
 } // namespace infinity
