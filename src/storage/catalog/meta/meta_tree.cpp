@@ -57,14 +57,14 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
 
                 // Check if duplicated
                 if (db_names.contains(db_key->db_name_)) {
-                    String error_message = fmt::format("Duplicate db name: {}, idx: {}", db_key->ToString(), idx);
+                    String error_message = fmt::format("Duplicate db name: {}", db_key->ToString());
                     UnrecoverableError(error_message);
                 } else {
                     db_names.emplace(db_key->db_name_);
                 }
 
                 if (db_ids.contains(db_key->db_id_str_)) {
-                    String error_message = fmt::format("Duplicate db id: {}, idx: {}", db_key->ToString(), idx);
+                    String error_message = fmt::format("Duplicate db id: {}", db_key->ToString());
                     UnrecoverableError(error_message);
                 } else {
                     db_ids.emplace(db_key->db_id_str_);
@@ -91,7 +91,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
 
                 auto iter = meta_tree->db_map_.find(table_key->db_id_str_);
                 if (iter == meta_tree->db_map_.end()) {
-                    String error_message = fmt::format("DB not found for table: {}, idx: {}", table_key->ToString(), idx);
+                    String error_message = fmt::format("DB not found for table: {}", table_key->ToString());
                     LOG_WARN(error_message);
                     // DB is dropped
                     return true;
@@ -99,7 +99,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
 
                 auto &table_map = iter->second->table_map_;
                 if (table_map.contains(table_key->table_id_str_)) {
-                    String error_message = fmt::format("Duplicate table id: {}, idx: {}", table_key->ToString(), idx);
+                    String error_message = fmt::format("Duplicate table id: {}", table_key->ToString());
                     UnrecoverableError(error_message);
                 }
 
@@ -110,7 +110,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 auto db_tag_key = static_cast<DBTagMetaKey *>(meta_key.get());
                 auto db_iter = meta_tree->db_map_.find(db_tag_key->db_id_str_);
                 if (db_iter == meta_tree->db_map_.end()) {
-                    String error_message = fmt::format("DB not found for tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    String error_message = fmt::format("DB not found for tag: {}", db_tag_key->ToString());
                     LOG_WARN(error_message);
                     // DB is dropped
                     return true;
@@ -118,7 +118,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 auto &db_object = db_iter->second;
                 auto &tag_map = db_object->tag_map_;
                 if (tag_map.contains(db_tag_key->tag_name_)) {
-                    String error_message = fmt::format("Duplicate db tag: {}, idx: {}", db_tag_key->ToString(), idx);
+                    String error_message = fmt::format("Duplicate db tag: {}", db_tag_key->ToString());
                     UnrecoverableError(error_message);
                 }
                 tag_map.emplace(db_tag_key->tag_name_, meta_key);
