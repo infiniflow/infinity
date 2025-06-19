@@ -453,7 +453,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys
                 if (table_iter == table_map.end()) {
                     String error_message = fmt::format("Table not found: {}", table_index_tag_key->ToString());
                     LOG_WARN(error_message);
-                    // Table is dropped
+                    // The Table is dropped
                     return true;
                 }
 
