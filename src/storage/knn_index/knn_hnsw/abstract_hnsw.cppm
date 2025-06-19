@@ -17,7 +17,7 @@ module;
 #include <future>
 
 namespace infinity {
-struct SegmentEntry;
+struct ChunkIndexMetaInfo;
 }
 
 export module abstract_hnsw;
@@ -40,17 +40,12 @@ import infinity_context;
 import logger;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import buffer_handle;
 import third_party;
-import chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
-struct ChunkIndexEntry;
-struct SegmentIndexEntry;
-struct BlockColumnEntry;
 class ColumnVector;
 class BufferObj;
 
@@ -102,12 +97,11 @@ export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_(nullptr) {}
 
-    static UniquePtr<HnswIndexInMem>
-    Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace = false);
+    static UniquePtr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
 
     static UniquePtr<HnswIndexInMem> Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace = false);
 
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace);
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace);
 
 private:
     template <typename Iter, typename Index>
@@ -162,24 +156,10 @@ public:
 
     SizeT GetSizeInBytes() const;
 
-    void InsertVecs(SizeT block_offset,
-                    BlockColumnEntry *block_column_entry,
-                    BufferManager *buffer_manager,
-                    SizeT row_offset,
-                    SizeT row_count,
-                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
-
     void InsertVecs(SegmentOffset block_offset,
                     const ColumnVector &col,
                     BlockOffset offset,
                     BlockOffset row_count,
-                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
-
-    void InsertVecs(const SegmentEntry *segment_entry,
-                    BufferManager *buffer_mgr,
-                    SizeT column_id,
-                    TxnTimeStamp begin_ts,
-                    bool check_ts,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     template <typename Iter>
@@ -209,8 +189,6 @@ public:
 
     void SetLSGParam(float alpha, UniquePtr<float[]> avg);
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
-
     void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
 
     const AbstractHnsw &get() const { return hnsw_; }
@@ -228,7 +206,6 @@ private:
     RowID begin_row_id_ = {};
     AbstractHnsw hnsw_ = nullptr;
 
-    SegmentIndexEntry *segment_index_entry_{};
     bool trace_{};
     bool own_memory_{};
     BufferHandle chunk_handle_{};
