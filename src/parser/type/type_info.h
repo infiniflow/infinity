@@ -16,6 +16,9 @@
 
 #include "json.hpp"
 #include "simdjson.h"
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 #include <cstdint>
 #include <string>
 

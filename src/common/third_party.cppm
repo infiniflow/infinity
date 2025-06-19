@@ -83,6 +83,10 @@ module;
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+
 #pragma clang diagnostic pop
 
 export module third_party;
@@ -385,5 +389,28 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
+
+export namespace rapidjson {
+
+using Document = ::RAPIDJSON_NAMESPACE::Document;
+using Value = ::RAPIDJSON_NAMESPACE::Value;
+using StringBuffer = ::RAPIDJSON_NAMESPACE::StringBuffer;
+using Type = ::RAPIDJSON_NAMESPACE::Type;
+
+template <typename CharType = char>
+using UTF8 = ::RAPIDJSON_NAMESPACE::UTF8<CharType>;
+
+using CrtAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator;
+
+using WriteFlag = ::RAPIDJSON_NAMESPACE::WriteFlag;
+
+template <typename OutputStream,
+          typename SourceEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename TargetEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename StackAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator,
+          unsigned writeFlags = ::RAPIDJSON_NAMESPACE::WriteFlag::kWriteDefaultFlags>
+using Writer = ::RAPIDJSON_NAMESPACE::Writer<OutputStream, SourceEncoding, TargetEncoding, StackAllocator, writeFlags>;
+
+} // namespace rapidjson
 
 } // namespace infinity
