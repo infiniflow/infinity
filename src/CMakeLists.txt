@@ -288,6 +288,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rapidjson/include")
 
 
 if(X86_64)
@@ -643,6 +644,7 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cur
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rapidjson/include")
 
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)

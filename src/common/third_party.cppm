@@ -71,15 +71,19 @@ module;
 #include <miniocpp/client.h>
 
 #include "rocksdb/db.h"
+#include "rocksdb/env.h"
+#include "rocksdb/io_status.h"
+#include "rocksdb/merge_operator.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
-#include "rocksdb/io_status.h"
-#include "rocksdb/utilities/transaction.h"
-#include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/utilities/backup_engine.h"
 #include "rocksdb/utilities/merge_operators.h"
-#include "rocksdb/merge_operator.h"
-#include "rocksdb/env.h"
+#include "rocksdb/utilities/transaction.h"
+#include "rocksdb/utilities/transaction_db.h"
+
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 #pragma clang diagnostic pop
 
@@ -371,5 +375,27 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
+
+export namespace rapidjson {
+
+using Document = ::RAPIDJSON_NAMESPACE::Document;
+using Value = ::RAPIDJSON_NAMESPACE::Value;
+using StringBuffer = ::RAPIDJSON_NAMESPACE::StringBuffer;
+
+template <typename CharType = char>
+using UTF8 = ::RAPIDJSON_NAMESPACE::UTF8<CharType>;
+
+using CrtAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator;
+
+using WriteFlag = ::RAPIDJSON_NAMESPACE::WriteFlag;
+
+template <typename OutputStream,
+          typename SourceEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename TargetEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename StackAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator,
+          unsigned writeFlags = ::RAPIDJSON_NAMESPACE::WriteFlag::kWriteDefaultFlags>
+using Writer = ::RAPIDJSON_NAMESPACE::Writer<OutputStream, SourceEncoding, TargetEncoding, StackAllocator, writeFlags>;
+
+} // namespace rapidjson
 
 } // namespace infinity
