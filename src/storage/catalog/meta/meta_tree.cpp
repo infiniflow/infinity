@@ -45,7 +45,6 @@ namespace infinity {
 
 SharedPtr<MetaTree> MetaTree::MakeMetaTree(Vector<SharedPtr<MetaKey>> &meta_keys) {
     SharedPtr<MetaTree> meta_tree = MakeShared<MetaTree>();
-    // SizeT meta_count = meta_keys.size();
     auto new_end = meta_keys.end();
     // Get all dbs
     HashSet<String> db_names, db_ids;
