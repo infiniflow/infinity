@@ -180,6 +180,7 @@ void PhysicalMatchTensorScan::CheckColumn() {
 void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     Status status;
     SizeT search_column_id = SearchColumnID();
+    auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
     segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
@@ -208,12 +209,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     RecoverableError(status);
                 }
 
-                ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != search_column_id) {
+                if (index_base->column_name() != search_column_name) {
                     // search_column_id isn't in this table index
                     continue;
                 }
@@ -241,12 +237,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(status);
             }
 
-            ColumnID column_id = 0;
-            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (column_id != search_column_id) {
+            if (index_base->column_name() != search_column_name) {
                 // search_column_id isn't in this table index
                 LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
                 Status error_status = Status::ColumnNotExist(index_base->column_name());

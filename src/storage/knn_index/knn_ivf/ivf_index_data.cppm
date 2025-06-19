@@ -50,12 +50,6 @@ public:
 
     const IVF_Index_Storage *GetIVFIndexStoragePtr() const { return this; }
 
-    void BuildIVFIndex(RowID base_rowid,
-                       u32 row_count,
-                       const SegmentEntry *segment_entry,
-                       const SharedPtr<ColumnDef> &column_def,
-                       BufferManager *buffer_mgr);
-
     void BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def);
 
     void BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);

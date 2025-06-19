@@ -385,6 +385,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
     Status status;
     SizeT knn_column_id = GetColumnID();
+    auto &knn_column_name = base_table_ref_->table_info_->column_defs_[knn_column_id]->name();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
     segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
@@ -405,7 +406,6 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
-            // TODO: delete for() by table_index_meta ( in base_table_ref )
             for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
                 auto it = base_table_ref_->block_index_->table_index_meta_map_[i];
 
@@ -415,12 +415,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                     RecoverableError(status);
                 }
 
-                ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != knn_column_id) {
+                if (index_base->column_name() != knn_column_name) {
                     // knn_column_id isn't in this table index
                     continue;
                 }
@@ -447,12 +442,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(status);
             }
 
-            ColumnID column_id = 0;
-            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (column_id != knn_column_id) {
+            if (index_base->column_name() != knn_column_name) {
                 // knn_column_id isn't in this table index
                 LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
                 Status error_status = Status::ColumnNotExist(index_base->column_name());

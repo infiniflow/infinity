@@ -46,7 +46,6 @@ import background_process;
 import base_table_ref;
 import compact_statement;
 import default_values;
-import chunk_index_entry;
 import memory_indexer;
 import persistence_manager;
 import persist_result_handler;
@@ -761,6 +760,10 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
         return {nullptr, status};
     }
     status = table_meta->GetTableInfo(*table_info);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    status = table_meta->GetComment(*table_info);
     if (!status.ok()) {
         return {nullptr, status};
     }

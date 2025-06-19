@@ -45,16 +45,7 @@ public:
     const String &table_id_str() const { return table_id_str_; }
     const String &db_id_str() const { return db_id_str_; }
 
-    Status GetComment(String *&comment) {
-        if (!comment_) {
-            Status status = LoadComment();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        comment = &*comment_;
-        return Status::OK();
-    }
+    Status GetComment(TableInfo &table_info);
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
