@@ -31,7 +31,6 @@ import sparse_util;
 import multivector_util;
 import internal_types;
 import column_vector;
-import fix_heap;
 import block_column_iter;
 
 namespace infinity {

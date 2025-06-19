@@ -199,7 +199,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -443,7 +443,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 

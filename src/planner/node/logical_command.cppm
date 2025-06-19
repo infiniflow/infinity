@@ -27,8 +27,6 @@ import data_type;
 
 namespace infinity {
 
-struct TableEntry;
-
 export class LogicalCommand : public LogicalNode {
 public:
     LogicalCommand(u64 node_id, SharedPtr<CommandInfo> command_info)

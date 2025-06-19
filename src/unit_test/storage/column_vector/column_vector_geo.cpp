@@ -197,7 +197,7 @@ TEST_P(ColumnVectorGeoTest, contant_point) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -466,7 +466,7 @@ TEST_P(ColumnVectorGeoTest, contant_line) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -752,7 +752,7 @@ TEST_P(ColumnVectorGeoTest, contant_line_seg) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -1050,7 +1050,7 @@ TEST_P(ColumnVectorGeoTest, contant_box) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -1293,7 +1293,7 @@ TEST_P(ColumnVectorGeoTest, flat_path) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -1444,7 +1444,7 @@ TEST_P(ColumnVectorGeoTest, contant_path) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -1758,7 +1758,7 @@ TEST_P(ColumnVectorGeoTest, flat_polygon) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -1928,7 +1928,7 @@ TEST_P(ColumnVectorGeoTest, contant_polygon) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -2302,7 +2302,7 @@ TEST_P(ColumnVectorGeoTest, contant_circle) {
     EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
+
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 

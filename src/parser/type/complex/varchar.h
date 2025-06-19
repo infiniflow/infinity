@@ -19,8 +19,6 @@
 
 namespace infinity {
 
-struct FixHeapManager;
-
 // varchar related constants
 constexpr uint64_t VARCHAR_PREFIX_LENGTH = 5;
 constexpr uint64_t VARCHAR_INLINE_LENGTH = 13;

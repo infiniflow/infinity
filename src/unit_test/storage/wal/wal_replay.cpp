@@ -25,7 +25,6 @@ import table_def;
 import data_block;
 import value;
 import buffer_manager;
-import meta_state;
 import wal_entry;
 import infinity_exception;
 import status;

@@ -32,9 +32,6 @@ import global_resource_usage;
 
 namespace infinity {
 
-struct BlockEntry;
-struct SegmentEntry;
-struct ChunkIndexEntry;
 enum class SegmentStatus;
 class ChunkIndexMeta;
 class BlockMeta;

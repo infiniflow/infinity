@@ -18,8 +18,6 @@ export module vector_buffer;
 
 import stl;
 import global_resource_usage;
-import heap_chunk;
-import fix_heap;
 import buffer_handle;
 import var_buffer;
 import data_type;
@@ -30,7 +28,6 @@ import internal_types;
 namespace infinity {
 
 class BufferManager;
-struct BlockColumnEntry;
 class BufferObj;
 
 export enum class VectorBufferType {
@@ -114,11 +111,8 @@ private:
 public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
-    UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
-
 public:
     void Reset() {
-        fix_heap_mgr_ = nullptr;
         var_buffer_mgr_ = nullptr;
     }
 

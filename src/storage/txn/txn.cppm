@@ -21,7 +21,6 @@ import meta_info;
 import table_def;
 import index_base;
 import data_block;
-import meta_state;
 import buffer_manager;
 import txn_state;
 import txn_store;

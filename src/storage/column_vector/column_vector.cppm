@@ -30,7 +30,6 @@ import value;
 import status;
 import third_party;
 import infinity_exception;
-import fix_heap;
 import internal_types;
 import data_type;
 import embedding_info;
