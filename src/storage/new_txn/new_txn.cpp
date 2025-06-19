@@ -46,7 +46,6 @@ import background_process;
 import base_table_ref;
 import compact_statement;
 import default_values;
-import chunk_index_entry;
 import memory_indexer;
 import persistence_manager;
 import persist_result_handler;

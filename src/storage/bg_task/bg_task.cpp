@@ -20,7 +20,6 @@ module bg_task;
 
 import base_memindex;
 import emvb_index_in_mem;
-import chunk_index_entry;
 import cleanup_scanner;
 import infinity_context;
 import storage;

@@ -248,11 +248,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<FilterFulltextExpression> &exp
         const RowID row_id = rowid_ptr[idx];
         const SegmentID segment_id = row_id.segment_id_;
         SegmentOffset segment_row_count = 0;
-        if (!expr->block_index_->segment_block_index_.empty()) {
-            segment_row_count = expr->block_index_->segment_block_index_.at(segment_id).segment_offset_;
-        } else {
-            segment_row_count = expr->block_index_->new_segment_block_index_.at(segment_id).segment_offset();
-        }
+        segment_row_count = expr->block_index_->new_segment_block_index_.at(segment_id).segment_offset();
         const Bitmask *segment_filter_result_ptr = nullptr;
         {
             std::shared_lock lock(expr->rw_mutex_);

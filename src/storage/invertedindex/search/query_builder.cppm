@@ -28,8 +28,6 @@ import query_node;
 
 namespace infinity {
 
-class Txn;
-
 export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_{};
     UniquePtr<QueryNode> optimized_query_tree_{};

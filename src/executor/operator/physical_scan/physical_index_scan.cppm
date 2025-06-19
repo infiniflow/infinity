@@ -32,16 +32,12 @@ import base_table_ref;
 import value;
 import knn_filter;
 import secondary_index_data;
-import table_index_entry;
-import segment_index_entry;
 import fast_rough_filter;
 import global_block_id;
 import roaring_bitmap;
 import filter_expression_push_down;
 
 namespace infinity {
-
-class Txn;
 
 // for int range filter, x > n is equivalent to x >= n + 1
 // for float range filter, x > f is equivalent to x >= std::nextafter(f, INFINITY)

@@ -123,14 +123,8 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes()
 SizeT PhysicalMatchSparseScan::TaskletCount() {
     SizeT ret = base_table_ref_->block_index_->BlockCount();
     if (base_table_ref_->index_index_.get() != nullptr) {
-        if (!base_table_ref_->index_index_->index_snapshots_vec_.empty()) {
-            const auto &index_snapshots = base_table_ref_->index_index_->index_snapshots_vec_;
-            if (index_snapshots.size() != 1) {
-                UnrecoverableError("Multiple index snapshots are not supported.");
-            }
-            ret = index_snapshots[0]->segment_index_entries_.size();
-        } else if (!base_table_ref_->index_index_->new_index_snapshots_vec_.empty()) {
-            const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
+        const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
+        if (!index_snapshots.empty()) {
             if (index_snapshots.size() != 1) {
                 UnrecoverableError("Multiple index snapshots are not supported.");
             }
@@ -185,7 +179,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     } else {
         auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), match_sparse_expr_->index_name_);
         if (iter == index_names_ptr->end()) {
-            Status status = Status::IndexNotExist(match_sparse_expr_->index_name_);
+            status = Status::IndexNotExist(match_sparse_expr_->index_name_);
             RecoverableError(std::move(status));
         }
         const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
@@ -471,7 +465,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
             break;
         }
-        Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
+        status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
