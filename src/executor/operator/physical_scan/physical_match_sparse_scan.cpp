@@ -136,6 +136,7 @@ SizeT PhysicalMatchSparseScan::TaskletCount() {
 
 void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     SizeT search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
+    auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
     Status status;
     TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
@@ -157,12 +158,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            SizeT column_id = 0;
-            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (column_id != search_column_id) {
+            if (index_base->column_name() != search_column_name) {
                 continue;
             }
             if (index_base->index_type_ != IndexType::kBMP) {
@@ -191,12 +187,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         if (!status.ok()) {
             RecoverableError(status);
         }
-        SizeT column_id = 0;
-        std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        if (column_id != search_column_id) {
+        if (index_base->column_name() != search_column_name) {
             // knn_column_id isn't in this table index
             LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
             Status error_status = Status::ColumnNotExist(index_base->column_name());

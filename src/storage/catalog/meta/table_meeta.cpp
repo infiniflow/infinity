@@ -43,6 +43,17 @@ namespace infinity {
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
     : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
+Status TableMeeta::GetComment(TableInfo &table_info) {
+    if (!comment_) {
+        Status status = LoadComment();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    table_info.table_comment_ = MakeShared<String>(*comment_);
+    return Status::OK();
+}
+
 Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
     if (!index_id_strs_ || !index_names_) {
         Status status = LoadIndexIDs();
@@ -414,13 +425,6 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
 Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     Status status;
 
-    String *table_comment = nullptr;
-    status = GetComment(table_comment);
-    if (!status.ok()) {
-        return status;
-    }
-    table_info.table_comment_ = MakeShared<String>(*table_comment);
-
     table_info.table_full_dir_ =
         MakeShared<String>(fmt::format("{}/db_{}/tbl_{}", InfinityContext::instance().config()->DataDir(), db_id_str_, table_id_str_));
 
@@ -450,6 +454,10 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
 Status TableMeeta::GetTableDetail(TableDetail &table_detail, const String &db_name, const String &table_name) {
     TableInfo table_info;
     Status status = GetTableInfo(table_info);
+    if (!status.ok()) {
+        return status;
+    }
+    status = GetComment(table_info);
     if (!status.ok()) {
         return status;
     }
