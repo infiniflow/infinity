@@ -35,8 +35,6 @@ private:
     static QueryResult ShowLogFile(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult ListLogIndexes(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult ShowLogIndex(QueryContext *query_context, const AdminStatement *admin_statement);
-    static QueryResult ListCatalogs(QueryContext *query_context, const AdminStatement *admin_statement);
-    static QueryResult ShowCatalog(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult ListDatabases(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult ShowDatabase(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult ListTables(QueryContext *query_context, const AdminStatement *admin_statement);
@@ -65,11 +63,6 @@ private:
     static QueryResult DeleteSnapshot(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult ExportSnapshot(QueryContext *query_context, const AdminStatement *admin_statement);
     static QueryResult RecoverFromSnapshot(QueryContext *query_context, const AdminStatement *admin_statement);
-
-    static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext *query_context, const AdminStatement *admin_statement);
-    static Vector<String> GetAllCheckpointFiles(QueryContext *query_context, const AdminStatement *admin_statement);
-    static Tuple<UniquePtr<NewCatalog>, Status>
-    LoadCatalogFiles(QueryContext *query_context, const AdminStatement *admin_statement, Vector<SharedPtr<WalEntry>> &ckp_entries);
 };
 
 } // namespace infinity

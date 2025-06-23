@@ -24,7 +24,6 @@ import query_context;
 import operator_state;
 import load_meta;
 import data_type;
-import segment_entry;
 import compact_statement;
 
 namespace infinity {
@@ -46,9 +45,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SizeT TaskletCount() override { return compactible_segments_group_.size(); }
+    SizeT TaskletCount() override { return 1; }
 
-    Vector<Vector<Vector<SegmentEntry *>>> PlanCompact(SizeT parallel_count);
+    // Vector<Vector<Vector<SegmentEntry *>>> PlanCompact(SizeT parallel_count);
 
     SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 
@@ -59,7 +58,7 @@ public:
 
 private:
     CompactStatementType compact_type_;
-    Vector<Vector<SegmentEntry *>> compactible_segments_group_;
+    // Vector<Vector<SegmentEntry *>> compactible_segments_group_;
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

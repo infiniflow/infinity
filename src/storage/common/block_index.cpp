@@ -106,9 +106,7 @@ BlockOffset BlockIndex::GetBlockOffset(SegmentID segment_id, BlockID block_id) c
     return segment_offset % DEFAULT_BLOCK_CAPACITY;
 }
 
-bool BlockIndex::IsEmpty() const {
-    return new_segment_block_index_.empty();
-}
+bool BlockIndex::IsEmpty() const { return new_segment_block_index_.empty(); }
 
 BlockMeta *BlockIndex::GetBlockMeta(u32 segment_id, u16 block_id) const {
     auto seg_it = new_segment_block_index_.find(segment_id);

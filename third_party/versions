@@ -1,7 +1,7 @@
 cli11 v2.3.2
 googletest v1.12.1
 magic_enum v0.8.1
-spdlog v1.10.0
+spdlog v1.15.3
 simdjson v3.1.8
 tlx v0.6.1
 nlohmann v3.11.3

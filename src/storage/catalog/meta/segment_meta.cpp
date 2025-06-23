@@ -28,7 +28,6 @@ import infinity_exception;
 
 import block_meta;
 import meta_info;
-import segment_entry;
 import new_catalog;
 import fast_rough_filter;
 import column_def;

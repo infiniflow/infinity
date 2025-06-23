@@ -212,8 +212,6 @@ public:
     QueryResult TestCommand(const String &command_content);
 
     // Admin interface
-    QueryResult AdminShowCatalogs();
-    QueryResult AdminShowCatalog(i64 index);
     QueryResult AdminShowLogs();
     QueryResult AdminShowLog(i64 index);
     QueryResult AdminShowConfigs();

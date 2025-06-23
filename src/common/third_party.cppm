@@ -25,6 +25,7 @@ module;
 
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
+#include "spdlog/fmt/ranges.h"
 #include "spdlog/logger.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
@@ -171,11 +172,6 @@ export using nlohmann::json;
 namespace magic_enum {
 export using magic_enum::underlying_type_t;
 }
-
-namespace moodycamel {
-export using moodycamel::ConcurrentQueue;
-export using moodycamel::BlockingConcurrentQueue;
-} // namespace moodycamel
 
 namespace arrow {
 export using Status = arrow::Status;

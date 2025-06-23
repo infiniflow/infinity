@@ -23,8 +23,6 @@ import bg_task;
 import blocking_queue;
 import third_party;
 import logger;
-import txn;
-import table_index_entry;
 import new_txn;
 import compilation_config;
 import infinity_context;
@@ -166,8 +164,6 @@ public:
     void TriggerDump(UniquePtr<DumpIndexTask> task) override { task_queue_.Enqueue(std::move(task)); }
 
     NewTxn *GetTxn() override { return nullptr; }
-
-    Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override { return catalog_.GetMemIndexes(); }
 
     Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override { return {}; }
 

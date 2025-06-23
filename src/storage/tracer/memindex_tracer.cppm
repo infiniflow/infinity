@@ -25,10 +25,7 @@ namespace infinity {
 
 class BaseMemIndex;
 class NewTxn;
-class Txn;
 struct NewCatalog;
-struct Catalog;
-class TxnManager;
 class NewTxnManager;
 class DumpIndexTask;
 class EMVBIndexInMem;
@@ -63,11 +60,7 @@ public:
 
     void DumpFail(BaseMemIndex *mem_index);
 
-    Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(Txn *txn);
-
     Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
-
-    Vector<BaseMemIndex *> GetUndumpedMemIndexes(Txn *txn);
 
     Vector<BaseMemIndex *> GetUndumpedMemIndexes(NewTxn *new_txn);
 
@@ -77,8 +70,6 @@ public:
 
 protected:
     virtual NewTxn *GetTxn() = 0;
-
-    virtual Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) = 0;
 
     virtual Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) = 0;
 
@@ -124,8 +115,6 @@ public:
 
 protected:
     NewTxn *GetTxn() override;
-
-    Vector<BaseMemIndex *> GetAllMemIndexes(Txn *txn) override;
 
     Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override;
 

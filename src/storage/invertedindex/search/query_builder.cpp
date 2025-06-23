@@ -30,7 +30,6 @@ import index_base;
 import infinity_exception;
 import query_node;
 import base_table_ref;
-import segment_entry;
 import term_doc_iterator;
 import logger;
 import third_party;

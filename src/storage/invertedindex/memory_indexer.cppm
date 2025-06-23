@@ -36,8 +36,6 @@ import external_sort_merger;
 import persistence_manager;
 import base_memindex;
 import memindex_tracer;
-import segment_index_entry;
-import table_index_entry;
 import mem_usage_change;
 import chunk_index_meta;
 
@@ -63,12 +61,7 @@ public:
         PostingTableStore store_;
     };
 
-    MemoryIndexer(const String &index_dir,
-                  const String &base_name,
-                  RowID base_row_id,
-                  optionflag_t flag,
-                  const String &analyzer,
-                  SegmentIndexEntry *segment_index_entry);
+    MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer);
 
     ~MemoryIndexer();
 
@@ -198,7 +191,6 @@ private:
     SizeT spill_buffer_size_{0};
     UniquePtr<BufWriter> buf_writer_;
 
-    SegmentIndexEntry *segment_index_entry_{nullptr};
     Atomic<SizeT> mem_used_{0};
 };
 } // namespace infinity

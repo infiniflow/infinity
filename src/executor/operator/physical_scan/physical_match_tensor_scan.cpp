@@ -368,7 +368,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             LOG_TRACE(
                 fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
             // TODO: now only have EMVB index
-            // const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
             auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
             if (!status.ok()) {
                 UnrecoverableError(status.message());

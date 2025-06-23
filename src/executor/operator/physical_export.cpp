@@ -540,7 +540,6 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     bool switch_to_new_file = false;
     auto consume_block = [&](Vector<ColumnVector> &column_vectors,
                              const Bitmask *bitmask,
-                             const DeleteFilter *delete_filter,
                              SegmentOffset segment_offset,
                              bool use_new_filter,
                              const SizeT block_row_count) -> bool {
@@ -550,10 +549,6 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             for (block_rows_for_output.clear(); start_block_row_idx < block_row_count; ++start_block_row_idx) {
                 if (use_new_filter) {
                     if (!bitmask->IsTrue(start_block_row_idx)) {
-                        continue;
-                    }
-                } else {
-                    if (!(*delete_filter)(segment_offset + start_block_row_idx)) {
                         continue;
                     }
                 }
@@ -645,7 +640,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            if (!consume_block(column_vectors, &bitmask, nullptr, 0, true, block_row_count)) {
+            if (!consume_block(column_vectors, &bitmask, 0, true, block_row_count)) {
                 goto new_label_return;
             }
         }

@@ -25,7 +25,6 @@ import hnsw_handler;
 #else
 import abstract_hnsw;
 #endif
-import segment_entry;
 import column_def;
 import index_hnsw;
 import index_ivf;
@@ -36,7 +35,6 @@ import index_base;
 import ivf_index_data;
 import third_party;
 import internal_types;
-import segment_iter;
 import knn_scan_data;
 import knn_expr;
 import ivf_index_search;
@@ -123,38 +121,6 @@ HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef>
 }
 
 HnswLSGBuilder::~HnswLSGBuilder() = default;
-
-UniquePtr<HnswIndexInMem> HnswLSGBuilder::Make(const SegmentEntry *segment_entry,
-                                               SizeT column_id,
-                                               TxnTimeStamp begin_ts,
-                                               bool check_ts,
-                                               BufferManager *buffer_mgr,
-                                               bool trace) {
-    const DataType *column_type = column_def_->type().get();
-    auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    switch (embedding_info->Type()) {
-        case EmbeddingDataType::kElemFloat:
-            return MakeImpl<float, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
-        // case EmbeddingDataType::kElemDouble:
-        //     return MakeImpl<double, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
-        default:
-            UnrecoverableError("Invalid embedding data type");
-            return nullptr;
-    }
-}
-
-template <typename DataType, typename DistanceDataType>
-UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImpl(const SegmentEntry *segment_entry,
-                                                   SizeT column_id,
-                                                   TxnTimeStamp begin_ts,
-                                                   bool check_ts,
-                                                   BufferManager *buffer_mgr,
-                                                   bool trace) {
-    OneColumnIterator<DataType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-    SizeT row_count = segment_entry->row_count();
-    RowID base_row_id(segment_entry->segment_id(), 0);
-    return MakeImplIter<decltype(iter), DataType, DistanceDataType>(std::move(iter), row_count, base_row_id, trace);
-}
 
 template <typename Iter, typename DataType, typename DistanceDataType>
 UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace) {

@@ -1326,27 +1326,6 @@ QueryResult Infinity::TestCommand(const String &command_content) {
     return result;
 }
 
-QueryResult Infinity::AdminShowCatalogs() {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
-
-    auto admin_statement = MakeUnique<AdminStatement>();
-    admin_statement->admin_type_ = AdminStmtType::kListCatalogs;
-    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
-    return result;
-}
-
-QueryResult Infinity::AdminShowCatalog(i64 index) {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
-
-    auto admin_statement = MakeUnique<AdminStatement>();
-    admin_statement->admin_type_ = AdminStmtType::kShowCatalog;
-    admin_statement->catalog_file_index_ = index;
-    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
-    return result;
-}
-
 QueryResult Infinity::AdminShowLogs() {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
