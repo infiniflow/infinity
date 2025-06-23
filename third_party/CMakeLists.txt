@@ -16,9 +16,6 @@ add_subdirectory(googletest)
 # Build magic_enum
 add_subdirectory(magic_enum)
 
-# Build spdlog
-add_subdirectory(spdlog)
-
 # Build mlas
 add_subdirectory(mlas)
 
