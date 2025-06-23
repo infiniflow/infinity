@@ -55,6 +55,7 @@ public:
     UniquePtr<KVIterator> GetIterator();
     UniquePtr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
     Vector<Pair<String, String>> GetAllKeyValue();
+    String ToString() const;
 
     Status Commit();
     Status Rollback();

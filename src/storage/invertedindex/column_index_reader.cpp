@@ -66,6 +66,10 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             return status;
         }
     }
+    if (segment_ids_ptr->empty()) {
+        KVInstance &kv_instance = table_index_meta.kv_instance();
+        LOG_INFO(fmt::format("All kv_instance key and value: {}", kv_instance.ToString()));
+    }
     u64 column_len_sum = 0;
     u32 column_len_cnt = 0;
     // need to ensure that segment_id is in ascending order

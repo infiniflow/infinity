@@ -137,6 +137,23 @@ Vector<Pair<String, String>> KVInstance::GetAllKeyValue() {
     return result;
 }
 
+String KVInstance::ToString() const {
+    std::stringstream ss;
+    rocksdb::ReadOptions read_option;
+    UniquePtr<rocksdb::Iterator> iter{transaction_->GetIterator(read_options_)};
+    iter->SeekToFirst();
+    for (; iter->Valid(); iter->Next()) {
+        auto key = iter->key().ToString();
+        auto value = iter->value().ToString();
+        if (key.find("fast_rough_filter") == std::string::npos) {
+            ss << key << " : " << value << '\n';
+        } else {
+            ss << key << '\n';
+        }
+    }
+    return ss.str();
+}
+
 Status KVInstance::Commit() {
     rocksdb::Status s = transaction_->Commit();
     if (!s.ok()) {

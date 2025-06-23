@@ -404,19 +404,20 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
         LOG_TRACE(fmt::format("PutObjCache empty object {} for local path {}", obj_addr.obj_key_, local_path));
         return result;
     }
-    ObjStat *obj_stat = objects_->Release(obj_addr.obj_key_, result.drop_keys_);
-    if (obj_stat == nullptr) {
-        if (obj_addr.obj_key_ != current_object_key_) {
-            UnrecoverableError(fmt::format("PutObjCache object {} not found", obj_addr.obj_key_));
-        }
+    if (obj_addr.obj_key_ == current_object_key_) {
         if (current_object_ref_count_ <= 0) {
             UnrecoverableError(fmt::format("PutObjCache current object {} ref count is {}", obj_addr.obj_key_, current_object_ref_count_));
         }
         current_object_ref_count_--;
         LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
-        return result;
+    } else {
+        ObjStat *obj_stat = objects_->Release(obj_addr.obj_key_, result.drop_keys_);
+        if (obj_stat != nullptr) {
+            LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
+        } else {
+            LOG_WARN(fmt::format("PutObjCache object {} unknown ref count", obj_addr.obj_key_));
+        }
     }
-    LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
     return result;
 }
 
