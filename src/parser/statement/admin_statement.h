@@ -23,8 +23,6 @@ enum class AdminStmtType {
     kShowLogFile,
     kListLogIndexes,
     kShowLogIndex,
-    kListCatalogs,
-    kShowCatalog,
     kListDatabases,
     kShowDatabase,
     kListTables,

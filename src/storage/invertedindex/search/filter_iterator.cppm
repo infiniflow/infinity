@@ -23,7 +23,6 @@ import index_defines;
 import common_query_filter;
 import base_expression;
 import roaring_bitmap;
-import table_entry;
 import column_index_reader;
 
 namespace infinity {

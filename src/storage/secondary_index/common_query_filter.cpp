@@ -32,7 +32,6 @@ import expression_evaluator;
 import default_values;
 import internal_types;
 import column_vector;
-import segment_iter;
 import vector_buffer;
 import data_type;
 import logical_type;

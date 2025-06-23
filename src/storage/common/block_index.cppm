@@ -76,6 +76,8 @@ public:
 
     void Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index_snapshot);
 
+    bool IsEmpty() const { return new_index_snapshots_vec_.empty(); }
+
 public:
     HashMap<String, SharedPtr<NewIndexSnapshot>> new_index_snapshots_;
     Vector<NewIndexSnapshot *> new_index_snapshots_vec_;

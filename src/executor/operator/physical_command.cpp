@@ -41,7 +41,6 @@ import status;
 import infinity_exception;
 import variables;
 import logger;
-import cleanup_scanner;
 import infinity_context;
 import periodic_trigger;
 import bg_task;

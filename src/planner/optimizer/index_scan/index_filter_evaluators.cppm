@@ -18,7 +18,6 @@ export module index_filter_evaluators;
 
 import stl;
 import roaring_bitmap;
-import table_index_entry;
 import secondary_index_data;
 import filter_expression_push_down;
 import filter_expression_push_down_helper;
@@ -62,7 +61,6 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     Vector<const BaseExpression *> src_filter_secondary_index_expressions_;
     ColumnID column_id_ = std::numeric_limits<ColumnID>::max();
     LogicalType column_logical_type_ = LogicalType::kInvalid;
-    const TableIndexEntry *secondary_index_ = nullptr;
     SharedPtr<TableIndexMeeta> new_secondary_index_ = nullptr;
 
     ColumnID column_id() const { return column_id_; }
@@ -70,7 +68,6 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     virtual void Merge(IndexFilterEvaluatorSecondary &other, Type op) = 0;
     static UniquePtr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                          ColumnID column_id,
-                                                         const TableIndexEntry *secondary_index,
                                                          SharedPtr<TableIndexMeeta> new_secondary_index,
                                                          FilterCompareType compare_type,
                                                          const Value &val);
@@ -79,10 +76,9 @@ protected:
     IndexFilterEvaluatorSecondary(const BaseExpression *src_expr,
                                   const ColumnID column_id,
                                   const LogicalType column_logical_type,
-                                  const TableIndexEntry *secondary_index,
                                   SharedPtr<TableIndexMeeta> new_secondary_index)
         : IndexFilterEvaluator(Type::kSecondaryIndex), src_filter_secondary_index_expressions_({src_expr}), column_id_(column_id),
-          column_logical_type_(column_logical_type), secondary_index_(secondary_index), new_secondary_index_(std::move(new_secondary_index)) {}
+          column_logical_type_(column_logical_type), new_secondary_index_(std::move(new_secondary_index)) {}
 };
 
 // maybe combined from multiple filter_fulltext exprs

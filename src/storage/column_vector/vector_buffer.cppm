@@ -112,9 +112,7 @@ public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
 public:
-    void Reset() {
-        var_buffer_mgr_ = nullptr;
-    }
+    void Reset() { var_buffer_mgr_ = nullptr; }
 
     SizeT TotalSize(const DataType *data_type) const;
 

@@ -34,7 +34,6 @@ import txn_state;
 import data_access_state;
 import status;
 import meta_info;
-import table_entry_type;
 
 import database_detail;
 import status;
@@ -72,12 +71,12 @@ import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
 import meta_key;
-import segment_entry;
 import txn_allocator_task;
 import meta_type;
 import base_txn_store;
 import buffer_handle;
 import virtual_store;
+import txn_context;
 
 namespace infinity {
 

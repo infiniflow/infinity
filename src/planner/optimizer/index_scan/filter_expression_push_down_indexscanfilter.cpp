@@ -39,10 +39,8 @@ import third_party;
 import scalar_function;
 import scalar_function_set;
 import index_base;
-import table_index_entry;
 import new_catalog;
 import value;
-import table_index_meta;
 import meta_info;
 import roaring_bitmap;
 import query_node;
@@ -54,7 +52,6 @@ import doc_iterator;
 import search_driver;
 import status;
 import parse_fulltext_options;
-import table_entry;
 import block_index;
 
 import new_txn;
@@ -91,7 +88,6 @@ struct ExpressionIndexScanInfo {
     };
 
     // for index scan
-    HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
     TableMeeta *table_meta_ = nullptr;
     HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
 
@@ -153,10 +149,7 @@ struct ExpressionIndexScanInfo {
             case ExpressionType::kColumn: {
                 auto *column_expression = static_cast<const ColumnExpression *>(expression.get());
                 const ColumnID column_id = column_expression->binding().column_idx;
-                if (candidate_column_index_map_.contains(column_id)) {
-                    tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
-                                                                                          : Enum::kSecondaryIndexColumnExprOrAfterCast;
-                } else if (new_candidate_column_index_map_.contains(column_id)) {
+                if (new_candidate_column_index_map_.contains(column_id)) {
                     tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
                                                                                           : Enum::kSecondaryIndexColumnExprOrAfterCast;
                 }
@@ -459,12 +452,7 @@ private:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
                             SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
-                            return IndexFilterEvaluatorSecondary::Make(function_expression,
-                                                                       column_id,
-                                                                       nullptr,
-                                                                       secondary_index,
-                                                                       compare_type,
-                                                                       value);
+                            return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
                         }
                         case FilterCompareType::kAlwaysTrue: {
                             return MakeUnique<IndexFilterEvaluatorAllTrue>();

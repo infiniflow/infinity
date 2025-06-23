@@ -85,37 +85,37 @@ Vector<Pair<SegmentID, Vector<SegmentOffset>>> CompactStateData::GetToDelete() c
     return res;
 }
 
-void CompactStateData::AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn) {
-    //    std::lock_guard lock(mutex2_);
-    //    auto *block_index = new_table_ref_->block_index_.get();
-    //    block_index->Insert(new_segment.get(), txn);
-    //
-    //    CompactSegmentData data{new_segment, std::move(compacted_segments)};
-    //    segment_data_list_.push_back(std::move(data));
-}
+// void CompactStateData::AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn) {
+//     std::lock_guard lock(mutex2_);
+//     auto *block_index = new_table_ref_->block_index_.get();
+//     block_index->Insert(new_segment.get(), txn);
 
-void CompactStateData::AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn) {
-    //    std::lock_guard lock(mutex2_);
-    //    auto *index_index = new_table_ref_->index_index_.get();
-    //    index_index->Insert(table_index_entry, txn);
-}
+//     CompactSegmentData data{new_segment, std::move(compacted_segments)};
+//     segment_data_list_.push_back(std::move(data));
+// }
 
-void CompactStateData::AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry) {
-    //    std::lock_guard lock(mutex2_);
-    //    if (new_table_ref_->index_index_.get() == nullptr) {
-    //        new_table_ref_->index_index_ = MakeShared<IndexIndex>();
-    //    }
-    //    new_table_ref_->index_index_->Insert(table_index_entry, index_segment_entry);
-}
+// void CompactStateData::AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn) {
+//     std::lock_guard lock(mutex2_);
+//     auto *index_index = new_table_ref_->index_index_.get();
+//     index_index->Insert(table_index_entry, txn);
+// }
 
-Map<SegmentID, SegmentIndexEntry *> CompactStateData::GetSegmentIndexEntries(const String &index_name) {
-    //    std::lock_guard lock(mutex2_);
-    Map<SegmentID, SegmentIndexEntry *> res;
-    //    const IndexIndex &index_index = *new_table_ref_->index_index_;
-    //    if (auto iter = index_index.index_snapshots_.find(index_name); iter != index_index.index_snapshots_.end()) {
-    //        res = iter->second->segment_index_entries_;
-    //    }
-    return res;
-}
+// void CompactStateData::AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry) {
+//     std::lock_guard lock(mutex2_);
+//     if (new_table_ref_->index_index_.get() == nullptr) {
+//         new_table_ref_->index_index_ = MakeShared<IndexIndex>();
+//     }
+//     new_table_ref_->index_index_->Insert(table_index_entry, index_segment_entry);
+// }
+
+// Map<SegmentID, SegmentIndexEntry *> CompactStateData::GetSegmentIndexEntries(const String &index_name) {
+//     std::lock_guard lock(mutex2_);
+//     Map<SegmentID, SegmentIndexEntry *> res;
+//     const IndexIndex &index_index = *new_table_ref_->index_index_;
+//     if (auto iter = index_index.index_snapshots_.find(index_name); iter != index_index.index_snapshots_.end()) {
+//         res = iter->second->segment_index_entries_;
+//     }
+//     return res;
+// }
 
 } // namespace infinity

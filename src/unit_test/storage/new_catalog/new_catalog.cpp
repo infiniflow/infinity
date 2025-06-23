@@ -43,7 +43,6 @@ import meta_info;
 import data_block;
 import column_vector;
 import value;
-import data_access_state;
 import kv_code;
 import kv_store;
 import new_txn;

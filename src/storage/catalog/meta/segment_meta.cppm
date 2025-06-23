@@ -29,6 +29,29 @@ class TableMeeta;
 class SegmentInfo;
 class FastRoughFilter;
 
+export enum class SegmentStatus : u8 {
+    kUnsealed,
+    kSealed,
+    kCompacting,
+    kNoDelete,
+    kDeprecated,
+};
+
+export String ToString(SegmentStatus segment_status) {
+    switch (segment_status) {
+        case SegmentStatus::kUnsealed:
+            return "Unsealed";
+        case SegmentStatus::kSealed:
+            return "Sealed";
+        case SegmentStatus::kCompacting:
+            return "Compacting";
+        case SegmentStatus::kNoDelete:
+            return "NoDelete";
+        case SegmentStatus::kDeprecated:
+            return "Deprecated";
+    }
+}
+
 export class SegmentMeta {
 public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);

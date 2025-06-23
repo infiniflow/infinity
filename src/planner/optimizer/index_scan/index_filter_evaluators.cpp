@@ -20,22 +20,18 @@ module index_filter_evaluators;
 
 import stl;
 import roaring_bitmap;
-import table_index_entry;
 import secondary_index_data;
 import secondary_index_in_mem;
-import chunk_index_entry;
 import buffer_obj;
 import buffer_handle;
 import filter_expression_push_down;
 import filter_fulltext_expression;
-import table_entry;
 import query_node;
 import column_index_reader;
 import infinity_exception;
 import status;
 import internal_types;
 import third_party;
-import segment_index_entry;
 import doc_iterator;
 import score_threshold_iterator;
 import column_def;
@@ -376,21 +372,16 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     IndexFilterEvaluatorSecondaryT(const BaseExpression *src_expr,
                                    const ColumnID column_id,
                                    const LogicalType column_logical_type,
-                                   const TableIndexEntry *secondary_index,
                                    SharedPtr<TableIndexMeeta> new_secondary_index)
-        : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, secondary_index, new_secondary_index) {}
+        : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index) {}
 
     static UniquePtr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                           const ColumnID column_id,
-                                                          const TableIndexEntry *secondary_index,
                                                           SharedPtr<TableIndexMeeta> new_secondary_index,
                                                           const FilterCompareType compare_type,
                                                           const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
-        if (secondary_index && (expect_logical_type != secondary_index->column_def()->type()->type() || expect_logical_type != val.type().type())) {
-            UnrecoverableError("Column type mismatch");
-        }
-        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, secondary_index, new_secondary_index);
+        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, new_secondary_index);
         const SecondaryIndexOrderedT val_ordered = GetOrderedV<ColumnValueT>(val);
         switch (compare_type) {
             case FilterCompareType::kEqual: {
@@ -415,57 +406,52 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 
 UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                              ColumnID column_id,
-                                                                             const TableIndexEntry *secondary_index,
                                                                              SharedPtr<TableIndexMeeta> new_secondary_index,
                                                                              FilterCompareType compare_type,
                                                                              const Value &val) {
     ColumnDef *column_def;
-    if (secondary_index) {
-        column_def = secondary_index->column_def().get();
-    } else {
-        auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-        column_def = column_def_ptr.get();
+    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
+    column_def = column_def_ptr.get();
     if (column_def->id() != static_cast<i64>(column_id)) {
         UnrecoverableError("Invalid column id");
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
-            return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kSmallInt: {
-            return IndexFilterEvaluatorSecondaryT<SmallIntT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<SmallIntT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kInteger: {
-            return IndexFilterEvaluatorSecondaryT<IntegerT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<IntegerT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kBigInt: {
-            return IndexFilterEvaluatorSecondaryT<BigIntT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<BigIntT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kFloat: {
-            return IndexFilterEvaluatorSecondaryT<FloatT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<FloatT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kDouble: {
-            return IndexFilterEvaluatorSecondaryT<DoubleT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DoubleT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kDate: {
-            return IndexFilterEvaluatorSecondaryT<DateT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DateT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kTime: {
-            return IndexFilterEvaluatorSecondaryT<TimeT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TimeT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kDateTime: {
-            return IndexFilterEvaluatorSecondaryT<DateTimeT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DateTimeT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kTimestamp: {
-            return IndexFilterEvaluatorSecondaryT<TimestampT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TimestampT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         case LogicalType::kVarchar: {
             if (compare_type == FilterCompareType::kEqual) {
-                return IndexFilterEvaluatorSecondaryT<VarcharT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
+                return IndexFilterEvaluatorSecondaryT<VarcharT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
             }
             RecoverableError(Status::SyntaxError("VarcharT only support kEqual compare type in secondary index."));
             return {};
