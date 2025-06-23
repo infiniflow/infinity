@@ -187,7 +187,7 @@ void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry> &new_table_
 void TableIndexMeta::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) { index_entry_list_.Cleanup(info_tracer, dropped); }
 
 bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) {
-    LOG_DEBUG(fmt::format("Pick cleanup for table index: {}, entry_list size: {}", *index_name_, index_entry_list_.size()));
+//    LOG_DEBUG(fmt::format("Pick cleanup for table index: {}, entry_list size: {}", *index_name_, index_entry_list_.size()));
     return index_entry_list_.PickCleanup(scanner);
 }
 

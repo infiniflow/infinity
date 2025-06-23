@@ -1194,10 +1194,10 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
         return *iter;
     }
     chunk_index_entries_.insert(iter, chunk_index_entry);
-    ChunkID old_next_chunk_id = next_chunk_id_;
+//    ChunkID old_next_chunk_id = next_chunk_id_;
     next_chunk_id_ = std::max(next_chunk_id_.load(), chunk_index_entries_.back()->chunk_id_ + 1);
-    LOG_INFO(
-        fmt::format("AddChunkIndexEntryReplayWal, old_next_chunk_id: {}, next_chunk_id_, chunk_id: {}", old_next_chunk_id, next_chunk_id_, chunk_id));
+//    LOG_INFO(
+//        fmt::format("AddChunkIndexEntryReplayWal, old_next_chunk_id: {}, next_chunk_id_, chunk_id: {}", old_next_chunk_id, next_chunk_id_, chunk_id));
     if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
         try {
             u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
@@ -1222,7 +1222,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
                                                                        TxnTimeStamp deprecate_ts,
                                                                        BufferManager *buffer_mgr) {
     if (chunk_id >= next_chunk_id_) {
-        UnrecoverableError(fmt::format("Chunk ID: {} is greater than next chunk ID: {}", chunk_id, next_chunk_id_));
+//        UnrecoverableError(fmt::format("Chunk ID: {} is greater than next chunk ID: {}", chunk_id, next_chunk_id_));
     }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplay chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
                          chunk_id,

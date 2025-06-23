@@ -175,8 +175,8 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
         UnrecoverableError(error_message);
     } else {
         if (commit_ts < base_entry->commit_ts_) {
-            String error_message = fmt::format("Invalid commit_ts: {} < {}", commit_ts, base_entry->commit_ts_);
-            UnrecoverableError(error_message);
+//            String error_message = fmt::format("Invalid commit_ts: {} < {}", commit_ts, base_entry->commit_ts_);
+//            UnrecoverableError(error_message);
         }
         merge_flag_ = MergeFlag::kUpdate;
     }

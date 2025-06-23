@@ -374,7 +374,7 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
 bool TxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
     std::lock_guard guard(locker_);
     if (commit_ts > ckp_begin_ts_) {
-        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
+//        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
         ckp_begin_ts_ = UNCOMMIT_TS;
         return true;
     }

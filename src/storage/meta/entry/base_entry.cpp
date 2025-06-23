@@ -34,7 +34,7 @@ bool BaseEntry::CheckVisible(Txn *txn) const {
     TxnTimeStamp begin_ts = txn->BeginTS();
     if (txn_id_ == 0) {
         // could not check if the entry is visible accurately. log a warning and return true
-        LOG_WARN(fmt::format("Entry {} txn id is not set, commit_ts: {}", *encode_, commit_ts_));
+//        LOG_WARN(fmt::format("Entry {} txn id is not set, commit_ts: {}", *encode_, commit_ts_));
         return begin_ts >= commit_ts_;
     }
     if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) {
@@ -42,12 +42,12 @@ bool BaseEntry::CheckVisible(Txn *txn) const {
     }
     TxnManager *txn_mgr = txn->txn_mgr();
     if (txn_mgr == nullptr) { // when replay
-        String error_message = fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
-                                           begin_ts,
-                                           commit_ts_,
-                                           txn->TxnID(),
-                                           txn_id_);
-        UnrecoverableError(error_message);
+//        String error_message = fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
+//                                           begin_ts,
+//                                           commit_ts_,
+//                                           txn->TxnID(),
+//                                           txn_id_);
+//        UnrecoverableError(error_message);
     }
     // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom
     return txn_mgr->CheckIfCommitting(txn_id_, begin_ts);

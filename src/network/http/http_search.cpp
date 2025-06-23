@@ -593,7 +593,7 @@ UniquePtr<ParsedExpr> HTTPSearch::ParseFilter(const nlohmann::json &json_object,
     expr_parser.Parse(json_object, expr_parsed_result.get());
     if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Invalid expression: {}", json_object);
+        response["error_message"] = fmt::format("Invalid expression: {}", json_object.dump());
         return nullptr;
     }
 
@@ -618,12 +618,14 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     });
 
     output_columns->reserve(output_list.size());
-    for (const auto &output_expr_str : output_list) {
-        if (!output_expr_str.is_string()) {
+    for (const auto &output_expr : output_list) {
+        if (!output_expr.is_string()) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Invalid expression: {}", output_expr_str);
+            response["error_message"] = fmt::format("Invalid expression: {}", output_expr.dump());
             return nullptr;
         }
+
+        String output_expr_str = output_expr.dump();
 
         if (output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
             auto parsed_expr = new FunctionExpr();
@@ -812,7 +814,7 @@ SearchExpr *HTTPSearch::ParseSearchExpr(const nlohmann::json &json_object, HTTPS
 UniquePtr<FusionExpr> HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Fusion expression must be a json object: {}", json_object);
+        response["error_message"] = fmt::format("Fusion expression must be a json object: {}", json_object.dump());
         return nullptr;
     }
     i64 topn = -1;
