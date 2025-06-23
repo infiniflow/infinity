@@ -173,11 +173,6 @@ namespace magic_enum {
 export using magic_enum::underlying_type_t;
 }
 
-namespace moodycamel {
-export using moodycamel::ConcurrentQueue;
-export using moodycamel::BlockingConcurrentQueue;
-} // namespace moodycamel
-
 namespace arrow {
 export using Status = arrow::Status;
 export using ReadableFile = arrow::io::ReadableFile;
