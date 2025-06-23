@@ -31,6 +31,7 @@ endif()
 set(thriftcpp_SOURCES
    src/thrift/TApplicationException.cpp
    src/thrift/TOutput.cpp
+   src/thrift/TUuid.cpp
    src/thrift/async/TAsyncChannel.cpp
    src/thrift/async/TAsyncProtocolProcessor.cpp
    src/thrift/async/TConcurrentClientSyncInfo.h
@@ -196,14 +197,14 @@ if(WITH_ZLIB)
     ADD_PKGCONFIG_THRIFT(thrift-z)
 endif()
 
-if(WITH_QT5)
-    add_subdirectory(src/thrift/qt)
-    ADD_PKGCONFIG_THRIFT(thrift-qt5)
-endif()
-
-if(MSVC)
-    add_definitions("-DUNICODE -D_UNICODE")
-endif()
+#if(WITH_QT5)
+#    add_subdirectory(src/thrift/qt)
+#    ADD_PKGCONFIG_THRIFT(thrift-qt5)
+#endif()
+#
+#if(MSVC)
+#    add_definitions("-DUNICODE -D_UNICODE")
+#endif()
 
 # Install the headers
 install(DIRECTORY "src/thrift" DESTINATION "${INCLUDE_INSTALL_DIR}"
