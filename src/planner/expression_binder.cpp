@@ -97,10 +97,8 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
 
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
-        if (result.get() == nullptr) {
-            Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));
-            RecoverableError(status);
-        }
+        Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));
+        RecoverableError(status);
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
     }

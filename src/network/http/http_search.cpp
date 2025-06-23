@@ -355,7 +355,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> filter{};
         UniquePtr<ParsedExpr> limit{};
         UniquePtr<ParsedExpr> offset{};
-        SearchExpr* search_expr{};
+        SearchExpr *search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
@@ -625,7 +625,7 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
             return nullptr;
         }
 
-        String output_expr_str = output_expr.dump();
+        String output_expr_str = output_expr.get<String>();
 
         if (output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
             auto parsed_expr = new FunctionExpr();
@@ -650,8 +650,16 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
                 return nullptr;
             }
 
-            output_columns->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
-            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+            auto &expr_ptr = expr_parsed_result->exprs_ptr_->at(0);
+            if (expr_ptr->type_ == ParsedExprType::kColumn) {
+                if (output_expr_str == "*") {
+                    auto column_expr = static_cast<ColumnExpr *>(expr_ptr);
+                    column_expr->star_ = true;
+                }
+            }
+
+            output_columns->emplace_back(expr_ptr);
+            expr_ptr = nullptr;
         }
     }
 
