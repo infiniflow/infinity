@@ -14,7 +14,7 @@
 
 module;
 
-#include <__iterator/prev.h>
+#include <iterator>
 #include <cassert>
 
 module obj_stat_accessor;

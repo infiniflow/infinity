@@ -82,7 +82,7 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
         hash_table.Init(groupby_types);
     }
 
-    if (input_block == nullptr) {
+    if (input_block.get() == nullptr) {
         return;
     }
 

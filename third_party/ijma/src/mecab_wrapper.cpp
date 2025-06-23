@@ -1,3 +1,4 @@
+#include <cstring>
 #include "mecab_wrapper.h"
 #include "mecab.h"
 

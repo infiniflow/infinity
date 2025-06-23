@@ -17,6 +17,7 @@ module;
 #include <cstring>
 #include <string>
 #include <vector>
+#include <memory>
 
 module infinity_thrift_service;
 

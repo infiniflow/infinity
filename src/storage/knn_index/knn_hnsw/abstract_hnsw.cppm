@@ -14,7 +14,16 @@
 
 module;
 
+#include "ctpl_stl.h"
+#include <functional>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <memory>
+#include <exception>
 #include <future>
+#include <mutex>
+#include <queue>
 
 namespace infinity {
 struct ChunkIndexMetaInfo;

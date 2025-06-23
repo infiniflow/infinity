@@ -146,7 +146,7 @@ SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
     SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession();
-    if (remote_session == nullptr) {
+    if (remote_session.get() == nullptr) {
         return nullptr;
     }
     infinity_ptr->session_ = std::move(remote_session);

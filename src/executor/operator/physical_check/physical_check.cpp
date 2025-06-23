@@ -16,6 +16,8 @@ module;
 
 #include <map>
 #include <string>
+#include <algorithm>
+#include <ranges>
 
 module physical_check;
 

@@ -611,10 +611,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
         }
         auto bound_argument_expr = BuildExpression(*expr.arguments_->at(idx), bind_context_ptr, depth, false);
 
-        if (arguments_type != nullptr && bound_argument_expr->Type() != *arguments_type) {
+        if (arguments_type.get() != nullptr && bound_argument_expr->Type() != *arguments_type) {
             Status status = Status::SyntaxError("Expressions in In expression must be of the same data type!");
             RecoverableError(status);
-        } else if (arguments_type == nullptr) {
+        } else if (arguments_type.get() == nullptr) {
             arguments_type = MakeShared<DataType>(bound_argument_expr->Type());
         }
 

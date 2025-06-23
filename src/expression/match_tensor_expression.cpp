@@ -13,7 +13,9 @@
 // limitations under the License.
 
 module;
+
 #include <vector>
+#include <string>
 
 module match_tensor_expression;
 

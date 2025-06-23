@@ -16,6 +16,7 @@ module;
 
 #include <ranges>
 #include <thread>
+#include <algorithm>
 
 module compaction_process;
 
@@ -266,25 +267,25 @@ void CompactionProcessor::NewScanAndOptimize() {
 
         OptimizeIndexTxnStore *optimize_idx_store = static_cast<OptimizeIndexTxnStore *>(new_txn_shared->GetTxnStore());
         if (optimize_idx_store != nullptr) {
-            for (const OptimizeIndexStoreEntry &store_entry : optimize_idx_store->entries_) {
-                String task_text = fmt::format(
-                    "Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
-                    new_txn_shared->TxnID(),
-                    new_txn_shared->CommitTS(),
-                    store_entry.db_name_,
-                    store_entry.table_name_,
-                    store_entry.index_name_,
-                    store_entry.segment_id_,
-                    fmt::join(store_entry.deprecate_chunks_, ","),
-                    fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), ","));
-
-                bg_task_info->task_info_list_.emplace_back(task_text);
-                if (commit_status.ok()) {
-                    bg_task_info->status_list_.emplace_back("OK");
-                } else {
-                    bg_task_info->status_list_.emplace_back(commit_status.message());
-                }
-            }
+//            for (const OptimizeIndexStoreEntry &store_entry : optimize_idx_store->entries_) {
+//                String task_text = fmt::format(
+//                    "Txn: {}, commit: {}, optimize index: {}.{}.{} segment: {} with chunks: {} into {}",
+//                    new_txn_shared->TxnID(),
+//                    new_txn_shared->CommitTS(),
+//                    store_entry.db_name_,
+//                    store_entry.table_name_,
+//                    store_entry.index_name_,
+//                    store_entry.segment_id_,
+//                    fmt::join(store_entry.deprecate_chunks_, ","),
+//                    fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), ","));
+//
+//                bg_task_info->task_info_list_.emplace_back(task_text);
+//                if (commit_status.ok()) {
+//                    bg_task_info->status_list_.emplace_back("OK");
+//                } else {
+//                    bg_task_info->status_list_.emplace_back(commit_status.message());
+//                }
+//            }
         }
     } else {
         LOG_ERROR(fmt::format("optimize all indexes failed: {}", status.message()));

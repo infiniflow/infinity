@@ -20,6 +20,7 @@ module;
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <iterator>
 
 module lemmatizer;
 

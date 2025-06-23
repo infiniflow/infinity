@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <algorithm>
 
 module new_txn;
 
@@ -327,7 +328,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
+    if (base_txn_store_.get() == nullptr) {
         base_txn_store_ = MakeShared<ImportTxnStore>();
         ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
         import_txn_store->db_name_ = db_name;
@@ -410,7 +411,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
+    if (base_txn_store_.get() != nullptr) {
         return Status::UnexpectedError("txn store is not null");
     }
     base_txn_store_ = MakeShared<AppendTxnStore>();
@@ -480,7 +481,7 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
+    if (base_txn_store_.get() == nullptr) {
         base_txn_store_ = MakeShared<DeleteTxnStore>();
         DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
         delete_txn_store->db_name_ = db_name;
@@ -520,7 +521,7 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
     }
 
     // Put the data into local txn store
-    if (base_txn_store_ == nullptr) {
+    if (base_txn_store_.get() == nullptr) {
         base_txn_store_ = MakeShared<UpdateTxnStore>();
         UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
         update_txn_store->db_name_ = db_name;
@@ -628,7 +629,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     }
     {
         // Put the data into local txn store
-        if (base_txn_store_ != nullptr) {
+        if (base_txn_store_.get() != nullptr) {
             return Status::UnexpectedError("txn store is not null");
         }
         Vector<WalSegmentInfo> segment_infos;
@@ -1413,7 +1414,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
                 SegmentIndexMeta segment_index_meta(segment_id, table_index_metas[i]);
                 SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
-                if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+                if (mem_index.get() == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex().get() == nullptr)) {
                     return Status::UnexpectedError(
                         fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
                 }
@@ -1425,7 +1426,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
                     const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
                     dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn_shared);
 
-                } else if (mem_index->GetEMVBIndex() != nullptr) {
+                } else if (mem_index->GetEMVBIndex().get() != nullptr) {
                     mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
                     EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
                     dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn_shared);

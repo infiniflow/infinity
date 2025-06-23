@@ -15,6 +15,11 @@
 module;
 
 #include <sstream>
+#include <string>
+#include <vector>
+
+module knn_expression;
+
 import stl;
 import expression_type;
 
@@ -23,8 +28,6 @@ import logger;
 import infinity_exception;
 import third_party;
 import statement_common;
-
-module knn_expression;
 
 namespace infinity {
 

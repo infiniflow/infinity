@@ -28,7 +28,7 @@ import filter_expression_push_down_helper;
 
 namespace infinity {
 
-bool FastRoughFilter::IsValid() const { return min_max_data_filter_ != nullptr; }
+bool FastRoughFilter::IsValid() const { return min_max_data_filter_.get() != nullptr; }
 
 String FastRoughFilter::SerializeToString() const {
     if (HaveMinMaxFilter()) {

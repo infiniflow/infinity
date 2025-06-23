@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module node_info;
 
 import stl;

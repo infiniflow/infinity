@@ -17,6 +17,7 @@ module;
 #include <cassert>
 #include <cstring>
 #include <sstream>
+#include <memory>
 
 module column_vector;
 

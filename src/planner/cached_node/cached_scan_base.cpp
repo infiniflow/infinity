@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <string>
 
 module cached_scan_base;
 

@@ -13,8 +13,11 @@
 // limitations under the License.
 
 module;
+
+#include <vector>
 #include <cassert>
 #include <filesystem>
+#include <cstring>
 
 module persistence_manager;
 import stl;
