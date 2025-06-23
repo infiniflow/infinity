@@ -355,7 +355,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         UniquePtr<ParsedExpr> filter{};
         UniquePtr<ParsedExpr> limit{};
         UniquePtr<ParsedExpr> offset{};
-        SearchExpr* search_expr{};
+        SearchExpr *search_expr{};
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
@@ -593,7 +593,7 @@ UniquePtr<ParsedExpr> HTTPSearch::ParseFilter(const nlohmann::json &json_object,
     expr_parser.Parse(json_object, expr_parsed_result.get());
     if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Invalid expression: {}", json_object);
+        response["error_message"] = fmt::format("Invalid expression: {}", json_object.dump());
         return nullptr;
     }
 
@@ -618,12 +618,14 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     });
 
     output_columns->reserve(output_list.size());
-    for (const auto &output_expr_str : output_list) {
-        if (!output_expr_str.is_string()) {
+    for (const auto &output_expr : output_list) {
+        if (!output_expr.is_string()) {
             response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Invalid expression: {}", output_expr_str);
+            response["error_message"] = fmt::format("Invalid expression: {}", output_expr.dump());
             return nullptr;
         }
+
+        String output_expr_str = output_expr.get<String>();
 
         if (output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
             auto parsed_expr = new FunctionExpr();
@@ -648,8 +650,16 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
                 return nullptr;
             }
 
-            output_columns->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
-            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+            auto &expr_ptr = expr_parsed_result->exprs_ptr_->at(0);
+            if (expr_ptr->type_ == ParsedExprType::kColumn) {
+                if (output_expr_str == "*") {
+                    auto column_expr = static_cast<ColumnExpr *>(expr_ptr);
+                    column_expr->star_ = true;
+                }
+            }
+
+            output_columns->emplace_back(expr_ptr);
+            expr_ptr = nullptr;
         }
     }
 
@@ -812,7 +822,7 @@ SearchExpr *HTTPSearch::ParseSearchExpr(const nlohmann::json &json_object, HTTPS
 UniquePtr<FusionExpr> HTTPSearch::ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = fmt::format("Fusion expression must be a json object: {}", json_object);
+        response["error_message"] = fmt::format("Fusion expression must be a json object: {}", json_object.dump());
         return nullptr;
     }
     i64 topn = -1;

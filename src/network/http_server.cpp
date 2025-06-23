@@ -221,7 +221,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
             ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, table_comment, default_expr);
             column_definitions.emplace_back(col_def);
         } else {
-            return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
+            return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"].dump()));
         }
     }
     return Status::OK();
@@ -954,7 +954,7 @@ public:
                             SizeT dimension = value.size();
                             if (dimension == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = fmt::format("Empty embedding data: {}", value);
+                                json_response["error_message"] = fmt::format("Empty embedding data: {}", value.dump());
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                             auto first_elem = value[0];
@@ -1010,7 +1010,7 @@ public:
                                         auto subdimension = array.size();
                                         if (subdimension == 0) {
                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = fmt::format("Empty tensor array: {}", array);
+                                            json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
                                         auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
@@ -1045,7 +1045,7 @@ public:
                                         auto subdimension = array.size();
                                         if (subdimension == 0) {
                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = fmt::format("Empty tensor array: {}", array);
+                                            json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
                                         auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
@@ -1081,7 +1081,7 @@ public:
                                             auto subdimension = array.size();
                                             if (subdimension == 0) {
                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                json_response["error_message"] = fmt::format("Empty tensor array: {}", array);
+                                                json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                             }
                                             auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
@@ -1091,7 +1091,7 @@ public:
                                                 auto subsubdimension = subarray.size();
                                                 if (subsubdimension == 0) {
                                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = fmt::format("Empty tensor array: {}", array);
+                                                    json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
                                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                                 }
                                                 auto const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
@@ -1129,7 +1129,7 @@ public:
                                             auto subdimension = array.size();
                                             if (subdimension == 0) {
                                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                json_response["error_message"] = fmt::format("Empty tensor array: {}", array);
+                                                json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
                                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                                             }
                                             auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
@@ -1139,7 +1139,7 @@ public:
                                                 auto subsubdimension = subarray.size();
                                                 if (subsubdimension == 0) {
                                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = fmt::format("Empty tensor array: {}", array);
+                                                    json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
                                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                                 }
                                                 auto const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
@@ -1452,7 +1452,7 @@ public:
                         SizeT dimension = value.size();
                         if (dimension == 0) {
                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = fmt::format("Empty embedding data: {}", value);
+                            json_response["error_message"] = fmt::format("Empty embedding data: {}", value.dump());
                             return ResponseFactory::createResponse(http_status, json_response.dump());
                         }
 
