@@ -25,7 +25,6 @@ extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 class LocalFileHandle;
 struct RowID;
-struct SegmentEntry;
 class ColumnDef;
 class BufferManager;
 struct BlockIndex;

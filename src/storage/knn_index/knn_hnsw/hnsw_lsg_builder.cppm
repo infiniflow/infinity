@@ -15,7 +15,6 @@
 module;
 
 namespace infinity {
-struct SegmentEntry;
 class ColumnDef;
 struct RowID;
 } // namespace infinity
@@ -39,14 +38,8 @@ public:
 
     ~HnswLSGBuilder();
 
-    UniquePtr<HnswIndexInMem> Make(const SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace = true);
-
     template <typename Iter, typename DataType, typename DistanceDataType>
     UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace);
-
-private:
-    template <typename DataType, typename DistanceDataType>
-    UniquePtr<HnswIndexInMem> MakeImpl(const SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace);
 
 public:
     template <typename Iter, typename DataType, typename DistanceDataType>

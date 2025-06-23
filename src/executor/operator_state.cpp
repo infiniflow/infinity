@@ -35,8 +35,8 @@ TableScanOperatorState::~TableScanOperatorState() = default;
 KnnScanOperatorState::KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 KnnScanOperatorState::~KnnScanOperatorState() = default;
 
-CompactOperatorState::CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data)
-    : OperatorState(PhysicalOperatorType::kCompact), segment_groups_(std::move(segment_groups)), compact_state_data_(compact_state_data) {}
+CompactOperatorState::CompactOperatorState(SharedPtr<CompactStateData> compact_state_data)
+    : OperatorState(PhysicalOperatorType::kCompact), compact_state_data_(compact_state_data) {}
 
 CompactOperatorState::~CompactOperatorState() = default;
 

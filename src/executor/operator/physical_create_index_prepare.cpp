@@ -35,7 +35,6 @@ import buffer_manager;
 import buffer_handle;
 import index_hnsw;
 import default_values;
-import txn_store;
 import base_table_ref;
 import extra_ddl_info;
 import wal_manager;

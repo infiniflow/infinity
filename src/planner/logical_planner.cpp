@@ -38,7 +38,6 @@ import cast_expression;
 import cast_function;
 import bound_cast_func;
 import base_expression;
-import table_entry_type;
 import third_party;
 import table_def;
 import logical_alter;
@@ -297,10 +296,6 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     table_info->db_name_ = MakeShared<String>(schema_name);
     table_info->table_name_ = MakeShared<String>(table_name);
     table_info->table_key_ = table_key;
-
-    if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
-        RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
-    }
 
     // check
     const auto row_count = statement->insert_rows_.size();

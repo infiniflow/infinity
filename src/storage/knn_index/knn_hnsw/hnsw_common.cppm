@@ -110,4 +110,7 @@ export constexpr HnswInsertConfig kDefaultHnswInsertConfig = {
     .optimize_ = false,
 };
 
+export template <typename Iter>
+concept SplitIter = requires(Iter iter) { typename Iter::Split; };
+
 } // namespace infinity

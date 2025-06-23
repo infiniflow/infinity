@@ -69,9 +69,9 @@ import defer_op;
 import base_txn_store;
 import kv_code;
 import buffer_handle;
-import segment_entry;
 import bg_task;
 import mem_index_appender;
+import txn_context;
 
 namespace infinity {
 
@@ -787,7 +787,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
                     String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                     mem_index->memory_indexer_ =
-                        MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
+                        MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
                     need_to_update_ft_segment_ts = true;
                 } else {
                     LOG_TRACE(fmt::format("AppendMemIndex: memory_indexer_ is not null, base_row_id: {}, doc_count: {}",
@@ -832,7 +832,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_base.get(), base_row_id, nullptr);
+                    mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_base.get(), base_row_id);
                 }
                 memory_ivf_index = mem_index->memory_ivf_index_;
             }
@@ -1136,8 +1136,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
     Status status;
     SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
     segment_index_meta.GetOrSetMemIndex(mem_index);
-    mem_index->memory_indexer_ =
-        MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
+    mem_index->memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
     MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
 
     Vector<BlockID> *block_ids_ptr = nullptr;

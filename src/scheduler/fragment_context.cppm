@@ -199,8 +199,6 @@ public:
 public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
 
-    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_array_{};
-
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
@@ -215,9 +213,6 @@ public:
 
 public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
-
-    UniquePtr<CreateIndexSharedData> create_index_shared_data_{};
-    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_array_{};
 
     SharedPtr<CompactStateData> compact_state_data_{};
 

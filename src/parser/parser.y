@@ -2362,16 +2362,7 @@ compact_statement: COMPACT TABLE table_name {
     delete $3;
 }
 
-admin_statement: ADMIN SHOW CATALOGS {
-     $$ = new infinity::AdminStatement();
-     $$->admin_type_ = infinity::AdminStmtType::kListCatalogs;
-}
-| ADMIN SHOW CATALOG LONG_VALUE {
-     $$ = new infinity::AdminStatement();
-     $$->admin_type_ = infinity::AdminStmtType::kShowCatalog;
-     $$->catalog_file_index_ = $4;
-}
-| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
+admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListDatabases;
      $$->catalog_file_start_index_ = $4;

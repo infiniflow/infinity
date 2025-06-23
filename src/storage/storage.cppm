@@ -18,6 +18,7 @@ import stl;
 import wal_manager;
 import log_file;
 import status;
+import buffer_manager;
 
 export module storage;
 
@@ -38,7 +39,6 @@ class BGTaskProcessor;
 class BGMemIndexTracer;
 class ObjectStorageProcess;
 class Config;
-class BufferManager;
 class PersistenceManager;
 
 export enum class ReaderInitPhase {

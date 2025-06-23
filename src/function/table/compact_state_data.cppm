@@ -22,11 +22,7 @@ import global_block_id;
 import internal_types;
 import default_values;
 import meta_info;
-import table_index_entry;
-import segment_entry;
-import segment_index_entry;
 import base_table_ref;
-import txn;
 
 namespace infinity {
 
@@ -55,8 +51,8 @@ private:
 
 export class CompactSegmentData {
 public:
-    SharedPtr<SegmentEntry> new_segment_{};
-    Vector<SegmentEntry *> old_segments_{};
+    // SharedPtr<SegmentEntry> new_segment_{};
+    // Vector<SegmentEntry *> old_segments_{};
 };
 
 export class CompactStateData {
@@ -67,15 +63,15 @@ public:
 
     Vector<Pair<SegmentID, Vector<SegmentOffset>>> GetToDelete() const;
 
-    void AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn);
+    // void AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn);
 
-    void AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn);
+    // void AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn);
 
-    void AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry);
+    // void AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry);
 
     BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }
 
-    Map<SegmentID, SegmentIndexEntry *> GetSegmentIndexEntries(const String &index_name);
+    // Map<SegmentID, SegmentIndexEntry *> GetSegmentIndexEntries(const String &index_name);
 
     void SetScanTS(TxnTimeStamp scan_ts) {
         std::lock_guard lock(mutex_);

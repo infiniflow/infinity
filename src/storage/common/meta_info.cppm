@@ -15,7 +15,6 @@
 module;
 
 import stl;
-import table_entry_type;
 import column_def;
 import default_values;
 import data_type;
@@ -47,7 +46,6 @@ export struct TableInfo {
     i64 column_count_{};
     i64 segment_count_{};
     i64 row_count_{};
-    TableEntryType table_entry_type_{TableEntryType::kTableEntry};
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
     String db_id_{};
@@ -111,7 +109,6 @@ export struct TableDetail {
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_name_{};
     SharedPtr<String> table_comment_{};
-    TableEntryType table_entry_type_;
     i64 column_count_{};
     i64 row_count_{};
     i64 block_count_{};

@@ -57,7 +57,6 @@ public:
 private:
     u32 SeekFile(RowID row_id);
     const String &index_dir_;
-    // const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; 
     Vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
 
     SharedPtr<MemoryIndexer> memory_indexer_{};

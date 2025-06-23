@@ -25,7 +25,6 @@ import logical_type;
 import buffer_handle;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import chunk_index_meta;
 
 namespace infinity {
@@ -59,8 +58,7 @@ public:
                   const IndexIVFOption &ivf_option,
                   LogicalType column_logical_type,
                   EmbeddingDataType embedding_data_type,
-                  u32 embedding_dimension,
-                  SegmentIndexEntry *segment_index_entry);
+                  u32 embedding_dimension);
     virtual ~IVFIndexInMem();
     u32 GetInputRowCount() const;
 
@@ -68,13 +66,7 @@ public:
 
     virtual u32 GetRowCount() const = 0;
 
-    virtual void InsertBlockData(SegmentOffset block_offset,
-                                 BlockColumnEntry *block_column_entry,
-                                 BufferManager *buffer_manager,
-                                 u32 row_offset,
-                                 u32 row_count) = 0;
     virtual void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &col, BlockOffset row_offset, BlockOffset row_cnt) = 0;
-    virtual SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *p_dump_size = nullptr) = 0;
     virtual void Dump(BufferObj *buffer_obj, SizeT *p_dump_size = nullptr) = 0;
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
@@ -82,8 +74,7 @@ public:
                      u32 nprobe,
                      const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                      const std::function<void(f32, SegmentOffset)> &add_result_func) const;
-    static SharedPtr<IVFIndexInMem>
-    NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id, SegmentIndexEntry *segment_index_entry);
+    static SharedPtr<IVFIndexInMem> NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, RowID begin_row_id);
 
     virtual SizeT MemoryUsed() const = 0;
 

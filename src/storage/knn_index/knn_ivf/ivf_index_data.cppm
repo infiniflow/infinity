@@ -29,7 +29,6 @@ import infinity_exception;
 namespace infinity {
 
 class IndexBase;
-struct SegmentEntry;
 class BufferManager;
 class SegmentMeta;
 
