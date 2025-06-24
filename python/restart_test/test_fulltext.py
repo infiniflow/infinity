@@ -31,7 +31,6 @@ class TestFullText:
         gt_table_name = "test_fulltext_gt"
         matching_text = "American"
         search_after_insert = 2
-        shutdown = False
 
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
@@ -103,20 +102,19 @@ class TestFullText:
 
         cur_insert_n = 0
         enwiki_gen2 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
-        end = False
         qu = queue.Queue()
+        got_exception = False
 
         def work_func(table_obj, table_obj2, gt_table_obj):
-            nonlocal cur_insert_n, end, shutdown, qu
+            nonlocal cur_insert_n, qu, got_exception
             it = 0
-            while not end and not shutdown:
+            while not got_exception:
                 try:
                     it += 1
                     if it % 500 != 0:
                         res = next(enwiki_gen2, None)
                         if res is None:
                             logging.info("enwiki_gen2 end")
-                            end = True
                             # Put a special item to notify search thread to quit
                             qu.put((None, None, time.time()))
                             break
@@ -174,12 +172,12 @@ class TestFullText:
 
                 except Exception:
                     logging.exception("work_func exception, cur_insert_n: {cur_insert_n}")
-                    shutdown = True
+                    got_exception = True
                     break
 
         def search_thread():
-            nonlocal qu, shutdown
-            while not shutdown:
+            nonlocal qu, got_exception
+            while not got_exception:
                 try:
                     (f, gt_data_dict, search_time) = qu.get(timeout=1)
                 except queue.Empty:
@@ -194,12 +192,12 @@ class TestFullText:
                     f(gt_data_dict)
                 except Exception:
                     logging.exception("search_thread got exception")
-                    shutdown = True
+                    got_exception = True
                     break
 
         @decorator2
         def part2(infinity_pool):
-            nonlocal shutdown
+            nonlocal got_exception
             infinity_obj = infinity_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -217,14 +215,13 @@ class TestFullText:
                 t2.join()
             except Exception:
                 logging.exception("part2 got exception")
-                shutdown = True
+                got_exception = True
                 t2.join()
                 raise
             finally:
                 infinity_pool.release_conn(infinity_obj)
 
-        while not end:
-            part2()
+        part2()
 
         @decorator
         def part3(infinity_obj):

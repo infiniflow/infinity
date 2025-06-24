@@ -117,5 +117,4 @@ TEST_F(NotFunctionsTest, not_func) {
             }
         }
     }
-    kv_store_ptr->Uninit();
 }

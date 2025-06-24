@@ -292,6 +292,4 @@ TEST_F(CountFunctionTest, quarter_func) {
 
         EXPECT_FLOAT_EQ(result, row_count);
     }
-
-    kv_store_ptr->Uninit();
 }

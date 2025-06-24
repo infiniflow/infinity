@@ -25,6 +25,7 @@ import status;
 // A view means a logical plan
 namespace infinity {
 
+class KVStore;
 class KVInstance;
 class ObjectStatAccessorBase;
 
@@ -97,11 +98,8 @@ public:
      * Utils
      */
     String GetObjPath(const String &obj_key) const { return std::filesystem::path(workspace_).append(obj_key).string(); }
-    nlohmann::json Serialize();
 
-    void Deserialize(const nlohmann::json &obj);
-
-    void Deserialize(KVInstance *kv_instance);
+    void SetKvStore(KVStore *kv_store);
 
     HashMap<String, ObjStat> GetAllObjects() const;
     HashMap<String, ObjAddr> GetAllFiles() const;
@@ -136,10 +134,11 @@ public: // for unit test
     void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
 
 private:
-    void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
+    void SaveObjStat(const String &obj_key, const ObjStat &obj_stat);
 
     void AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr);
 
+    KVStore *kv_store_{nullptr};
     String workspace_;
     String local_data_dir_;
     SizeT object_size_limit_;
@@ -147,13 +146,11 @@ private:
     mutable std::mutex mtx_;
     // HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
     UniquePtr<ObjectStatAccessorBase> objects_; // obj_key -> ObjStat
-    HashMap<String, ObjAddr> local_path_obj_;   // local_file_path -> ObjAddr
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_ = 0;
     SizeT current_object_parts_ = 0;
     SizeT current_object_ref_count_ = 0;
-
     friend struct AddrSerializer;
 };
 

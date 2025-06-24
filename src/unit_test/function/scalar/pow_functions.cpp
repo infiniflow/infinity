@@ -176,5 +176,4 @@ TEST_F(PowFunctionsTest, mul_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("POW(Heterogeneous, Double)->Double", func.ToString().c_str());
     }
-    kv_store_ptr->Uninit();
 }

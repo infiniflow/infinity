@@ -158,7 +158,6 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
             EXPECT_EQ(value.value_.big_int, (i64)(row_id + 1));
         }
     }
-    kv_store_ptr->Uninit();
 }
 
 TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
@@ -265,5 +264,4 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
             EXPECT_EQ((u64)value.value_.big_int, row_count - row_id);
         }
     }
-    kv_store_ptr->Uninit();
 }
