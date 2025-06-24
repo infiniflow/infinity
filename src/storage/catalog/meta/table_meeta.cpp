@@ -606,7 +606,7 @@ Status TableMeeta::LoadColumnDefs() {
         String column_key = iter2->Key().ToString();
         String column_value = iter2->Value().ToString();
         [[maybe_unused]] String column_name = column_key.substr(column_key.find_last_of('|') + 1);
-        auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
+        auto column_def = ColumnDef::FromJson(column_value);
         column_defs.emplace_back(column_def);
         iter2->Next();
     }
