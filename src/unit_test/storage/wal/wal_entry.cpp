@@ -36,6 +36,8 @@ import statement_common;
 import data_type;
 import persistence_manager;
 import embedding_info;
+import kv_store;
+import status;
 
 using namespace infinity;
 
@@ -405,7 +407,12 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     String workspace = GetFullPersistDir();
     String data_dir = GetFullDataDir();
     SizeT object_size_limit = 100;
+    auto kv_store = MakeUnique<KVStore>();
+    Status status = kv_store->Init(GetCatalogDir());
+    EXPECT_TRUE(status.ok());
     PersistenceManager pm(workspace, data_dir, object_size_limit);
+    pm.SetKvStore(kv_store.get());
+
     ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
     ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 10, .part_size_ = 20};
     pm.SaveLocalPath(paths[0], obj_addr0);

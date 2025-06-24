@@ -434,7 +434,6 @@ TEST_F(GreaterFunctionsTest, greater_func) {
             }
         }
     }
-    kv_store_ptr->Uninit();
 #if 0
     {
         Vector<SharedPtr<BaseExpression>> inputs;

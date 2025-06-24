@@ -169,6 +169,5 @@ TEST_F(TruncateFunctionsTest, truncate_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kVarchar);
         }
     }
-    kv_store_ptr->Uninit();
 }
 

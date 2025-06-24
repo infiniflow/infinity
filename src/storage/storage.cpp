@@ -258,7 +258,10 @@ Status Storage::AdminToWriter() {
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
     kv_store_ = MakeUnique<KVStore>();
-    kv_store_->Init(config_ptr_->CatalogDir());
+    Status status = kv_store_->Init(config_ptr_->CatalogDir());
+    if (!status.ok()) {
+        return status;
+    }
     new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
 
     Vector<SharedPtr<WalEntry>> replay_entries;
@@ -340,7 +343,7 @@ Status Storage::AdminToWriter() {
 
     auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    Status status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
+    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
     if (!status.ok()) {
         UnrecoverableError("Failed to checkpoint");
     }
@@ -402,7 +405,6 @@ Status Storage::UnInitFromReader() {
         }
 
         new_catalog_.reset();
-        kv_store_->Uninit();
         kv_store_.reset();
 
         if (memory_index_tracer_ != nullptr) {
@@ -538,7 +540,6 @@ Status Storage::WriterToAdmin() {
     }
 
     new_catalog_.reset();
-    kv_store_->Uninit();
     kv_store_.reset();
 
     memory_index_tracer_.reset();
@@ -663,7 +664,6 @@ Status Storage::UnInitFromWriter() {
         new_txn_mgr_->Stop();
         new_txn_mgr_.reset();
     }
-    kv_store_->Uninit();
     kv_store_.reset();
 
     if (buffer_mgr_ != nullptr) {
@@ -828,7 +828,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     }
 
     if (persistence_manager_) {
-        persistence_manager_->Deserialize(kv_instance.get());
+        persistence_manager_->SetKvStore(kv_store_.get());
     }
 
     status = kv_instance->Commit();
