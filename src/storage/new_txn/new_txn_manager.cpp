@@ -572,20 +572,15 @@ Status NewTxnManager::Cleanup(TxnTimeStamp last_cleanup_ts, TxnTimeStamp *cur_cl
         return Status::OK();
     }
 
-    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
+    auto *txn = BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
 
-    Status status;
-
-    status = NewTxn::Cleanup(cleanup_ts, kv_instance.get());
+    Status status = txn->Cleanup();
     if (!status.ok()) {
         return status;
     }
 
-    status = kv_instance->Commit();
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
+    status = CommitTxn(txn);
+    return status;
 }
 
 Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
