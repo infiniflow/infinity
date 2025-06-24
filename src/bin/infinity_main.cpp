@@ -167,7 +167,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             exit(-1);
             break;
         }
-#ifdef ENABLE_JEMALLOC_PROF
+#if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
         case SIGUSR2: {
             // http://jemalloc.net/jemalloc.3.html
             malloc_stats_print(nullptr, nullptr, "admp");

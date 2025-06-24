@@ -111,7 +111,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
                         }
                         case GlobalVariable::kJeProf: {
-#ifdef ENABLE_JEMALLOC_PROF
+#if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
                             // http://jemalloc.net/jemalloc.3.html
                             malloc_stats_print(nullptr, nullptr, "admp");
                             int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);

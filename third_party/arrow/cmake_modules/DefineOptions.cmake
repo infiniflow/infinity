@@ -355,6 +355,7 @@ takes precedence over ccache if a storage backend is configured" ON)
 
   set(ARROW_JEMALLOC_DESCRIPTION "Build the Arrow jemalloc-based allocator")
   if(WIN32
+     OR APPLE
      OR "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD"
      OR NOT ARROW_ENABLE_THREADING)
     # jemalloc is not supported on Windows.
