@@ -104,9 +104,9 @@ String ChunkIndexTagMetaKey::ToString() const {
 
 String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
 
-String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
+String PmObjectMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
 
-String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
+String PmStatMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
 String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
 
@@ -239,14 +239,14 @@ nlohmann::json SystemTagMetaKey::ToJson() const {
     return json_res;
 }
 
-nlohmann::json PmPathMetaKey::ToJson() const {
+nlohmann::json PmObjectMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["path"] = path_key_;
     json_res["description"] = nlohmann::json::parse(value_);
     return json_res;
 }
 
-nlohmann::json PmObjectMetaKey::ToJson() const {
+nlohmann::json PmStatMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["object"] = object_key_;
     json_res["stat"] = nlohmann::json::parse(value_);
@@ -421,13 +421,13 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
             const String &path_key = fields[2];
-            SharedPtr<PmPathMetaKey> pm_path_meta_key = MakeShared<PmPathMetaKey>(path_key);
+            SharedPtr<PmObjectMetaKey> pm_path_meta_key = MakeShared<PmObjectMetaKey>(path_key);
             pm_path_meta_key->value_ = value; //
             return pm_path_meta_key;
         }
         if (fields[1] == "object_stat") {
             const String &object_key = fields[2];
-            SharedPtr<PmObjectMetaKey> pm_object_meta_key = MakeShared<PmObjectMetaKey>(object_key);
+            SharedPtr<PmStatMetaKey> pm_object_meta_key = MakeShared<PmStatMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
         }
