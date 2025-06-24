@@ -228,8 +228,6 @@ public:
 
     SizeT ProfileHistorySize() const { return history_.HistoryCapacity(); }
 
-    Status IncrLatestID(String &id_str, std::string_view id_name);
-
     void SetLastCleanupTS(TxnTimeStamp cleanup_ts);
     TxnTimeStamp GetLastCleanupTS() const;
 

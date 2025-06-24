@@ -1301,6 +1301,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::CREATE_DATABASE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of CREATE_DATABASE_V2 command.
+                    break;
+                }
                 auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
                 Status status = CommitCreateDB(create_db_cmd);
                 if (!status.ok()) {
@@ -4142,8 +4146,27 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
 
             // IncreaseLatestDBID
-            SizeT id_num = std::stoull(create_db_cmd->db_id_);
-            Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
+            String current_next_db_id_str;
+            Status status = kv_instance_->Get(NEXT_DATABASE_ID.data(), current_next_db_id_str);
+            if (!status.ok()) {
+                return status;
+            }
+
+            u64 current_next_db_id = std::stoull(current_next_db_id_str);
+            u64 this_db_id = std::stoull(create_db_cmd->db_id_);
+            if (this_db_id + 1 > current_next_db_id) {
+                // Update the next db id
+                String next_db_id_str = std::to_string(this_db_id + 1);
+                status = kv_instance_->Put(NEXT_DATABASE_ID.data(), next_db_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+
+            status = CommitCreateDB(create_db_cmd);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::CREATE_TABLE_V2: {

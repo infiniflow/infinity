@@ -346,24 +346,6 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &m
     return Status::OK();
 }
 
-Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
-    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
-    Status s = kv_instance->Get(id_name.data(), id_str);
-    if (!s.ok()) {
-        kv_instance->Rollback();
-        return s;
-    }
-    SizeT id_num = std::stoull(id_str);
-    ++id_num;
-    s = kv_instance->Put(id_name.data(), fmt::format("{}", id_num));
-    if (!s.ok()) {
-        kv_instance->Rollback();
-        return s;
-    }
-    s = kv_instance->Commit();
-    return s;
-}
-
 void NewCatalog::SetLastCleanupTS(TxnTimeStamp cleanup_ts) { last_cleanup_ts_ = cleanup_ts; }
 
 TxnTimeStamp NewCatalog::GetLastCleanupTS() const { return last_cleanup_ts_; }
