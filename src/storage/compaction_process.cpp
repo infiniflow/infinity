@@ -213,8 +213,6 @@ void CompactionProcessor::NewDoCompact() {
             new_txn_mgr->AddTaskInfo(bg_task_info);
         }
     }
-
-    // new_txn_mgr->Cleanup();
 }
 
 Status CompactionProcessor::NewManualCompact(const String &db_name, const String &table_name) {
