@@ -3749,7 +3749,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            Status status = CleanupInner(std::move(metas));
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -3774,7 +3774,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            Status status = CleanupInner(std::move(metas));
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -3809,7 +3809,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            Status status = CleanupInner(std::move(metas));
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -3905,108 +3905,10 @@ Status NewTxn::Cleanup() {
         return Status::OK();
     }
 
-    for (auto &meta : metas) {
-        switch (meta->type_) {
-            case MetaType::kDB: {
-                auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
-                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kTable: {
-                auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kSegment: {
-                auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
-                Status status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kBlock: {
-                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-                Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kBlockColumn: {
-                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
-                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kTableIndex: {
-                auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                Status status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kSegmentIndex: {
-                auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
-                                      segment_index_meta_key->table_id_str_,
-                                      *kv_instance,
-                                      begin_ts,
-                                      MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
-                SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
-                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kChunkIndex: {
-                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
-                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
-                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
-                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            default: {
-                UnrecoverableError("Unexpected");
-            }
-        }
+    status = CleanupInner(std::move(metas));
+    if (!status.ok()) {
+        return status;
     }
-
-    status = buffer_mgr_->RemoveClean(kv_instance);
-
-    auto data_dir_str = buffer_mgr_->GetFullDataDir();
-    auto data_dir = static_cast<Path>(*data_dir_str);
-    // Delete empty dir
-    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
 
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -4016,26 +3918,17 @@ Status NewTxn::Cleanup() {
     CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
     txn_store->timestamp_ = begin_ts;
 
-    return status;
+    return Status::OK();
 }
 
-Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-
-    Vector<UniquePtr<MetaKey>> metas;
-    new_catalog->GetCleanedMeta(ts, metas, kv_instance);
-
-    return CleanupImpl(ts, kv_instance, std::move(metas));
-}
-
-Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas) {
-    TxnTimeStamp begin_ts = ts;
+Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
+    TxnTimeStamp begin_ts = BeginTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
-                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
+                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance_);
                 Status status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -4044,7 +3937,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance_, begin_ts, MAX_TIMESTAMP);
                 Status status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
@@ -4053,7 +3946,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance_, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
                 Status status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -4063,7 +3956,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance_, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
                 Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
@@ -4074,7 +3967,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance_, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -4086,7 +3979,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kTableIndex: {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance_, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
                 Status status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
                 if (!status.ok()) {
@@ -4098,7 +3991,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_index_meta_key->db_id_str_,
                                       segment_index_meta_key->table_id_str_,
-                                      *kv_instance,
+                                      *kv_instance_,
                                       begin_ts,
                                       MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
@@ -4111,7 +4004,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance_, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -4127,7 +4020,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
         }
     }
 
-    Status status = buffer_mgr->RemoveClean(kv_instance);
+    Status status = buffer_mgr->RemoveClean(kv_instance_.get());
 
     auto data_dir_str = buffer_mgr->GetFullDataDir();
     auto data_dir = static_cast<Path>(*data_dir_str);
