@@ -132,8 +132,6 @@ public:
 
     KVStore *kv_store() const { return kv_store_; }
 
-    Status Cleanup(TxnTimeStamp last_cleanup_ts = 0, TxnTimeStamp *cur_cleanup_ts = nullptr);
-
     Vector<SharedPtr<NewTxn>> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);

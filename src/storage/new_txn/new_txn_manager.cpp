@@ -563,26 +563,6 @@ void NewTxnManager::PrintAllKeyValue() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-Status NewTxnManager::Cleanup(TxnTimeStamp last_cleanup_ts, TxnTimeStamp *cur_cleanup_ts) {
-    TxnTimeStamp cleanup_ts = this->GetOldestAliveTS();
-    if (cur_cleanup_ts) {
-        *cur_cleanup_ts = cleanup_ts;
-    }
-    if (last_cleanup_ts >= cleanup_ts) {
-        return Status::OK();
-    }
-
-    auto *txn = BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
-
-    Status status = txn->Cleanup();
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = CommitTxn(txn);
-    return status;
-}
-
 Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Vector<SharedPtr<NewTxn>> res;
     {
