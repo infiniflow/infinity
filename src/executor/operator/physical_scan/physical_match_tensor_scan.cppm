@@ -33,8 +33,6 @@ import meta_info;
 namespace infinity {
 struct LoadMeta;
 struct BlockIndex;
-struct BlockColumnEntry;
-struct SegmentIndexEntry;
 
 class BlockMeta;
 class TableIndexMeeta;
@@ -101,9 +99,6 @@ private:
 
     // column to search
     ColumnID search_column_id_ = 0;
-
-    Vector<SegmentIndexEntry *> index_entries_;
-    Vector<BlockColumnEntry *> block_column_entries_;
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
     UniquePtr<TableIndexMeeta> table_index_meta_{};

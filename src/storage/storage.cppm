@@ -26,9 +26,7 @@ namespace infinity {
 
 class ResultCacheManager;
 class NewCatalog;
-class Catalog;
 class NewTxnManager;
-class TxnManager;
 class KVStore;
 class KVInstance;
 class PeriodicTriggerThread;

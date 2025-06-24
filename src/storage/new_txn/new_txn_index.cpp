@@ -121,7 +121,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
         ChunkID chunk_id = 0;
         {
-            Status status = segment_index_meta.GetNextChunkID(chunk_id);
+            status = segment_index_meta.GetNextChunkID(chunk_id);
             if (!status.ok()) {
                 return status;
             }
@@ -428,13 +428,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             return status;
         }
     }
-
-    this->AddMetaKeyForBufferObject(
-        MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
-                                      chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
-                                      chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
-                                      chunk_index_meta->segment_index_meta().segment_id(),
-                                      chunk_index_meta->chunk_id()));
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {

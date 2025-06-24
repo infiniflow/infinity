@@ -26,7 +26,6 @@ class BaseTableRef;
 class BaseExpression;
 class QueryContext;
 class BufferManager;
-struct TableIndexEntry;
 class NewTxn;
 
 export struct CommonQueryFilter {

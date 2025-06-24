@@ -21,7 +21,6 @@ import memindex_tracer;
 
 namespace infinity {
 
-struct TableIndexEntry;
 struct ChunkIndexMetaInfo;
 
 export class BaseMemIndex : public EnableSharedFromThis<BaseMemIndex> {

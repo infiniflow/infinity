@@ -146,8 +146,8 @@ TEST_F(HnswHandlerTest, test_memory) {
 
         /// test interface
         auto [mem_usage, vec_num] = hnsw_handler->GetInfo();
-        printf("hnsw_handler::GetInfo() -> %lu, %lu\n", mem_usage, vec_num);
-        printf("hnsw_handler::GetSizeInBytes() -> %lu\n", hnsw_handler->GetSizeInBytes());
+        printf("hnsw_handler::GetInfo() -> %lu, %lu\n", (std::size_t)mem_usage, (std::size_t)vec_num);
+        printf("hnsw_handler::GetSizeInBytes() -> %lu\n", (std::size_t)hnsw_handler->GetSizeInBytes());
         SearchHnswHandler(hnsw_handler.get());
 
         /// test save

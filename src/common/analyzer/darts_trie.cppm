@@ -14,6 +14,8 @@
 
 module;
 
+#include <cstdlib>
+
 export module darts_trie;
 
 import stl;
@@ -66,7 +68,7 @@ public:
 
     bool HasKeysWithPrefix(std::string_view key) const;
 
-    int Traverse(const char *key, SizeT &node_pos, SizeT &key_pos, SizeT length) const;
+    int Traverse(const char *key, std::size_t &node_pos, std::size_t &key_pos, std::size_t length) const;
 
     int Get(std::string_view key) const;
 };
