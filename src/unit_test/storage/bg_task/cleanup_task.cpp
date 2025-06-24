@@ -51,9 +51,7 @@ protected:
         NewTxnManager *new_txn_mgr = storage->new_txn_manager();
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
         Status status = txn->Cleanup();
-        if (!status.ok()) {
-            return status;
-        }
+        EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
