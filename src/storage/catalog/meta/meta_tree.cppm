@@ -116,7 +116,7 @@ export struct MetaChunkIndexObject final : public MetaObject {
 };
 
 export struct MetaPmObject final : public MetaObject {
-    MetaPmObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kPmObject, meta_key) {}
+    MetaPmObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kPmStat, meta_key) {}
     nlohmann::json ToJson() const final;
 
     SharedPtr<MetaKey> object_{};

@@ -534,11 +534,11 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
         switch (meta_key->type_) {
-            case MetaType::kPmObject: {
-                auto pm_obj_key = static_cast<PmObjectMetaKey *>(meta_key.get());
+            case MetaType::kPmStat: {
+                auto pm_obj_key = static_cast<PmStatMetaKey *>(meta_key.get());
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(pm_obj_key->object_key_);
                 if (pm_obj_iter != meta_tree->pm_object_map_.end()) {
-                    String error_message = fmt::format("Duplicate pm object key: {}, idx: {}", pm_obj_key->ToString(), idx);
+                    String error_message = fmt::format("Duplicate pm stat key: {}, idx: {}", pm_obj_key->ToString(), idx);
                     UnrecoverableError(error_message);
                 }
 
@@ -555,8 +555,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
         switch (meta_key->type_) {
-            case MetaType::kPmPath: {
-                auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
+            case MetaType::kPmObject: {
+                auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
                 nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
                 String object_key = pm_path_json["obj_key"];
                 if (object_key == "KEY_EMPTY") {
@@ -564,8 +564,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 }
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(object_key);
                 if (pm_obj_iter == meta_tree->pm_object_map_.end()) {
-                    String error_message = fmt::format("PM object not found: {}, idx: {}", pm_path_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(fmt::format("PM object not found: {}, idx: {}", pm_path_key->ToString(), idx));
+                    continue;
                 }
 
                 pm_obj_iter->second->path_map_.emplace(pm_path_key->path_key_, meta_key);
