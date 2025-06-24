@@ -16,7 +16,6 @@
 import base_test;
 
 #include <chrono>
-#include <definition/column_def.h>
 import new_txn_manager;
 import new_txn;
 import status;

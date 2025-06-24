@@ -14,8 +14,6 @@
 
 #include "gtest/gtest.h"
 
-#include "simdjson.h"
-
 import base_test;
 
 import infinity_exception;
@@ -50,8 +48,8 @@ TEST_F(JsonTest, test2) {
 
     String json_path = String(test_data_path()) + "/json/twitter.json";
     //    LOG_TRACE("JSON Path: {}", json_path);
-    simdjson::ondemand::parser parser;
+    simdjson::parser parser;
     simdjson::padded_string json = simdjson::padded_string::load(json_path);
-    simdjson::ondemand::document tweets = parser.iterate(json);
-    EXPECT_EQ(uint64_t(tweets["search_metadata"]["count"]), 100);
+    simdjson::document tweets = parser.iterate(json);
+    EXPECT_EQ((uint64_t)tweets["search_metadata"]["count"].get<uint64_t>(), 100);
 }
