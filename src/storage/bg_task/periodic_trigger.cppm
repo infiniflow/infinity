@@ -24,7 +24,6 @@ import global_resource_usage;
 
 namespace infinity {
 
-class CleanupTask;
 class NewCleanupTask;
 
 export class PeriodicTrigger {

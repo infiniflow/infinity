@@ -144,14 +144,14 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return block_meta.LoadSet(checkpoint_ts);
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
-        if (!status.ok()) {
-            return status;
+        auto [block_ids, blocks_status] = segment_meta.GetBlockIDs1();
+        if (!blocks_status.ok()) {
+            return blocks_status;
         }
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            status = InitBlock(block_meta);
-            if (!status.ok()) {
+            blocks_status = InitBlock(block_meta);
+            if (!blocks_status.ok()) {
                 return status;
             }
         }

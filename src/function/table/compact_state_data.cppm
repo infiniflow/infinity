@@ -63,12 +63,6 @@ public:
 
     Vector<Pair<SegmentID, Vector<SegmentOffset>>> GetToDelete() const;
 
-    // void AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn);
-
-    // void AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn);
-
-    // void AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry);
-
     BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }
 
     // Map<SegmentID, SegmentIndexEntry *> GetSegmentIndexEntries(const String &index_name);

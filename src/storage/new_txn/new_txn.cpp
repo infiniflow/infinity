@@ -4198,7 +4198,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
                 return status;
             }
             if (append_cmd->db_id_ != db_meta->db_id_str() || append_cmd->table_id_ != table_meta->table_id_str()) {
-                return Status::CatalogError(fmt::format("WalCmdAppendV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                return Status::CatalogError(fmt::format("WalCmdAppendV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
                                                         append_cmd->db_id_,
                                                         append_cmd->table_id_,
                                                         db_meta->db_id_str(),
@@ -4216,7 +4216,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
                 return status;
             }
             if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
-                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
                                                         delete_cmd->db_id_,
                                                         delete_cmd->table_id_,
                                                         db_meta->db_id_str(),
@@ -4502,9 +4502,5 @@ String NewTxn::GetTableIdStr() {
 void NewTxn::AddSemaphore(UniquePtr<std::binary_semaphore> sema) { semas_.push_back(std::move(sema)); }
 
 const Vector<UniquePtr<std::binary_semaphore>> &NewTxn::semas() const { return semas_; }
-
-void NewTxn::AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key) { object_meta_keys_.push_back(std::move(object_meta_key)); }
-
-const Vector<UniquePtr<MetaKey>> &NewTxn::GetMetaKeyForBufferObject() const { return object_meta_keys_; };
 
 } // namespace infinity
