@@ -4503,8 +4503,4 @@ void NewTxn::AddSemaphore(UniquePtr<std::binary_semaphore> sema) { semas_.push_b
 
 const Vector<UniquePtr<std::binary_semaphore>> &NewTxn::semas() const { return semas_; }
 
-void NewTxn::AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key) { object_meta_keys_.push_back(std::move(object_meta_key)); }
-
-const Vector<UniquePtr<MetaKey>> &NewTxn::GetMetaKeyForBufferObject() const { return object_meta_keys_; };
-
 } // namespace infinity

@@ -582,7 +582,6 @@ public:
     void AddSemaphore(UniquePtr<std::binary_semaphore> sema);
     const Vector<UniquePtr<std::binary_semaphore>> &semas() const;
     void AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key);
-    const Vector<UniquePtr<MetaKey>> &GetMetaKeyForBufferObject() const;
 
 private:
     // Reference to external class
@@ -627,7 +626,6 @@ private:
     SizeT wal_size_{};
 
     // Use for commit and rollback
-    Vector<UniquePtr<MetaKey>> object_meta_keys_{};
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
 
 private:

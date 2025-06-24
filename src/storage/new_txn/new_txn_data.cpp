@@ -232,22 +232,10 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             return status;
         }
 
-        this->AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(block_meta->segment_meta().table_meta().db_id_str(),
-                                                                 block_meta->segment_meta().table_meta().table_id_str(),
-                                                                 block_meta->segment_meta().segment_id(),
-                                                                 block_meta->block_id()));
-
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
-        }
-        for (SizeT i = 0; i < column_defs_ptr->size(); ++i) {
-            this->AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(block_meta->segment_meta().table_meta().db_id_str(),
-                                                                      block_meta->segment_meta().table_meta().table_id_str(),
-                                                                      block_meta->segment_meta().segment_id(),
-                                                                      block_meta->block_id(),
-                                                                      (*column_defs_ptr)[i]));
         }
 
         if (j < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
@@ -952,11 +940,6 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                 if (!status.ok()) {
                     return status;
                 }
-
-                this->AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(compact_state.block_meta_->segment_meta().table_meta().db_id_str(),
-                                                                         compact_state.block_meta_->segment_meta().table_meta().table_id_str(),
-                                                                         compact_state.block_meta_->segment_meta().segment_id(),
-                                                                         compact_state.block_meta_->block_id()));
             }
             append_size = std::min(SizeT(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
             if (append_size == 0) {
@@ -968,10 +951,6 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                 if (!status.ok()) {
                     return status;
                 }
-                this->AddMetaKeyForBufferObject(MakeUnique<BlockMetaKey>(compact_state.block_meta_->segment_meta().table_meta().db_id_str(),
-                                                                         compact_state.block_meta_->segment_meta().table_meta().table_id_str(),
-                                                                         compact_state.block_meta_->segment_meta().segment_id(),
-                                                                         compact_state.block_meta_->block_id()));
 
             } else {
                 break;
@@ -983,13 +962,6 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
         std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
-        }
-        for (SizeT i = 0; i < column_defs_ptr->size(); ++i) {
-            this->AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(compact_state.block_meta_->segment_meta().table_meta().db_id_str(),
-                                                                      compact_state.block_meta_->segment_meta().table_meta().table_id_str(),
-                                                                      compact_state.block_meta_->segment_meta().segment_id(),
-                                                                      compact_state.block_meta_->block_id(),
-                                                                      (*column_defs_ptr)[i]));
         }
 
         for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
@@ -1104,12 +1076,6 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         for (SizeT i = 0; i < block_row_count; ++i) {
             column_vector.AppendValue(default_value);
         }
-
-        this->AddMetaKeyForBufferObject(MakeUnique<ColumnMetaKey>(block_meta.segment_meta().table_meta().db_id_str(),
-                                                                  block_meta.segment_meta().table_meta().table_id_str(),
-                                                                  block_meta.segment_meta().segment_id(),
-                                                                  block_meta.block_id(),
-                                                                  column_defs[i]));
     }
 
     return Status::OK();
@@ -1374,13 +1340,6 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             }
             if (block_meta->block_id() != block_id) {
                 UnrecoverableError(fmt::format("Block id mismatch, expect: {}, actual: {}", block_id, block_meta->block_id()));
-            }
-            UniquePtr<BlockMetaKey> block_meta_key = MakeUnique<BlockMetaKey>(db_id_str, table_id_str, segment_id, block_id);
-            this->AddMetaKeyForBufferObject(std::move(block_meta_key));
-            for (SizeT i = 0; i < column_defs_ptr->size(); ++i) {
-                UniquePtr<ColumnMetaKey> column_meta_key =
-                    MakeUnique<ColumnMetaKey>(db_id_str, table_id_str, segment_id, block_id, (*column_defs_ptr)[i]);
-                this->AddMetaKeyForBufferObject(std::move(column_meta_key));
             }
         } else {
             block_meta.emplace(block_id, segment_meta.value());
