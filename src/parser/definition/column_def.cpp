@@ -265,4 +265,38 @@ std::shared_ptr<ColumnDef> ColumnDef::FromJson(const nlohmann::json &json) {
     return std::make_shared<ColumnDef>(column_id, column_type, column_name, constraints, column_comment, default_expr);
 }
 
+std::shared_ptr<ColumnDef> ColumnDef::FromJson(const std::string &col_def_str) {
+    simdjson::ondemand::parser parser;
+    simdjson::padded_string col_def_json(col_def_str);
+    simdjson::ondemand::document doc = parser.iterate(col_def_json);
+
+    auto column_type_json = doc["column_type"];
+    auto column_type = DataType::Deserialize(column_type_json);
+    int64_t column_id = doc["column_id"].get<int64_t>();
+    std::string column_name = doc["column_name"].get<std::string>();
+
+    std::set<ConstraintType> constraints;
+    simdjson::ondemand::array constraints_json;
+    if (!doc["constraints"].get(constraints_json)) {
+        for (auto item : constraints_json) {
+            ConstraintType constraint = static_cast<ConstraintType>(static_cast<char>(item.get<char>()));
+            constraints.insert(constraint);
+        }
+    }
+
+    std::string column_comment;
+    std::string column_comment_json;
+    if (!doc["column_comment"].get<std::string>(column_comment_json)) {
+        column_comment = column_comment_json;
+    }
+
+    std::shared_ptr<ParsedExpr> default_expr = nullptr;
+    auto default_expr_json = doc["default"];
+    if (default_expr_json.error() == simdjson::SUCCESS) {
+        default_expr = ConstantExpr::Deserialize(default_expr_json);
+    }
+
+    return std::make_shared<ColumnDef>(column_id, column_type, column_name, constraints, column_comment, default_expr);
+}
+
 } // namespace infinity
