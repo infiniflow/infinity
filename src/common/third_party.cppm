@@ -32,6 +32,7 @@ module;
 #include "spdlog/spdlog.h"
 
 #include "json.hpp"
+#include "simdjson.h"
 
 #include "toml.hpp"
 
@@ -167,6 +168,17 @@ export using toml::parse_file;
 
 namespace nlohmann {
 export using nlohmann::json;
+}
+
+namespace simdjson {
+export using simdjson::padded_string;
+export using simdjson::simdjson_result;
+export using simdjson::deserialize_tag;
+export using simdjson::error_code;
+export using ondemand::parser;
+export using ondemand::document;
+export using ondemand::object;
+export using ondemand::value;
 }
 
 namespace magic_enum {
