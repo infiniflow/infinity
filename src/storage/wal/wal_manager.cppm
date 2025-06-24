@@ -26,7 +26,6 @@ namespace infinity {
 class Storage;
 class BGTaskProcessor;
 class NewTxn;
-class Catalog;
 class CheckpointTaskBase;
 class ForceCheckpointTask;
 class BottomExecutor;

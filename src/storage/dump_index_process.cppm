@@ -23,7 +23,6 @@ import status;
 
 namespace infinity {
 
-class TxnManager;
 class NewTxn;
 class BGTask;
 class DumpIndexTask;

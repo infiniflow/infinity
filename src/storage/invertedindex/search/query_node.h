@@ -46,7 +46,6 @@ enum class QueryNodeType : char {
 
 std::string QueryNodeTypeToString(QueryNodeType type);
 
-struct TableEntry;
 struct IndexReader;
 class Scorer;
 class DocIterator;

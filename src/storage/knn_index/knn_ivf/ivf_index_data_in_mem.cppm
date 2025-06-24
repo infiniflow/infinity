@@ -29,10 +29,7 @@ import chunk_index_meta;
 
 namespace infinity {
 
-struct BlockColumnEntry;
 class BufferManager;
-struct ChunkIndexEntry;
-struct SegmentIndexEntry;
 class IndexBase;
 class KnnDistanceBase1;
 class ColumnVector;
@@ -48,7 +45,6 @@ protected:
     IVF_Index_Storage *ivf_index_storage_ = nullptr;
     bool own_ivf_index_storage_ = true;
     BufferHandle dump_handle_{};
-    SegmentIndexEntry *segment_index_entry_ = nullptr;
 
     const IndexIVFOption &ivf_option() const { return ivf_index_storage_->ivf_option(); }
     u32 embedding_dimension() const { return ivf_index_storage_->embedding_dimension(); }
