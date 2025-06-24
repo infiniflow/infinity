@@ -129,6 +129,7 @@ public:
 
     nlohmann::json ToJson() const;
     static std::shared_ptr<ColumnDef> FromJson(const nlohmann::json &json);
+    static std::shared_ptr<ColumnDef> FromJson(const std::string &json);
 
 public:
     int64_t id_{-1};
