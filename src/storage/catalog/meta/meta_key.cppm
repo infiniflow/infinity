@@ -264,8 +264,8 @@ export struct ChunkIndexTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmPathMetaKey final : public MetaKey {
-    PmPathMetaKey(String path_key) : MetaKey(MetaType::kPmPath), path_key_(std::move(path_key)) {}
+export struct PmObjectMetaKey final : public MetaKey {
+    PmObjectMetaKey(String path_key) : MetaKey(MetaType::kPmObject), path_key_(std::move(path_key)) {}
 
     String path_key_{};
     String value_{};
@@ -274,8 +274,8 @@ export struct PmPathMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmObjectMetaKey final : public MetaKey {
-    PmObjectMetaKey(String object_key) : MetaKey(MetaType::kPmObject), object_key_(std::move(object_key)) {}
+export struct PmStatMetaKey final : public MetaKey {
+    PmStatMetaKey(String object_key) : MetaKey(MetaType::kPmStat), object_key_(std::move(object_key)) {}
 
     String object_key_{};
     String value_{};
