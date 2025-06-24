@@ -163,7 +163,10 @@ TEST_P(TestTxnColumn, test_add_columns) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup();
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
 }

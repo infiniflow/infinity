@@ -294,6 +294,8 @@ public:
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
+    Status CleanupInner(const Vector<UniquePtr<MetaKey>> &metas);
+
 public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts);
 
@@ -542,9 +544,6 @@ private:
     bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
-    static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
-    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
-
     bool IsReplay() const;
 
     Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
