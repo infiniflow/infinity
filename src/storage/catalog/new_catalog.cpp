@@ -394,8 +394,8 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     }
 
     auto new_end = std::remove_if(meta_keys.begin(), meta_keys.end(), [&](const auto &meta_key) {
-        if (meta_key->type_ == MetaType::kPmPath) {
-            auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
+        if (meta_key->type_ == MetaType::kPmObject) {
+            auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
             nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
             String object_key = pm_path_json["obj_key"];
             if (object_key == "KEY_EMPTY") {
