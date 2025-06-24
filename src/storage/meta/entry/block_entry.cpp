@@ -39,7 +39,7 @@ import buffer_obj;
 import logical_type;
 import infinity_context;
 import virtual_store;
-import snapshot_info;
+// import snapshot_info;
 import wal_entry;
 
 namespace infinity {
@@ -158,44 +158,44 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     return block_entry;
 }
 
-SharedPtr<BlockEntry>
-BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_snapshot_info->block_id_, 0);
+// SharedPtr<BlockEntry>
+// BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
+//     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_snapshot_info->block_id_, 0);
 
-    block_entry->checkpoint_row_count_ = block_snapshot_info->row_count_;
-    block_entry->row_capacity_ = block_snapshot_info->row_capacity_;
-    block_entry->block_dir_ = MakeShared<String>(block_snapshot_info->block_dir_);
+//     block_entry->checkpoint_row_count_ = block_snapshot_info->row_count_;
+//     block_entry->row_capacity_ = block_snapshot_info->row_capacity_;
+//     block_entry->block_dir_ = MakeShared<String>(block_snapshot_info->block_dir_);
 
-    for (const auto &block_column_snapshot : block_snapshot_info->column_block_snapshots_) {
-        auto column_entry = BlockColumnEntry::ApplyBlockColumnSnapshot(block_entry.get(), block_column_snapshot.get(), txn_id, begin_ts);
-        block_entry->columns_.emplace_back(std::move(column_entry));
-    }
-    // Version file rewrite
-    nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
-    block_entry->GetFastRoughFilter()->LoadFromJsonFile(fast_rough_filter_json);
-    return block_entry;
-}
+//     for (const auto &block_column_snapshot : block_snapshot_info->column_block_snapshots_) {
+//         auto column_entry = BlockColumnEntry::ApplyBlockColumnSnapshot(block_entry.get(), block_column_snapshot.get(), txn_id, begin_ts);
+//         block_entry->columns_.emplace_back(std::move(column_entry));
+//     }
+//     // Version file rewrite
+//     nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
+//     block_entry->GetFastRoughFilter()->LoadFromJsonFile(fast_rough_filter_json);
+//     return block_entry;
+// }
 
-SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
-    SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
-    block_snapshot_info->block_id_ = block_id_;
-    block_snapshot_info->row_count_ = checkpoint_row_count_;
-    block_snapshot_info->row_capacity_ = row_capacity_;
-    block_snapshot_info->block_dir_ = *block_dir_;
+// SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
+//     SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
+//     block_snapshot_info->block_id_ = block_id_;
+//     block_snapshot_info->row_count_ = checkpoint_row_count_;
+//     block_snapshot_info->row_capacity_ = row_capacity_;
+//     block_snapshot_info->block_dir_ = *block_dir_;
 
-    SizeT column_count = this->columns_.size();
-    block_snapshot_info->column_block_snapshots_.reserve(column_count);
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = columns_[column_id]->GetSnapshotInfo();
-        block_snapshot_info->column_block_snapshots_.push_back(block_column_snapshot_info);
-    }
+//     SizeT column_count = this->columns_.size();
+//     block_snapshot_info->column_block_snapshots_.reserve(column_count);
+//     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+//         SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = columns_[column_id]->GetSnapshotInfo();
+//         block_snapshot_info->column_block_snapshots_.push_back(block_column_snapshot_info);
+//     }
 
-    nlohmann::json json_res;
-    this->GetFastRoughFilter()->SaveToJsonFile(json_res);
-    block_snapshot_info->fast_rough_filter_ = json_res.dump();
+//     nlohmann::json json_res;
+//     this->GetFastRoughFilter()->SaveToJsonFile(json_res);
+//     block_snapshot_info->fast_rough_filter_ = json_res.dump();
 
-    return block_snapshot_info;
-}
+//     return block_snapshot_info;
+// }
 
 SharedPtr<BlockInfo> BlockEntry::GetBlockInfo(Txn *txn) const {
     SharedPtr<BlockInfo> block_info = MakeShared<BlockInfo>();

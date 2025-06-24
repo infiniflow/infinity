@@ -1604,6 +1604,9 @@ curlpp_IS_TOP_LEVEL:STATIC=OFF
 //Value Computed by CMake
 curlpp_SOURCE_DIR:STATIC=/home/infiniflow/zhengql/infinity/third_party/curlpp
 
+//The directory containing a CMake configuration file for fmt.
+fmt_DIR:PATH=/home/infiniflow/anaconda3/lib/cmake/fmt
+
 //Value Computed by CMake
 googletest-distribution_BINARY_DIR:STATIC=/home/infiniflow/zhengql/infinity/build/third_party/googletest
 
@@ -1751,6 +1754,15 @@ thriftqt5_LIB_DEPENDS:STATIC=general;thrift;general;Qt5::Core;general;Qt5::Netwo
 
 //Dependencies for the target
 thriftz_LIB_DEPENDS:STATIC=general;thrift;general;ZLIB::ZLIB;
+
+//Value Computed by CMake
+version_timestamp_modifier_BINARY_DIR:STATIC=/home/infiniflow/zhengql/infinity/build
+
+//Value Computed by CMake
+version_timestamp_modifier_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+version_timestamp_modifier_SOURCE_DIR:STATIC=/home/infiniflow/zhengql/infinity
 
 //Path to a file.
 zstd_INCLUDE_DIR:PATH=zstd_INCLUDE_DIR-NOTFOUND

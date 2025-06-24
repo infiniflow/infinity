@@ -128,6 +128,29 @@ Status SegmentMeta::InitSet() {
     return Status::OK();
 }
 
+// called when restore segment from snapshot with segment meta
+// restore segment meta from snapshot with segment meta
+Status SegmentMeta::RestoreSet() {
+
+    {
+        Status status;
+        status = SetNextBlockID(next_block_id_.value_or(0));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    {
+        Status status = SetFirstDeleteTS(first_delete_ts_.value_or(UNCOMMIT_TS));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+
+    return Status::OK();
+}
+
 Status SegmentMeta::UninitSet(UsageFlag usage_flag) { return UninitSet(usage_flag, begin_ts_); }
 
 Status SegmentMeta::UninitSet(UsageFlag usage_flag, TxnTimeStamp begin_ts) {
@@ -250,6 +273,16 @@ Status SegmentMeta::LoadFirstDeleteTS() {
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
+}
+
+TxnTimeStamp SegmentMeta::GetCreateTimestampFromKV() const {
+    String segment_key = KeyEncode::CatalogTableSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
+    String create_ts_str;
+    Status status = kv_instance_.Get(segment_key, create_ts_str);
+    if (!status.ok()) {
+        return 0;
+    }
+    return std::stoull(create_ts_str);
 }
 
 Status SegmentMeta::Init() {
@@ -550,6 +583,7 @@ Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo
     // }
     // segment_snapshot_info->segment_dir_ = *segment_dir_ptr;
     segment_snapshot_info->segment_id_ = segment_id_;
+    segment_snapshot_info->create_ts_ = GetCreateTimestampFromKV();
     status = GetFirstDeleteTS(segment_snapshot_info->first_delete_ts_);
     if (!status.ok()) {
         return {nullptr, status};
@@ -577,5 +611,29 @@ Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo
 
     return {std::move(segment_snapshot_info), Status::OK()};
 }
+
+Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info){
+
+    Status status = RestoreSet();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const BlockID &block_id : segment_info.block_ids_) {
+        status = AddBlockWithID(commit_ts(), block_id);
+        if (!status.ok()) {
+            return status;
+        }
+        BlockMeta block_meta(block_id, *this);
+        status = block_meta.RestoreFromSnapshot();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+
+
 
 } // namespace infinity

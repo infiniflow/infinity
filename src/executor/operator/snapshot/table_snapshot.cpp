@@ -26,6 +26,10 @@ import third_party;
 import config;
 import infinity_exception;
 import snapshot_info;
+import db_meeta;
+import table_meeta;
+import txn_state;
+import logger;
 
 namespace infinity {
 
@@ -39,21 +43,47 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     if (!status.ok()) {
         RecoverableError(status);
     }
-
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
     table_snapshot->Serialize(snapshot_dir);
+
 
     return Status::OK();
 }
 
 Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
-    //    Txn *txn_ptr = query_context->GetTxn();
-    //    String snapshot_dir = query_context->global_config()->SnapshotDir();
-    //
-    //    SharedPtr<TableSnapshotInfo> table_snapshot;
-    //    Status status;
-    //    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    auto *txn_ptr = query_context->GetNewTxn();
+    const String &db_name = query_context->schema_name();
+
+    Optional<DBMeeta> db_meta;
+    Status status = txn_ptr->GetDBMeta(db_name, db_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (!db_meta.has_value()) {
+        return Status::NotFound("DB not found");
+    }
+    String snapshot_dir = query_context->global_config()->SnapshotDir();
+
+    SharedPtr<TableSnapshotInfo> table_snapshot;
+    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+
+    //check txn_type
+    LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
+    // if (txn_ptr->GetTxnType() != TransactionType::kRestoreTable) {
+    //     return Status::InvalidArgument("Txn type is not RestoreTable");
+    // }
+
+     status = txn_ptr->RestoreTableSnapshot(table_snapshot);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // print txn state
+    // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
+    // txn_ptr->Commit();
+    // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
     //    if(!status.ok()) {
     //        return status;
     //    }

@@ -25,7 +25,7 @@ import status;
 import extra_ddl_info;
 import column_def;
 import base_entry;
-import snapshot_info;
+// import snapshot_info;
 import table_entry;
 import entry_list;
 import meta_info;

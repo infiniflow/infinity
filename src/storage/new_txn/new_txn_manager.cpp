@@ -445,6 +445,15 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
+        case TransactionType::kRestoreTable: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store);
+                system_cache_->AddNewTableCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
+                system_cache_->ApplySegmentIDs(txn_store->db_id_, txn_store->table_id_, txn_store->segment_infos_.size());
+            }
+            break;
+        }
         case TransactionType::kDropTable: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             // base_txn_store means the drop with ignore

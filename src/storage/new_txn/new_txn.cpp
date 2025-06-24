@@ -948,18 +948,66 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshotInfo (const 
         return {nullptr, status};
     }
 
-    std::tie(table_snapshot_info, status) = table_meta_opt->MapMetaToSnapShotInfo();
+    std::tie(table_snapshot_info, status) = table_meta_opt->MapMetaToSnapShotInfo(db_name, table_name);
 
     if (!status.ok()) {
         return {nullptr, status};
     }
 
-    // update table name and db name
-    table_snapshot_info->table_name_ = table_name;
-    table_snapshot_info->db_name_ = db_name;
-
-
     return {std::move(table_snapshot_info), Status::OK()}; // Success
+}
+
+Status NewTxn::RestoreTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
+    this->SetTxnType(TransactionType::kRestoreTable);
+    const String &db_name = table_snapshot_info->db_name_;
+    const String &table_name = table_snapshot_info->table_name_;
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetDBMeta(db_name, db_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    //get table def
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), MakeShared<String>(table_snapshot_info->table_comment_), table_snapshot_info->columns_);
+
+    
+
+    //add new table to catalog
+    // NewCatalog::AddNewTable(db_meta.value(), table_snapshot_info->table_id_str_, table_snapshot_info->create_ts_, table_snapshot_info->create_ts_, table_def, table_meta);
+    // // restore segment from snapshot with segment meta
+    // get table meta from snapshot
+    // status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // restore segment from snapshot with segment meta
+    // status = table_meta->RestoreFromSnapshot(table_snapshot_info);
+
+    base_txn_store_ = MakeShared<RestoreTableTxnStore>();
+    RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+    txn_store->table_name_ = *table_def->table_name();
+    txn_store->table_id_str_ = table_snapshot_info->table_id_str_;
+    txn_store->table_id_ = std::stoull(table_snapshot_info->table_id_str_);
+    txn_store->table_def_ = table_def;
+    for (const auto &segment_info : table_snapshot_info->segment_snapshots_) {
+        WalSegmentInfoV2 wal_segment_info{};
+        wal_segment_info.segment_id_ = segment_info.second->segment_id_;
+        for (const auto &block_info : segment_info.second->block_snapshots_) {
+            wal_segment_info.block_ids_.push_back(block_info->block_id_);
+        }
+        txn_store->segment_infos_.push_back(wal_segment_info);
+    }
+    LOG_TRACE("NewTxn::RestoreTable created table entry is inserted.");
+    // figure out why this is needed
+    // status = db_meta.value().kv_instance().Commit();
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
@@ -1466,6 +1514,14 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::CLEANUP: {
                 break;
             }
+            case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
+                auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
+                Status status = CommitRestoreTableSnapshot(restore_table_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             default: {
                 UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
@@ -1769,6 +1825,66 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::CommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    const String &db_name = restore_table_snapshot_cmd->db_name_;
+
+    // Get database ID
+    Optional<DBMeeta> db_meta;
+    Status status = GetDBMeta(db_name, db_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    Optional<TableMeeta> table_meta;
+    status = NewCatalog::AddNewTable(*db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    //restore meta data of the table 
+    status = table_meta->RestoreFromSnapshot(const_cast<WalCmdRestoreTableSnapshot*>(restore_table_snapshot_cmd));
+    if (!status.ok()) {
+        return status;
+    }
+
+    
+    // const String &db_id_str = restore_table_snapshot_cmd->db_id_;
+    // const String &table_id_str = restore_table_snapshot_cmd->table_id_;
+    
+    // for (const WalSegmentInfoV2 &segment_info : restore_table_snapshot_cmd->segment_infos_) {
+    //     SegmentMeta segment_meta(segment_info.segment_id_, *table_meta);
+
+    //     status = table_meta->CommitSegment(segment_info.segment_id_, commit_ts);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     for (const BlockID &block_id : segment_info.block_ids_) {
+    //         status = segment_meta.CommitBlock(block_id, commit_ts);
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
+    //     }
+
+    //     // Convert WalSegmentInfoV2 to WalSegmentInfo for CommitSegmentVersion
+    //     WalSegmentInfo wal_segment_info;
+    //     wal_segment_info.segment_id_ = segment_info.segment_id_;
+    //     // Note: WalSegmentInfoV2 doesn't have block_infos_, so we can't populate them
+    //     // This might need to be handled differently depending on the requirements
+        
+    //     status = this->CommitSegmentVersion(wal_segment_info, segment_meta);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+
+    //     // BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
+    // }
+
     return Status::OK();
 }
 

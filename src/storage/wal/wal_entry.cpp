@@ -174,6 +174,18 @@ String WalBlockInfo::ToString() const {
     return std::move(ss).str();
 }
 
+WalSegmentInfoV2::WalSegmentInfoV2(SegmentID segment_id, const Vector<BlockID> &block_ids) : segment_id_(segment_id) {
+    block_ids_ = block_ids;
+}
+
+void WalSegmentInfoV2::WriteBufferAdv(char *&buf) const {
+    WriteBufAdv(buf, segment_id_);
+    WriteBufAdv(buf, static_cast<i32>(block_ids_.size()));
+    for (const auto &block_id : block_ids_) {
+        WriteBufAdv(buf, block_id);
+    }
+}
+
 WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) : segment_id_(segment_meta.segment_id()) {
     Status status;
 
@@ -213,6 +225,14 @@ bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
            actual_row_count_ == other.actual_row_count_ && row_capacity_ == other.row_capacity_ && block_infos_ == other.block_infos_;
 }
 
+bool WalSegmentInfoV2::operator==(const WalSegmentInfoV2 &other) const {
+    return segment_id_ == other.segment_id_ && block_ids_ == other.block_ids_;
+}
+
+i32 WalSegmentInfoV2::GetSizeInBytes() const {
+    return sizeof(SegmentID) + sizeof(i32) + block_ids_.size() * sizeof(BlockID);
+}
+
 i32 WalSegmentInfo::GetSizeInBytes() const {
     i32 size = sizeof(SegmentID) + sizeof(column_count_) + sizeof(row_count_) + sizeof(actual_row_count_) + sizeof(row_capacity_);
     size += sizeof(i32);
@@ -246,6 +266,22 @@ WalSegmentInfo WalSegmentInfo::ReadBufferAdv(const char *&ptr) {
         segment_info.block_infos_.push_back(WalBlockInfo::ReadBufferAdv(ptr));
     }
     return segment_info;
+}
+
+WalSegmentInfoV2 WalSegmentInfoV2::ReadBufferAdv(const char *&ptr) {
+    WalSegmentInfoV2 segment_info;
+    segment_info.segment_id_ = ReadBufAdv<SegmentID>(ptr);
+    i32 count = ReadBufAdv<i32>(ptr);
+    for (i32 i = 0; i < count; i++) {
+        segment_info.block_ids_.push_back(ReadBufAdv<BlockID>(ptr));
+    }
+    return segment_info;
+}
+
+String WalSegmentInfoV2::ToString() const {
+    std::stringstream ss;
+    ss << "segment_id: " << segment_id_ << ", block_id count: " << block_ids_.size() << std::endl;
+    return std::move(ss).str();
 }
 
 String WalSegmentInfo::ToString() const {
@@ -822,6 +858,20 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = MakeShared<WalCmdCleanup>(timestamp);
             break;
         }
+        case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String db_id = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String table_id = ReadBufAdv<String>(ptr);
+            SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
+            i32 segment_info_n = ReadBufAdv<i32>(ptr);
+            Vector<WalSegmentInfoV2> segment_infos;
+            for (i32 i = 0; i < segment_info_n; ++i) {
+                segment_infos.push_back(WalSegmentInfoV2::ReadBufferAdv(ptr));
+            }
+            cmd = MakeShared<WalCmdRestoreTableSnapshot>(db_name, db_id, table_name, table_id, table_def, segment_infos);
+            break;
+        }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
             UnrecoverableError(error_message);
@@ -1143,6 +1193,20 @@ bool WalCmdCleanup::operator==(const WalCmd &other) const {
     return other_cmd != nullptr && timestamp_ == other_cmd->timestamp_;
 }
 
+bool WalCmdRestoreTableSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdRestoreTableSnapshot *>(&other);
+    if (other_cmd == nullptr || db_name_ != other_cmd->db_name_ || db_id_ != other_cmd->db_id_ || table_name_ != other_cmd->table_name_ ||
+        table_id_ != other_cmd->table_id_ || table_def_ != other_cmd->table_def_ || segment_infos_.size() != other_cmd->segment_infos_.size()) {
+        return false;
+    }
+    for (SizeT i = 0; i < segment_infos_.size(); i++) {
+        if (segment_infos_[i] != other_cmd->segment_infos_[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size() + sizeof(i32) +
            this->db_comment_.size();
@@ -1393,6 +1457,18 @@ i32 WalCmdDropColumnsV2::GetSizeInBytes() const {
 
 i32 WalCmdCleanup::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(timestamp_); }
 
+i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_.size() + sizeof(i32) + table_name_.size() +
+           sizeof(i32) + table_id_.size() + table_def_->GetSizeInBytes() + sizeof(i32);
+    
+    // Calculate size for segment_infos_
+    for (const auto& segment_info : segment_infos_) {
+        size += segment_info.GetSizeInBytes();
+    }
+    
+    return size;
+}
+
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
@@ -1508,6 +1584,19 @@ void WalCmdImportV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_id_);
     this->segment_info_.WriteBufferAdv(buf);
+}
+
+void WalCmdRestoreTableSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::RESTORE_TABLE_SNAPSHOT);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->db_id_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->table_id_);
+    this->table_def_->WriteAdv(buf);
+    WriteBufAdv(buf, static_cast<i32>(segment_infos_.size()));
+    for (const auto &segment_info : segment_infos_) {
+        segment_info.WriteBufferAdv(buf);
+    }
 }
 
 void WalCmdAppend::WriteAdv(char *&buf) const {
@@ -2231,10 +2320,7 @@ String WalCmdDropColumnsV2::ToString() const {
 }
 
 String WalCmdCleanup::ToString() const {
-    std::stringstream ss;
-    ss << "Cleanup: " << std::endl;
-    ss << "timestamp: " << timestamp_ << std::endl;
-    return std::move(ss).str();
+    return fmt::format("{}: timestamp: {}", WalCmd::WalCommandTypeToString(GetType()), timestamp_);
 }
 
 String WalCmdCreateDatabase::CompactInfo() const {
@@ -2563,6 +2649,28 @@ String WalCmdDropColumnsV2::CompactInfo() const {
 
 String WalCmdCleanup::CompactInfo() const { return fmt::format("{}: timestamp: {}", WalCmd::WalCommandTypeToString(GetType()), timestamp_); }
 
+String WalCmdRestoreTableSnapshot::CompactInfo() const {
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_def: {}, segment_count: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       db_id_,
+                       table_name_,
+                       table_id_,
+                       table_def_->ToString(),
+                       segment_infos_.size());
+}
+
+String WalCmdRestoreTableSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "db_name: " << db_name_ << ", db_id: " << db_id_ << ", table_name: " << table_name_ << ", table_id: " << table_id_ << std::endl;
+    ss << "table_def: " << table_def_->ToString() << std::endl;
+    ss << "segment_infos count: " << segment_infos_.size() << std::endl;
+    for (SizeT i = 0; i < segment_infos_.size(); ++i) {
+        ss << "  segment " << i << ": " << segment_infos_[i].ToString();
+    }
+    return std::move(ss).str();
+}
+
 bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->cmds_.size() != other.cmds_.size()) {
         return false;
@@ -2850,6 +2958,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::CLEANUP:
             command = "CLEAN_UP";
+            break;
+        case WalCommandType::RESTORE_TABLE_SNAPSHOT:
+            command = "RESTORE_TABLE_SNAPSHOT";
             break;
         default: {
             String error_message = "Unknown command type";

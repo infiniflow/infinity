@@ -160,21 +160,21 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     return column_entry;
 }
 
-UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntry *block_entry,
-                                                                       BlockColumnSnapshotInfo *block_column_snapshot_info,
-                                                                       TransactionID txn_id,
-                                                                       TxnTimeStamp begin_ts) {
-    ColumnID column_id = block_column_snapshot_info->column_id_;
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
-    block_column_entry->filename_ = MakeShared<String>(block_column_snapshot_info->filename_);
-    block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
+// UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntry *block_entry,
+//                                                                        BlockColumnSnapshotInfo *block_column_snapshot_info,
+//                                                                        TransactionID txn_id,
+//                                                                        TxnTimeStamp begin_ts) {
+//     ColumnID column_id = block_column_snapshot_info->column_id_;
+//     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
+//     block_column_entry->filename_ = MakeShared<String>(block_column_snapshot_info->filename_);
+//     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
 
-    // column_entry->buffer_
-    // column_entry->outline need to be updated;
+//     // column_entry->buffer_
+//     // column_entry->outline need to be updated;
 
-    block_column_entry->last_chunk_offset_ = block_column_snapshot_info->last_chunk_offset_;
-    return block_column_entry;
-}
+//     block_column_entry->last_chunk_offset_ = block_column_snapshot_info->last_chunk_offset_;
+//     return block_column_entry;
+// }
 
 SharedPtr<BlockColumnInfo> BlockColumnEntry::GetColumnInfo() const {
     SharedPtr<BlockColumnInfo> block_column_info = MakeShared<BlockColumnInfo>();
@@ -198,20 +198,20 @@ SharedPtr<BlockColumnInfo> BlockColumnEntry::GetColumnInfo() const {
     return block_column_info;
 }
 
-SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
-    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
-    block_column_snapshot_info->column_id_ = column_id_;
-    block_column_snapshot_info->filename_ = *filename_;
-    block_column_snapshot_info->last_chunk_offset_ = last_chunk_offset_;
-    SizeT outline_count = outline_buffers_.size();
-    for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
-        String outline_file_path = *OutlineFilename(file_idx);
-        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
-        outline_snapshot_info->filename_ = outline_file_path;
-        block_column_snapshot_info->outline_snapshots_.emplace_back(outline_snapshot_info);
-    }
-    return block_column_snapshot_info;
-}
+// SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
+//     SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
+//     block_column_snapshot_info->column_id_ = column_id_;
+//     block_column_snapshot_info->filename_ = *filename_;
+//     block_column_snapshot_info->last_chunk_offset_ = last_chunk_offset_;
+//     SizeT outline_count = outline_buffers_.size();
+//     for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
+//         String outline_file_path = *OutlineFilename(file_idx);
+//         SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
+//         outline_snapshot_info->filename_ = outline_file_path;
+//         block_column_snapshot_info->outline_snapshots_.emplace_back(outline_snapshot_info);
+//     }
+//     return block_column_snapshot_info;
+// }
 
 String BlockColumnEntry::FilePath() const { return Path(*block_entry_->block_dir()) / *filename_; }
 

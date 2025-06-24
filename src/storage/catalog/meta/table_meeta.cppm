@@ -23,6 +23,7 @@ import status;
 import column_def;
 import new_catalog;
 import snapshot_info;
+import wal_entry;
 
 namespace infinity {
 
@@ -40,6 +41,14 @@ public:
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
+    
+
+    /**
+     * Get the table creation timestamp from KV instance
+     * @return Tuple containing the create timestamp and status
+     * @note This parses the actual key in KV store to get the creation timestamp
+     */
+    Tuple<TxnTimeStamp, Status> GetCreateTimestampFromKV(const String &table_name) ;
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
@@ -143,7 +152,10 @@ public:
 
     Status SetNextIndexID(const String &index_id_str);
 
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo();
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo(const String &db_name, const String &table_name);
+
+
+    Status RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
 
 private:
     Status LoadComment();

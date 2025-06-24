@@ -514,7 +514,6 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
     if (!status.ok()) {
         return status;
     }
-
     return status;
 }
 

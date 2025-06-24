@@ -56,6 +56,22 @@ Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     return Status::OK();
 }
 
+
+TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
+    String block_key = KeyEncode::CatalogTableSegmentBlockKey(segment_meta_.table_meta().db_id_str(), 
+                                                              segment_meta_.table_meta().table_id_str(), 
+                                                              segment_meta_.segment_id(), 
+                                                              block_id_);
+    String create_ts_str;
+    Status status = kv_instance_.Get(block_key, create_ts_str);
+    if (!status.ok()) {
+        return 0;
+    }
+    return std::stoull(create_ts_str);
+}
+
+
+
 Status BlockMeta::InitSet() {
     // {
     //     Status status = SetRowCnt(0);
@@ -200,6 +216,8 @@ SharedPtr<String> BlockMeta::GetBlockDir() {
     return block_dir_;
 }
 
+// TODO: Need to fix this function: no data stored in kv_instance_ this way
+// usually use column_def to get column_id
 Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
     if (!column_ids1_) {
         column_ids1_ = infinity::GetTableSegmentBlockColumns(&kv_instance_,
@@ -356,6 +374,7 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
     Status status;
     block_snapshot_info->block_id_ = block_id_;
 
+    block_snapshot_info->create_ts_ = GetCreateTimestampFromKV();
     // Get row count
     std::tie(block_snapshot_info->row_count_, status) = GetRowCnt1();
     if (!status.ok()) {
@@ -379,13 +398,13 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
     
 
     // Get column ids
-    Vector<ColumnID> *column_ids_ptr = nullptr;
-    std::tie(column_ids_ptr, status) = GetBlockColumnIDs1();
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = segment_meta_.table_meta().GetColumnDefs();
     if (!status.ok()) {
         return {nullptr, status};
     }
-    for (ColumnID column_id : *column_ids_ptr) {
-        ColumnMeta column_meta(column_id, *this);
+    for (auto &column_def: *column_defs) {
+        ColumnMeta column_meta(column_def->id(), *this);
         auto [column_snapshot_info, status] = column_meta.MapMetaToSnapShotInfo();
         if (!status.ok()) {
             return {nullptr, status};
@@ -395,4 +414,28 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
 
     return {block_snapshot_info, Status::OK()};
 }
+
+Status BlockMeta::RestoreFromSnapshot(){
+    Status status = RestoreSet();
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = segment_meta_.table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const auto &column_def : *column_defs) {
+        ColumnMeta column_meta(column_def->id(), *this);
+        status = column_meta.RestoreFromSnapshot(column_def->id());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+
+
+
 } // namespace infinity

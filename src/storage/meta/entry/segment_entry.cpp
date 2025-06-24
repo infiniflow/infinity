@@ -144,33 +144,33 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
-SharedPtr<SegmentEntry>
-SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry, SegmentSnapshotInfo *segment_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry,
-                                                  std::move(segment_dir),
-                                                  segment_snapshot_info->segment_id_,
-                                                  DEFAULT_SEGMENT_CAPACITY,
-                                                  table_entry->ColumnCount(),
-                                                  segment_snapshot_info->status_);
-    //    segment_entry->min_row_ts_ = commit_ts;
-    //    segment_entry->max_row_ts_ = commit_ts;
-    //    segment_entry->commit_ts_ = commit_ts;
-    segment_entry->deleted_ = false;
-    segment_entry->first_delete_ts_ = segment_snapshot_info->first_delete_ts_;
-    segment_entry->deprecate_ts_ = segment_snapshot_info->deprecate_ts_;
-    segment_entry->begin_ts_ = begin_ts;
-    segment_entry->row_count_ = segment_snapshot_info->row_count_;
-    segment_entry->actual_row_count_ = segment_snapshot_info->actual_row_count_;
-    segment_entry->txn_id_ = txn_id;
+// SharedPtr<SegmentEntry>
+// SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry, SegmentSnapshotInfo *segment_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
+//     SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);
+//     auto segment_entry = MakeShared<SegmentEntry>(table_entry,
+//                                                   std::move(segment_dir),
+//                                                   segment_snapshot_info->segment_id_,
+//                                                   DEFAULT_SEGMENT_CAPACITY,
+//                                                   table_entry->ColumnCount(),
+//                                                   segment_snapshot_info->status_);
+//     //    segment_entry->min_row_ts_ = commit_ts;
+//     //    segment_entry->max_row_ts_ = commit_ts;
+//     //    segment_entry->commit_ts_ = commit_ts;
+//     segment_entry->deleted_ = false;
+//     segment_entry->first_delete_ts_ = segment_snapshot_info->first_delete_ts_;
+//     segment_entry->deprecate_ts_ = segment_snapshot_info->deprecate_ts_;
+//     segment_entry->begin_ts_ = begin_ts;
+//     segment_entry->row_count_ = segment_snapshot_info->row_count_;
+//     segment_entry->actual_row_count_ = segment_snapshot_info->actual_row_count_;
+//     segment_entry->txn_id_ = txn_id;
 
-    for (const auto &block_snapshot : segment_snapshot_info->block_snapshots_) {
-        auto block_entry = BlockEntry::ApplyBlockSnapshot(segment_entry.get(), block_snapshot.get(), txn_id, begin_ts);
-        segment_entry->block_entries_.emplace_back(block_entry);
-    }
+//     for (const auto &block_snapshot : segment_snapshot_info->block_snapshots_) {
+//         auto block_entry = BlockEntry::ApplyBlockSnapshot(segment_entry.get(), block_snapshot.get(), txn_id, begin_ts);
+//         segment_entry->block_entries_.emplace_back(block_entry);
+//     }
 
-    return segment_entry;
-}
+//     return segment_entry;
+// }
 
 void SegmentEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data) {
     status_ = segment_entry->status_;
@@ -800,20 +800,20 @@ SharedPtr<SegmentInfo> SegmentEntry::GetSegmentInfo(Txn *txn_ptr) const {
     return segment_info;
 }
 
-SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {
-    SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
-    segment_snapshot_info->segment_id_ = segment_id_;
-    segment_snapshot_info->segment_dir_ = *segment_dir_;
+// SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {
+//     SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
+//     segment_snapshot_info->segment_id_ = segment_id_;
+//     segment_snapshot_info->segment_dir_ = *segment_dir_;
 
-    std::shared_lock lock(rw_locker_);
-    SizeT block_count = block_entries_.size();
-    segment_snapshot_info->block_snapshots_.reserve(block_count);
-    for (SizeT block_id = 0; block_id < block_count; ++block_id) {
-        SharedPtr<BlockSnapshotInfo> block_snapshot_info = block_entries_[block_id]->GetSnapshotInfo();
-        segment_snapshot_info->block_snapshots_.push_back(block_snapshot_info);
-    }
-    return segment_snapshot_info;
-}
+//     std::shared_lock lock(rw_locker_);
+//     SizeT block_count = block_entries_.size();
+//     segment_snapshot_info->block_snapshots_.reserve(block_count);
+//     for (SizeT block_id = 0; block_id < block_count; ++block_id) {
+//         SharedPtr<BlockSnapshotInfo> block_snapshot_info = block_entries_[block_id]->GetSnapshotInfo();
+//         segment_snapshot_info->block_snapshots_.push_back(block_snapshot_info);
+//     }
+//     return segment_snapshot_info;
+// }
 
 SizeT SegmentEntry::GetStorageSize() const {
     SizeT result = 0;

@@ -27,6 +27,7 @@ import value;
 import snapshot_info;
 import column_def;
 import column_vector;
+import fast_rough_filter;
 
 namespace infinity {
 
@@ -53,6 +54,7 @@ struct WalChunkIndexInfo;
 struct WalSegmentInfo;
 struct WalCmdCheckpointV2;
 struct WalCmdOptimizeV2;
+struct WalCmdRestoreTableSnapshot;
 
 class BufferObj;
 
@@ -253,6 +255,10 @@ public:
 
     // // Snapshot OPs
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
+
+    Status RestoreTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
+
+
 
     Status DropTableSnapShot(const String &db_name, const String &table_name);
 
@@ -513,6 +519,7 @@ private:
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
+    Status CommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);

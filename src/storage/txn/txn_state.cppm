@@ -76,6 +76,7 @@ export enum class TransactionType {
     kCompact,
     kCreateDB,
     kCreateTable,
+    kRestoreTable,
     kDropDB,
     kDropTable,
     kRenameTable,
@@ -137,6 +138,9 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kCreateTable: {
             return "CreateTable";
+        }
+        case TransactionType::kRestoreTable: {
+            return "RestoreTable";
         }
         case TransactionType::kRenameTable: {
             return "RenameTable";

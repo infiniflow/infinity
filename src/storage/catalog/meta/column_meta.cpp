@@ -198,17 +198,20 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
     if (buffer_type == VectorBufferType::kVarBuffer) {
         auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_def->id()));
 
-        SizeT chunk_offset = 0;
-        status = this->GetChunkOffset(chunk_offset);
-        if (!status.ok()) {
-            return status;
-        }
+        // NO LONGER USING CHUNK OFFSET
+        // SizeT chunk_offset = 0;
+        // status = this->GetChunkOffset(chunk_offset);
+        // if (!status.ok()) {
+        //     return status;
+        // }
 
+        // check if 0 is the right buffer size
+        // follow loadset
         auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_dir_ptr,
                                                              filename,
-                                                             chunk_offset,
+                                                             0, /*buffer_size*/
                                                              buffer_mgr->persistence_manager());
         auto *buffer_obj = buffer_mgr->GetBufferObject(outline_file_worker->GetFilePath());
         if (buffer_obj == nullptr) {
@@ -345,19 +348,40 @@ Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotI
     if (!status.ok()) {
         return {nullptr, status};
     }
-    block_column_snapshot_info->filename_ = column_file_paths[0];
-    status = this->GetChunkOffset(block_column_snapshot_info->last_chunk_offset_);
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
+    block_column_snapshot_info->filepath_ = column_file_paths[0];
+    SizeT last_chunk_offset;
+    status = this->GetChunkOffset(last_chunk_offset);
+    block_column_snapshot_info->last_chunk_offset_ = last_chunk_offset;
+
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots;
     for (const String &outline_filename : column_file_paths) {
         SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
-        outline_snapshot_info->filename_ = outline_filename;
+        outline_snapshot_info->filepath_ = outline_filename;
         outline_snapshots.push_back(outline_snapshot_info);
     }
     block_column_snapshot_info->outline_snapshots_ = outline_snapshots;
     return {block_column_snapshot_info, Status::OK()};
 }
+
+Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id){
+    // TODO: figure out whether we are still using chunkoffset
+    Status status;
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+    const ColumnDef *col_def = (*column_defs)[column_id].get();
+    status = RestoreSet(col_def);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+
+
+
 
 } // namespace infinity

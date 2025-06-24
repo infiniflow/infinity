@@ -92,6 +92,37 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     return Status::OK();
 }
 
+Tuple<TxnTimeStamp, Status> TableMeeta::GetCreateTimestampFromKV(const String &table_name) {
+    // Construct the table key prefix to find the table entry
+    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
+    
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(table_key_prefix);
+    
+    if (!iter->Valid() || !iter->Key().starts_with(table_key_prefix)) {
+        return {0, Status::TableNotExist(table_id_str_)};
+    }
+    
+    // Parse the key to extract timestamp
+    // Key format: catalog|tbl|db_id|table_name|timestamp
+    String key = iter->Key().ToString();
+    
+    // Find the last '|' to get the timestamp part
+    SizeT last_pipe_pos = key.find_last_of('|');
+    if (last_pipe_pos == String::npos || last_pipe_pos == key.length() - 1) {
+        return {0, Status::UnexpectedError("Invalid table key format")};
+    }
+    
+    String timestamp_str = key.substr(last_pipe_pos + 1);
+    
+    try {
+        TxnTimeStamp create_ts = std::stoull(timestamp_str);
+        return {create_ts, Status::OK()};
+    } catch (const std::exception &e) {
+        return {0, Status::UnexpectedError("Failed to parse timestamp from key")};
+    }
+}
+
 Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
     if (!column_defs_) {
         Status status = LoadColumnDefs();
@@ -828,7 +859,7 @@ Status TableMeeta::SetNextIndexID(const String &index_id_str) {
     return Status::OK();
 }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(){
+Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(const String &db_name, const String &table_name){
     // TxnTimeStamp txn_id_{};
 
     // TxnTimeStamp max_commit_ts_{};
@@ -847,10 +878,25 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(){
     // if (!status.ok()) {
     //     return {nullptr, status};
     // }
+    table_snapshot_info->table_name_ = table_name;
+    table_snapshot_info->db_name_ = db_name;
+    table_snapshot_info->db_id_str_ = db_id_str_;
+    table_snapshot_info->table_id_str_ = table_id_str_;
     table_snapshot_info->table_comment_ = *comment_ptr;
 
-    table_snapshot_info->begin_ts_ = begin_ts_;
-    table_snapshot_info->commit_ts_ = commit_ts_;
+    // TODO: remove these two fields and figure out why they are here in the first place
+    // table_snapshot_info->begin_ts_ = begin_ts_;
+    // table_snapshot_info->commit_ts_ = commit_ts_;
+
+    TxnTimeStamp create_ts = 0;
+    std::tie(create_ts, status) = GetCreateTimestampFromKV(table_name);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    LOG_INFO(fmt::format("Table create ts: {}", create_ts));
+    table_snapshot_info->create_ts_ = create_ts;
+
+    
 
     // Get unsealed segment id
     SegmentID unsealed_segment_id = 0;
@@ -897,5 +943,21 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(){
 
     return {table_snapshot_info, Status::OK()};
 }
+
+Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
+    for (const WalSegmentInfoV2 &segment_info : restore_table_snapshot_cmd->segment_infos_) {
+        Status status = AddSegmentWithID(commit_ts(), segment_info.segment_id_);
+        if (!status.ok()) {
+            return status;
+        }
+        SegmentMeta segment_meta(segment_info.segment_id_, *this);
+        status = segment_meta.RestoreFromSnapshot(segment_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 
 } // namespace infinity

@@ -29,6 +29,7 @@ import internal_types;
 import persistence_manager;
 import column_def;
 import global_resource_usage;
+import snapshot_info;
 
 namespace infinity {
 
@@ -97,6 +98,11 @@ export enum class WalCommandType : i8 {
     COMPACT_V2 = 105,
 
     // -----------------------------
+    // Snapshot
+    // -----------------------------
+    RESTORE_TABLE_SNAPSHOT = 110,
+
+    // -----------------------------
     // Other
     // -----------------------------
     OPTIMIZE = 101,
@@ -112,7 +118,7 @@ export struct WalBlockInfo {
     u16 row_count_{};
     u16 row_capacity_{};
     Vector<Pair<u32, u64>> outline_infos_;
-    Vector<String> paths_;
+    Vector<String> paths_; // the last one is the block version file, previous ones are column files
     AddrSerializer addr_serializer_;
     mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
 
@@ -150,6 +156,25 @@ export struct WalSegmentInfo {
     void WriteBufferAdv(char *&buf) const;
 
     static WalSegmentInfo ReadBufferAdv(const char *&ptr);
+
+    String ToString() const;
+};
+
+export struct WalSegmentInfoV2 {
+    SegmentID segment_id_{};
+    Vector<BlockID> block_ids_;
+
+    WalSegmentInfoV2() = default;
+
+    explicit WalSegmentInfoV2(SegmentID segment_id, const Vector<BlockID> &block_ids);
+
+    bool operator==(const WalSegmentInfoV2 &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalSegmentInfoV2 ReadBufferAdv(const char *&ptr);
 
     String ToString() const;
 };
@@ -1012,6 +1037,26 @@ export struct WalCmdCleanup : public WalCmd {
 
     i64 timestamp_{};
 };
+
+export struct WalCmdRestoreTableSnapshot : public WalCmd {
+    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos)
+        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),table_def_(table_def_),
+          segment_infos_(segment_infos) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String db_id_{};
+    String table_name_{};
+    String table_id_{};
+    SharedPtr<TableDef> table_def_{};
+    Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
+};
+
 
 export struct WalEntryHeader {
     i32 size_{}; // size of header + payload + 4 bytes pad. There's 4 bytes pad just after the payload storing

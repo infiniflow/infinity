@@ -29,7 +29,7 @@ import base_entry;
 import column_def;
 import value;
 import cleanup_scanner;
-import snapshot_info;
+// import snapshot_info;
 import meta_info;
 
 
@@ -67,14 +67,14 @@ public:
                                                                  const u64 last_chunk_offset,
                                                                  const TxnTimeStamp commit_ts);
 
-    static UniquePtr<BlockColumnEntry> ApplyBlockColumnSnapshot(BlockEntry *block_entry,
-                                                                BlockColumnSnapshotInfo *block_column_snapshot_info,
-                                                                TransactionID txn_id,
-                                                                TxnTimeStamp begin_ts);
+    // static UniquePtr<BlockColumnEntry> ApplyBlockColumnSnapshot(BlockEntry *block_entry,
+    //                                                             BlockColumnSnapshotInfo *block_column_snapshot_info,
+    //                                                             TransactionID txn_id,
+    //                                                             TxnTimeStamp begin_ts);
 
     SharedPtr<BlockColumnInfo> GetColumnInfo() const;
 
-    SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
+    // SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
 
     nlohmann::json Serialize();
 

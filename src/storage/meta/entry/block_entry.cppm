@@ -34,7 +34,7 @@ import buffer_obj;
 import column_def;
 import txn_store;
 import cleanup_scanner;
-import snapshot_info;
+// import snapshot_info;
 import meta_info;
 import txn;
 import status;
@@ -88,8 +88,8 @@ public:
                                                      BufferManager *buffer_mgr,
                                                      TransactionID txn_id);
 
-    static SharedPtr<BlockEntry>
-    ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
+    // static SharedPtr<BlockEntry>
+    // ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
@@ -199,7 +199,7 @@ public:
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
-    SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
+    // SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
 
     SharedPtr<BlockInfo> GetBlockInfo(Txn *txn) const;
 

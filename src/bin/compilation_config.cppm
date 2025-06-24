@@ -20,9 +20,9 @@ export module compilation_config;
 #define VERSION_MINOR 6
 #define VERSION_PATCH 0
 
-#define BUILD_TIME "2025-06-17 15:09.11"
+#define BUILD_TIME "2025-06-24 09:18.40"
 #define GIT_BRANCH_NAME "main"
-#define GIT_COMMIT_ID "nightly-0-21c6cf54e"
+#define GIT_COMMIT_ID "nightly-20-adea84165"
 #define BUILD_TYPE "Debug"
 
 #define TEST_DATA_PATH "/home/infiniflow/zhengql/infinity/test/data"

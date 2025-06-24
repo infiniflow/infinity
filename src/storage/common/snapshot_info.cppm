@@ -34,12 +34,12 @@ export struct SnapshotInfo {
 };
 
 export struct OutlineSnapshotInfo {
-    String filename_;
+    String filepath_;
 };
 
 export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
-    String filename_;
+    String filepath_;
     u64 last_chunk_offset_;
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 
@@ -52,6 +52,7 @@ export struct BlockSnapshotInfo {
     SizeT row_count_;
     SizeT row_capacity_;
     String block_dir_;
+    TxnTimeStamp create_ts_;
     Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
     String fast_rough_filter_;
 
@@ -65,6 +66,7 @@ export struct SegmentSnapshotInfo {
     SegmentStatus status_;
     TxnTimeStamp first_delete_ts_;
     TxnTimeStamp deprecate_ts_;
+    TxnTimeStamp create_ts_;
     TxnTimeStamp row_count_;
     TxnTimeStamp actual_row_count_;
     Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
@@ -97,14 +99,18 @@ export struct TableIndexSnapshotInfo {
 };
 
 export struct TableSnapshotInfo : public SnapshotInfo {
+    String db_id_str_;
+    String table_id_str_;
     String db_name_;
     String table_name_;
     String table_comment_{};
 
     TxnTimeStamp txn_id_{};
-    TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
+    // TODO: remove these two fields and figure out why they are here in the first place
+    // TxnTimeStamp begin_ts_{};
+    // TxnTimeStamp commit_ts_{};
     TxnTimeStamp max_commit_ts_{};
+    TxnTimeStamp create_ts_{};
     String table_entry_dir_{}; // no longer in use
     ColumnID next_column_id_{};
     SegmentID unsealed_id_{};
@@ -118,6 +124,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     void Serialize(const String &save_path);
     String ToString() const;
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+    static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore);
 };
 
 } // namespace infinity

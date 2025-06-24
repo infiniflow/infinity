@@ -44,9 +44,9 @@ namespace infinity {
 nlohmann::json BlockColumnSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = column_id_;
-    json_res["filename"] = filename_;
+    json_res["filepath"] = filepath_;
     for (const auto &outline_snapshot : outline_snapshots_) {
-        json_res["outlines"].emplace_back(outline_snapshot->filename_);
+        json_res["outlines"].emplace_back(outline_snapshot->filepath_);
     }
     return json_res;
 }
@@ -54,11 +54,11 @@ nlohmann::json BlockColumnSnapshotInfo::Serialize() {
 SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(const nlohmann::json &column_block_json) {
     auto column_block_snapshot = MakeShared<BlockColumnSnapshotInfo>();
     column_block_snapshot->column_id_ = column_block_json["column_id"];
-    column_block_snapshot->filename_ = column_block_json["filename"];
+    column_block_snapshot->filepath_ = column_block_json["filepath"];
     if (column_block_json.contains("outlines")) {
         for (const auto &outline_snapshot : column_block_json["outlines"]) {
             auto outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
-            outline_snapshot_info->filename_ = outline_snapshot;
+            outline_snapshot_info->filepath_ = outline_snapshot;
             column_block_snapshot->outline_snapshots_.emplace_back(outline_snapshot_info);
         }
     }
@@ -269,14 +269,17 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["snapshot_scope"] = SnapshotScope::kTable;
     json_res["database_name"] = db_name_;
     json_res["table_name"] = table_name_;
+    json_res["db_id_str"] = db_id_str_;
+    json_res["table_id_str"] = table_id_str_;
+    
     json_res["table_comment"] = table_comment_;
     //    json_res["md5"] = md5;
 
     json_res["txn_id"] = txn_id_;
-    json_res["begin_ts"] = begin_ts_;
-    json_res["commit_ts"] = commit_ts_;
+    // json_res["begin_ts"] = begin_ts_;
+    // json_res["commit_ts"] = commit_ts_;
     json_res["max_commit_ts"] = max_commit_ts_;
-    json_res["table_entry_dir"] = table_entry_dir_;
+    json_res["create_ts"] = create_ts_;
 
     json_res["next_column_id"] = next_column_id_;
     json_res["unsealed_id"] = unsealed_id_;
@@ -339,9 +342,9 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
     for (const auto &segment_snapshot_pair : segment_snapshots_) {
         for (const auto &block_snapshot : segment_snapshot_pair.second->block_snapshots_) {
             for (const auto &column_block_snapshot : block_snapshot->column_block_snapshots_) {
-                files.emplace_back(VirtualStore::ConcatenatePath(block_snapshot->block_dir_, column_block_snapshot->filename_));
+                files.emplace_back(column_block_snapshot->filepath_);
                 for (const auto &outline_snapshot : column_block_snapshot->outline_snapshots_) {
-                    files.emplace_back(VirtualStore::ConcatenatePath(block_snapshot->block_dir_, outline_snapshot->filename_));
+                    files.emplace_back(outline_snapshot->filepath_);
                 }
             }
 
@@ -365,95 +368,103 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 }
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
-    //    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
-    // String meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
+    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
-    // if (!VirtualStore::Exists(meta_path)) {
-    //     return {nullptr, Status::FileNotFound(meta_path)};
-    // }
-    // auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
-    // if (!status.ok()) {
-    //     return {nullptr, status};
-    // }
+    String meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
 
-    // i64 file_size = meta_file_handle->FileSize();
-    // String json_str(file_size, 0);
-    // auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
-    // if (!status.ok()) {
-    //     RecoverableError(status_read);
-    // }
-    // if ((SizeT)file_size != n_bytes) {
-    //     Status status = Status::FileCorrupted(meta_path);
-    //     RecoverableError(status);
-    // }
+    if (!VirtualStore::Exists(meta_path)) {
+        return {nullptr, Status::FileNotFound(meta_path)};
+    }
+    auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
 
-    // nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+    i64 file_size = meta_file_handle->FileSize();
+    String json_str(file_size, 0);
+    auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
+    if (!status.ok()) {
+        RecoverableError(status_read);
+    }
+    if ((SizeT)file_size != n_bytes) {
+        Status status = Status::FileCorrupted(meta_path);
+        RecoverableError(status);
+    }
 
-    // //    LOG_INFO(snapshot_meta_json.dump());
+    nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+
+    //    LOG_INFO(snapshot_meta_json.dump());
 
     SharedPtr<TableSnapshotInfo> table_snapshot = MakeShared<TableSnapshotInfo>();
 
-    // table_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
-    // SnapshotScope scope = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
-    // if (scope != SnapshotScope::kTable) {
-    //     return {nullptr, Status::Unknown("Invalid snapshot scope")};
-    // }
+    table_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
+    SnapshotScope scope = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
+    if (scope != SnapshotScope::kTable) {
+        return {nullptr, Status::Unknown("Invalid snapshot scope")};
+    }
 
-    // table_snapshot->scope_ = SnapshotScope::kTable;
-    // table_snapshot->version_ = snapshot_meta_json["version"];
-    // table_snapshot->db_name_ = snapshot_meta_json["database_name"];
-    // table_snapshot->table_name_ = snapshot_meta_json["table_name"];
-    // table_snapshot->table_comment_ = snapshot_meta_json["table_comment"];
+    table_snapshot->scope_ = SnapshotScope::kTable;
+    table_snapshot->version_ = snapshot_meta_json["version"];
+    table_snapshot->db_name_ = snapshot_meta_json["database_name"];
+    table_snapshot->table_name_ = snapshot_meta_json["table_name"];
+    table_snapshot->db_id_str_ = snapshot_meta_json["db_id_str"];
+    table_snapshot->table_id_str_ = snapshot_meta_json["table_id_str"];
+    table_snapshot->table_comment_ = snapshot_meta_json["table_comment"];
 
-    // table_snapshot->txn_id_ = snapshot_meta_json["txn_id"];
+    table_snapshot->txn_id_ = snapshot_meta_json["txn_id"];
     // table_snapshot->begin_ts_ = snapshot_meta_json["begin_ts"];
     // table_snapshot->commit_ts_ = snapshot_meta_json["commit_ts"];
-    // table_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
-    // table_snapshot->table_entry_dir_ = snapshot_meta_json["table_entry_dir"];
-    // table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
-    // table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
-    // table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
-    // table_snapshot->row_count_ = snapshot_meta_json["row_count"];
+    table_snapshot->create_ts_ = snapshot_meta_json["create_ts"];
 
-    // for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
-    //     SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
-    //     i64 column_id = column_def_json["column_id"];
-    //     String column_name = column_def_json["column_name"];
+    table_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
+    table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
+    table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
+    table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
+    table_snapshot->row_count_ = snapshot_meta_json["row_count"];
 
-    //     std::set<ConstraintType> constraints;
-    //     if (column_def_json.contains("constraints")) {
-    //         for (const auto &column_constraint : column_def_json["constraints"]) {
-    //             ConstraintType constraint = column_constraint;
-    //             constraints.emplace(constraint);
-    //         }
-    //     }
+    for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
+        SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
+        i64 column_id = column_def_json["column_id"];
+        String column_name = column_def_json["column_name"];
 
-    //     String comment;
-    //     if (column_def_json.contains("column_comment")) {
-    //         comment = column_def_json["column_comment"];
-    //     }
+        std::set<ConstraintType> constraints;
+        if (column_def_json.contains("constraints")) {
+            for (const auto &column_constraint : column_def_json["constraints"]) {
+                ConstraintType constraint = column_constraint;
+                constraints.emplace(constraint);
+            }
+        }
 
-    //     SharedPtr<ParsedExpr> default_expr = nullptr;
-    //     if (column_def_json.contains("default")) {
-    //         default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
-    //     }
+        String comment;
+        if (column_def_json.contains("column_comment")) {
+            comment = column_def_json["column_comment"];
+        }
 
-    //     SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
-    //     table_snapshot->columns_.emplace_back(column_def);
-    // }
+        SharedPtr<ParsedExpr> default_expr = nullptr;
+        if (column_def_json.contains("default")) {
+            default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+        }
 
-    // for (const auto &segment_meta_json : snapshot_meta_json["segments"]) {
-    //     SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json);
-    //     table_snapshot->segment_snapshots_.emplace(segment_snapshot->segment_id_, segment_snapshot);
-    // }
+        SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
+        table_snapshot->columns_.emplace_back(column_def);
+    }
 
-    // for (const auto &table_index_meta_json : snapshot_meta_json["table_indexes"]) {
-    //     SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json);
-    //     table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
-    // }
+    for (const auto &segment_meta_json : snapshot_meta_json["segments"]) {
+        SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json);
+        table_snapshot->segment_snapshots_.emplace(segment_snapshot->segment_id_, segment_snapshot);
+    }
 
-    // //    LOG_INFO(table_snapshot->ToString());
+    for (const auto &table_index_meta_json : snapshot_meta_json["table_indexes"]) {
+        SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json);
+        table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
+    }
+
+    //    LOG_INFO(table_snapshot->ToString());
+    Status restore_status = RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot->GetFiles());
+    if (!restore_status.ok()) {
+        return {nullptr, restore_status};
+    }
 
     return {table_snapshot, Status::OK()};
 }
@@ -466,4 +477,28 @@ String TableSnapshotInfo::ToString() const {
                        version_);
 }
 
+// copy files from snapshot back to data
+Status TableSnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir, 
+                           const String& snapshot_name,
+                           const Vector<String>& files_to_restore) {
+    Config* config = InfinityContext::instance().config();
+    
+    for (const auto& file : files_to_restore) {
+        String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+        String dst_file_path = fmt::format("{}/{}", config->DataDir(), file);
+        
+        // Create destination directory
+        String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+        if (!VirtualStore::Exists(dst_dir)) {
+            VirtualStore::MakeDirectory(dst_dir);
+        }
+        
+        Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+        if (!copy_status.ok()) {
+            return copy_status;
+        }
+    }
+    return Status::OK();
+}
+    
 } // namespace infinity

@@ -21,6 +21,7 @@ import status;
 import default_values;
 import new_catalog;
 import snapshot_info;
+import wal_entry;
 
 namespace infinity {
 
@@ -36,6 +37,8 @@ public:
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
+
+    TxnTimeStamp GetCreateTimestampFromKV() const;
 
     KVInstance &kv_instance() { return kv_instance_; }
 
@@ -87,6 +90,10 @@ public:
 
     Tuple<SharedPtr<SegmentSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
+    Status RestoreSet();
+
+    Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info);
+
 private:
     // Status LoadBlockIDs();
 
@@ -106,7 +113,7 @@ private:
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;
-    Optional<String> segment_dir_;
+    Optional<String> segment_dir_; // TODO: check if it is no longer in use
 
     // SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
