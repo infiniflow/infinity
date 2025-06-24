@@ -109,6 +109,7 @@ void CompactionProcessor::NewDoCompact() {
     auto compact_table = [&](const String &db_name, const String &table_name, SharedPtr<BGTaskInfo> &bg_task_info) {
         auto new_txn_shared =
             new_txn_mgr->BeginTxnShared(MakeUnique<String>(fmt::format("compact table {}.{}", db_name, table_name)), TransactionType::kNormal);
+        LOG_INFO(fmt::format("Compact begin ts: {}", new_txn_shared->BeginTS()));
         Status status = Status::OK();
         DeferFn defer_fn([&] {
             if (status.ok()) {
@@ -212,6 +213,8 @@ void CompactionProcessor::NewDoCompact() {
             new_txn_mgr->AddTaskInfo(bg_task_info);
         }
     }
+
+    // new_txn_mgr->Cleanup();
 }
 
 Status CompactionProcessor::NewManualCompact(const String &db_name, const String &table_name) {
