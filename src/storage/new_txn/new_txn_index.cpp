@@ -121,7 +121,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
         ChunkID chunk_id = 0;
         {
-            Status status = segment_index_meta.GetNextChunkID(chunk_id);
+            status = segment_index_meta.GetNextChunkID(chunk_id);
             if (!status.ok()) {
                 return status;
             }
