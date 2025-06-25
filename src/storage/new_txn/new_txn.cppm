@@ -546,7 +546,7 @@ private:
 public:
     bool IsReplay() const;
 
-    Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
+    Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
     Status GetDBFilePaths(const String &db_name, Vector<String> &file_paths);
     Status GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths);
