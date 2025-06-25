@@ -990,7 +990,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     Vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(chunk_index_meta);
 
-    // Put the index into local txn store
+    // Put the index info local txn store
     switch (dump_index_cause) {
         case DumpIndexCause::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
