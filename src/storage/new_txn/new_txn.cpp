@@ -1313,6 +1313,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DROP_DATABASE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_DATABASE_V2 command.
+                    break;
+                }
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
                 Status status = CommitDropDB(drop_db_cmd);
                 if (!status.ok()) {
@@ -1321,6 +1325,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::CREATE_TABLE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_TABLE_V2 command.
+                    break;
+                }
                 auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
                 Status status = CommitCreateTable(create_table_cmd);
                 if (!status.ok()) {
@@ -1329,6 +1337,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DROP_TABLE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_TABLE_V2 command.
+                    break;
+                }
                 auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
                 Status status = CommitDropTable(drop_table_cmd);
                 if (!status.ok()) {
@@ -1361,6 +1373,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::CREATE_INDEX_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_TABLE_V2 command.
+                    break;
+                }
                 auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
                 Status status = CommitCreateIndex(create_index_cmd);
                 if (!status.ok()) {
@@ -1369,6 +1385,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DROP_INDEX_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_INDEX_V2 command.
+                    break;
+                }
                 auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
                 Status status = CommitDropIndex(drop_index_cmd);
                 if (!status.ok()) {
@@ -4038,9 +4058,23 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         case WalCommandType::CREATE_DATABASE_V2: {
             auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
 
-            // IncreaseLatestDBID
+            // Check if the database already exists
+            Optional<DBMeeta> db_meta;
+            Status status = GetDBMeta(create_db_cmd->db_name_, db_meta);
+            if (status.ok()) {
+                LOG_WARN(fmt::format("Skipping replay create db: Database {} already exists.", create_db_cmd->db_name_));
+                break;
+            }
+
+            // If the database does not exist, create it
+            status = CommitCreateDB(create_db_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+
+            // Update next db id if necessary
             String current_next_db_id_str;
-            Status status = kv_instance_->Get(NEXT_DATABASE_ID.data(), current_next_db_id_str);
+            status = kv_instance_->Get(NEXT_DATABASE_ID.data(), current_next_db_id_str);
             if (!status.ok()) {
                 return status;
             }
@@ -4054,29 +4088,78 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
                 if (!status.ok()) {
                     return status;
                 }
+                LOG_TRACE(fmt::format("Update next db id to {}.", next_db_id_str));
+            }
+            LOG_TRACE(fmt::format("Replay create db: {} with id {}.", create_db_cmd->db_name_, create_db_cmd->db_id_));
+            break;
+        }
+        case WalCommandType::DROP_DATABASE_V2: {
+            auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
+
+            // Check if the database already exists
+            Optional<DBMeeta> db_meta;
+            Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta);
+            if (!status.ok()) {
+                LOG_WARN(fmt::format("Skipping replay drop db: Database {} is already dropped.", drop_db_cmd->db_name_));
+                break;
             }
 
-            status = CommitCreateDB(create_db_cmd);
+            status = CommitDropDB(drop_db_cmd);
             if (!status.ok()) {
                 return status;
             }
+            LOG_TRACE(fmt::format("Replay drop db: {} with id {}.", drop_db_cmd->db_name_, drop_db_cmd->db_id_));
             break;
         }
         case WalCommandType::CREATE_TABLE_V2: {
             auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
 
+            // Check if the table already exists
             Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
             String table_key;
-            Status status = GetDBMeta(create_table_cmd->db_name_, db_meta);
+            Status status = GetTableMeta(create_table_cmd->db_name_, *create_table_cmd->table_def_->table_name(), db_meta, table_meta, &table_key);
+            if (status.ok()) {
+                LOG_WARN(fmt::format("Skipping replay create table: Table {} already exists in database {}.",
+                                     *create_table_cmd->table_def_->table_name(),
+                                     create_table_cmd->db_name_));
+                break;
+            }
+
+            // If the table does not exist, create it
+            status = CommitCreateTable(create_table_cmd);
             if (!status.ok()) {
                 return status;
             }
 
-            u64 next_table_id = std::stoull(create_table_cmd->table_id_);
-            ++next_table_id;
-            String next_table_id_str = std::to_string(next_table_id);
+            // Get next table id of the db
+            String current_next_table_id_str;
+            std::tie(current_next_table_id_str, status) = db_meta->GetNextTableID();
+            if (!status.ok()) {
+                return status;
+            }
 
-            status = db_meta->SetNextTableID(next_table_id_str);
+            u64 current_next_table_id = std::stoull(current_next_table_id_str);
+            u64 this_table_id = std::stoull(create_table_cmd->table_id_);
+            if (this_table_id + 1 > current_next_table_id) {
+                // Update the next table id
+                String next_table_id_str = std::to_string(this_table_id + 1);
+                status = db_meta->SetNextTableID(next_table_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+                LOG_TRACE(fmt::format("Update next table id to {} for database {}.", next_table_id_str, create_table_cmd->db_name_));
+            }
+
+            LOG_TRACE(fmt::format("Replay create table: {} with id {} in database {}.",
+                                  *create_table_cmd->table_def_->table_name(),
+                                  create_table_cmd->table_id_,
+                                  create_table_cmd->db_name_));
+            break;
+        }
+        case WalCommandType::DROP_TABLE_V2: {
+            auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
+            Status status = CommitDropTable(drop_table_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -4085,10 +4168,29 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
+            // Check if the index already exists
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
+            Optional<TableIndexMeeta> table_index_meta;
             String table_key;
-            Status status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta, &table_key);
+            String index_key;
+            Status status = GetTableIndexMeta(create_index_cmd->db_name_,
+                                              create_index_cmd->table_name_,
+                                              *create_index_cmd->index_base_->index_name_,
+                                              db_meta,
+                                              table_meta,
+                                              table_index_meta,
+                                              &table_key,
+                                              &index_key);
+            if (status.ok()) {
+                LOG_WARN(fmt::format("Skipping replay create index: Index {} already exists in table {} of database {}.",
+                                     *create_index_cmd->index_base_->index_name_,
+                                     create_index_cmd->table_name_,
+                                     create_index_cmd->db_name_));
+                break;
+            }
+
+            status = CommitCreateIndex(create_index_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -4098,6 +4200,14 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             String next_index_id_str = std::to_string(next_index_id);
 
             status = table_meta->SetNextIndexID(next_index_id_str);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DROP_INDEX_V2: {
+            auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
+            Status status = CommitDropIndex(drop_index_cmd);
             if (!status.ok()) {
                 return status;
             }
