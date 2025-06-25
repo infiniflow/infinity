@@ -1421,6 +1421,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::IMPORT_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of IMPORT_V2 command.
+                    break;
+                }
                 auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
                 Status status = CommitImport(import_cmd);
                 if (!status.ok()) {
@@ -1429,6 +1433,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::COMPACT_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of COMPACT_V2 command.
+                    break;
+                }
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
                 Status status = CommitCompact(compact_cmd);
                 if (!status.ok()) {
@@ -1437,6 +1445,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::CHECKPOINT_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of CHECKPOINT_V2 command.
+                    break;
+                }
                 auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
                 Status status = CommitCheckpoint(checkpoint_cmd);
                 if (!status.ok()) {
@@ -4391,6 +4403,10 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             if (!status.ok()) {
                 return status;
             }
+            status = CommitImport(import_cmd);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::DUMP_INDEX_V2: {
@@ -4409,12 +4425,24 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             if (!status.ok()) {
                 return status;
             }
+            status = CommitCompact(compact_cmd);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::OPTIMIZE_V2: {
             auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
 
             Status status = ReplayOptimizeIndeByParams(optimize_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::CHECKPOINT_V2: {
+            auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
+            Status status = CommitCheckpoint(checkpoint_cmd);
             if (!status.ok()) {
                 return status;
             }
