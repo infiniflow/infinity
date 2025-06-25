@@ -46,6 +46,9 @@ void PrintTransactionHistory() {
 }
 
 void PrintStacktrace(const String &err_msg) {
+    if (!err_msg.empty()) {
+        LOG_CRITICAL(err_msg);
+    }
     int trace_stack_depth = 256;
     String trace = cpptrace::generate_trace(0, trace_stack_depth).to_string();
     LOG_CRITICAL(trace);
@@ -81,9 +84,12 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     //     LOG_ERROR(std::move(error_msg));
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
-    if (IS_LOGGER_INITIALIZED() && GetPrintStacktrace()) {
-
-        PrintStacktrace(location_message);
+    if (IS_LOGGER_INITIALIZED()) {
+        if (GetPrintStacktrace()) {
+            PrintStacktrace(location_message);
+        } else {
+            LOG_CRITICAL(location_message);
+        }
     }
     Logger::Flush();
     throw UnrecoverableException(location_message);
@@ -100,7 +106,11 @@ void RecoverableError(Status status) {
 
 void UnrecoverableError(const String &message) {
     if (IS_LOGGER_INITIALIZED()) {
-        LOG_CRITICAL(message);
+        if (GetPrintStacktrace()) {
+            PrintStacktrace(message);
+        } else {
+            LOG_CRITICAL(message);
+        }
     }
     Logger::Flush();
     throw UnrecoverableException(message);
