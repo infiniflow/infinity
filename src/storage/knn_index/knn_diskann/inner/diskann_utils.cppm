@@ -17,6 +17,7 @@ module;
 #include <boost/dynamic_bitset.hpp>
 #include <cassert>
 #include <cstdlib>
+#include <queue>
 
 import stl;
 import third_party;

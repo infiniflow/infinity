@@ -15,6 +15,7 @@
 module;
 
 #include <exception>
+#include <string>
 
 module peer_thrift_client;
 

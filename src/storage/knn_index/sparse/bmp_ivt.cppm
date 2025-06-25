@@ -16,6 +16,7 @@ module;
 
 #include "common/simd/simd_common_intrin_include.h"
 #include <algorithm>
+#include <functional>
 
 export module bmp_ivt;
 

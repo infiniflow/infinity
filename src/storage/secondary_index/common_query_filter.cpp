@@ -141,7 +141,7 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Check table has delete error: {}", status.message()));
     }
-    always_true_ = original_filter_ == nullptr && !has_delete;
+    always_true_ = original_filter_.get() == nullptr && !has_delete;
 
     if (always_true_) {
         finish_build_.test_and_set(std::memory_order_release);

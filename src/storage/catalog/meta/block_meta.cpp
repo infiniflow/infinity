@@ -1,4 +1,4 @@
-// Copyri1ht(C) 2024 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -189,7 +189,7 @@ Vector<String> BlockMeta::FilePaths() {
 }
 
 SharedPtr<String> BlockMeta::GetBlockDir() {
-    if (block_dir_ == nullptr) {
+    if (block_dir_.get() == nullptr) {
         TableMeeta &table_meta = segment_meta_.table_meta();
         block_dir_ = MakeShared<String>(
             fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
@@ -293,7 +293,7 @@ Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID
         }
         select_column_idx++;
     }
-    if (column_def == nullptr) {
+    if (column_def.get() == nullptr) {
         return {nullptr, Status::CatalogError("Column not found")};
     }
     ColumnMeta column_meta(select_column_idx, *this);

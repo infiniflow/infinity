@@ -17,6 +17,7 @@ module;
 #include <cassert>
 #include <cstring>
 #include <random>
+#include <unordered_map>
 
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>

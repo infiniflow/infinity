@@ -6,6 +6,7 @@ module;
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <filesystem>
 
 module ik_dict;
 

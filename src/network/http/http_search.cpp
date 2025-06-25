@@ -171,13 +171,13 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     return;
                 }
             } else if (IsEqual(key, "having")) {
-                if (having != nullptr) {
+                if (having.get() != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
                     response["error_message"] = "More than one having field.";
                     return;
                 }
                 having = ParseFilter(elem.value(), http_status, response);
-                if (having == nullptr) {
+                if (having.get() == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -454,24 +454,24 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                     return;
                 }
             } else if (IsEqual(key, "having")) {
-                if (having != nullptr) {
+                if (having.get() != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
                     response["error_message"] = "More than one having field.";
                     return;
                 }
                 having = ParseFilter(elem.value(), http_status, response);
-                if (having == nullptr) {
+                if (having.get() == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
 
-                if (filter != nullptr) {
+                if (filter.get() != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
                     response["error_message"] = "More than one output field.";
                     return;
                 }
                 filter = ParseFilter(elem.value(), http_status, response);
-                if (filter == nullptr) {
+                if (filter.get() == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "limit")) {

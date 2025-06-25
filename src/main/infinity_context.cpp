@@ -44,7 +44,7 @@ InfinityContext::InfinityContext() = default;
 InfinityContext::~InfinityContext() = default;
 
 NodeRole InfinityContext::GetServerRole() const {
-    if (cluster_manager_ == nullptr) {
+    if (cluster_manager_.get() == nullptr) {
         return NodeRole::kUnInitialized;
     }
     return cluster_manager_->GetNodeRole();
@@ -122,7 +122,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                 return status;
             }
             storage_ = MakeUnique<Storage>(config_.get());
-            if (cluster_manager_ != nullptr) {
+            if (cluster_manager_.get() != nullptr) {
                 UnrecoverableError("Cluster manager was initialized before");
             }
             cluster_manager_ = MakeUnique<ClusterManager>();
@@ -246,7 +246,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
 
                     RestoreIndexThreadPoolToDefault();
 
-                    if (task_scheduler_ != nullptr) {
+                    if (task_scheduler_.get() != nullptr) {
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
                     }
@@ -273,7 +273,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
         case NodeRole::kLeader: {
             switch (target_role) {
                 case NodeRole::kAdmin: {
-                    if (cluster_manager_ == nullptr) {
+                    if (cluster_manager_.get() == nullptr) {
                         UnrecoverableError("cluster manager wasn't valid.");
                     }
                     // TODO: disconnect with all follower/learner
@@ -286,7 +286,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     }
                     RestoreIndexThreadPoolToDefault();
 
-                    if (task_scheduler_ != nullptr) {
+                    if (task_scheduler_.get() != nullptr) {
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
                     }
@@ -371,7 +371,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         fmt::format("Can't switch node role: from {} to {}", ToString(current_role), ToString(target_role)));
                 }
                 case NodeRole::kAdmin: {
-                    if (cluster_manager_ == nullptr) {
+                    if (cluster_manager_.get() == nullptr) {
                         UnrecoverableError("cluster manager wasn't valid.");
                     }
                     // TODO: disconnect from leader;
@@ -385,7 +385,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
 
                     RestoreIndexThreadPoolToDefault();
 
-                    if (task_scheduler_ != nullptr) {
+                    if (task_scheduler_.get() != nullptr) {
                         task_scheduler_->UnInit();
                         task_scheduler_.reset();
                     }
@@ -412,7 +412,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         Status status = Status::CantSwitchRole("Can't switch from learner to leader");
                         return status;
                     }
-                    if (cluster_manager_ == nullptr) {
+                    if (cluster_manager_.get() == nullptr) {
                         UnrecoverableError("cluster manager wasn't valid.");
                     }
                     // TODO: disconnect from leader;
@@ -483,14 +483,14 @@ void InfinityContext::UnInit() {
         }
     }
 
-    if (task_scheduler_ != nullptr) {
+    if (task_scheduler_.get() != nullptr) {
         task_scheduler_->UnInit();
         task_scheduler_.reset();
     }
 
     storage_.reset();
 
-    if (cluster_manager_ != nullptr) {
+    if (cluster_manager_.get() != nullptr) {
         cluster_manager_.reset();
     }
 

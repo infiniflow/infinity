@@ -380,7 +380,7 @@ Status NewCatalog::GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &me
         for (SegmentID segment_id : *index_segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
             SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr) {
+            if (mem_index.get() == nullptr) {
                 continue;
             }
             mem_indexes.push_back(mem_index);
@@ -1355,7 +1355,7 @@ Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file
     if (!status.ok()) {
         return status;
     }
-    if (column_def == nullptr) {
+    if (column_def.get() == nullptr) {
         for (const auto &column_def_ptr : *column_defs_ptr) {
             ColumnMeta column_meta(column_def_ptr->id(), block_meta);
             status = GetBlockColumnFilePaths(column_meta, file_paths);

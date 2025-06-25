@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <algorithm>
 
 module meta_info;
 

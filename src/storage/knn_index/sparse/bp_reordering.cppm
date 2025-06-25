@@ -17,6 +17,7 @@ module;
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <atomic>
 
 export module bp_reordering;
 

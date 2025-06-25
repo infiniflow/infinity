@@ -1,5 +1,6 @@
 module;
 
+#include <stdexcept>
 #include <string>
 
 export module lexeme;

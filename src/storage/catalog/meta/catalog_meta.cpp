@@ -55,7 +55,7 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
         // join error_db_keys
         String error_db_keys_str =
             std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {
-                return a + ", " + b;
+                return fmt::format("{}, {}", a, b);
             });
         UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
     }

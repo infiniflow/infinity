@@ -15,11 +15,12 @@
 module;
 
 #include <cctype>
+#include <string>
+
+module reference_expression;
 
 import stl;
 import third_party;
-
-module reference_expression;
 
 namespace infinity {
 
