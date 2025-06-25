@@ -255,7 +255,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnCleanup,
-                         ::testing::Values(/*BaseTestParamStr::NEW_CONFIG_PATH, */ BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
     LOG_INFO("Checking cleanup & drop db...");
