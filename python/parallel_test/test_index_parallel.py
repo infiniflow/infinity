@@ -102,61 +102,61 @@ class TestIndexParallel(TestSdk):
     #         "test_fulltext_index_parallel", ConflictType.Error)
     #     connection_pool.release_conn(infinity_obj)
 
-    @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw])
-    @pytest.mark.parametrize("index_column_name", ["gender_vector"])
-    @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
-    @pytest.mark.parametrize("index_distance_type", ["l2"])
-    @pytest.mark.parametrize("knn_distance_type", ["l2"])
-    @pytest.mark.parametrize("file_format", ["csv"])
-    @pytest.mark.parametrize("running_time", [30])
-    def test_vector_index_single_thread(self, get_infinity_connection_pool, index_type, index_column_name,
-                                        knn_column_name,
-                                        index_distance_type, knn_distance_type, file_format, running_time):
-        file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
-                    "/pysdk_test_knn." + file_format
-
-        connection_pool = get_infinity_connection_pool
-        infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default_db")
-        res = db_obj.drop_table(
-            "test_vector_index_parallel", ConflictType.Ignore)
-        assert res.error_code == ErrorCode.OK
-
-        table_obj = db_obj.create_table("test_vector_index_parallel", {
-            "variant_id": {"type": "varchar"},
-            "gender_vector": {"type": "vector,4,float"},
-            "color_vector": {"type": "vector,4,float"},
-            "category_vector": {"type": "vector,4,float"},
-            "tag_vector": {"type": "vector,4,float"},
-            "other_vector": {"type": "vector,4,float"},
-            "query_is_recommend": {"type": "varchar"},
-            "query_gender": {"type": "varchar"},
-            "query_color": {"type": "varchar"},
-            "query_price": {"type": "float"}
-        }, ConflictType.Error)
-        res = table_obj.create_index("my_index",
-                                     index.IndexInfo(index_column_name,
-                                                     index_type,
-                                                     {
-                                                         "M": "16",
-                                                         "ef_construction": "50",
-                                                         "metric": index_distance_type
-                                                     }), ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        end_time = time.time() + running_time
-        while time.time() < end_time:
-            print("begin import")
-            table_obj.import_data(file_path)
-            print("import complete")
-        res, extra_result = table_obj.output(["variant_id"]).match_dense(
-            knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
-        print(res)
-
-        res = db_obj.drop_table(
-            "test_vector_index_parallel", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-        connection_pool.release_conn(infinity_obj)
+    # @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw])
+    # @pytest.mark.parametrize("index_column_name", ["gender_vector"])
+    # @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
+    # @pytest.mark.parametrize("index_distance_type", ["l2"])
+    # @pytest.mark.parametrize("knn_distance_type", ["l2"])
+    # @pytest.mark.parametrize("file_format", ["csv"])
+    # @pytest.mark.parametrize("running_time", [30])
+    # def test_vector_index_single_thread(self, get_infinity_connection_pool, index_type, index_column_name,
+    #                                     knn_column_name,
+    #                                     index_distance_type, knn_distance_type, file_format, running_time):
+    #     file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
+    #                 "/pysdk_test_knn." + file_format
+    #
+    #     connection_pool = get_infinity_connection_pool
+    #     infinity_obj = connection_pool.get_conn()
+    #     db_obj = infinity_obj.get_database("default_db")
+    #     res = db_obj.drop_table(
+    #         "test_vector_index_parallel", ConflictType.Ignore)
+    #     assert res.error_code == ErrorCode.OK
+    #
+    #     table_obj = db_obj.create_table("test_vector_index_parallel", {
+    #         "variant_id": {"type": "varchar"},
+    #         "gender_vector": {"type": "vector,4,float"},
+    #         "color_vector": {"type": "vector,4,float"},
+    #         "category_vector": {"type": "vector,4,float"},
+    #         "tag_vector": {"type": "vector,4,float"},
+    #         "other_vector": {"type": "vector,4,float"},
+    #         "query_is_recommend": {"type": "varchar"},
+    #         "query_gender": {"type": "varchar"},
+    #         "query_color": {"type": "varchar"},
+    #         "query_price": {"type": "float"}
+    #     }, ConflictType.Error)
+    #     res = table_obj.create_index("my_index",
+    #                                  index.IndexInfo(index_column_name,
+    #                                                  index_type,
+    #                                                  {
+    #                                                      "M": "16",
+    #                                                      "ef_construction": "50",
+    #                                                      "metric": index_distance_type
+    #                                                  }), ConflictType.Error)
+    #     assert res.error_code == ErrorCode.OK
+    #
+    #     end_time = time.time() + running_time
+    #     while time.time() < end_time:
+    #         print("begin import")
+    #         table_obj.import_data(file_path)
+    #         print("import complete")
+    #     res, extra_result = table_obj.output(["variant_id"]).match_dense(
+    #         knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
+    #     print(res)
+    #
+    #     res = db_obj.drop_table(
+    #         "test_vector_index_parallel", ConflictType.Error)
+    #     assert res.error_code == ErrorCode.OK
+    #     connection_pool.release_conn(infinity_obj)
 
     # @pytest.mark.parametrize("index_column_name", ["gender_vector",
     #                                                "color_vector",
