@@ -4180,22 +4180,22 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             status = GetDBMeta(create_table_cmd->db_name_, db_meta);
 
             // Get next table id of the db
-            String current_next_table_id_str;
-            std::tie(current_next_table_id_str, status) = db_meta->GetNextTableID();
+            String next_table_id_key = KeyEncode::CatalogDbTagKey(create_table_cmd->db_id_, NEXT_TABLE_ID.data());
+            String next_table_id_str;
+            status = kv_instance_->Get(next_table_id_key, next_table_id_str);
             if (!status.ok()) {
                 return status;
             }
-
-            u64 current_next_table_id = std::stoull(current_next_table_id_str);
+            u64 next_table_id = std::stoull(next_table_id_str);
             u64 this_table_id = std::stoull(create_table_cmd->table_id_);
-            if (this_table_id + 1 > current_next_table_id) {
+            if (this_table_id + 1 > next_table_id) {
                 // Update the next table id
-                String next_table_id_str = std::to_string(this_table_id + 1);
-                status = db_meta->SetNextTableID(next_table_id_str);
+                String new_next_table_id_str = std::to_string(this_table_id + 1);
+                status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
                 if (!status.ok()) {
                     return status;
                 }
-                LOG_TRACE(fmt::format("Update next table id to {} for database {}.", next_table_id_str, create_table_cmd->db_name_));
+                LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, create_table_cmd->db_name_));
             }
 
             LOG_TRACE(fmt::format("Replay create table: {} with id {} in database {}.",
@@ -4279,21 +4279,23 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
                 return status;
             }
 
-            u64 next_index_id = std::stoull(create_index_cmd->index_id_);
-            ++next_index_id;
-            String next_index_id_str = std::to_string(next_index_id);
+            String next_index_id_key = KeyEncode::CatalogTableTagKey(create_index_cmd->db_id_, create_index_cmd->table_id_, NEXT_INDEX_ID.data());
+            String next_index_id_str;
+            status = kv_instance_->Get(next_index_id_key, next_index_id_str);
 
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            String table_key;
-            status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta, &table_key);
-            if (!status.ok()) {
-                return status;
-            }
-
-            status = table_meta->SetNextIndexID(next_index_id_str);
-            if (!status.ok()) {
-                return status;
+            u64 next_index_id = std::stoull(next_index_id_str);
+            u64 this_index_id = std::stoull(create_index_cmd->index_id_);
+            if (this_index_id + 1 > next_index_id) {
+                // Update the next index id
+                String new_next_index_id_str = std::to_string(this_index_id + 1);
+                status = kv_instance_->Put(next_index_id_key, new_next_index_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+                LOG_TRACE(fmt::format("Update next index id to {} for table {} of database {}.",
+                                      new_next_index_id_str,
+                                      create_index_cmd->table_name_,
+                                      create_index_cmd->db_name_));
             }
             LOG_TRACE(fmt::format("Replay create index: {} with id {} in table {} of database {}.",
                                   *create_index_cmd->index_base_->index_name_,
