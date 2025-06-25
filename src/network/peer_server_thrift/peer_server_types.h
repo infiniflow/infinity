@@ -17,6 +17,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 
 namespace infinity_peer_server {

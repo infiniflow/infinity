@@ -543,12 +543,7 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
 Status NewTxn::Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
 
     //    LOG_INFO(fmt::format("Start to compact segment ids: {}", segment_ids.size()));
-    OStringStream fout;
-    auto size = segment_ids.size();
-    for (SizeT i = 0; i < size; ++i) {
-        fout << segment_ids[i] << " \n"[i == size - 1];
-    }
-    LOG_INFO(fmt::format("Compact db_name: {}, table_name: {}, segment ids: {}", db_name, table_name, fout.str()));
+    LOG_INFO(fmt::format("Compact db_name: {}, table_name: {}, segment ids: {}", db_name, table_name, fmt::join(segment_ids, " ")));
 
     this->SetTxnType(TransactionType::kCompact);
 
