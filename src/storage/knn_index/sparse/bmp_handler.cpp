@@ -28,15 +28,65 @@ import chunk_index_meta;
 
 namespace infinity {
 
-BMPHandler::~BMPHandler() {
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                delete index;
-            }
-        },
-        bmp_);
+template <typename DataType, typename IndexType, BMPOwnMem OwnMem>
+static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {
+    switch (index_bmp->compress_type_) {
+        case BMPCompressType::kCompressed: {
+            using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed, OwnMem>;
+            return SharedPtr<BMPIndex>();
+        }
+        case BMPCompressType::kRaw: {
+            using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw, OwnMem>;
+            return SharedPtr<BMPIndex>();
+        }
+        default: {
+            return nullptr;
+        }
+    }
+}
+
+template <typename DataType, BMPOwnMem OwnMem>
+static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
+    switch (sparse_info->IndexType()) {
+        case EmbeddingDataType::kElemInt8: {
+            return InitAbstractIndex<DataType, i8, OwnMem>(index_bmp);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return InitAbstractIndex<DataType, i16, OwnMem>(index_bmp);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return InitAbstractIndex<DataType, i32, OwnMem>(index_bmp);
+        }
+        default: {
+            return nullptr;
+        }
+    }
+}
+
+template <BMPOwnMem OwnMem>
+static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
+    const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
+    const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
+
+    switch (sparse_info->DataType()) {
+        case EmbeddingDataType::kElemFloat: {
+            return InitAbstractIndex<f32, OwnMem>(index_bmp, sparse_info);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return InitAbstractIndex<f64, OwnMem>(index_bmp, sparse_info);
+        }
+        default: {
+            return nullptr;
+        }
+    }
+}
+
+AbstractBMP BMPHandler::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
+    if (own_mem) {
+        return InitAbstractIndex<BMPOwnMem::kTrue>(index_base, column_def);
+    } else {
+        return InitAbstractIndex<BMPOwnMem::kFalse>(index_base, column_def);
+    }
 }
 
 BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem)
@@ -54,7 +104,7 @@ BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def,
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = new IndexT(term_num, block_size);
+                    index = MakeShared<IndexT>(term_num, block_size);
                 } else {
                     UnrecoverableError("BMPHandler::BMPHandler: index does not own memory");
                 }
@@ -187,8 +237,7 @@ void BMPHandler::Load(LocalFileHandle &file_handle) {
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    delete index;
-                    index = new IndexT(IndexT::Load(file_handle));
+                    index = IndexT::Load(file_handle);
                 } else {
                     UnrecoverableError("BMPHandler::Load: index does not own memory");
                 }
@@ -204,8 +253,7 @@ void BMPHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    delete index;
-                    index = new IndexT(IndexT::LoadFromPtr(file_handle, file_size));
+                    index = IndexT::LoadFromPtr(file_handle, file_size);
                 } else {
                     UnrecoverableError("BMPHandler::LoadFromPtr: index does not own memory");
                 }
@@ -223,8 +271,7 @@ void BMPHandler::LoadFromPtr(const char *ptr, SizeT file_size) {
                 if constexpr (IndexT::kOwnMem) {
                     UnrecoverableError("BMPHandler::LoadFromPtr: index own memory");
                 } else {
-                    delete index;
-                    index = new IndexT(IndexT::LoadFromPtr(ptr, file_size));
+                    index = IndexT::LoadFromPtr(ptr, file_size);
                 }
             }
         },
@@ -238,7 +285,7 @@ void BMPHandler::Optimize(const BMPOptimizeOptions &options) {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                using IndexT = typename std::remove_pointer_t<T>;
+                using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     index->Optimize(options);
                 } else {
