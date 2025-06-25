@@ -4207,7 +4207,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::DROP_TABLE_V2: {
             auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
 
-            // Check if the database is already dropped in kv store
+            // Check if the table is already dropped in kv store
             String drop_table_key = KeyEncode::DropTableKey(drop_table_cmd->db_id_, drop_table_cmd->table_id_, drop_table_cmd->table_name_);
             String drop_table_commit_ts_str;
             Status status = kv_instance_->Get(drop_table_key, drop_table_commit_ts_str);
@@ -4236,31 +4236,42 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             if (!status.ok()) {
                 return status;
             }
+            LOG_TRACE(fmt::format("Replay drop table: {} with id {} in database {}.",
+                                  drop_table_cmd->table_name_,
+                                  drop_table_cmd->table_id_,
+                                  drop_table_cmd->db_name_));
             break;
         }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
 
-            // Check if the index already exists
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Optional<TableIndexMeeta> table_index_meta;
-            String table_key;
-            String index_key;
-            Status status = GetTableIndexMeta(create_index_cmd->db_name_,
-                                              create_index_cmd->table_name_,
-                                              *create_index_cmd->index_base_->index_name_,
-                                              db_meta,
-                                              table_meta,
-                                              table_index_meta,
-                                              &table_key,
-                                              &index_key);
+            // Check if the index already exists in kv store
+            String index_key = KeyEncode::CatalogIndexKey(create_index_cmd->db_id_,
+                                                          create_index_cmd->table_id_,
+                                                          *create_index_cmd->index_base_->index_name_,
+                                                          commit_ts);
+            String index_id;
+            Status status = kv_instance_->Get(index_key, index_id);
             if (status.ok()) {
-                LOG_WARN(fmt::format("Skipping replay create index: Index {} already exists in table {} of database {}.",
-                                     *create_index_cmd->index_base_->index_name_,
-                                     create_index_cmd->table_name_,
-                                     create_index_cmd->db_name_));
-                break;
+                if (index_id == create_index_cmd->index_id_) {
+                    LOG_WARN(fmt::format("Skipping replay create index: Index {} already exists in table {} of database {}, commit ts: {}, txn: {}.",
+                                         *create_index_cmd->index_base_->index_name_,
+                                         create_index_cmd->table_name_,
+                                         create_index_cmd->db_name_,
+                                         commit_ts,
+                                         txn_id));
+                    break;
+                } else {
+                    LOG_ERROR(fmt::format(
+                        "Replay create index: Index {} already exists in table {} of database {} with different id {}, commit ts: {}, txn: {}.",
+                        *create_index_cmd->index_base_->index_name_,
+                        create_index_cmd->table_name_,
+                        create_index_cmd->db_name_,
+                        index_id,
+                        commit_ts,
+                        txn_id));
+                    return Status::UnexpectedError("Index ID mismatch during replay of index creation.");
+                }
             }
 
             status = CommitCreateIndex(create_index_cmd);
@@ -4272,18 +4283,66 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             ++next_index_id;
             String next_index_id_str = std::to_string(next_index_id);
 
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            String table_key;
+            status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta, &table_key);
+            if (!status.ok()) {
+                return status;
+            }
+
             status = table_meta->SetNextIndexID(next_index_id_str);
             if (!status.ok()) {
                 return status;
             }
+            LOG_TRACE(fmt::format("Replay create index: {} with id {} in table {} of database {}.",
+                                  *create_index_cmd->index_base_->index_name_,
+                                  create_index_cmd->index_id_,
+                                  create_index_cmd->table_name_,
+                                  create_index_cmd->db_name_));
             break;
         }
         case WalCommandType::DROP_INDEX_V2: {
             auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
-            Status status = CommitDropIndex(drop_index_cmd);
+
+            // Check if the index is already dropped in kv store
+            String drop_index_key = KeyEncode::DropTableIndexKey(drop_index_cmd->db_id_,
+                                                                 drop_index_cmd->table_id_,
+                                                                 drop_index_cmd->index_id_,
+                                                                 drop_index_cmd->index_name_);
+            String drop_index_commit_ts_str;
+            Status status = kv_instance_->Get(drop_index_key, drop_index_commit_ts_str);
+            if (status.ok()) {
+                TxnTimeStamp index_commit_ts = std::stoull(drop_index_commit_ts_str);
+                if (index_commit_ts == commit_ts) {
+                    LOG_WARN(fmt::format("Skipping replay drop index: Index {} already dropped in table {} of database {}, commit ts: {}, txn: {}.",
+                                         drop_index_cmd->index_name_,
+                                         drop_index_cmd->table_name_,
+                                         drop_index_cmd->db_name_,
+                                         commit_ts,
+                                         txn_id));
+                    break;
+                } else {
+                    LOG_ERROR(fmt::format(
+                        "Replay drop index: Index {} already dropped in table {} of database {} with different commit ts {}, commit ts: {}, txn: {}.",
+                        drop_index_cmd->index_name_,
+                        drop_index_cmd->table_name_,
+                        drop_index_cmd->db_name_,
+                        index_commit_ts,
+                        commit_ts,
+                        txn_id));
+                    return Status::UnexpectedError("Index commit timestamp mismatch during replay of index drop.");
+                }
+            }
+
+            status = CommitDropIndex(drop_index_cmd);
             if (!status.ok()) {
                 return status;
             }
+            LOG_TRACE(fmt::format("Replay drop index: {} in table {} of database {}.",
+                                  drop_index_cmd->index_name_,
+                                  drop_index_cmd->table_name_,
+                                  drop_index_cmd->db_name_));
             break;
         }
         case WalCommandType::APPEND_V2: {
