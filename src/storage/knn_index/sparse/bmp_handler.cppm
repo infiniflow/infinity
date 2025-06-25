@@ -42,31 +42,31 @@ class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 
-using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
-                                 BMPAlg<f32, i32, BMPCompressType::kRaw> *,
-                                 BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
-                                 BMPAlg<f32, i16, BMPCompressType::kRaw> *,
-                                 BMPAlg<f32, i8, BMPCompressType::kCompressed> *,
-                                 BMPAlg<f32, i8, BMPCompressType::kRaw> *,
-                                 BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
-                                 BMPAlg<f64, i32, BMPCompressType::kRaw> *,
-                                 BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
-                                 BMPAlg<f64, i16, BMPCompressType::kRaw> *,
-                                 BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
-                                 BMPAlg<f64, i8, BMPCompressType::kRaw> *,
+using AbstractBMP = std::variant<SharedPtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
+                                 SharedPtr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
+                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
+                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,
+                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kCompressed>>,
+                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kRaw>>,
+                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kCompressed>>,
+                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kRaw>>,
+                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kCompressed>>,
+                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kRaw>>,
+                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kCompressed>>,
+                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kRaw>>,
 
-                                 BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
-                                 BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+                                 SharedPtr<BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
 
                                  std::nullptr_t>;
 
@@ -74,70 +74,9 @@ export class BMPHandler {
 public:
     BMPHandler() : bmp_(nullptr) {}
     BMPHandler(const void *ptr) : bmp_(*reinterpret_cast<const AbstractBMP *>(ptr)) {}
-    ~BMPHandler();
+    ~BMPHandler() {}
 
-private:
-    template <typename DataType, typename IndexType, BMPOwnMem OwnMem>
-    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {
-        switch (index_bmp->compress_type_) {
-            case BMPCompressType::kCompressed: {
-                using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed, OwnMem>;
-                return static_cast<BMPIndex *>(nullptr);
-            }
-            case BMPCompressType::kRaw: {
-                using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw, OwnMem>;
-                return static_cast<BMPIndex *>(nullptr);
-            }
-            default: {
-                return nullptr;
-            }
-        }
-    }
-
-    template <typename DataType, BMPOwnMem OwnMem>
-    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
-        switch (sparse_info->IndexType()) {
-            case EmbeddingDataType::kElemInt8: {
-                return InitAbstractIndex<DataType, i8, OwnMem>(index_bmp);
-            }
-            case EmbeddingDataType::kElemInt16: {
-                return InitAbstractIndex<DataType, i16, OwnMem>(index_bmp);
-            }
-            case EmbeddingDataType::kElemInt32: {
-                return InitAbstractIndex<DataType, i32, OwnMem>(index_bmp);
-            }
-            default: {
-                return nullptr;
-            }
-        }
-    }
-
-    template <BMPOwnMem OwnMem>
-    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
-        const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
-        const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
-
-        switch (sparse_info->DataType()) {
-            case EmbeddingDataType::kElemFloat: {
-                return InitAbstractIndex<f32, OwnMem>(index_bmp, sparse_info);
-            }
-            case EmbeddingDataType::kElemDouble: {
-                return InitAbstractIndex<f64, OwnMem>(index_bmp, sparse_info);
-            }
-            default: {
-                return nullptr;
-            }
-        }
-    }
-
-public:
-    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true) {
-        if (own_mem) {
-            return InitAbstractIndex<BMPOwnMem::kTrue>(index_base, column_def);
-        } else {
-            return InitAbstractIndex<BMPOwnMem::kFalse>(index_base, column_def);
-        }
-    }
+    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
     BMPHandler(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
 
