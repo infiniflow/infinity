@@ -231,7 +231,7 @@ Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStam
     }
 
     // If the database does not exist, create it
-    status = CommitCreateDB(create_db_cmd);
+    status = PrepareCommitCreateDB(create_db_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -321,7 +321,7 @@ Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp comm
         }
     }
 
-    status = CommitDropDB(drop_db_cmd);
+    status = PrepareCommitDropDB(drop_db_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -466,7 +466,7 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     }
 
     // If the table does not exist, create it
-    status = CommitCreateTable(create_table_cmd);
+    status = PrepareCommitCreateTable(create_table_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -574,7 +574,7 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
         }
     }
 
-    status = CommitDropTable(drop_table_cmd);
+    status = PrepareCommitDropTable(drop_table_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -885,7 +885,7 @@ Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeS
         }
     }
 
-    status = CommitCreateIndex(create_index_cmd);
+    status = PrepareCommitCreateIndex(create_index_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -1022,7 +1022,7 @@ Status NewTxn::ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp c
         }
     }
 
-    status = CommitDropIndex(drop_index_cmd);
+    status = PrepareCommitDropIndex(drop_index_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -1597,7 +1597,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
-                Status status = CommitCreateDB(create_db_cmd);
+                Status status = PrepareCommitCreateDB(create_db_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1609,7 +1609,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
-                Status status = CommitDropDB(drop_db_cmd);
+                Status status = PrepareCommitDropDB(drop_db_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1621,7 +1621,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
-                Status status = CommitCreateTable(create_table_cmd);
+                Status status = PrepareCommitCreateTable(create_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1633,7 +1633,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
-                Status status = CommitDropTable(drop_table_cmd);
+                Status status = PrepareCommitDropTable(drop_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1641,7 +1641,7 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::RENAME_TABLE_V2: {
                 auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
-                Status status = CommitRenameTable(rename_table_cmd);
+                Status status = PrepareCommitRenameTable(rename_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1649,7 +1649,7 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::ADD_COLUMNS_V2: {
                 auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
-                Status status = CommitAddColumns(add_column_cmd);
+                Status status = PrepareCommitAddColumns(add_column_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1657,7 +1657,7 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::DROP_COLUMNS_V2: {
                 auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
-                Status status = CommitDropColumns(drop_column_cmd);
+                Status status = PrepareCommitDropColumns(drop_column_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1669,7 +1669,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
-                Status status = CommitCreateIndex(create_index_cmd);
+                Status status = PrepareCommitCreateIndex(create_index_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1681,7 +1681,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
-                Status status = CommitDropIndex(drop_index_cmd);
+                Status status = PrepareCommitDropIndex(drop_index_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1692,7 +1692,7 @@ Status NewTxn::PrepareCommit() {
                 // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
                 if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
-                    Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                    Status status = PrepareCommitDumpIndex(dump_index_cmd, kv_instance_.get());
                     if (!status.ok()) {
                         return status;
                     }
@@ -1721,7 +1721,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
-                Status status = CommitImport(import_cmd);
+                Status status = PrepareCommitImport(import_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1733,7 +1733,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
-                Status status = CommitCompact(compact_cmd);
+                Status status = PrepareCommitCompact(compact_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1745,7 +1745,7 @@ Status NewTxn::PrepareCommit() {
                     break;
                 }
                 auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-                Status status = CommitCheckpoint(checkpoint_cmd);
+                Status status = PrepareCommitCheckpoint(checkpoint_cmd);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to checkpoint");
                 }
@@ -1854,7 +1854,7 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
     return Status::OK();
 }
 //
-// Status NewTxn::CommitCreateDB() {
+// Status NewTxn::PrepareCommitCreateDB() {
 //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 //
 //    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
@@ -1871,7 +1871,7 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
 //    return Status::OK();
 //}
 
-Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
+Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     Optional<DBMeeta> db_meta;
@@ -1883,7 +1883,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
 
     return Status::OK();
 }
-Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
+Status NewTxn::PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
     String db_key;
     Optional<DBMeeta> db_meta;
@@ -1906,7 +1906,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
+Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1928,7 +1928,7 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
+Status NewTxn::PrepareCommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_id_str = drop_table_cmd->db_id_;
@@ -1949,7 +1949,7 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
+Status NewTxn::PrepareCommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &old_table_key = rename_table_cmd->old_table_key_;
     const String &table_id = rename_table_cmd->table_id_;
@@ -1969,7 +1969,7 @@ Status NewTxn::CommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
+Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
     const String &db_name = add_columns_cmd->db_name_;
     const String &table_name = add_columns_cmd->table_name_;
 
@@ -2004,7 +2004,7 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
+Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
     const String &db_name = drop_columns_cmd->db_name_;
     const String &table_name = drop_columns_cmd->table_name_;
 
@@ -2029,7 +2029,7 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
+Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
@@ -4463,7 +4463,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             if (!status.ok()) {
                 return status;
             }
-            status = CommitImport(import_cmd);
+            status = PrepareCommitImport(import_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -4485,7 +4485,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             if (!status.ok()) {
                 return status;
             }
-            status = CommitCompact(compact_cmd);
+            status = PrepareCommitCompact(compact_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -4502,7 +4502,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         }
         case WalCommandType::CHECKPOINT_V2: {
             auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-            Status status = CommitCheckpoint(checkpoint_cmd);
+            Status status = PrepareCommitCheckpoint(checkpoint_cmd);
             if (!status.ok()) {
                 return status;
             }

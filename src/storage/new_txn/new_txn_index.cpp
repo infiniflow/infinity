@@ -1910,7 +1910,7 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
+Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1984,7 +1984,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
+Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     const String &db_id_str = drop_index_cmd->db_id_;
     const String &table_id_str = drop_index_cmd->table_id_;
@@ -2016,7 +2016,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
+Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = dump_index_cmd->db_id_;

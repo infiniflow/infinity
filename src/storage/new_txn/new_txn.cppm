@@ -500,23 +500,23 @@ public:
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
 private:
-    Status CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
-    Status CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
-    Status CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
-    Status CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd);
-    Status CommitRenameTable(const WalCmdRenameTableV2 *create_table_cmd);
-    Status CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd);
-    Status CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd);
-    Status CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
-    Status CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
-    Status CommitImport(WalCmdImportV2 *import_cmd);
+    Status PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
+    Status PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
+    Status PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
+    Status PrepareCommitDropTable(const WalCmdDropTableV2 *drop_table_cmd);
+    Status PrepareCommitRenameTable(const WalCmdRenameTableV2 *create_table_cmd);
+    Status PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd);
+    Status PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd);
+    Status PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
+    Status PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
+    Status PrepareCommitImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
     Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
     Status RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance);
-    Status CommitCompact(WalCmdCompactV2 *compact_cmd);
-    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
-    Status CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
+    Status PrepareCommitCompact(WalCmdCompactV2 *compact_cmd);
+    Status PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
+    Status PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);

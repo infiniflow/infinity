@@ -1234,7 +1234,7 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
     return Status::OK();
 }
 
-Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
+Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     Status status;
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -1498,7 +1498,7 @@ Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance
     return Status::OK();
 }
 
-Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
+Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     const String &db_id_str = compact_cmd->db_id_;
     const String &table_id_str = compact_cmd->table_id_;
