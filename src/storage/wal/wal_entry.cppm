@@ -974,9 +974,10 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
                         const String &table_id,
                         const Vector<String> &column_names,
                         const Vector<ColumnID> &column_ids,
-                        const String &table_key)
+                        const String &table_key,
+                        const Vector<String> &column_keys)
         : WalCmd(WalCommandType::DROP_COLUMNS_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-          column_names_(column_names), column_ids_(column_ids), table_key_(table_key) {}
+          column_names_(column_names), column_ids_(column_ids), table_key_(table_key), column_keys_(column_keys) {}
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -993,6 +994,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
 
     // Redundant but useful in commit phase.
     String table_key_{};
+    Vector<String> column_keys_{};
 };
 
 export struct WalCmdCleanup : public WalCmd {

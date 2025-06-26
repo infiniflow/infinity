@@ -64,4 +64,8 @@ export SizeT GetSegmentRowCount(KVInstance *kv_instance,
                                 TxnTimeStamp begin_ts,
                                 TxnTimeStamp commit_ts);
 
+export String GetLastPartOfKey(const String& key, char delimiter = '|');
+
+export u64 GetTimestampFromKey(const String& key);
+
 } // namespace infinity

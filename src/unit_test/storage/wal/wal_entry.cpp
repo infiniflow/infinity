@@ -380,8 +380,17 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         Vector<String> column_names;
         column_names.push_back("boolean_col");
         column_names.push_back("embedding_col");
-        entry->cmds_.push_back(
-            MakeShared<WalCmdDropColumnsV2>("db1", "1", "tbl1", "2", std::move(column_names), Vector<ColumnID>{3, 4}, "table_key"));
+        Vector<String> column_keys;
+        column_keys.push_back("column_key1");
+        column_keys.push_back("column_key2");
+        entry->cmds_.push_back(MakeShared<WalCmdDropColumnsV2>("db1",
+                                                               "1",
+                                                               "tbl1",
+                                                               "2",
+                                                               std::move(column_names),
+                                                               Vector<ColumnID>{3, 4},
+                                                               "table_key",
+                                                               std::move(column_keys)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();

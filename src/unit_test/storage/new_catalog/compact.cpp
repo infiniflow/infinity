@@ -1222,7 +1222,7 @@ TEST_P(TestTxnCompact, compact_and_compact) {
         //  t1            compact   commit (success)
         //  |--------------|---------------|
         //                         |------------------|------------------|
-        //                        t2                compact (fail)    rollback
+        //                        t2                compact           commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
         status = txn->Compact(*db_name, *table_name, {0, 1});
@@ -1234,9 +1234,9 @@ TEST_P(TestTxnCompact, compact_and_compact) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
         EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
 
         CheckTable();
         DropDB();
@@ -1247,7 +1247,7 @@ TEST_P(TestTxnCompact, compact_and_compact) {
         //  t1            compact   commit (success)
         //  |--------------|---------------|
         //         |------------------|------------------|
-        //        t2                compact (fail)       rollback
+        //        t2                compact           commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
 
@@ -1257,13 +1257,13 @@ TEST_P(TestTxnCompact, compact_and_compact) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn2);
-        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
 
         CheckTable();
         DropDB();
@@ -1271,10 +1271,10 @@ TEST_P(TestTxnCompact, compact_and_compact) {
     {
         PrepareForCompact();
 
-        //  t1            compact                        commit
+        //  t1            compact                        commit (fail)
         //  |--------------|--------------------------------|
         //         |------------------|------------------|
-        //        t2                compact (fail)      rollback
+        //        t2                compact          commit (success)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
 
@@ -1284,12 +1284,12 @@ TEST_P(TestTxnCompact, compact_and_compact) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_FALSE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         CheckTable();
         DropDB();
