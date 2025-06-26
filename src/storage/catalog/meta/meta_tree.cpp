@@ -958,6 +958,8 @@ bool MetaTree::CheckData(const String &path) {
     static const std::regex re(
         R"(^(?:db_([^/]+))\/(?:tbl_([^/]+))(?:\/idx_([^/]+))?\/seg_(\d+)\/(?:blk_(\d+)|chunk_(\d+))(?:[._](\w+)(?:_(\d+))?)?$)",
         std::regex::optimize | std::regex::icase);
+    // db_{}/tbl_{}/seg_{}/blk_{}/({}.col | version | col_{}_out | trash)
+    // db_{}/tbl_{}/idx_{}/(chunk_{}.idx | ft_{}.pos | ft_{}.dic | ft_{}.len | trash)
     std::smatch m;
     if (!std::regex_match(path, m, re)) {
         return false;
