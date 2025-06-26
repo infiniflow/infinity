@@ -364,13 +364,12 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     return Status::OK();
 }
 
-Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
-    Status status;
+Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+    Status status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
@@ -383,10 +382,8 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
         return status;
     }
 
-    return Status::OK();
+    return PrepareCommitImport(import_cmd);
 }
-
-Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
@@ -491,7 +488,23 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     return DeleteInner(db_name, table_name, *table_meta_opt, row_ids);
 }
 
-Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
+        return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
+                                                delete_cmd->db_id_,
+                                                delete_cmd->table_id_,
+                                                db_meta->db_id_str(),
+                                                table_meta->table_id_str()));
+    }
+
+    return PrepareCommitDelete(delete_cmd, kv_instance_.get());
+}
 
 Status NewTxn::DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids) {
     auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
@@ -752,7 +765,36 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
 }
 
 Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    return Status::OK();
+    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    Status status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta &table_meta = *table_meta_opt;
+
+    for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+        status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    {
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        status = table_meta.RemoveSegmentIDs1(compact_cmd->deprecated_segment_ids_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return PrepareCommitCompact(compact_cmd);
 }
 
 Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset) {

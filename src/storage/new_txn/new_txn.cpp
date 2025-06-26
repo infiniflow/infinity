@@ -4436,21 +4436,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::DELETE_V2: {
             auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
 
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
-            if (!status.ok()) {
-                return status;
-            }
-            if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
-                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
-                                                        delete_cmd->db_id_,
-                                                        delete_cmd->table_id_,
-                                                        db_meta->db_id_str(),
-                                                        table_meta->table_id_str()));
-            }
-
-            status = PrepareCommitDelete(delete_cmd, kv_instance_.get());
+            Status status = ReplayDelete(delete_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4459,11 +4445,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::IMPORT_V2: {
             auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
 
-            Status status = ReplayImport(import_cmd);
-            if (!status.ok()) {
-                return status;
-            }
-            status = PrepareCommitImport(import_cmd);
+            Status status = ReplayImport(import_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4481,11 +4463,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::COMPACT_V2: {
             auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
 
-            Status status = ReplayCompact(compact_cmd);
-            if (!status.ok()) {
-                return status;
-            }
-            status = PrepareCommitCompact(compact_cmd);
+            Status status = ReplayCompact(compact_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
