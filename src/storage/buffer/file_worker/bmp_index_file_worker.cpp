@@ -168,9 +168,9 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     if (from_spill) {
-                        index = new IndexT(IndexT::Load(*file_handle_));
+                        index = IndexT::Load(*file_handle_).release();
                     } else {
-                        index = new IndexT(IndexT::LoadFromPtr(*file_handle_, file_size));
+                        index = IndexT::LoadFromPtr(*file_handle_, file_size).release();
                     }
                 } else {
                     UnrecoverableError("BMPIndexFileWorker::ReadFromFileImpl: index does not own memory");
@@ -201,7 +201,7 @@ bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (!IndexT::kOwnMem) {
                     const auto *p = static_cast<const char *>(ptr);
-                    index = new IndexT(IndexT::LoadFromPtr(p, size));
+                    index = IndexT::LoadFromPtr(p, size).release();
                 } else {
                     UnrecoverableError("BMPIndexFileWorker::ReadFromMmapImpl: index own memory");
                 }
