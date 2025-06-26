@@ -144,8 +144,7 @@ public:
                                                     const String &table_id,
                                                     SegmentID segment_id,
                                                     BlockID block_id,
-                                                    ColumnID column_id,
-                                                    TxnTimeStamp ts);
+                                                    ColumnID column_id);
     static String CatalogTableSegmentBlockColumnKeyPrefix(const String &db_id,
                                                           const String &table_id,
                                                           SegmentID segment_id,

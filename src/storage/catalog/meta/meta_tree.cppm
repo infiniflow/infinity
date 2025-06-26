@@ -126,12 +126,22 @@ export struct MetaPmObject final : public MetaObject {
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
+    struct TupleHash {
+        SizeT operator()(const Tuple<String, String, ColumnID> &s) const noexcept {
+            SizeT h1 = std::hash<String>{}(std::get<0>(s));
+            SizeT h2 = std::hash<String>{}(std::get<1>(s));
+            SizeT h3 = std::hash<ColumnID>{}(std::get<2>(s));
+            return (h1 ^ (h2 << 1)) ^ (h3 << 1);
+        }
+    };
+
 public:
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
+    bool CheckData(const String &path);
     HashSet<String> GetMetaPathSet();
     static HashSet<String> GetDataVfsPathSet();
     static HashSet<String> GetDataVfsOffPathSet();
-    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str);
+    Vector<String> CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str);
 
     Vector<MetaTableObject *> ListTables() const;
     SharedPtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
@@ -141,6 +151,10 @@ public:
     Map<String, String> system_tag_map_{};
     Map<String, SharedPtr<MetaDBObject>> db_map_{};
     Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
+    Vector<SharedPtr<MetaKey>> metas_;
+    HashMap<String, Tuple<String, String, ColumnID>> out_;
+    HashMap<String, Tuple<String, String, ColumnID>> index_;
+    HashSet<Tuple<String, String, ColumnID>, TupleHash> col_;
 };
 
 } // namespace infinity

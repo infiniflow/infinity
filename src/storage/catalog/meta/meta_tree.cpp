@@ -16,6 +16,7 @@ module;
 
 #include <filesystem>
 #include <ranges>
+#include <regex>
 
 module meta_tree;
 
@@ -40,11 +41,13 @@ import check_statement;
 import kv_utility;
 import kv_store;
 import new_txn_manager;
+import utility;
 
 namespace infinity {
 
 SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys) {
     SharedPtr<MetaTree> meta_tree = MakeShared<MetaTree>();
+    meta_tree->metas_ = meta_keys; // copy
     SizeT meta_count = meta_keys.size();
     // Get all dbs
     HashSet<String> db_names, db_ids;
@@ -962,6 +965,241 @@ HashSet<String> MetaTree::GetMetaPathSet() {
     return meta_path_set;
 }
 
+// bool MetaTree::CheckData(const String &path) {
+//     auto all_fields = infinity::Partition(path, '/');
+//     LOG_INFO(fmt::format("***** {}", path));
+//     String db_id_str;
+//     String table_id_str;
+//     String index_id_str;
+//     SegmentID segment_id;
+//     BlockID block_id;
+//     for (const auto &field : all_fields) {
+//         auto entity_and_id = infinity::Partition(field, '_');
+//         if (entity_and_id[0] == "db") {
+//             db_id_str = entity_and_id[1];
+//         } else if (entity_and_id[0] == "tbl") {
+//             table_id_str = entity_and_id[1];
+//         } else if (entity_and_id[0] == "idx") {
+//             index_id_str = entity_and_id[1];
+//         } else if (entity_and_id[0] == "seg") { // duplicate check? Even if use regex
+//             segment_id = static_cast<SegmentID>(std::stoull(entity_and_id[1]));
+//         } else if (entity_and_id[0] == "blk") { // duplicate check? Even if use regex
+//             block_id = static_cast<BlockID>(std::stoull(entity_and_id[1]));
+//         } else {
+//             if (index_id_str.empty()) {
+//                 ColumnID column_id;
+//                 auto last_field_str = infinity::Partition(field, '.');
+//                 auto last_field_str_size = last_field_str.size();
+//                 if (last_field_str_size == 1) {
+//                     auto double_col_vec = infinity::Partition(field, '_');
+//                     if (double_col_vec[0] == "version") {                                  // version
+//                         return false;                                                      // if dont have any col?
+//                     } else if (double_col_vec[0] == "col" && double_col_vec[2] == "out") { // col_{}_out
+//                         try {
+//                             column_id = static_cast<ColumnID>(std::stoull(double_col_vec[1]));
+//                         } catch (...) {
+//                             return true;
+//                         }
+//                         out_[path] = {db_id_str, table_id_str, column_id};
+//                         return true;
+//                     } else {
+//                         return true;
+//                     }
+//                 } else if (last_field_str_size == 2 && last_field_str[1] == "col") { // {}.col
+//                     try {
+//                         column_id = static_cast<ColumnID>(std::stoull(last_field_str[0]));
+//                     } catch (...) { // not a column id
+//                         return true;
+//                     }
+//
+//                     bool ret_flag = false;
+//                     // check catalog|seg(db|tbl|seg: commit_ts)
+//                     {
+//                         auto new_end = std::find_if(metas_.begin(), metas_.end(), [&](const auto &meta) {
+//                             if (meta->type_ != MetaType::kSegment) {
+//                                 return false;
+//                             }
+//                             auto *segment_meta = static_cast<SegmentMetaKey *>(meta.get());
+//                             return segment_meta->db_id_str_ == db_id_str && segment_meta->table_id_str_ == table_id_str &&
+//                                    segment_meta->segment_id_ == segment_id;
+//                         });
+//                         ret_flag |= (new_end == metas_.end());
+//                     }
+//
+//                     // check catalog|blk(db|tbl|seg|blk: commit_ts)
+//                     {
+//                         auto new_end = std::find_if(metas_.begin(), metas_.end(), [&](const auto &meta) {
+//                             if (meta->type_ != MetaType::kBlock) {
+//                                 return false;
+//                             }
+//                             auto *block_meta = static_cast<BlockMetaKey *>(meta.get());
+//                             return block_meta->db_id_str_ == db_id_str && block_meta->table_id_str_ == table_id_str &&
+//                                    block_meta->segment_id_ == segment_id && block_meta->block_id_ == block_id;
+//                         });
+//                         ret_flag |= (new_end == metas_.end());
+//                     }
+//
+//                     // check tbl|col
+//                     {
+//                         auto new_end = std::find_if(metas_.begin(), metas_.end(), [&](const auto &meta) {
+//                             if (meta->type_ != MetaType::kTableColumn) {
+//                                 return false;
+//                             }
+//                             auto *table_column_meta = static_cast<TableColumnMetaKey *>(meta.get());
+//                             auto json = table_column_meta->ToJson();
+//                             auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
+//                             return table_column_meta->db_id_str_ == db_id_str && table_column_meta->table_id_str_ == table_id_str &&
+//                                    meta_column_id == column_id;
+//                         });
+//                         ret_flag |= (new_end == metas_.end());
+//                     }
+//
+//                     if (!ret_flag) {
+//                         col_.emplace(db_id_str, table_id_str, column_id);
+//                     }
+//                     return ret_flag;
+//                 }
+//                 /* else {
+//                  *      trash file
+//                  * }
+//                  */
+//             } else {
+//                 ChunkID chunk_id;
+//                 auto last_field_str_size = entity_and_id.size();
+//                 if (last_field_str_size == 2) {
+//                     auto double_col_vec = infinity::Partition(entity_and_id[1], '.');
+//                     if (double_col_vec[1] == "dic" || double_col_vec[1] == "pos" || double_col_vec[1] == "len") { // .dic .pos .len
+//                         return false;
+//                     } else if (double_col_vec[1] == "idx") {                             // .idx
+//                         chunk_id = static_cast<ChunkID>(std::stoull(double_col_vec[0])); // need try catch
+//
+//                         bool ret_flag = false;
+//                         // check idx_seg(db|tbl|idx|seg: commit_ts)
+//                         {
+//                             auto new_end = std::find_if(metas_.begin(), metas_.end(), [&](const auto &meta) {
+//                                 if (meta->type_ != MetaType::kSegmentIndex) {
+//                                     return false;
+//                                 }
+//                                 auto *segment_index_meta = static_cast<SegmentIndexMetaKey *>(meta.get());
+//                                 return segment_index_meta->db_id_str_ == db_id_str && segment_index_meta->table_id_str_ == table_id_str &&
+//                                        segment_index_meta->index_id_str_ == index_id_str && segment_index_meta->segment_id_ == segment_id;
+//                             });
+//                             ret_flag |= (new_end == metas_.end());
+//                         }
+//
+//                         // check idx_chunk(db|tbl|idx|seg|chunk: commit_ts)
+//                         {
+//                             auto new_end = std::find_if(metas_.begin(), metas_.end(), [&](const auto &meta) {
+//                                 if (meta->type_ != MetaType::kChunkIndex) {
+//                                     return false;
+//                                 }
+//                                 auto *chunk_index_meta = static_cast<ChunkIndexMetaKey *>(meta.get());
+//                                 return chunk_index_meta->db_id_str_ == db_id_str && chunk_index_meta->table_id_str_ == table_id_str &&
+//                                        chunk_index_meta->segment_id_ == segment_id && chunk_index_meta->chunk_id_ == chunk_id;
+//                             });
+//                             ret_flag |= (new_end == metas_.end());
+//                         }
+//
+//                         // check idx
+//                         {
+//                             auto new_end = std::find_if(metas_.begin(), metas_.end(), [&](const auto &meta) {
+//                                 if (meta->type_ != MetaType::kTableIndex) {
+//                                     return false;
+//                                 }
+//                                 auto *table_index_meta = static_cast<TableIndexMetaKey *>(meta.get());
+//                                 return table_index_meta->db_id_str_ == db_id_str && table_index_meta->table_id_str_ == table_id_str &&
+//                                        table_index_meta->index_id_str_ == index_id_str;
+//                             });
+//                             ret_flag |= (new_end == metas_.end());
+//                         }
+//
+//                         if (!ret_flag) {
+//                             index_[path] = {db_id_str, table_id_str, 0 /* column_id */}; // use index_base to get column id
+//                         }
+//                         return ret_flag;
+//                     } else { // trash file
+//                         return true;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     return true;
+// }
+
+template <typename Pred>
+bool exist_in_metas(const Vector<SharedPtr<MetaKey>> &metas, MetaType want_type, Pred pred) {
+    return std::any_of(metas.begin(), metas.end(), [&](auto &m) { return m->type_ == want_type && pred(m.get()); });
+}
+
+bool MetaTree::CheckData(const String &path) {
+    LOG_INFO(path);
+    static const std::regex re(
+        R"(^(?:db_([^/]+))\/(?:tbl_([^/]+))(?:\/idx_([^/]+))?\/seg_(\d+)\/(?:blk_(\d+)|chunk_(\d+))(?:[._](\w+)(?:_(\d+))?)?$)",
+        std::regex::ECMAScript | std::regex::optimize | std::regex::icase
+    );
+    std::smatch m;
+    if (!std::regex_match(path, m, re)) {
+        return false;
+    }
+
+    String db = m[1];
+    String tbl = m[2];
+    String idx = m[3].matched ? m[3] : String{};
+    SegmentID seg = static_cast<SegmentID>(std::stoull(m[4]));
+    BlockID blk = m[5].matched ? static_cast<BlockID>(std::stoull(m[5])) : INVALID_BLOCK_ID;
+    String suf = m[6].matched ? m[6] : String{};
+    String idstr = m[7].matched ? m[7] : String{};
+
+    if ((suf == "dic" || suf == "pos" || suf == "len" || suf.empty()) && idx.empty()) {
+        return false;
+    }
+
+    if (suf == "col" && path.rfind("_out") == path.size() - 4) {
+        ColumnID cid = static_cast<ColumnID>(std::stoull(idstr));
+        out_[path] = {db, tbl, cid};
+        return true;
+    }
+
+    if (idstr == "col" && idx.empty()) {
+        ColumnID cid = static_cast<ColumnID>(std::stoull(suf));
+        bool miss = !exist_in_metas(metas_, MetaType::kSegment, [&](MetaKey *b) {
+            auto *k = static_cast<SegmentMetaKey *>(b);
+            return k->db_id_str_ == db && k->table_id_str_ == tbl && k->segment_id_ == seg;
+        }) || !exist_in_metas(metas_, MetaType::kBlock, [&](MetaKey *b) {
+            auto *k = static_cast<BlockMetaKey *>(b);
+            return k->db_id_str_ == db && k->table_id_str_ == tbl && k->segment_id_ == seg && k->block_id_ == blk;
+        }) || !exist_in_metas(metas_, MetaType::kTableColumn, [&](MetaKey *b) {
+            auto *k = static_cast<TableColumnMetaKey *>(b);
+            return k->db_id_str_ == db && k->table_id_str_ == tbl && k->column_name_ == idstr;
+        });
+
+        if (!miss)
+            col_.emplace(db, tbl, cid);
+        return miss;
+    }
+
+    if (idstr == "idx" && !idx.empty()) {
+        ChunkID ck = static_cast<ChunkID>(std::stoull(suf));
+        bool miss = !exist_in_metas(metas_, MetaType::kSegmentIndex, [&](MetaKey *b) {
+            auto *k = static_cast<SegmentIndexMetaKey *>(b);
+            return k->db_id_str_ == db && k->table_id_str_ == tbl && k->index_id_str_ == idx && k->segment_id_ == seg;
+        }) || !exist_in_metas(metas_, MetaType::kChunkIndex, [&](MetaKey *b) {
+            auto *k = static_cast<ChunkIndexMetaKey *>(b);
+            return k->db_id_str_ == db && k->table_id_str_ == tbl && k->segment_id_ == seg && k->chunk_id_ == ck;
+        }) || !exist_in_metas(metas_, MetaType::kTableIndex, [&](MetaKey *b) {
+            auto *k = static_cast<TableIndexMetaKey *>(b);
+            return k->db_id_str_ == db && k->table_id_str_ == tbl && k->index_id_str_ == idx;
+        });
+
+        if (!miss)
+            index_[path] = {db, tbl, 0};
+        return miss;
+    }
+
+    return true;
+}
+
 HashSet<String> MetaTree::GetDataVfsPathSet() {
     HashSet<String> data_path_set;
     const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
@@ -973,37 +1211,44 @@ HashSet<String> MetaTree::GetDataVfsPathSet() {
 
 HashSet<String> MetaTree::GetDataVfsOffPathSet() {
     HashSet<String> data_path_set;
-    auto data_dir = InfinityContext::instance().config()->DataDir();
+    Path data_dir = InfinityContext::instance().config()->DataDir();
+
     for (const auto &entry : std::filesystem::recursive_directory_iterator{data_dir}) {
-        if (std::filesystem::is_regular_file(entry)) {
-            data_path_set.emplace(entry.path().string());
+        if (entry.is_regular_file()) {
+            Path rel = std::filesystem::relative(entry.path(), data_dir);
+            data_path_set.emplace(rel.string());
         }
     }
     return data_path_set;
 }
 
-Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str) {
-    auto meta_path_set = this->GetMetaPathSet();
-    auto data_path_set = is_vfs ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
+Vector<String> MetaTree::CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str) {
+    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
+    auto data_path_set = pm != nullptr ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
 
-    meta_path_set.merge(data_path_set);
-
-    Pair<Vector<String>, Vector<String>> mismatch_entries_pair;
-    auto &[meta_mismatch_entry, data_mismatch_entry] = mismatch_entries_pair;
-
-    for (auto &path : meta_path_set) {
-        if (PathFilter(path, tag, db_table_str) && !data_path_set.contains(path)) {
-            meta_mismatch_entry.emplace_back(path);
-        }
-    }
+    Vector<String> data_mismatch_entry;
 
     for (auto &path : data_path_set) {
-        if (PathFilter(path, tag, db_table_str) && !meta_path_set.contains(path)) {
+        if (CheckData(path) && PathFilter(path, tag, db_table_str)) {
             data_mismatch_entry.emplace_back(path);
         }
     }
 
-    return mismatch_entries_pair;
+    auto iter = data_mismatch_entry.end();
+
+    for (const auto &[key, value] : out_) {
+        if (col_.contains(value)) {
+            iter = std::remove(data_mismatch_entry.begin(), iter, key);
+        }
+    }
+    for (const auto &[key, value] : index_) {
+        if (col_.contains(value)) {
+            iter = std::remove(data_mismatch_entry.begin(), iter, key);
+        }
+    }
+    data_mismatch_entry.erase(iter, data_mismatch_entry.end());
+
+    return data_mismatch_entry;
 }
 
 } // namespace infinity

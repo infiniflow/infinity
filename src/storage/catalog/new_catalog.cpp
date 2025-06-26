@@ -384,6 +384,7 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
 
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const auto &pair = all_key_values[idx];
+        LOG_ERROR(fmt::format("{} {}", pair.first, pair.second));
         SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
         if (meta_key == nullptr) {
             LOG_ERROR(fmt::format("Can't parse {}: {}: {}", idx, pair.first, pair.second));

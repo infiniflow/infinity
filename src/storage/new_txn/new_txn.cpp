@@ -3898,6 +3898,11 @@ Status NewTxn::Cleanup() {
     }
     if (metas.empty()) {
         LOG_TRACE("SIP cleanup, no data need to clean.");
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        auto data_dir_str = buffer_mgr->GetFullDataDir();
+        auto data_dir = static_cast<Path>(*data_dir_str);
+        // Delete empty dir
+        VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
         return Status::OK();
     }
 

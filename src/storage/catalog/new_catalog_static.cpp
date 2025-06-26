@@ -54,7 +54,7 @@ namespace infinity {
 
 // namespace {
 
-// String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
+// String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 
 // } // namespace
 
@@ -920,8 +920,7 @@ Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT co
                                                                        table_meta.table_id_str(),
                                                                        segment_meta.segment_id(),
                                                                        block_meta.block_id(),
-                                                                       column_idx,
-                                                                       commit_ts);
+                                                                       column_idx);
     String commit_ts_str = fmt::format("{}", commit_ts);
     Status status = kv_instance.Put(block_id_key, commit_ts_str);
     // {

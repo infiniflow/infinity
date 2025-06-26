@@ -48,7 +48,7 @@ namespace infinity {
 
 namespace {
 
-String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
+String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 
 } // namespace
 
@@ -108,13 +108,12 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         column_def = std::move(col_def);
     }
 
-    SegmentID segment_id = segment_index_meta_.segment_id();
     SharedPtr<String> index_dir = segment_index_meta_.GetSegmentIndexDir();
     {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         switch (index_base->index_type_) {
             case IndexType::kSecondary: {
-                auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+                auto secondary_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
                 auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                               MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                               index_dir,
@@ -138,7 +137,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 break;
             }
             case IndexType::kIVF: {
-                auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+                auto ivf_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
                 auto index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                         MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                         index_dir,
@@ -150,7 +149,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 break;
             }
             case IndexType::kHnsw: {
-                auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+                auto hnsw_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
                 auto index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                     index_dir,
@@ -163,7 +162,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 break;
             }
             case IndexType::kBMP: {
-                auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+                auto bmp_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
                 auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                   index_dir,
@@ -176,7 +175,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 break;
             }
             case IndexType::kEMVB: {
-                auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+                auto emvb_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
                 const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
                 auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -209,7 +208,6 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
 Status ChunkIndexMeta::LoadSet() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
-    SegmentID segment_id = segment_index_meta_.segment_id();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
     Status status = this->GetChunkInfo(chunk_info_ptr);
@@ -233,7 +231,7 @@ Status ChunkIndexMeta::LoadSet() {
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto secondary_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                           MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                           index_dir,
@@ -257,7 +255,7 @@ Status ChunkIndexMeta::LoadSet() {
             break;
         }
         case IndexType::kIVF: {
-            auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto ivf_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             auto index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                     index_dir,
@@ -269,7 +267,7 @@ Status ChunkIndexMeta::LoadSet() {
             break;
         }
         case IndexType::kHnsw: {
-            auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto hnsw_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             auto index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                 index_dir,
@@ -282,7 +280,7 @@ Status ChunkIndexMeta::LoadSet() {
             break;
         }
         case IndexType::kBMP: {
-            auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto bmp_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                               MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                               index_dir,
@@ -295,7 +293,7 @@ Status ChunkIndexMeta::LoadSet() {
             break;
         }
         case IndexType::kEMVB: {
-            auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto emvb_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             const auto segment_start_offset = base_row_id.segment_offset_;
             auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -322,7 +320,6 @@ Status ChunkIndexMeta::LoadSet() {
 Status ChunkIndexMeta::RestoreSet() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
-    SegmentID segment_id = segment_index_meta_.segment_id();
 
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
     Status status = this->GetChunkInfo(chunk_info_ptr);
@@ -346,7 +343,7 @@ Status ChunkIndexMeta::RestoreSet() {
     UniquePtr<FileWorker> index_file_worker;
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto secondary_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                      index_dir,
@@ -368,7 +365,7 @@ Status ChunkIndexMeta::RestoreSet() {
             break;
         }
         case IndexType::kIVF: {
-            auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto ivf_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                index_dir,
@@ -379,7 +376,7 @@ Status ChunkIndexMeta::RestoreSet() {
             break;
         }
         case IndexType::kHnsw: {
-            auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto hnsw_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                            MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                            index_dir,
@@ -391,7 +388,7 @@ Status ChunkIndexMeta::RestoreSet() {
             break;
         }
         case IndexType::kBMP: {
-            auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto bmp_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             index_file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                index_dir,
@@ -403,7 +400,7 @@ Status ChunkIndexMeta::RestoreSet() {
             break;
         }
         case IndexType::kEMVB: {
-            auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id_));
+            auto emvb_index_file_name = MakeShared<String>(IndexFileName(chunk_id_));
             const auto segment_start_offset = base_row_id.segment_offset_;
             index_file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -535,7 +532,7 @@ Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
         case IndexType::kIVF:
         case IndexType::kSecondary:
         case IndexType::kBMP: {
-            String file_name = IndexFileName(segment_index_meta_.segment_id(), chunk_id_);
+            String file_name = IndexFileName(chunk_id_);
             String file_path = fmt::format("{}/{}", *index_dir, file_name);
             paths.push_back(file_path);
             break;
@@ -570,14 +567,13 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
     if (!index_status.ok()) {
         return index_status;
     }
-    SegmentID segment_id = segment_index_meta_.segment_id();
     switch (index_def->index_type_) {
         case IndexType::kSecondary:
         case IndexType::kIVF:
         case IndexType::kHnsw:
         case IndexType::kBMP:
         case IndexType::kEMVB: {
-            String index_file_name = IndexFileName(segment_id, chunk_id_);
+            String index_file_name = IndexFileName(chunk_id_);
             String index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
             if (index_buffer_ == nullptr) {
