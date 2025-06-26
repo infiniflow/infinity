@@ -136,6 +136,7 @@ public:
     HashMap<String, ObjStat> GetAllObjects() const override;
 
 private:
+    mutable std::shared_mutex mutex_{}; // protect obj_map_
     HashMap<String, ObjStat> obj_map_{};
 };
 
@@ -171,12 +172,13 @@ public:
     SizeT disk_used() const { return disk_used_; }
 
 private:
-    bool Envict(Vector<String> &drop_keys);
+    bool EnvictNoLock(Vector<String> &drop_keys);
 
 private:
-    ObjectStatMap obj_map_{};
-
     const SizeT disk_capacity_limit_{};
+
+    mutable std::shared_mutex mutex_{}; // protect obj_map_, disk_used_
+    ObjectStatMap obj_map_{};
     SizeT disk_used_{};
 };
 
