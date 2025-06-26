@@ -987,14 +987,14 @@ bool MetaTree::CheckData(const String &path) {
         if (suf_id == "col" && idx.empty()) {
             ColumnID cid = static_cast<ColumnID>(std::stoull(suf));
             bool miss = !ExistInMetas(MetaType::kSegment, [&](MetaKey *b) {
-                auto *k = static_cast<SegmentMetaKey *>(b);
-                return k->db_id_str_ == db && k->table_id_str_ == tbl && k->segment_id_ == seg;
+                auto *segment_meta = static_cast<SegmentMetaKey *>(b);
+                return segment_meta->db_id_str_ == db && segment_meta->table_id_str_ == tbl && segment_meta->segment_id_ == seg;
             }) || !ExistInMetas(MetaType::kBlock, [&](MetaKey *b) {
-                auto *k = static_cast<BlockMetaKey *>(b);
-                return k->db_id_str_ == db && k->table_id_str_ == tbl && k->segment_id_ == seg && k->block_id_ == blk;
+                auto *block_meta = static_cast<BlockMetaKey *>(b);
+                return block_meta->db_id_str_ == db && block_meta->table_id_str_ == tbl && block_meta->segment_id_ == seg && block_meta->block_id_ == blk;
             }) || !ExistInMetas(MetaType::kTableColumn, [&](MetaKey *b) {
-                auto *k = static_cast<TableColumnMetaKey *>(b);
-                return k->db_id_str_ == db && k->table_id_str_ == tbl && k->column_name_ == suf_id;
+                auto *table_column_meta = static_cast<TableColumnMetaKey *>(b);
+                return table_column_meta->db_id_str_ == db && table_column_meta->table_id_str_ == tbl && table_column_meta->column_name_ == suf_id;
             });
 
             if (!miss)
