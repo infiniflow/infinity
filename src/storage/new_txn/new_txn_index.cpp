@@ -1084,6 +1084,8 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     return Status::OK();
 }
 
+Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt) {
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {

@@ -386,6 +386,8 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
     return Status::OK();
 }
 
+Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
 
@@ -746,6 +748,10 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
         }
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     return Status::OK();
 }
 
