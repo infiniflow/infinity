@@ -419,6 +419,8 @@ Status NewTxn::Append(const TableInfo &table_info, const SharedPtr<DataBlock> &i
     return Append(*table_info.db_name_, *table_info.table_name_, input_block);
 }
 
+Status NewTxn::ReplayAppend(WalCmdAppendV2 *append_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+
 Status NewTxn::AppendInner(const String &db_name,
                            const String &table_name,
                            const String &table_key,
@@ -486,6 +488,8 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
 
     return DeleteInner(db_name, table_name, *table_meta_opt, row_ids);
 }
+
+Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids) {
     auto delete_command = MakeShared<WalCmdDeleteV2>(db_name, table_meta.db_id_str(), table_name, table_meta.table_id_str(), row_ids);
