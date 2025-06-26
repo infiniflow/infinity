@@ -543,6 +543,8 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
 Status NewTxn::Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
 
     //    LOG_INFO(fmt::format("Start to compact segment ids: {}", segment_ids.size()));
+    LOG_INFO(fmt::format("Compact db_name: {}, table_name: {}, segment ids: {}", db_name, table_name, fmt::join(segment_ids, " ")));
+
     this->SetTxnType(TransactionType::kCompact);
 
     this->CheckTxn(db_name);
@@ -1553,7 +1555,7 @@ Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
                     kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
                 }
             }
-            status = table_index_meta.RemoveSegmentIndexIDs(*segment_ids_ptr);
+            status = table_index_meta.RemoveSegmentIndexIDs(deprecated_ids);
             if (!status.ok()) {
                 return status;
             }
