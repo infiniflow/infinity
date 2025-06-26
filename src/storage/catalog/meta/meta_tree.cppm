@@ -135,10 +135,14 @@ export struct MetaTree {
         }
     };
 
+    template <typename Pred>
+    bool ExistInMetas(MetaType want_type, Pred pred) {
+        return std::any_of(metas_.begin(), metas_.end(), [&](auto &m) { return m->type_ == want_type && pred(m.get()); });
+    }
+
 public:
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
     bool CheckData(const String &path);
-    HashSet<String> GetMetaPathSet();
     static HashSet<String> GetDataVfsPathSet();
     static HashSet<String> GetDataVfsOffPathSet();
     Vector<String> CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str);
