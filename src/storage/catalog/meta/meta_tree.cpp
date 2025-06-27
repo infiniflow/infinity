@@ -960,7 +960,7 @@ bool MetaTree::ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey
     return std::any_of(metas_.begin(), metas_.end(), [&](auto &meta) { return meta->type_ == meta_type && predicate(meta.get()); });
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeColumnPredicate(const String &db_id_str, const String &table_id_str, ColumnID column_id) {
+std::function<bool(MetaKey *)> MetaTree::MakeColumnPredicate(std::string_view db_id_str, std::string_view table_id_str, ColumnID column_id) {
     return [=](MetaKey *meta) {
         auto *table_column_meta = static_cast<TableColumnMetaKey *>(meta);
         auto json = table_column_meta->ToJson();
@@ -970,7 +970,7 @@ std::function<bool(MetaKey *)> MetaTree::MakeColumnPredicate(const String &db_id
 }
 
 std::function<bool(MetaKey *)>
-MetaTree::MakeBlockPredicate(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) {
+MetaTree::MakeBlockPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id, BlockID block_id) {
     return [=](MetaKey *meta) {
         auto *block_meta = static_cast<BlockMetaKey *>(meta);
         return block_meta->db_id_str_ == db_id_str && block_meta->table_id_str_ == table_id_str && block_meta->segment_id_ == segment_id &&
@@ -978,7 +978,7 @@ MetaTree::MakeBlockPredicate(const String &db_id_str, const String &table_id_str
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeSegmentPredicate(const String &db_id_str, const String &table_id_str, SegmentID segment_id) {
+std::function<bool(MetaKey *)> MetaTree::MakeSegmentPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id) {
     return [=](MetaKey *meta) {
         auto *segment_meta = static_cast<SegmentMetaKey *>(meta);
         return segment_meta->db_id_str_ == db_id_str && segment_meta->table_id_str_ == table_id_str && segment_meta->segment_id_ == segment_id;
@@ -986,7 +986,7 @@ std::function<bool(MetaKey *)> MetaTree::MakeSegmentPredicate(const String &db_i
 }
 
 std::function<bool(MetaKey *)>
-MetaTree::MakeSegmentIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) {
+MetaTree::MakeSegmentIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str, SegmentID segment_id) {
     return [=](MetaKey *meta) {
         auto *seg_idx = static_cast<SegmentIndexMetaKey *>(meta);
         return seg_idx->db_id_str_ == db_id_str && seg_idx->table_id_str_ == table_id_str && seg_idx->index_id_str_ == index_id_str &&
@@ -994,9 +994,9 @@ MetaTree::MakeSegmentIndexPredicate(const String &db_id_str, const String &table
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPredicate(const String &db_id_str,
-                                                                 const String &table_id_str,
-                                                                 const String &index_id_str,
+std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPredicate(std::string_view db_id_str,
+                                                                 std::string_view table_id_str,
+                                                                 std::string_view index_id_str,
                                                                  SegmentID segment_id,
                                                                  ChunkID chunk_id) {
     return [=](MetaKey *meta) {
@@ -1006,7 +1006,8 @@ std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPredicate(const String &d
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeTableIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str) {
+std::function<bool(MetaKey *)>
+MetaTree::MakeTableIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str) {
     return [=](MetaKey *meta) {
         auto *tbl_idx = static_cast<TableIndexMetaKey *>(meta);
         return tbl_idx->db_id_str_ == db_id_str && tbl_idx->table_id_str_ == table_id_str && tbl_idx->index_id_str_ == index_id_str;

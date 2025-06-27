@@ -128,20 +128,24 @@ export struct MetaTree {
 
     [[nodiscard]] bool ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &pred) const;
 
-    static std::function<bool(MetaKey *)> MakeColumnPredicate(const String &db_id_str, const String &table_id_str, ColumnID column_id);
+    static std::function<bool(MetaKey *)> MakeColumnPredicate(std::string_view db_id_str, std::string_view table_id_str, ColumnID column_id);
 
     static std::function<bool(MetaKey *)>
-    MakeBlockPredicate(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id);
+    MakeBlockPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id, BlockID block_id);
 
-    static std::function<bool(MetaKey *)> MakeSegmentPredicate(const String &db_id_str, const String &table_id_str, SegmentID segment_id);
-
-    static std::function<bool(MetaKey *)>
-    MakeSegmentIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id);
+    static std::function<bool(MetaKey *)> MakeSegmentPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id);
 
     static std::function<bool(MetaKey *)>
-    MakeChunkIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id, ChunkID chunk_id);
+    MakeSegmentIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str, SegmentID segment_id);
 
-    static std::function<bool(MetaKey *)> MakeTableIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str);
+    static std::function<bool(MetaKey *)> MakeChunkIndexPredicate(std::string_view db_id_str,
+                                                                  std::string_view table_id_str,
+                                                                  std::string_view index_id_str,
+                                                                  SegmentID segment_id,
+                                                                  ChunkID chunk_id);
+
+    static std::function<bool(MetaKey *)>
+    MakeTableIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str);
 
 public:
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
