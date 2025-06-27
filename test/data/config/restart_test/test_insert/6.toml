@@ -13,6 +13,6 @@ cleanup_interval         = "0s"
 compact_interval         = "0s"
 [buffer]
 [wal]
-full_checkpoint_interval = "0s"
+checkpoint_interval = "0s"
 
 [resource]

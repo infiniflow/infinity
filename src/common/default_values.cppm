@@ -118,10 +118,10 @@ export {
     constexpr std::string_view DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";              // 1GB
     constexpr i64 MAX_WAL_FILE_SIZE_THRESHOLD = 1024l * DEFAULT_WAL_FILE_SIZE_THRESHOLD; // 1TB
 
-    constexpr i64 MIN_FULL_CHECKPOINT_INTERVAL_SEC = 0;                          // 0 means disable full checkpoint
-    constexpr i64 DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC = 30;                     // 30 seconds
-    constexpr std::string_view DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
-    constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30;          // 1 month
+    constexpr i64 MIN_CHECKPOINT_INTERVAL_SEC = 0;                          // 0 means disable checkpoint
+    constexpr i64 DEFAULT_CHECKPOINT_INTERVAL_SEC = 30;                     // 30 seconds
+    constexpr std::string_view DEFAULT_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
+    constexpr i64 MAX_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30;          // 1 month
 
     constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024;                      // 1K
     constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l;      // 64 MB
@@ -288,7 +288,7 @@ export {
 
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
-    constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";
+    constexpr std::string_view CHECKPOINT_INTERVAL_OPTION_NAME = "checkpoint_interval";
 
     constexpr std::string_view WAL_FLUSH_OPTION_NAME = "wal_flush";
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";

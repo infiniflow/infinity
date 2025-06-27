@@ -196,9 +196,9 @@ cache_result_capacity        = 100
 [wal]
 # The directory containing the WAL files
 wal_dir                       = "/var/infinity/wal"
-# Interval between full checkpoints
+# Interval between checkpoints
 # Range: ["0s", "720h"]
-full_checkpoint_interval      = "86400s"
+checkpoint_interval      = "86400s"
 
 # Size threshold for triggering a compaction on a WAL file
 # When the size of a WAL file exceeds this threshold, the system will perform compaction.

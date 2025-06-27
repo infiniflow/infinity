@@ -2403,7 +2403,7 @@ The response includes a JSON object like the following:
     "cpu_limit":"16",
     "data_dir":"/var/infinity/data",
     "error_code":0,
-    "full_checkpoint_interval":"30",
+    "checkpoint_interval":"30",
     "http_port":"23820",
     "log_dir":"/var/infinity/log",
     "log_file_max_size":"1073741824",
@@ -2910,7 +2910,7 @@ The response includes a JSON object like the following:
         {
             "command_type":"CHECKPOINT",
             "commit_ts":"1",
-            "text":"catalog path: catalog/FULL.82192.json\nmax commit ts: 82192\nis full checkpoint: 1\n",
+            "text":"catalog path: catalog/FULL.82192.json\nmax commit ts: 82192\nis checkpoint: 1\n",
             "transaction_id":"82195"
         }
     ]
@@ -2922,44 +2922,8 @@ The response includes a JSON object like the following:
 
 ---
 
-### Show delta checkpoints
 
-**GET** `/instance/delta_checkpoint`
-
-Shows delta logs.
-
-#### Request
-
-- Method: GET
-- URL: `/instance/delta_checkpoint`
-- Headers: `accept: application/json`
-
-##### Request example
-
-```shell
-curl --request GET \
-    --url http://localhost:23821/instance/delta_checkpoint \
-    --header 'accept: application/json'
-```
-
-#### Response
-
-##### Status code 200
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code":0,
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
-
----
-
-### Show full checkpoints
+### Show checkpoints
 
 **GET** `/instance/global_checkpoint`
 
@@ -2988,7 +2952,7 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code":0,
-    "full_checkpoint":[
+    "checkpoint":[
         {
             "file_path":"/var/infinity/data/catalog/FULL.82192.json",
             "max_commit_timestamp":"82192"
@@ -3317,7 +3281,7 @@ The response includes a JSON object like the following:
 
 **POST** `/instance/flush`
 
-Performs a full checkpoint on the instance.
+Performs a checkpoint on the instance.
 
 #### Request
 
@@ -3665,7 +3629,7 @@ The response includes a JSON object like the following:
     "cpu_limit":"16",
     "data_dir":"/var/infinity/leader/data",
     "error_code":0,
-    "full_checkpoint_interval":"86400",
+    "checkpoint_interval":"86400",
     "http_port":"23821",
     "log_dir":"/var/infinity/leader/log",
     "log_file_max_size":"10737418240",
