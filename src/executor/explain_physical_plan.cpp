@@ -2223,8 +2223,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node, SharedPtr<Vec
     }
 
     switch (flush_node->flush_type()) {
-        case FlushType::kDelta:
-            flush_header_str += "DELTA (" + std::to_string(flush_node->node_id()) + ")";
+        case FlushType::kCatalog:
+            flush_header_str += "CATALOG (" + std::to_string(flush_node->node_id()) + ")";
             break;
         case FlushType::kData:
             flush_header_str += "DATA (" + std::to_string(flush_node->node_id()) + ")";

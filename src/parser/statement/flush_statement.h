@@ -26,7 +26,7 @@
 namespace infinity {
 
 enum class FlushType {
-    kDelta,
+    kCatalog,
     kData,
     kLog,
     kBuffer,
