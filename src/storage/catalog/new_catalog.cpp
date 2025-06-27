@@ -401,7 +401,6 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
 
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const auto &pair = all_key_values[idx];
-        LOG_ERROR(fmt::format("{}", pair));
         // Skip dropped metas.
         if (!keys_encode.empty() && std::find(keys_encode.begin(), keys_encode.end(), pair.first) != keys_encode.end()) {
             continue;

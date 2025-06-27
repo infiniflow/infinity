@@ -409,8 +409,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // Persistence Dir
-        // String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
-        String persistence_dir;
+        String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
         if (default_config != nullptr) {
             persistence_dir = default_config->default_persistence_dir_;
         }
