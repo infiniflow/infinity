@@ -1285,7 +1285,7 @@ i32 WalCmdUpdateSegmentBloomFilterDataV2::GetSizeInBytes() const {
 }
 
 i32 WalCmdCheckpoint::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(max_commit_ts_) + sizeof(i8) + sizeof(i32) + catalog_path_.size() + sizeof(i32) + catalog_name_.size();
+    return sizeof(WalCommandType) + sizeof(max_commit_ts_) + sizeof(i32) + catalog_path_.size() + sizeof(i32) + catalog_name_.size();
 }
 
 i32 WalCmdCheckpointV2::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(max_commit_ts_); }
