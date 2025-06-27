@@ -126,19 +126,21 @@ export struct MetaPmObject final : public MetaObject {
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
-    struct TupleHash {
-        SizeT operator()(const Tuple<String, String, ColumnID> &s) const noexcept {
-            SizeT h1 = std::hash<String>{}(std::get<0>(s));
-            SizeT h2 = std::hash<String>{}(std::get<1>(s));
-            SizeT h3 = std::hash<ColumnID>{}(std::get<2>(s));
-            return (h1 ^ (h2 << 1)) ^ (h3 << 1);
-        }
-    };
+    [[nodiscard]] bool ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &pred) const;
 
-    template <typename Pred>
-    bool ExistInMetas(MetaType want_type, Pred pred) {
-        return std::any_of(metas_.begin(), metas_.end(), [&](auto &m) { return m->type_ == want_type && pred(m.get()); });
-    }
+    static std::function<bool(MetaKey *)> MakeColumnPred(const String &db_id_str, const String &table_id_str, ColumnID column_id);
+
+    static std::function<bool(MetaKey *)> MakeBlockPred(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id);
+
+    static std::function<bool(MetaKey *)> MakeSegmentPred(const String &db_id_str, const String &table_id_str, SegmentID segment_id);
+
+    static std::function<bool(MetaKey *)>
+    MakeSegmentIndexPred(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id);
+
+    static std::function<bool(MetaKey *)>
+    MakeChunkIndexPred(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id, ChunkID chunk_id);
+
+    static std::function<bool(MetaKey *)> MakeTableIndexPred(const String &db_id_str, const String &table_id_str, const String &index_id_str);
 
 public:
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
@@ -156,9 +158,6 @@ public:
     Map<String, SharedPtr<MetaDBObject>> db_map_{};
     Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
     Vector<SharedPtr<MetaKey>> metas_;
-    HashMap<String, Tuple<String, String, ColumnID>> out_;
-    HashMap<String, Tuple<String, String, ColumnID>> index_;
-    HashSet<Tuple<String, String, ColumnID>, TupleHash> col_;
 };
 
 } // namespace infinity

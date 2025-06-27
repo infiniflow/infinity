@@ -910,7 +910,8 @@ Status NewCatalog::AddNewBlockColumnForTransform(BlockMeta &block_meta, SizeT co
                                                                        table_meta.table_id_str(),
                                                                        segment_meta.segment_id(),
                                                                        block_meta.block_id(),
-                                                                       column_idx);
+                                                                       column_idx,
+                                                                       commit_ts);
     String commit_ts_str = fmt::format("{}", commit_ts);
     Status status = kv_instance.Put(block_id_key, commit_ts_str);
     // {
