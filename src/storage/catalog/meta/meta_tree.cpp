@@ -14,6 +14,8 @@
 
 module;
 
+#include <re2/re2.h>
+
 #include <filesystem>
 #include <ranges>
 #include <regex>
@@ -47,12 +49,13 @@ namespace infinity {
 
 SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys) {
     SharedPtr<MetaTree> meta_tree = MakeShared<MetaTree>();
-    meta_tree->metas_ = meta_keys; // copy
-    SizeT meta_count = meta_keys.size();
+    meta_tree->metas_ = std::move(meta_keys);
+    auto &meta_keys_ref = meta_tree->metas_;
+    SizeT meta_count = meta_keys_ref.size();
     // Get all dbs
     HashSet<String> db_names, db_ids;
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kDB: {
                 auto db_key = static_cast<DBMetaKey *>(meta_key.get());
@@ -87,7 +90,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all tables and attach to the db
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kTable: {
                 auto table_key = static_cast<TableMetaKey *>(meta_key.get());
@@ -135,7 +138,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all table segments / table tag / table index / table column and attach them to the table
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kSegment: {
                 auto segment_key = static_cast<SegmentMetaKey *>(meta_key.get());
@@ -246,7 +249,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all blocks and attach to segment
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kBlock: {
                 auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
@@ -322,7 +325,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all block column / block tag and attach to blocks
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kBlockColumn: {
                 auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
@@ -406,7 +409,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all segment indexes and attach to table index
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kSegmentIndex: {
                 auto segment_index_key = static_cast<SegmentIndexMetaKey *>(meta_key.get());
@@ -483,7 +486,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all chunk indexes and attach to segment index
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kChunkIndex: {
                 auto chunk_index_key = static_cast<ChunkIndexMetaKey *>(meta_key.get());
@@ -535,7 +538,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all pm object stat
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kPmStat: {
                 auto pm_obj_key = static_cast<PmStatMetaKey *>(meta_key.get());
@@ -556,7 +559,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get pm object
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kPmObject: {
                 auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
@@ -953,20 +956,21 @@ bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<Str
     return true;
 }
 
-bool MetaTree::ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &pred) const {
-    return std::any_of(metas_.begin(), metas_.end(), [&](auto &meta) { return meta->type_ == meta_type && pred(meta.get()); });
+bool MetaTree::ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &predicate) const {
+    return std::any_of(metas_.begin(), metas_.end(), [&](auto &meta) { return meta->type_ == meta_type && predicate(meta.get()); });
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeColumnPred(const String &db_id_str, const String &table_id_str, ColumnID column_id) {
+std::function<bool(MetaKey *)> MetaTree::MakeColumnPredicate(const String &db_id_str, const String &table_id_str, ColumnID column_id) {
     return [=](MetaKey *meta) {
         auto *table_column_meta = static_cast<TableColumnMetaKey *>(meta);
         auto json = table_column_meta->ToJson();
-        ColumnID meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
+        auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
         return table_column_meta->db_id_str_ == db_id_str && table_column_meta->table_id_str_ == table_id_str && meta_column_id == column_id;
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeBlockPred(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) {
+std::function<bool(MetaKey *)>
+MetaTree::MakeBlockPredicate(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) {
     return [=](MetaKey *meta) {
         auto *block_meta = static_cast<BlockMetaKey *>(meta);
         return block_meta->db_id_str_ == db_id_str && block_meta->table_id_str_ == table_id_str && block_meta->segment_id_ == segment_id &&
@@ -974,7 +978,7 @@ std::function<bool(MetaKey *)> MetaTree::MakeBlockPred(const String &db_id_str, 
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeSegmentPred(const String &db_id_str, const String &table_id_str, SegmentID segment_id) {
+std::function<bool(MetaKey *)> MetaTree::MakeSegmentPredicate(const String &db_id_str, const String &table_id_str, SegmentID segment_id) {
     return [=](MetaKey *meta) {
         auto *segment_meta = static_cast<SegmentMetaKey *>(meta);
         return segment_meta->db_id_str_ == db_id_str && segment_meta->table_id_str_ == table_id_str && segment_meta->segment_id_ == segment_id;
@@ -982,7 +986,7 @@ std::function<bool(MetaKey *)> MetaTree::MakeSegmentPred(const String &db_id_str
 }
 
 std::function<bool(MetaKey *)>
-MetaTree::MakeSegmentIndexPred(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) {
+MetaTree::MakeSegmentIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) {
     return [=](MetaKey *meta) {
         auto *seg_idx = static_cast<SegmentIndexMetaKey *>(meta);
         return seg_idx->db_id_str_ == db_id_str && seg_idx->table_id_str_ == table_id_str && seg_idx->index_id_str_ == index_id_str &&
@@ -990,11 +994,11 @@ MetaTree::MakeSegmentIndexPred(const String &db_id_str, const String &table_id_s
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPred(const String &db_id_str,
-                                                            const String &table_id_str,
-                                                            const String &index_id_str,
-                                                            SegmentID segment_id,
-                                                            ChunkID chunk_id) {
+std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPredicate(const String &db_id_str,
+                                                                 const String &table_id_str,
+                                                                 const String &index_id_str,
+                                                                 SegmentID segment_id,
+                                                                 ChunkID chunk_id) {
     return [=](MetaKey *meta) {
         auto *chunk_idx = static_cast<ChunkIndexMetaKey *>(meta);
         return chunk_idx->db_id_str_ == db_id_str && chunk_idx->table_id_str_ == table_id_str && chunk_idx->index_id_str_ == index_id_str &&
@@ -1002,7 +1006,7 @@ std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPred(const String &db_id_
     };
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeTableIndexPred(const String &db_id_str, const String &table_id_str, const String &index_id_str) {
+std::function<bool(MetaKey *)> MetaTree::MakeTableIndexPredicate(const String &db_id_str, const String &table_id_str, const String &index_id_str) {
     return [=](MetaKey *meta) {
         auto *tbl_idx = static_cast<TableIndexMetaKey *>(meta);
         return tbl_idx->db_id_str_ == db_id_str && tbl_idx->table_id_str_ == table_id_str && tbl_idx->index_id_str_ == index_id_str;
@@ -1010,46 +1014,46 @@ std::function<bool(MetaKey *)> MetaTree::MakeTableIndexPred(const String &db_id_
 }
 
 bool MetaTree::CheckData(const String &path) {
-    static const std::regex re_col(R"(^(?:db_(\d+)\/tbl_(\d+)\/seg_(\d+)\/blk_(\d+)\/(?:version|(\d+)\.col|col_(\d+)_out))$)",
-                                   std::regex::optimize | std::regex::icase);
+    static const RE2 regex_column(R"(^(?:db_(\d+)/tbl_(\d+)/seg_(\d+)/blk_(\d+)/(?:version|(\d+)\.col|col_(\d+)_out))$)");
 
-    static const std::regex re_idx(R"(^(?:db_(\d+)\/tbl_(\d+)\/idx_(\d+)\/seg_(\d+)\/(?:chunk_(\d+)\.idx|ft_(\d+)\.(\w+)))$)",
-                                   std::regex::optimize | std::regex::icase);
+    static const RE2 regex_index(R"(^(?:db_(\d+)/tbl_(\d+)/idx_(\d+)/seg_(\d+)/(?:chunk_(\d+)\.idx|ft_(\d+)\.(\w+)))$)");
 
-    std::smatch m;
+    re2::StringPiece sp1, sp2, sp3, sp4, sp5, sp6, sp7;
     String db_id_str, table_id_str, index_id_str, suffix_id, suffix;
     SegmentID segment_id = INVALID_SEGMENT_ID;
     BlockID block_id = INVALID_BLOCK_ID;
 
-    if (std::regex_match(path, m, re_col)) {
+    if (RE2::FullMatch(path, regex_column, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6)) {
         // db_{1}, tbl_{2}, seg_{3}, blk_{4}, {5}.col, col_{6}_out
-        db_id_str = m[1];
-        table_id_str = m[2];
-        segment_id = static_cast<SegmentID>(std::stoull(m[3]));
-        block_id = static_cast<BlockID>(std::stoull(m[4]));
-        if (m[5].matched) {
-            suffix_id = m[5];
+        db_id_str = sp1.as_string();
+        table_id_str = sp2.as_string();
+        segment_id = static_cast<SegmentID>(std::stoull(sp3.as_string()));
+        block_id = static_cast<BlockID>(std::stoull(sp4.as_string()));
+
+        if (!sp5.empty()) {
+            suffix_id = sp5.as_string();
             suffix = "col";
-        } else if (m[6].matched) {
+        } else if (!sp6.empty()) {
+            suffix_id = sp6.as_string();
             suffix = "out";
-            suffix_id = m[6];
         } else {
             suffix = "version";
         }
-    } else if (std::regex_match(path, m, re_idx)) {
+    } else if (RE2::FullMatch(path, regex_index, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6, &sp7)) {
         // db_{1}, tbl_{2}, idx_{3}, seg_{4},
         // chunk_{5}.idx,
-        // ft_{6}.{7}   m[7] == len | pos | dic
-        db_id_str = m[1];
-        table_id_str = m[2];
-        index_id_str = m[3];
-        segment_id = static_cast<SegmentID>(std::stoull(m[4]));
-        if (m[5].matched) {
-            suffix_id = m[5];
+        // ft_{6}.{7}   sp[7] == len | pos | dic
+        db_id_str = sp1.as_string();
+        table_id_str = sp2.as_string();
+        index_id_str = sp3.as_string();
+        segment_id = static_cast<SegmentID>(std::stoull(sp4.as_string()));
+
+        if (!sp5.empty()) {
+            suffix_id = sp5.as_string();
             suffix = "idx";
-        } else if (m[6].matched) {
-            suffix_id = m[6];
-            suffix = m[7];
+        } else {
+            suffix_id = sp6.as_string();
+            suffix = sp7.as_string(); // len | pos | dic
         }
     } else {
         return true;
@@ -1060,19 +1064,20 @@ bool MetaTree::CheckData(const String &path) {
         return false;
     }
     if (suffix == "version") {
-        return !ExistInMetas(MetaType::kBlock, MakeBlockPred(db_id_str, table_id_str, segment_id, block_id));
+        return !ExistInMetas(MetaType::kSegment, MakeSegmentPredicate(db_id_str, table_id_str, segment_id)) ||
+               !ExistInMetas(MetaType::kBlock, MakeBlockPredicate(db_id_str, table_id_str, segment_id, block_id));
     }
     if (suffix == "col" || suffix == "out") {
         auto column_id = static_cast<ColumnID>(std::stoull(suffix_id));
-        return !ExistInMetas(MetaType::kSegment, MakeSegmentPred(db_id_str, table_id_str, segment_id)) ||
-               !ExistInMetas(MetaType::kBlock, MakeBlockPred(db_id_str, table_id_str, segment_id, block_id)) ||
-               !ExistInMetas(MetaType::kTableColumn, MakeColumnPred(db_id_str, table_id_str, column_id));
+        return !ExistInMetas(MetaType::kSegment, MakeSegmentPredicate(db_id_str, table_id_str, segment_id)) ||
+               !ExistInMetas(MetaType::kBlock, MakeBlockPredicate(db_id_str, table_id_str, segment_id, block_id)) ||
+               !ExistInMetas(MetaType::kTableColumn, MakeColumnPredicate(db_id_str, table_id_str, column_id));
     }
     if (suffix == "idx") {
         auto chunk_id = static_cast<ChunkID>(std::stoull(suffix_id));
-        return !ExistInMetas(MetaType::kSegmentIndex, MakeSegmentIndexPred(db_id_str, table_id_str, index_id_str, segment_id)) ||
-               !ExistInMetas(MetaType::kChunkIndex, MakeChunkIndexPred(db_id_str, table_id_str, index_id_str, segment_id, chunk_id)) ||
-               !ExistInMetas(MetaType::kTableIndex, MakeTableIndexPred(db_id_str, table_id_str, index_id_str));
+        return !ExistInMetas(MetaType::kSegmentIndex, MakeSegmentIndexPredicate(db_id_str, table_id_str, index_id_str, segment_id)) ||
+               !ExistInMetas(MetaType::kChunkIndex, MakeChunkIndexPredicate(db_id_str, table_id_str, index_id_str, segment_id, chunk_id)) ||
+               !ExistInMetas(MetaType::kTableIndex, MakeTableIndexPredicate(db_id_str, table_id_str, index_id_str));
     }
     return true;
 }
@@ -1092,8 +1097,8 @@ HashSet<String> MetaTree::GetDataVfsOffPathSet() {
 
     for (const auto &entry : std::filesystem::recursive_directory_iterator{data_dir}) {
         if (entry.is_regular_file()) {
-            Path rel = std::filesystem::relative(entry.path(), data_dir);
-            data_path_set.emplace(rel.string());
+            auto relative_path = std::filesystem::relative(entry.path(), data_dir);
+            data_path_set.emplace(relative_path.string());
         }
     }
     return data_path_set;
