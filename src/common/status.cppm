@@ -147,7 +147,8 @@ export enum class ErrorCode : long {
     kDuplicateColumnIndex = 3097,
     kInvalidParameter = 3098,
     kIndexOnColumn = 3099,
-
+    kSnapshotAlreadyExists = 3100,
+    kSnapshotAlreadyDeleted = 3101,
     // 4. Txn fail
     kTxnRollback = 4001,
     kTxnConflict = 4002,
@@ -340,7 +341,8 @@ public:
     static Status DuplicateColumnIndex(const String &detail);
     static Status InvalidParameter(const String &detail);
     static Status IndexOnColumn(const String &column_name);
-
+    static Status SnapshotAlreadyExists(const String &snapshot_name);
+    static Status SnapshotAlreadyDeleted(const String &snapshot_name);
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reason");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);

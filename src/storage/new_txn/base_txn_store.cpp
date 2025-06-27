@@ -90,7 +90,7 @@ SharedPtr<WalEntry> RestoreTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdRestoreTableSnapshot>(db_name_, db_id_str_, table_name_, table_id_str_, table_def_, segment_infos_);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdRestoreTableSnapshot>(db_name_, db_id_str_, table_name_, table_id_str_, table_def_, segment_infos_,index_cmds_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }

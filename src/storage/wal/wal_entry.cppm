@@ -187,6 +187,7 @@ export struct WalChunkIndexInfo {
     mutable SizeT pm_size_; // tmp for test. should delete when stable
     RowID base_rowid_{};
     u32 row_count_{};
+    u32 index_size_{};
     TxnTimeStamp deprecate_ts_{};
 
     WalChunkIndexInfo() = default;
@@ -424,6 +425,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
         : WalCmd(WalCommandType::CREATE_INDEX_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           index_id_(index_id), index_base_(index_base), table_key_(table_key) {}
 
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -438,8 +440,29 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
     SharedPtr<IndexBase> index_base_{};
     Vector<WalSegmentIndexInfo> segment_index_infos_;
 
+    static WalCmdCreateIndexV2 ReadBufferAdv(const char *&ptr, i32 max_bytes);
     // Redundant but useful in commit phase.
     String table_key_{};
+};
+
+export struct WalRestoreIndexV2 final {
+    WalRestoreIndexV2(const String &index_id,
+                        const SharedPtr<IndexBase> &index_base,
+                        const Vector<WalSegmentIndexInfo> &segment_index_infos)
+        : index_id_(index_id), index_base_(index_base), segment_index_infos_(segment_index_infos) {}
+    WalRestoreIndexV2() = default;
+    bool operator==(const WalRestoreIndexV2 &other) const;
+    [[nodiscard]] i32 GetSizeInBytes() const;
+    void WriteAdv(char *&buf) const;
+    String ToString() const;
+    String CompactInfo() const;
+
+    String index_id_{};
+    SharedPtr<IndexBase> index_base_{};
+    Vector<WalSegmentIndexInfo> segment_index_infos_;
+
+    static WalRestoreIndexV2 ReadBufferAdv(const char *&ptr, i32 max_bytes);
+    void WriteBufferAdv(char *&buf) const;
 };
 
 export struct WalCmdDropIndex final : public WalCmd {
@@ -1039,9 +1062,9 @@ export struct WalCmdCleanup : public WalCmd {
 };
 
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
-    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos)
+    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds)
         : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),table_def_(table_def_),
-          segment_infos_(segment_infos) {}
+          segment_infos_(segment_infos), index_cmds_(index_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1055,6 +1078,7 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     String table_id_{};
     SharedPtr<TableDef> table_def_{};
     Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
+    Vector<WalCmdCreateIndexV2> index_cmds_;// index commands to restore indexes
 };
 
 

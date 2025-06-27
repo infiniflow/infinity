@@ -176,3 +176,67 @@ TEST_P(BlockVersionTest, get_delete_ts_test) {
     EXPECT_EQ(res->ToString(2), "0");
     EXPECT_EQ(res->ToString(3), "40");
 }
+
+// restore snapshot test
+TEST_P(BlockVersionTest, test_restore_from_snapshot) {
+    // Create a block version with some data
+    BlockVersion block_version(8192);
+    
+    // Add some creation records with different timestamps
+    block_version.Append(10, 5);   // Create 5 rows at timestamp 10
+    block_version.Append(20, 3);   // Create 3 more rows at timestamp 20
+    block_version.Append(30, 2);   // Create 2 more rows at timestamp 30
+    
+    // Add some deletion records
+    block_version.Delete(2, 25);   // Delete row 2 at timestamp 25
+    block_version.Delete(7, 35);   // Delete row 7 at timestamp 35
+    
+    // Verify initial state
+    EXPECT_EQ(block_version.created_.size(), 3);
+    EXPECT_EQ(block_version.created_[0].create_ts_, 10);
+    EXPECT_EQ(block_version.created_[0].row_count_, 5);
+    EXPECT_EQ(block_version.created_[1].create_ts_, 20);
+    EXPECT_EQ(block_version.created_[1].row_count_, 3);
+    EXPECT_EQ(block_version.created_[2].create_ts_, 30);
+    EXPECT_EQ(block_version.created_[2].row_count_, 2);
+    
+    EXPECT_EQ(block_version.deleted_[2], 25);
+    EXPECT_EQ(block_version.deleted_[7], 35);
+    
+    // Test RestoreFromSnapshot
+    TxnTimeStamp restore_ts = 100;
+    block_version.RestoreFromSnapshot(restore_ts);
+    
+    // Verify the restoration worked correctly
+    // 1. All creation records should be consolidated into one with restore_ts
+    EXPECT_EQ(block_version.created_.size(), 1);
+    EXPECT_EQ(block_version.created_[0].create_ts_, restore_ts);
+    EXPECT_EQ(block_version.created_[0].row_count_, 10);  // Total rows: 5+3+2=10
+    
+    // 2. All deletion timestamps should be updated to restore_ts
+    EXPECT_EQ(block_version.deleted_[2], restore_ts);
+    EXPECT_EQ(block_version.deleted_[7], restore_ts);
+    
+    // 3. Non-deleted rows should remain 0
+    EXPECT_EQ(block_version.deleted_[0], 0);
+    EXPECT_EQ(block_version.deleted_[1], 0);
+    EXPECT_EQ(block_version.deleted_[3], 0);
+    EXPECT_EQ(block_version.deleted_[4], 0);
+    EXPECT_EQ(block_version.deleted_[5], 0);
+    EXPECT_EQ(block_version.deleted_[6], 0);
+    
+    // 4. latest_change_ts should be updated
+    EXPECT_EQ(block_version.latest_change_ts(), restore_ts);
+}
+
+TEST_P(BlockVersionTest, test_restore_from_snapshot_empty_version) {
+    // Test with empty block version
+    BlockVersion block_version(8192);
+    
+    TxnTimeStamp restore_ts = 100;
+    block_version.RestoreFromSnapshot(restore_ts);
+    
+    // Should handle empty version gracefully
+    EXPECT_EQ(block_version.created_.size(), 0);
+    EXPECT_EQ(block_version.latest_change_ts(), restore_ts);
+}

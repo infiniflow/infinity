@@ -123,11 +123,25 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::
 
 nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
     nlohmann::json json_res;
+    json_res["chunk_id"] = chunk_id_;
+    json_res["chunk_info"] = chunk_info_->Serialize();
+    json_res["index_filename"] = index_filename_;
+    for (const auto &file : full_text_files_) {
+        json_res["full_text_files"].emplace_back(file);
+    }
     return json_res;
 }
 
 SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(const nlohmann::json &chunk_index_json) {
     auto chunk_index_snapshot = MakeShared<ChunkIndexSnapshotInfo>();
+    chunk_index_snapshot->chunk_id_ = chunk_index_json["chunk_id"];
+    chunk_index_snapshot->chunk_info_ = ChunkIndexMetaInfo::Deserialize(chunk_index_json["chunk_info"]);
+    chunk_index_snapshot->index_filename_ = chunk_index_json["index_filename"];
+    if (chunk_index_json.contains("full_text_files")) {
+        for (const auto &file : chunk_index_json["full_text_files"]) {
+            chunk_index_snapshot->full_text_files_.emplace_back(file);
+        }
+    }
     return chunk_index_snapshot;
 }
 
@@ -143,9 +157,11 @@ nlohmann::json SegmentIndexSnapshotInfo::Serialize() {
 SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(const nlohmann::json &segment_index_json) {
     auto segment_index_snapshot = MakeShared<SegmentIndexSnapshotInfo>();
     segment_index_snapshot->segment_id_ = segment_index_json["segment_id"];
-    for (const auto &chunk_index_json : segment_index_json["chunk_indexes"]) {
-        auto chunk_index_snapshot = ChunkIndexSnapshotInfo::Deserialize(chunk_index_json);
-        segment_index_snapshot->chunk_index_snapshots_.emplace_back(chunk_index_snapshot);
+    if (segment_index_json.contains("chunk_indexes")) {
+        for (const auto &chunk_index_json : segment_index_json["chunk_indexes"]) {
+            auto chunk_index_snapshot = ChunkIndexSnapshotInfo::Deserialize(chunk_index_json);
+            segment_index_snapshot->chunk_index_snapshots_.emplace_back(chunk_index_snapshot);
+        }
     }
     return segment_index_snapshot;
 }
@@ -153,9 +169,10 @@ SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(const 
 nlohmann::json TableIndexSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["index_dir"] = *index_dir_;
+    json_res["index_id_str"] = *index_id_str_;
     json_res["index_base"] = index_base_->Serialize();
-    for (const auto &segment_index_entry : index_by_segment_) {
-        json_res["segment_indexes"].emplace_back(segment_index_entry.second->Serialize());
+    for (const auto &segment_index_snapshot : segment_index_snapshots_) {
+        json_res["segment_indexes"].emplace_back(segment_index_snapshot->Serialize());
     }
     return json_res;
 }
@@ -163,27 +180,38 @@ nlohmann::json TableIndexSnapshotInfo::Serialize() {
 SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(const nlohmann::json &table_index_json) {
     auto table_index_snapshot = MakeShared<TableIndexSnapshotInfo>();
     table_index_snapshot->index_dir_ = MakeShared<String>(table_index_json["index_dir"]);
+    table_index_snapshot->index_id_str_ = MakeShared<String>(table_index_json["index_id_str"]);
     table_index_snapshot->index_base_ = IndexBase::Deserialize(table_index_json["index_base"]);
-    for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
-        auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
-        table_index_snapshot->index_by_segment_.emplace(segment_index_snapshot->segment_id_, segment_index_snapshot);
+    if (table_index_json.contains("segment_indexes")) {
+        for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
+            auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
+            table_index_snapshot->segment_index_snapshots_.emplace_back(segment_index_snapshot);
+        }
     }
     return table_index_snapshot;
 }
 
-void TableSnapshotInfo::Serialize(const String &save_dir) {
+Status TableSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp commit_ts) {
 
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
-    // Create compressed file
-    //    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
-    //    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
+    // Create temporary directory for atomic operation
+    String temp_snapshot_dir = fmt::format("{}/temp_{}_{}", 
+                                          save_dir, 
+                                          snapshot_name_, 
+                                          commit_ts);
+    
+    // Create temporary directory
+    Status create_temp_status = VirtualStore::MakeDirectory(temp_snapshot_dir);
+    if (!create_temp_status.ok()) {
+        return create_temp_status;
+    }
 
     // Get files
     Vector<String> original_files = GetFiles();
 
-    // Copy files
+    // Copy files to temporary location
     if (persistence_manager != nullptr) {
         PersistResultHandler pm_handler(persistence_manager);
         for (const auto &file : original_files) {
@@ -195,74 +223,68 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
 
             const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
             if (!obj_addr.Valid()) {
+                // Clean up temp directory on failure
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
                 String error_message = fmt::format("Failed to find object for local path {}", file);
-                UnrecoverableError(error_message);
+                return Status::FileNotFound(error_message);
             }
             String read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
             LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
 
             auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
             if (!reader_open_status.ok()) {
-                UnrecoverableError(reader_open_status.message());
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return reader_open_status;
             }
 
             auto seek_status = reader_handle->Seek(obj_addr.part_offset_);
             if (!seek_status.ok()) {
-                UnrecoverableError(seek_status.message());
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return seek_status;
             }
 
             auto file_size = obj_addr.part_size_;
             auto buffer = std::make_unique<char[]>(file_size);
             auto [nread, read_status] = reader_handle->Read(buffer.get(), file_size);
 
-            String dst_file_path = fmt::format("{}/{}/{}", save_dir, snapshot_name_, file);
+            String dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
             String dst_dir = VirtualStore::GetParentPath(dst_file_path);
             if (!VirtualStore::Exists(dst_dir)) {
-                VirtualStore::MakeDirectory(dst_dir);
+                Status mkdir_status = VirtualStore::MakeDirectory(dst_dir);
+                if (!mkdir_status.ok()) {
+                    VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                    return mkdir_status;
+                }
             }
 
             auto [write_file_handle, writer_open_status] = VirtualStore::Open(dst_file_path, FileAccessMode::kWrite);
             if (!writer_open_status.ok()) {
-                UnrecoverableError(writer_open_status.message());
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return writer_open_status;
             }
 
             Status write_status = write_file_handle->Append(buffer.get(), file_size);
             if (!write_status.ok()) {
-                UnrecoverableError(write_status.message());
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return write_status;
             }
             write_file_handle->Sync();
-
-            //            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
-            //            if (!compress_status.ok()) {
-            //                RecoverableError(compress_status);
-            //            }
         }
     } else {
         String data_dir = config->DataDir();
         for (const auto &file : original_files) {
             String src_file_path = fmt::format("{}/{}", data_dir, file);
-            String dst_file_path = fmt::format("{}/{}/{}", save_dir, snapshot_name_, file);
-            //        LOG_INFO(fmt::format("Copy from: {} to {}", src_file_path, dst_file_path));
+            String dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
+            
             Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
             if (!copy_status.ok()) {
-                RecoverableError(copy_status);
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return copy_status;
             }
-
-            //            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
-            //            if (!compress_status.ok()) {
-            //                RecoverableError(compress_status);
-            //            }
         }
     }
 
-    //    VirtualStore::EndCompress(output_stream);
-
-    //    String md5 = CalcMD5(compressed_filename);
-
-    // Remove the directory
-    //    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
-    //    VirtualStore::RemoveDirectory(directory);
-
+    // Create metadata JSON
     nlohmann::json json_res;
     json_res["version"] = version_;
     json_res["snapshot_name"] = snapshot_name_;
@@ -273,11 +295,8 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["table_id_str"] = table_id_str_;
     
     json_res["table_comment"] = table_comment_;
-    //    json_res["md5"] = md5;
 
     json_res["txn_id"] = txn_id_;
-    // json_res["begin_ts"] = begin_ts_;
-    // json_res["commit_ts"] = commit_ts_;
     json_res["max_commit_ts"] = max_commit_ts_;
     json_res["create_ts"] = create_ts_;
 
@@ -318,23 +337,51 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     String json_string = json_res.dump();
 
-    Path save_path = Path(save_dir) / fmt::format("{}.json", snapshot_name_);
-
-    if (!VirtualStore::Exists(save_dir)) {
-        VirtualStore::MakeDirectory(save_dir);
-    }
-    auto [snapshot_file_handle, status] = VirtualStore::Open(save_path.string(), FileAccessMode::kWrite);
+    // Write metadata to temporary location
+    String temp_meta_path = fmt::format("{}/{}.json", temp_snapshot_dir, snapshot_name_);
+    auto [snapshot_file_handle, status] = VirtualStore::Open(temp_meta_path, FileAccessMode::kWrite);
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("{}: {}", save_path.string(), status.message()));
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return status;
     }
 
     status = snapshot_file_handle->Append(json_string.data(), json_string.size());
     if (!status.ok()) {
-        RecoverableError(status);
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return status;
     }
     snapshot_file_handle->Sync();
 
-    LOG_INFO(fmt::format("{}", json_res.dump()));
+    // Atomically move temporary directory to final location
+    String final_snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
+    
+    // Ensure save directory exists
+    if (!VirtualStore::Exists(save_dir)) {
+        Status mkdir_status = VirtualStore::MakeDirectory(save_dir);
+        if (!mkdir_status.ok()) {
+            VirtualStore::RemoveDirectory(temp_snapshot_dir);
+            return mkdir_status;
+        }
+    } 
+    if (VirtualStore::Exists(final_snapshot_dir)) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return Status::SnapshotAlreadyExists(snapshot_name_);
+    }
+    
+    // Atomic rename operation
+    try {
+        Status rename_status = VirtualStore::Rename(temp_snapshot_dir, final_snapshot_dir);
+        if (!rename_status.ok()) {
+            VirtualStore::RemoveDirectory(temp_snapshot_dir);
+            return rename_status;
+        }
+    } catch (const std::exception &e) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return Status::SnapshotAlreadyExists(snapshot_name_);
+    }
+
+    LOG_INFO(fmt::format("Atomic snapshot creation completed: {}", json_res.dump()));
+    return Status::OK();
 }
 
 Vector<String> TableSnapshotInfo::GetFiles() const {
@@ -353,13 +400,13 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
     }
 
     for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
-        for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
-            for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
-                if (chunk_index_snapshot->files_.empty()) {
+        for (const auto &segment_index_snapshot: table_index_snapshot_pair.second->segment_index_snapshots_) {
+            for (const auto &chunk_index_snapshot : segment_index_snapshot->chunk_index_snapshots_) {
+                if (chunk_index_snapshot->full_text_files_.empty()) {
                     files.emplace_back(
-                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->base_name_));
+                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->index_filename_));
                 } else {
-                    files.insert(files.end(), chunk_index_snapshot->files_.cbegin(), chunk_index_snapshot->files_.cend());
+                    files.insert(files.end(), chunk_index_snapshot->full_text_files_.cbegin(), chunk_index_snapshot->full_text_files_.cend());
                 }
             }
         }
@@ -371,7 +418,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
 
     LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
-    String meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
+    String meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
 
     if (!VirtualStore::Exists(meta_path)) {
         return {nullptr, Status::FileNotFound(meta_path)};
@@ -461,10 +508,10 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     }
 
     //    LOG_INFO(table_snapshot->ToString());
-    Status restore_status = RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot->GetFiles());
-    if (!restore_status.ok()) {
-        return {nullptr, restore_status};
-    }
+    // Status restore_status = RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot->GetFiles());
+    // if (!restore_status.ok()) {
+    //     return {nullptr, restore_status};
+    // }
 
     return {table_snapshot, Status::OK()};
 }
@@ -480,12 +527,37 @@ String TableSnapshotInfo::ToString() const {
 // copy files from snapshot back to data
 Status TableSnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir, 
                            const String& snapshot_name,
-                           const Vector<String>& files_to_restore) {
+                           const Vector<String>& files_to_restore,
+                           const String& new_table_id_str) {
     Config* config = InfinityContext::instance().config();
     
     for (const auto& file : files_to_restore) {
         String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-        String dst_file_path = fmt::format("{}/{}", config->DataDir(), file);
+        
+        // Replace the old table_id_str with the new one in the file path
+        String modified_file = file;
+        
+        // Find and replace the tbl_* pattern in the file path
+        // Look for pattern: /db_*/tbl_* where * can be any number of digits
+        size_t db_pos = modified_file.find("db_");
+        if (db_pos != String::npos) {
+            size_t tbl_pos = modified_file.find("/tbl_", db_pos);
+            if (tbl_pos != String::npos) {
+                // Find the end of the table ID (next '/' or end of string)
+                size_t tbl_end = modified_file.find('/', tbl_pos + 5);
+                if (tbl_end == String::npos) {
+                    tbl_end = modified_file.length();
+                }
+                
+                // Extract the old table ID from the path
+                String old_tbl_id_in_path = modified_file.substr(tbl_pos + 5, tbl_end - (tbl_pos + 5));
+                
+                // Replace the old table ID with the new one
+                modified_file.replace(tbl_pos + 5, old_tbl_id_in_path.length(), new_table_id_str);
+            }
+        }
+        
+        String dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
         
         // Create destination directory
         String dst_dir = VirtualStore::GetParentPath(dst_file_path);

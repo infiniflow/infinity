@@ -259,6 +259,7 @@ public:
     Status RestoreTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
 
+    Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds);
 
     Status DropTableSnapShot(const String &db_name, const String &table_name);
 

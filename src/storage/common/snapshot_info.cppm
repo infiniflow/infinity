@@ -22,6 +22,7 @@ import command_statement;
 import index_base;
 import third_party;
 import column_def;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -77,8 +78,9 @@ export struct SegmentSnapshotInfo {
 
 export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
-    String base_name_;
-    Vector<String> files_;
+    String index_filename_;
+    Vector<String> full_text_files_; // full text files of the chunk
+    SharedPtr<ChunkIndexMetaInfo> chunk_info_;
     nlohmann::json Serialize();
     static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(const nlohmann::json &chunk_index_json);
 };
@@ -93,7 +95,8 @@ export struct SegmentIndexSnapshotInfo {
 export struct TableIndexSnapshotInfo {
     SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
-    Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
+    SharedPtr<String> index_id_str_;
+    Vector<SharedPtr<SegmentIndexSnapshotInfo>> segment_index_snapshots_{};
     nlohmann::json Serialize();
     static SharedPtr<TableIndexSnapshotInfo> Deserialize(const nlohmann::json &table_index_json);
 };
@@ -121,10 +124,10 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
 
     Vector<String> GetFiles() const;
-    void Serialize(const String &save_path);
+    Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
     String ToString() const;
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
-    static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore);
+    static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_table_id_str);
 };
 
 } // namespace infinity

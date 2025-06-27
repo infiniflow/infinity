@@ -267,7 +267,7 @@ public:
     static Status CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
-                            String &index_id_str,
+                            const String &index_id_str,
                             TxnTimeStamp commit_ts,
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
@@ -282,6 +282,8 @@ public:
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegmentWithID(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta, SegmentID segment_id);
+
+
 
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
@@ -309,6 +311,12 @@ public:
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
+    static Status RestoreNewSegmentIndex1(TableIndexMeeta &table_index_meta,
+                                          NewTxn *new_txn,
+                                          SegmentID segment_id,
+                                          Optional<SegmentIndexMeta> &segment_index_meta,
+                                          ChunkID next_chunk_id);
+
     static Status
     AddNewSegmentIndex1(TableIndexMeeta &table_index_meta, NewTxn *new_txn, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
@@ -330,6 +338,15 @@ public:
                                     const String &base_name,
                                     SizeT index_size,
                                     Optional<ChunkIndexMeta> &chunk_index_meta);
+
+    static Status RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
+                                        NewTxn *new_txn,
+                                        ChunkID chunk_id,
+                                        RowID base_row_id,
+                                        SizeT row_count,
+                                        const String &base_name,
+                                        SizeT index_size,
+                                        Optional<ChunkIndexMeta> &chunk_index_meta);
 
     static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
 
@@ -372,6 +389,8 @@ public:
     static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
 
     static Status CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, Bitmask &bitmask);
+
+    
 
 public:
     // Function related methods

@@ -131,6 +131,7 @@ export struct RestoreTableTxnStore : public BaseTxnStore {
     u64 table_id_{};
     SharedPtr<TableDef> table_def_{};
     Vector<WalSegmentInfoV2> segment_infos_{};
+    Vector<WalCmdCreateIndexV2> index_cmds_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

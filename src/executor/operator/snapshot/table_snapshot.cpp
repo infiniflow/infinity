@@ -35,6 +35,7 @@ namespace infinity {
 
 Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
     auto *txn_ptr = query_context->GetNewTxn();
+    auto *txn_mgr = txn_ptr->txn_mgr();
     const String &db_name = query_context->schema_name();
 
     SharedPtr<TableSnapshotInfo> table_snapshot;
@@ -45,8 +46,10 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     }
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
-    table_snapshot->Serialize(snapshot_dir);
-
+    status = table_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
@@ -69,13 +72,13 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     SharedPtr<TableSnapshotInfo> table_snapshot;
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
 
-    //check txn_type
+    // check txn_type
     LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
     // if (txn_ptr->GetTxnType() != TransactionType::kRestoreTable) {
     //     return Status::InvalidArgument("Txn type is not RestoreTable");
     // }
 
-     status = txn_ptr->RestoreTableSnapshot(table_snapshot);
+    status = txn_ptr->RestoreTableSnapshot(table_snapshot);
     if (!status.ok()) {
         return status;
     }

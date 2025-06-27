@@ -250,6 +250,23 @@ Status SegmentIndexMeta::InitSet1() {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
+   {
+        Status status = SetNextChunkID(next_chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+        bool setted = GetOrSetMemIndex(mem_index);
+        if (!setted) {
+            return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::LoadSet() {
     // {
     //     String mem_index_key = GetSegmentIndexTag("mem_index");
@@ -501,6 +518,24 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
     segment_index_info->chunk_count_ = chunk_ids_.value().size();
     segment_index_info->files_ = std::move(segment_index_files);
     return segment_index_info;
+}
+
+Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::MapMetaToSnapShotInfo() {
+    SharedPtr<SegmentIndexSnapshotInfo> segment_index_snapshot_info = MakeShared<SegmentIndexSnapshotInfo>();
+    segment_index_snapshot_info->segment_id_ = segment_id_;
+    auto [chunk_ids, status] = GetChunkIDs1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }   
+    for (auto &chunk_id : *chunk_ids) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, *this);
+        auto [chunk_index_snapshot, chunk_index_status] = chunk_index_meta.MapMetaToSnapShotInfo(chunk_id);
+        if (!chunk_index_status.ok()) {
+            return {nullptr, chunk_index_status};
+        }
+        segment_index_snapshot_info->chunk_index_snapshots_.push_back(chunk_index_snapshot);
+    }
+    return {segment_index_snapshot_info, Status::OK()};
 }
 
 } // namespace infinity

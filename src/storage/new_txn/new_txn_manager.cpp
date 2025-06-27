@@ -450,7 +450,10 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             if (base_txn_store != nullptr) {
                 RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store);
                 system_cache_->AddNewTableCache(txn_store->db_id_, txn_store->table_id_, txn_store->table_name_);
-                system_cache_->ApplySegmentIDs(txn_store->db_id_, txn_store->table_id_, txn_store->segment_infos_.size());
+                // system_cache_->ApplySegmentIDs(txn_store->db_id_, txn_store->table_id_, txn_store->segment_infos_.size());
+                for (const auto &index_cmd : txn_store->index_cmds_) {
+                    system_cache_->AddNewIndexCache(txn_store->db_id_, txn_store->table_id_, index_cmd.index_id_);
+                }
             }
             break;
         }

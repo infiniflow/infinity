@@ -486,6 +486,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kDatabase: {
                             LOG_INFO(fmt::format("Execute snapshot database"));
+                            const String &db_name = snapshot_cmd->object_name();
+                            Status snapshot_status = Snapshot::CreateDatabaseSnapshot(query_context, snapshot_name, db_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
+
                             break;
                         }
                         case SnapshotScope::kTable: {

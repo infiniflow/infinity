@@ -941,6 +941,22 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
         table_snapshot_info->segment_snapshots_.emplace(segment_id, segment_snapshot);
     }
 
+    // Get index ids
+    if (!index_id_strs_) {
+        status = LoadIndexIDs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    for (const String &index_id : *index_id_strs_) {
+        TableIndexMeeta table_index_meta(index_id, *this);
+        auto [table_index_snapshot, table_index_status] = table_index_meta.MapMetaToSnapShotInfo();
+        if (!table_index_status.ok()) {
+            return {nullptr, table_index_status};
+        }
+        table_snapshot_info->table_index_snapshots_.emplace(index_id, table_index_snapshot);
+    }
+
     return {table_snapshot_info, Status::OK()};
 }
 
@@ -958,6 +974,8 @@ Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table
     }
     return Status::OK();
 }
+
+
 
 
 } // namespace infinity

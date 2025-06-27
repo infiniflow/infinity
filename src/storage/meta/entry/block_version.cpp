@@ -261,4 +261,17 @@ Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisi
     return Status::UnexpectedError(fmt::format("Offset {} out of range", offset));
 }
 
+void BlockVersion::RestoreFromSnapshot(TxnTimeStamp commit_ts) {
+    // set all the create timestamp to commit_ts
+    auto row_count = created_.back().row_count_;
+    created_.clear();
+    created_.emplace_back(commit_ts,row_count);
+    for(auto &ts:deleted_){
+        if(ts!=0){
+            ts = commit_ts;
+        }
+    }
+    latest_change_ts_ = commit_ts;
+}
+
 } // namespace infinity

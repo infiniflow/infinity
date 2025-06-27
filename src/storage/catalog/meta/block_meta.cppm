@@ -55,6 +55,8 @@ public:
 
     Status RestoreSet();
 
+    Status RestoreSetFromSnapshot();
+
     Status UninitSet(UsageFlag usage_flag);
 
     // Tuple<SizeT, Status> GetRowCnt();

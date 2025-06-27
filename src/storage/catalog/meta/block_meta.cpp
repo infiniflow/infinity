@@ -151,6 +151,36 @@ Status BlockMeta::RestoreSet() {
     return Status::OK();
 }
 
+Status BlockMeta::RestoreSetFromSnapshot() {
+    // TODO: need to fix this
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    {
+        String block_lock_key = GetBlockTag("lock");
+
+        Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
+    }
+    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             BlockVersion::FileName(),
+                                                             this->block_capacity(),
+                                                             buffer_mgr->persistence_manager());
+    
+    version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+    if (!version_buffer_) {
+        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
+    }
+    version_buffer_->AddObjRc();
+
+    BufferHandle buffer_handle = version_buffer_->Load();
+    auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+    block_version -> RestoreFromSnapshot(commit_ts_);
+
+    return Status::OK();
+}
+
 Status BlockMeta::UninitSet(UsageFlag usage_flag) {
     if (usage_flag == UsageFlag::kOther) {
         NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -416,7 +446,7 @@ Tuple<SharedPtr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapShotInfo(){
 }
 
 Status BlockMeta::RestoreFromSnapshot(){
-    Status status = RestoreSet();
+    Status status = RestoreSetFromSnapshot();
     if (!status.ok()) {
         return status;
     }
