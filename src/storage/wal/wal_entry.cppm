@@ -671,8 +671,8 @@ export struct WalCmdUpdateSegmentBloomFilterDataV2 final : public WalCmd {
 };
 
 export struct WalCmdCheckpoint final : public WalCmd {
-    WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, const String &catalog_path, const String &catalog_name)
-        : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path),
+    WalCmdCheckpoint(i64 max_commit_ts, const String &catalog_path, const String &catalog_name)
+        : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), catalog_path_(catalog_path),
           catalog_name_(catalog_name) {
         assert(!std::filesystem::path(catalog_path_).is_absolute());
     }
@@ -683,7 +683,6 @@ export struct WalCmdCheckpoint final : public WalCmd {
     String CompactInfo() const final;
 
     i64 max_commit_ts_{};
-    bool is_full_checkpoint_;
     String catalog_path_{};
     String catalog_name_{};
 };
@@ -1046,7 +1045,7 @@ export struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
-    // Return if the entry is a full checkpoint or delta checkpoint.
+    // Return if the entry is a checkpoint.
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpointV2 *&checkpoint_cmd) const;
 
@@ -1093,7 +1092,7 @@ public:
     [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    // Locate the latest full checkpoint entry, and purge bad entries after it.
+    // Locate the latest checkpoint entry, and purge bad entries after it.
     void PurgeBadEntriesAfterLatestCheckpoint();
     List<String> wal_list_{};
     UniquePtr<WalEntryIterator> iter_{};

@@ -16,6 +16,6 @@ compact_interval = "0s"
 [buffer]
 memindex_memory_quota   = "100MB"
 [wal]
-full_checkpoint_interval = "1s"
+checkpoint_interval = "1s"
 
 [resource]

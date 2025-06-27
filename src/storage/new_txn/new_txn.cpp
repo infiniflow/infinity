@@ -3777,6 +3777,30 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kCreateIndex: {
+            CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
+            TableMeeta table_meta(create_index_txn_store->db_id_str_,
+                                  create_index_txn_store->table_id_str_,
+                                  kv_instance_.get(),
+                                  abort_ts,
+                                  MAX_TIMESTAMP);
+            Vector<String> *index_id_strs_ptr = nullptr;
+            Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+
+            if (std::find(index_id_strs_ptr->begin(), index_id_strs_ptr->end(), create_index_txn_store->index_id_str_) != index_id_strs_ptr->end()) {
+                Vector<UniquePtr<MetaKey>> metas;
+                metas.emplace_back(MakeUnique<TableIndexMetaKey>(create_index_txn_store->db_id_str_,
+                                                                 create_index_txn_store->table_id_str_,
+                                                                 create_index_txn_store->index_id_str_,
+                                                                 *create_index_txn_store->index_base_->index_name_));
+
+                Status status = CleanupInner(std::move(metas));
+                if (!status.ok()) {
+                    UnrecoverableError("During PostRollback, cleanup failed.");
+                }
+            }
             break;
         }
         case TransactionType::kDropIndex: {

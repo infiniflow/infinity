@@ -253,7 +253,7 @@ TEST_F(ConfigTest, TestValidValues) {
 
     // wal
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
-    EXPECT_EQ(config.FullCheckpointInterval(), 86400l);
+    EXPECT_EQ(config.CheckpointInterval(), 86400l);
     EXPECT_EQ(config.WALCompactThreshold(), 1024l * 1024l * 1024l);
     // resource
     EXPECT_EQ(config.ResourcePath(), "/var/infinity/resource");
