@@ -1833,8 +1833,8 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
 
 Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     switch (statement->type()) {
-        case FlushType::kDelta: {
-            return BuildFlushDelta(statement, bind_context_ptr);
+        case FlushType::kCatalog: {
+            return BuildFlushCatalog(statement, bind_context_ptr);
         }
         case FlushType::kData: {
             return BuildFlushData(statement, bind_context_ptr);
@@ -1849,8 +1849,8 @@ Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<Bin
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildFlushDelta(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kDelta);
+Status LogicalPlanner::BuildFlushCatalog(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kCatalog);
     this->logical_plan_ = logical_flush;
     return Status::OK();
 }
