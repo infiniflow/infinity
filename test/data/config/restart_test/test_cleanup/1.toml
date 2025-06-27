@@ -16,6 +16,6 @@ compact_interval = "0s"
 
 [buffer]
 [wal]
-full_checkpoint_interval = "3s"
+checkpoint_interval = "3s"
 
 [resource]

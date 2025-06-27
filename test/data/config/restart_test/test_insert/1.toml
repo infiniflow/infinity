@@ -12,6 +12,6 @@ mem_index_capacity       = 8192
 
 [buffer]
 [wal]
-full_checkpoint_interval = "10s"
+checkpoint_interval = "10s"
 
 [resource]
