@@ -58,6 +58,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
     if (nullptr != pm) {
         PersistResultHandler handler(pm);
         PersistReadResult result = pm->GetObjCache(posting_file);
+        LOG_DEBUG(fmt::format("DiskIndexSegmentReader pm->GetObjCache(posting_file) {}", posting_file));
         const ObjAddr &obj_addr = handler.HandleReadResult(result);
         if (!obj_addr.Valid()) {
             // Empty posting
@@ -83,6 +84,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(SegmentID segment_id,
     if (nullptr != pm) {
         PersistResultHandler handler(pm);
         PersistReadResult result = pm->GetObjCache(dict_file);
+        LOG_DEBUG(fmt::format("DiskIndexSegmentReader pm->GetObjCache(dict_file) {}", dict_file));
         const ObjAddr &obj_addr = handler.HandleReadResult(result);
         dict_file = pm->GetObjPath(obj_addr.obj_key_);
     }
@@ -106,7 +108,9 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     if (nullptr != pm) {
         PersistResultHandler handler(pm);
         PersistWriteResult res1 = pm->PutObjCache(dict_file_);
+        LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(dict_file) {}", dict_file_));
         PersistWriteResult res2 = pm->PutObjCache(posting_file_);
+        LOG_DEBUG(fmt::format("~DiskIndexSegmentReader pm->PutObjCache(posting_file) {}", posting_file_));
         handler.HandleWriteResult(res1);
         handler.HandleWriteResult(res2);
     }
