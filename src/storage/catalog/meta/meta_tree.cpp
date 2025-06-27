@@ -955,74 +955,116 @@ bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<Str
 
 bool MetaTree::CheckData(const String &path) {
     LOG_INFO(path);
-    static const std::regex re(
-        R"(^(?:db_([^/]+))\/(?:tbl_([^/]+))(?:\/idx_([^/]+))?\/seg_(\d+)\/(?:blk_(\d+)|chunk_(\d+))(?:[._](\w+)(?:_(\d+))?)?$)",
-        std::regex::optimize | std::regex::icase);
-    // db_{}/tbl_{}/seg_{}/blk_{}/({}.col | version | col_{}_out | trash)
-    // db_{}/tbl_{}/idx_{}/(chunk_{}.idx | ft_{}.pos | ft_{}.dic | ft_{}.len | trash)
+    static const std::regex re_col(R"(^(?:db_(\d+)\/tbl_(\d+)\/seg_(\d+)\/blk_(\d+)\/(?:version|(\d+)\.col|col_(\d+)_out))$)",
+                                   std::regex::optimize | std::regex::icase);
+
+    static const std::regex re_idx(R"(^(?:db_(\d+)\/tbl_(\d+)\/idx_(\d+)\/seg_(\d+)\/(?:chunk_(\d+)\.(\w+)|ft_(\d+)\.(\w+)))$)",
+                                   std::regex::optimize | std::regex::icase);
+
     std::smatch m;
-    if (!std::regex_match(path, m, re)) {
+    String db_id_str, table_id_str, index_id_str, suffix_id, suffix;
+    SegmentID segment_id = INVALID_SEGMENT_ID;
+    BlockID block_id = INVALID_BLOCK_ID;
+
+    if (std::regex_match(path, m, re_col)) {
+        db_id_str = m[1];
+        table_id_str = m[2];
+        segment_id = static_cast<SegmentID>(std::stoull(m[3]));
+        block_id = static_cast<BlockID>(std::stoull(m[4]));
+        if (m[5].matched) {
+            suffix_id = m[5];
+            suffix = "col";
+        } else if (m[6].matched) {
+            suffix = "out";
+            suffix_id = m[6];
+        } else {
+            suffix = "version";
+        }
+    } else if (std::regex_match(path, m, re_idx)) {
+        db_id_str = m[1];
+        table_id_str = m[2];
+        index_id_str = m[3];
+        segment_id = static_cast<SegmentID>(std::stoull(m[4]));
+        if (m[5].matched) {
+            suffix_id = m[5];
+            suffix = m[6];
+        } else if (m[7].matched) {
+            suffix_id = m[7];
+            suffix = m[8];
+        }
+    } else {
+        return true;
+    }
+
+    if (suffix == "dic" || suffix == "pos" || suffix == "len") {
+        bool miss = !ExistInMetas(MetaType::kSegmentIndex, [&](MetaKey *b) {
+            auto *k = static_cast<SegmentIndexMetaKey *>(b);
+            return k->db_id_str_ == db_id_str && k->table_id_str_ == table_id_str && k->index_id_str_ == index_id_str && k->segment_id_ == segment_id;
+        }) || !ExistInMetas(MetaType::kTableIndex, [&](MetaKey *b) {
+            auto *k = static_cast<TableIndexMetaKey *>(b);
+            return k->db_id_str_ == db_id_str && k->table_id_str_ == table_id_str && k->index_id_str_ == index_id_str;
+        });
+
+        if (!miss)
+            index_[path] = {db_id_str, table_id_str, 0};
+        return miss;
+
         return false;
     }
-
-    try {
-        String db = m[1];
-        String tbl = m[2];
-        String idx = m[3].matched ? m[3] : String{};
-        SegmentID seg = static_cast<SegmentID>(std::stoull(m[4]));
-        BlockID blk = m[5].matched ? static_cast<BlockID>(std::stoull(m[5])) : INVALID_BLOCK_ID;
-        String suf = m[6].matched ? m[6] : String{};
-        String suf_id = m[7].matched ? m[7] : String{};
-
-        if ((suf == "dic" || suf == "pos" || suf == "len" || suf.empty()) && idx.empty()) {
-            return false;
-        }
-
-        if (suf == "col" && path.rfind("_out") == path.size() - 4) {
-            ColumnID cid = static_cast<ColumnID>(std::stoull(suf_id));
-            out_[path] = {db, tbl, cid};
-            return true;
-        }
-
-        if (suf_id == "col" && idx.empty()) {
-            ColumnID cid = static_cast<ColumnID>(std::stoull(suf));
-            bool miss = !ExistInMetas(MetaType::kSegment, [&](MetaKey *b) {
-                auto *segment_meta = static_cast<SegmentMetaKey *>(b);
-                return segment_meta->db_id_str_ == db && segment_meta->table_id_str_ == tbl && segment_meta->segment_id_ == seg;
-            }) || !ExistInMetas(MetaType::kBlock, [&](MetaKey *b) {
-                auto *block_meta = static_cast<BlockMetaKey *>(b);
-                return block_meta->db_id_str_ == db && block_meta->table_id_str_ == tbl && block_meta->segment_id_ == seg && block_meta->block_id_ == blk;
-            }) || !ExistInMetas(MetaType::kTableColumn, [&](MetaKey *b) {
-                auto *table_column_meta = static_cast<TableColumnMetaKey *>(b);
-                return table_column_meta->db_id_str_ == db && table_column_meta->table_id_str_ == tbl && table_column_meta->column_name_ == suf_id;
-            });
-
-            if (!miss)
-                col_.emplace(db, tbl, cid);
-            return miss;
-        }
-
-        if (suf_id == "idx" && !idx.empty()) {
-            ChunkID ck = static_cast<ChunkID>(std::stoull(suf));
-            bool miss = !ExistInMetas(MetaType::kSegmentIndex, [&](MetaKey *b) {
-                auto *k = static_cast<SegmentIndexMetaKey *>(b);
-                return k->db_id_str_ == db && k->table_id_str_ == tbl && k->index_id_str_ == idx && k->segment_id_ == seg;
-            }) || !ExistInMetas(MetaType::kChunkIndex, [&](MetaKey *b) {
-                auto *k = static_cast<ChunkIndexMetaKey *>(b);
-                return k->db_id_str_ == db && k->table_id_str_ == tbl && k->segment_id_ == seg && k->chunk_id_ == ck;
-            }) || !ExistInMetas(MetaType::kTableIndex, [&](MetaKey *b) {
-                auto *k = static_cast<TableIndexMetaKey *>(b);
-                return k->db_id_str_ == db && k->table_id_str_ == tbl && k->index_id_str_ == idx;
-            });
-
-            if (!miss)
-                index_[path] = {db, tbl, 0};
-            return miss;
-        }
-        return true;
-    } catch (const std::exception &e) {
+    if (suffix == "out") {
+        auto cid = static_cast<ColumnID>(std::stoull(suffix_id));
+        out_[path] = {db_id_str, table_id_str, cid};
         return true;
     }
+    if (suffix == "version") {
+        bool miss = !ExistInMetas(MetaType::kBlock, [&](MetaKey *b) {
+            auto *block_meta = static_cast<BlockMetaKey *>(b);
+            return block_meta->db_id_str_ == db_id_str && block_meta->table_id_str_ == table_id_str && block_meta->segment_id_ == segment_id &&
+                   block_meta->block_id_ == block_id;
+        });
+
+        return miss;
+    }
+    if (suffix == "col") {
+        auto column_id = static_cast<ColumnID>(std::stoull(suffix_id));
+        bool miss = !ExistInMetas(MetaType::kSegment, [&](MetaKey *b) {
+            auto *segment_meta = static_cast<SegmentMetaKey *>(b);
+            return segment_meta->db_id_str_ == db_id_str && segment_meta->table_id_str_ == table_id_str && segment_meta->segment_id_ == segment_id;
+        }) || !ExistInMetas(MetaType::kBlock, [&](MetaKey *b) {
+            auto *block_meta = static_cast<BlockMetaKey *>(b);
+            return block_meta->db_id_str_ == db_id_str && block_meta->table_id_str_ == table_id_str && block_meta->segment_id_ == segment_id &&
+                   block_meta->block_id_ == block_id;
+        }) || !ExistInMetas(MetaType::kTableColumn, [&](MetaKey *b) {
+            auto *table_column_meta = static_cast<TableColumnMetaKey *>(b);
+            auto json = table_column_meta->ToJson();
+            auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
+            return table_column_meta->db_id_str_ == db_id_str && table_column_meta->table_id_str_ == table_id_str && meta_column_id == column_id;
+        });
+
+        if (!miss)
+            col_.emplace(db_id_str, table_id_str, column_id);
+        return miss;
+    }
+    if (suffix == "idx") {
+        auto chunk_id = static_cast<ChunkID>(std::stoull(suffix_id));
+        bool miss = !ExistInMetas(MetaType::kSegmentIndex, [&](MetaKey *b) {
+            auto *segment_index_meta = static_cast<SegmentIndexMetaKey *>(b);
+            return segment_index_meta->db_id_str_ == db_id_str && segment_index_meta->table_id_str_ == table_id_str &&
+                   segment_index_meta->index_id_str_ == index_id_str && segment_index_meta->segment_id_ == segment_id;
+        }) || !ExistInMetas(MetaType::kChunkIndex, [&](MetaKey *b) {
+            auto *chunk_index_meta = static_cast<ChunkIndexMetaKey *>(b);
+            return chunk_index_meta->db_id_str_ == db_id_str && chunk_index_meta->table_id_str_ == table_id_str && chunk_index_meta->segment_id_ == segment_id && chunk_index_meta->chunk_id_ == chunk_id;
+        }) || !ExistInMetas(MetaType::kTableIndex, [&](MetaKey *b) {
+            auto *table_index_meta = static_cast<TableIndexMetaKey *>(b);
+            return table_index_meta->db_id_str_ == db_id_str && table_index_meta->table_id_str_ == table_id_str && table_index_meta->index_id_str_ == index_id_str;
+        });
+
+        if (!miss) {
+            index_[path] = {db_id_str, table_id_str, 0};
+        }
+        return miss;
+    }
+    return true;
 }
 
 HashSet<String> MetaTree::GetDataVfsPathSet() {

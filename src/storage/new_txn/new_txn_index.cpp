@@ -1124,7 +1124,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
     segment_index_meta.GetOrSetMemIndex(mem_index);
 
     RowID base_row_id(segment_index_meta.segment_id(), 0);
-    String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+    String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64()); //
     String full_path;
     {
         SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
