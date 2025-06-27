@@ -51,14 +51,14 @@ void PhysicalCheck::Init(QueryContext *query_context) {
         case CheckStmtType::kSystem: {
             output_names_->reserve(1);
             output_types_->reserve(1);
-            output_names_->emplace_back("data");
+            output_names_->emplace_back("mismatch_data");
             output_types_->emplace_back(varchar_type);
             break;
         }
         case CheckStmtType::kTable: {
             output_names_->reserve(1);
             output_types_->reserve(1);
-            output_names_->emplace_back("data");
+            output_names_->emplace_back("mismatch_data");
             output_types_->emplace_back(varchar_type);
             break;
         }
