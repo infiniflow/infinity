@@ -997,18 +997,20 @@ bool MetaTree::CheckData(const String &path) {
     }
 
     if (suffix == "dic" || suffix == "pos" || suffix == "len") {
-        bool miss = !ExistInMetas(MetaType::kSegmentIndex, [&](MetaKey *b) {
-            auto *k = static_cast<SegmentIndexMetaKey *>(b);
-            return k->db_id_str_ == db_id_str && k->table_id_str_ == table_id_str && k->index_id_str_ == index_id_str && k->segment_id_ == segment_id;
-        }) || !ExistInMetas(MetaType::kTableIndex, [&](MetaKey *b) {
-            auto *k = static_cast<TableIndexMetaKey *>(b);
-            return k->db_id_str_ == db_id_str && k->table_id_str_ == table_id_str && k->index_id_str_ == index_id_str;
-        });
-        // RowID base_row_id(segment_index_meta.segment_id(), 0);
-        // String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64()); //
-        if (!miss)
-            index_[path] = {db_id_str, table_id_str, 0};
-        return miss;
+        // fulltext later
+        // bool miss = !ExistInMetas(MetaType::kSegmentIndex, [&](MetaKey *b) {
+        //     auto *k = static_cast<SegmentIndexMetaKey *>(b);
+        //     return k->db_id_str_ == db_id_str && k->table_id_str_ == table_id_str && k->index_id_str_ == index_id_str && k->segment_id_ == segment_id;
+        // }) || !ExistInMetas(MetaType::kTableIndex, [&](MetaKey *b) {
+        //     auto *k = static_cast<TableIndexMetaKey *>(b);
+        //     return k->db_id_str_ == db_id_str && k->table_id_str_ == table_id_str && k->index_id_str_ == index_id_str;
+        // });
+        // // RowID base_row_id(segment_index_meta.segment_id(), 0);
+        // // String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+        // if (!miss)
+        //     index_[path] = {db_id_str, table_id_str, 0};
+        // return miss;
+        return true;
     }
     if (suffix == "out") {
         auto cid = static_cast<ColumnID>(std::stoull(suffix_id));
