@@ -2144,6 +2144,10 @@ flush_statement: FLUSH DATA {
 | FLUSH BUFFER {
     $$ = new infinity::FlushStatement();
     $$->type_ = infinity::FlushType::kBuffer;
+}
+| FLUSH CATALOG {
+    $$ = new infinity::FlushStatement();
+    $$->type_ = infinity::FlushType::kCatalog;
 };
 
 /*
