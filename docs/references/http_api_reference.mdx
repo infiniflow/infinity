@@ -2922,42 +2922,6 @@ The response includes a JSON object like the following:
 
 ---
 
-### Show delta checkpoints
-
-**GET** `/instance/delta_checkpoint`
-
-Shows delta logs.
-
-#### Request
-
-- Method: GET
-- URL: `/instance/delta_checkpoint`
-- Headers: `accept: application/json`
-
-##### Request example
-
-```shell
-curl --request GET \
-    --url http://localhost:23821/instance/delta_checkpoint \
-    --header 'accept: application/json'
-```
-
-#### Response
-
-##### Status code 200
-
-The response includes a JSON object like the following:
-
-```shell
-{
-    "error_code":0,
-}
-```
-
-- `"error_code"`: `integer`  
-  `0`: The operation succeeds.
-
----
 
 ### Show checkpoints
 
@@ -2988,7 +2952,7 @@ The response includes a JSON object like the following:
 ```shell
 {
     "error_code":0,
-    "full_checkpoint":[
+    "checkpoint":[
         {
             "file_path":"/var/infinity/data/catalog/FULL.82192.json",
             "max_commit_timestamp":"82192"

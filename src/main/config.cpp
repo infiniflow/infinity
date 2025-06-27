@@ -613,11 +613,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
         // Checkpoint Interval
         i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
-        UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                             checkpoint_interval,
-                                                                                             MAX_CHECKPOINT_INTERVAL_SEC,
-                                                                                             MIN_CHECKPOINT_INTERVAL_SEC);
-        status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
+        UniquePtr<IntegerOption> checkpoint_interval_option =
+            MakeUnique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME, checkpoint_interval, MAX_CHECKPOINT_INTERVAL_SEC, MIN_CHECKPOINT_INTERVAL_SEC);
+        status = global_options_.AddOption(std::move(checkpoint_interval_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -2334,8 +2332,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             // Checkpoint Interval
                             i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
                             if (elem.second.is_string()) {
-                                String full_checkpoint_interval_str = elem.second.value_or(DEFAULT_CHECKPOINT_INTERVAL_SEC_STR.data());
-                                auto res = ParseTimeInfo(full_checkpoint_interval_str, checkpoint_interval);
+                                String checkpoint_interval_str = elem.second.value_or(DEFAULT_CHECKPOINT_INTERVAL_SEC_STR.data());
+                                auto res = ParseTimeInfo(checkpoint_interval_str, checkpoint_interval);
                                 if (!res.ok()) {
                                     return res;
                                 }
@@ -2343,15 +2341,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                 return Status::InvalidConfig("'checkpoint_interval' field isn't string, such as \"30s\".");
                             }
 
-                            UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                                                 checkpoint_interval,
-                                                                                                                 MAX_CHECKPOINT_INTERVAL_SEC,
-                                                                                                                 MIN_CHECKPOINT_INTERVAL_SEC);
-                            if (!full_checkpoint_interval_option->Validate()) {
+                            UniquePtr<IntegerOption> checkpoint_interval_option = MakeUnique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                                            checkpoint_interval,
+                                                                                                            MAX_CHECKPOINT_INTERVAL_SEC,
+                                                                                                            MIN_CHECKPOINT_INTERVAL_SEC);
+                            if (!checkpoint_interval_option->Validate()) {
                                 return Status::InvalidConfig(fmt::format("Invalid checkpoint interval: {}", checkpoint_interval));
                             }
 
-                            Status status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
+                            Status status = global_options_.AddOption(std::move(checkpoint_interval_option));
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
                             }
@@ -2415,11 +2413,11 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCheckpointInterval) == nullptr) {
                     // Checkpoint Interval
                     i64 checkpoint_interval = DEFAULT_CHECKPOINT_INTERVAL_SEC;
-                    UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME,
-                                                                                                         checkpoint_interval,
-                                                                                                         MAX_CHECKPOINT_INTERVAL_SEC,
-                                                                                                         MIN_CHECKPOINT_INTERVAL_SEC);
-                    Status status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
+                    UniquePtr<IntegerOption> checkpoint_interval_option = MakeUnique<IntegerOption>(CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                                    checkpoint_interval,
+                                                                                                    MAX_CHECKPOINT_INTERVAL_SEC,
+                                                                                                    MIN_CHECKPOINT_INTERVAL_SEC);
+                    Status status = global_options_.AddOption(std::move(checkpoint_interval_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2875,8 +2873,8 @@ void Config::SetFullCheckpointInterval(i64 interval) {
         String error_message = "Attempt to set non-integer value to checkpoint interval";
         UnrecoverableError(error_message);
     }
-    IntegerOption *full_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
-    full_checkpoint_interval_option->value_ = interval;
+    IntegerOption *checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
+    checkpoint_interval_option->value_ = interval;
     return;
 }
 

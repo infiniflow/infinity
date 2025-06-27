@@ -205,7 +205,8 @@ TEST_P(RepeatReplayTest, append) {
 
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         CheckTable(new_txn_mgr, 2);
-        { //  manually add delta checkpoint
+        {
+            //  manually add checkpoint
             std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
@@ -333,7 +334,7 @@ TEST_P(RepeatReplayTest, import) {
         BufferManager *buffer_mgr = storage->buffer_manager();
         CheckTable(new_txn_mgr, 2);
         {
-            //  manually add delta checkpoint
+            //  manually add checkpoint
             std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};

@@ -432,8 +432,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             if (test_command->command_content() == "stuck dump by line bg_task for 3 second") {
                 auto *compact_processor = query_context->storage()->compaction_processor();
                 compact_processor->AddTestCommand(BGTaskType::kTestCommand, "stuck for 3 seconds");
-            } else if (test_command->command_content() == "delta checkpoint") {
-                LOG_INFO(fmt::format("test command: delta checkpoint"));
             } else {
                 LOG_INFO(fmt::format("test command: other"));
             }

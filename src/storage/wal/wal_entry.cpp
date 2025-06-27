@@ -577,10 +577,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
         }
         case WalCommandType::CHECKPOINT: {
             i64 max_commit_ts = ReadBufAdv<i64>(ptr);
-            bool is_full_checkpoint = ReadBufAdv<i8>(ptr);
             String catalog_path = ReadBufAdv<String>(ptr);
             String catalog_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path, catalog_name);
+            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path, catalog_name);
             break;
         }
         case WalCommandType::CHECKPOINT_V2: {
@@ -1021,7 +1020,7 @@ bool WalCmdUpdateSegmentBloomFilterDataV2::operator==(const WalCmd &other) const
 
 bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpoint *>(&other);
-    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
+    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_;
 }
 
 bool WalCmdCheckpointV2::operator==(const WalCmd &other) const {
@@ -1621,7 +1620,6 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     assert(!std::filesystem::path(catalog_path_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
-    WriteBufAdv(buf, i8(this->is_full_checkpoint_));
     WriteBufAdv(buf, this->catalog_path_);
     WriteBufAdv(buf, this->catalog_name_);
 }
@@ -2029,7 +2027,6 @@ String WalCmdCheckpoint::ToString() const {
     ss << "Checkpoint: " << std::endl;
     ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
     ss << "max commit ts: " << max_commit_ts_ << std::endl;
-    ss << "is checkpoint: " << is_full_checkpoint_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -2391,11 +2388,10 @@ String WalCmdUpdateSegmentBloomFilterDataV2::CompactInfo() const {
 }
 
 String WalCmdCheckpoint::CompactInfo() const {
-    return fmt::format("{}: path: {}, max_commit_ts: {}, full_checkpoint: {}",
+    return fmt::format("{}: path: {}, max_commit_ts: {},",
                        WalCmd::WalCommandTypeToString(GetType()),
                        fmt::format("{}/{}", catalog_path_, catalog_name_),
-                       max_commit_ts_,
-                       is_full_checkpoint_);
+                       max_commit_ts_);
 }
 
 String WalCmdCheckpointV2::CompactInfo() const {
