@@ -2029,7 +2029,7 @@ String WalCmdCheckpoint::ToString() const {
     ss << "Checkpoint: " << std::endl;
     ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
     ss << "max commit ts: " << max_commit_ts_ << std::endl;
-    ss << "is full checkpoint: " << is_full_checkpoint_ << std::endl;
+    ss << "is checkpoint: " << is_full_checkpoint_ << std::endl;
     return std::move(ss).str();
 }
 

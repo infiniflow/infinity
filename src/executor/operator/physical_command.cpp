@@ -275,14 +275,14 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             config->SetCleanupInterval(interval);
                             break;
                         }
-                        case GlobalOptionIndex::kFullCheckpointInterval: {
+                        case GlobalOptionIndex::kCheckpointInterval: {
                             if (set_command->value_type() != SetVarType::kInteger) {
                                 Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
                             if (interval < 0) {
-                                Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set checkpoint interval: {}", interval));
                                 RecoverableError(status);
                             }
                             query_context->storage()->periodic_trigger_thread()->checkpoint_trigger_->UpdateInternal(interval);
@@ -447,7 +447,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             const String &snapshot_name = snapshot_cmd->name();
 
             {
-                // Full checkpoint
+                // checkpoint
                 auto *wal_manager = query_context->storage()->wal_manager();
                 if (wal_manager->IsCheckpointing()) {
                     LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");

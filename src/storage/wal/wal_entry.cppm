@@ -1044,7 +1044,7 @@ export struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
-    // Return if the entry is a full checkpoint or delta checkpoint.
+    // Return if the entry is a checkpoint or delta checkpoint.
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpointV2 *&checkpoint_cmd) const;
 
@@ -1091,7 +1091,7 @@ public:
     [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    // Locate the latest full checkpoint entry, and purge bad entries after it.
+    // Locate the latest checkpoint entry, and purge bad entries after it.
     void PurgeBadEntriesAfterLatestCheckpoint();
     List<String> wal_list_{};
     UniquePtr<WalEntryIterator> iter_{};
