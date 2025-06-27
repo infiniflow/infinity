@@ -1,4 +1,5 @@
-# generate 'test/sql/dml/compact/test_compact_big.slt' and 'test/data/csv/test_compact_big.csv'
+# generate 'test/sql/dml/import/test_import_more_than_one_segment.slt'
+# generate 'test/data/csv/test_import_more_than_one_segment.csv'
 
 import os
 import argparse

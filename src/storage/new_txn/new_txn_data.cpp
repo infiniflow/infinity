@@ -216,12 +216,15 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     }
     LOG_TRACE(fmt::format("Import: apply segment id starting at: {}, count {}", segment_ids[0], segment_count));
 
+    Vector<UniquePtr<SegmentMeta>> segment_metas;
+    segment_metas.reserve(segment_count);
     for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
         Optional<SegmentMeta> segment_meta;
         status = NewCatalog::AddNewSegmentWithID(table_meta, fake_commit_ts, segment_meta, segment_ids[segment_idx]);
         if (!status.ok()) {
             return status;
         }
+        segment_metas.emplace_back(MakeUnique<SegmentMeta>(segment_ids[segment_idx], table_meta));
     }
 
     Vector<SizeT> segment_row_cnts(segment_count, 0);
@@ -236,8 +239,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         Optional<BlockMeta> block_meta;
         // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
         SizeT segment_idx = input_block_idx / DEFAULT_BLOCK_PER_SEGMENT;
-        SegmentMeta segment_meta(segment_ids[segment_idx], table_meta);
-        status = NewCatalog::AddNewBlock1(segment_meta, fake_commit_ts, block_meta);
+        status = NewCatalog::AddNewBlock1(*segment_metas[segment_idx], fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
         }
@@ -306,14 +308,14 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     //     return status;
     // }
     Vector<WalSegmentInfo> segment_infos;
+    segment_infos.reserve(segment_count);
     for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
-        SegmentMeta segment_meta(segment_ids[segment_idx], table_meta);
-        WalSegmentInfo segment_info(segment_meta, begin_ts);
+        WalSegmentInfo segment_info(*segment_metas[segment_idx], begin_ts);
         for (SizeT i = 0; i < block_row_cnts[segment_idx].size(); ++i) {
             segment_info.block_infos_[i].row_count_ = block_row_cnts[segment_idx][i];
         }
         segment_info.row_count_ = segment_row_cnts[segment_idx];
-        status = this->AddSegmentVersion(segment_info, segment_meta);
+        status = this->AddSegmentVersion(segment_info, *segment_metas[segment_idx]);
         if (!status.ok()) {
             return status;
         }
@@ -364,14 +366,13 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
-            SegmentMeta segment_meta(segment_ids[segment_idx], table_meta);
             SizeT segment_row_cnt = segment_row_cnts[segment_idx];
             status = this->PopulateIndex(db_name,
                                          table_name,
                                          index_name,
                                          table_key,
                                          table_index_meta,
-                                         segment_meta,
+                                         *segment_metas[segment_idx],
                                          segment_row_cnt,
                                          DumpIndexCause::kImport);
             if (!status.ok()) {
