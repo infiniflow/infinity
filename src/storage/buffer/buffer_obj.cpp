@@ -233,6 +233,9 @@ void BufferObj::PickForCleanup() {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
         case BufferStatus::kNew: {
+            if (file_worker_->GetData() != nullptr) {
+                file_worker_->FreeInMemory();
+            }
             buffer_mgr_->AddToCleanList(this, false /*do_free*/);
             break;
         }

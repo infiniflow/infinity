@@ -404,6 +404,7 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
         LOG_TRACE(fmt::format("PutObjCache empty object {} for local path {}", obj_addr.obj_key_, local_path));
         return result;
     }
+    std::lock_guard<std::mutex> lock(mtx_);
     if (obj_addr.obj_key_ == current_object_key_) {
         if (current_object_ref_count_ <= 0) {
             UnrecoverableError(fmt::format("PutObjCache current object {} ref count is {}", obj_addr.obj_key_, current_object_ref_count_));

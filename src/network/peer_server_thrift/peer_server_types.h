@@ -18,7 +18,6 @@
 #include <functional>
 #include <memory>
 
-
 namespace infinity_peer_server {
 
 struct NodeType {

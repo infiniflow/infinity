@@ -314,6 +314,7 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
     Vector<String> column_names_{};
     Vector<ColumnID> column_ids_{};
     String table_key_{};
+    Vector<String> column_keys_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

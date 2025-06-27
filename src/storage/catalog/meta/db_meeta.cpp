@@ -25,15 +25,28 @@ import third_party;
 import infinity_exception;
 import meta_info;
 import default_values;
+import new_txn;
+import utility;
+import kv_utility;
 
 namespace infinity {
 
-DBMeeta::DBMeeta(String db_id_str, KVInstance &kv_instance) : db_id_str_(std::move(db_id_str)), kv_instance_(kv_instance) {}
+DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str)), txn_(txn) {
+    if (txn == nullptr) {
+        UnrecoverableError("Null txn pointer");
+    }
+    read_ts_ = txn->BeginTS();
+    kv_instance_ = txn_->kv_instance();
+}
+
+DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance) : db_id_str_(std::move(db_id_str)), read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+
+const String &DBMeeta::db_id_str() const { return db_id_str_; }
 
 Status DBMeeta::InitSet(const String *comment) {
     if (comment) {
         String db_comment_key = GetDBTag("comment");
-        Status status = kv_instance_.Put(db_comment_key, *comment);
+        Status status = kv_instance_->Put(db_comment_key, *comment);
         if (!status.ok()) {
             return status;
         }
@@ -41,7 +54,7 @@ Status DBMeeta::InitSet(const String *comment) {
 
     // Create next table id;
     String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
-    Status status = kv_instance_.Put(next_table_id_key, "0");
+    Status status = kv_instance_->Put(next_table_id_key, "0");
     if (!status.ok()) {
         return status;
     }
@@ -50,15 +63,17 @@ Status DBMeeta::InitSet(const String *comment) {
 }
 
 Status DBMeeta::UninitSet(UsageFlag usage_flag) {
+    // called by cleanup to clean all data of the database.
+
     Status status;
 
     String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);
 
-    auto iter = kv_instance_.GetIterator();
+    auto iter = kv_instance_->GetIterator();
     iter->Seek(db_table_prefix);
     while (iter->Valid() && iter->Key().starts_with(db_table_prefix)) {
         String table_key = iter->Key().ToString();
-        status = kv_instance_.Delete(table_key);
+        status = kv_instance_->Delete(table_key);
         if (!status.ok()) {
             return status;
         }
@@ -66,14 +81,14 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     String db_comment_key = GetDBTag("comment");
-    status = kv_instance_.Delete(db_comment_key);
+    status = kv_instance_->Delete(db_comment_key);
     if (!status.ok()) {
         return status;
     }
 
     // Delete table comment
     String db_next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
-    status = kv_instance_.Delete(db_next_table_id_key);
+    status = kv_instance_->Delete(db_next_table_id_key);
     if (!status.ok()) {
         return status;
     }
@@ -81,137 +96,161 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
     return Status::OK();
 }
 
-Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str) {
-    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
-    auto iter2 = kv_instance_.GetIterator();
-    iter2->Seek(table_key_prefix);
-    SizeT found_count = 0;
-
-    Vector<String> error_table_keys;
-    while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
-        if (found_count > 0) {
-            // Error branch
-            error_table_keys.push_back(table_key);
+Status DBMeeta::GetComment(String *&comment) {
+    if (!comment_) {
+        String comment_str;
+        String db_comment_key = GetDBTag("comment");
+        Status status = kv_instance_->Get(db_comment_key, comment_str);
+        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
+            // "comment" not found is ok
+            return status;
         }
-        table_key = iter2->Key().ToString();
-        table_id_str = iter2->Value().ToString();
+        comment_ = std::move(comment_str);
+    }
+    comment = &*comment_;
+    return Status::OK();
+}
+
+Status DBMeeta::GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names) {
+    if (!table_id_strs_ || !table_names_) {
+        Status status = LoadTableIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    table_id_strs = &*table_id_strs_;
+    if (table_names) {
+        *table_names = &*table_names_;
+    }
+    return Status::OK();
+}
+
+Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str) {
+
+    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_key_prefix);
+
+    Vector<Pair<String, String>> table_kvs;
+    while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
+        table_kvs.emplace_back(iter2->Key().ToString(), iter2->Value().ToString());
         iter2->Next();
-        ++found_count;
     }
 
-    if (found_count == 0) {
-        // No table, ignore it.
+    if (table_kvs.empty()) {
         return Status::TableNotExist(table_name);
     }
 
-    if (!error_table_keys.empty()) {
-        error_table_keys.push_back(table_key);
-        // join error_table_keys
-        String error_table_keys_str =
-            std::accumulate(std::next(error_table_keys.begin()), error_table_keys.end(), error_table_keys.front(), [](String a, String b) {
-                return a + ", " + b;
-            });
-        UnrecoverableError(fmt::format("Found multiple table keys: {}", error_table_keys_str));
+    SizeT max_visible_table_index = std::numeric_limits<SizeT>::max();
+    TxnTimeStamp max_commit_ts = 0;
+    for (SizeT i = 0; i < table_kvs.size(); ++i) {
+        TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(table_kvs[i].first);
+        if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
+            max_commit_ts = commit_ts;
+            max_visible_table_index = i;
+        }
+    }
+
+    if (max_visible_table_index == std::numeric_limits<SizeT>::max()) {
+        return Status::TableNotExist(table_name);
+    }
+
+    table_id_str = table_kvs[max_visible_table_index].second;
+    table_key = table_kvs[max_visible_table_index].first;
+
+    String drop_table_ts{};
+    kv_instance_->Get(KeyEncode::DropTableKey(db_id_str_, table_name, table_id_str, max_commit_ts), drop_table_ts);
+
+    String rename_table_ts{};
+    kv_instance_->Get(KeyEncode::RenameTableKey(db_id_str_, table_name, table_id_str, max_commit_ts), rename_table_ts);
+
+    if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= read_ts_) ||
+        (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= read_ts_)) {
+        return Status::TableNotExist(table_name);
     }
 
     return Status::OK();
 }
 
-Status DBMeeta::GetTableName(const String &table_id_str, String &table_key, String &table_name) const {
-    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);
-
-    size_t start, end;
-    auto iter = kv_instance_.GetIterator();
-    iter->Seek(db_table_prefix);
-    while (iter->Valid() && iter->Key().starts_with(db_table_prefix)) {
-        table_key = iter->Key().ToString();
-        start = db_table_prefix.size();
-        end = table_key.find('|', start);
-        if (table_id_str == iter->Value().ToString()) {
-            table_name = table_key.substr(start, end - start);
-            return Status::OK();
-        }
-        iter->Next();
-    }
-    table_key = "";
-    return Status::TableNotExist(table_id_str);
-}
-
-Status DBMeeta::GetDBName(const String &db_id_str, String &db_name) const {
-    auto iter = kv_instance_.GetIterator();
-    iter->Seek(KeyEncode::kCatalogDbHeader);
-    while (iter->Valid() && iter->Key().starts_with(KeyEncode::kCatalogDbHeader)) {
-        String key_str = iter->Key().ToString();
-        size_t start = KeyEncode::kCatalogDbHeader.size();
-        size_t end = key_str.find('|', start);
-        if (db_id_str == iter->Value().ToString()) {
-            db_name = key_str.substr(start, end - start);
-            return Status::OK();
-        }
-        iter->Next();
-    }
-    return Status::DBNotExist(db_id_str);
-}
-
-Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
+Tuple<SharedPtr<DatabaseInfo>, Status> DBMeeta::GetDatabaseInfo() {
     Status status;
 
     String *db_comment = nullptr;
     status = this->GetComment(db_comment);
     if (!status.ok()) {
-        return status;
+        return {nullptr, status};
     }
-    db_info.db_comment_ = MakeShared<String>(*db_comment);
 
-    db_info.db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id_str_));
+    SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
 
-    return Status::OK();
+    db_info->db_comment_ = MakeShared<String>(*db_comment);
+    db_info->db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id_str_));
+
+    return {db_info, Status::OK()};
 }
 
 Tuple<String, Status> DBMeeta::GetNextTableID() {
     String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
     String next_table_id_str;
-    Status status = kv_instance_.Get(next_table_id_key, next_table_id_str);
+    Status status = kv_instance_->Get(next_table_id_key, next_table_id_str);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Fail to get next table id from kv store, key: {}, cause: {}", next_table_id_key, status.message()));
     }
     u64 next_table_id = std::stoull(next_table_id_str);
     ++next_table_id;
     String new_next_table_id_str = std::to_string(next_table_id);
-    status = kv_instance_.Put(next_table_id_key, new_next_table_id_str);
+    status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
     if (!status.ok()) {
         return {"", status};
     }
     return {next_table_id_str, Status::OK()};
 }
 
-Status DBMeeta::LoadComment() {
-    String comment;
-    String db_comment_key = GetDBTag("comment");
-    Status status = kv_instance_.Get(db_comment_key, comment);
-    if (!status.ok() && status.code() != ErrorCode::kNotFound) { // "comment" not found is ok
-        return status;
-    }
-    comment_ = std::move(comment);
-    return Status::OK();
-}
-
 Status DBMeeta::LoadTableIDs() {
     table_id_strs_ = Vector<String>();
     table_names_ = Vector<String>();
 
+    Map<String, Vector<Pair<String, String>>> table_kvs_map;
     String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str_);
 
-    auto iter2 = kv_instance_.GetIterator();
+    auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_table_prefix);
     while (iter2->Valid() && iter2->Key().starts_with(db_table_prefix)) {
         String key_str = iter2->Key().ToString();
         size_t start = db_table_prefix.size();
         size_t end = key_str.find('|', start);
         String table_id_str = iter2->Value().ToString();
-        table_names_->emplace_back(key_str.substr(start, end - start));
-        table_id_strs_->emplace_back(table_id_str);
+        String table_name = key_str.substr(start, end - start);
+        table_kvs_map[table_name].emplace_back(key_str, table_id_str);
         iter2->Next();
+    }
+
+    for (const auto &[table_name, table_kv] : table_kvs_map) {
+        SizeT max_visible_table_index = std::numeric_limits<SizeT>::max();
+        TxnTimeStamp max_commit_ts = 0;
+        for (SizeT i = 0; i < table_kv.size(); ++i) {
+            String commit_ts_str = GetLastPartOfKey(table_kv[i].first, '|');
+            TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
+            if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
+                max_commit_ts = commit_ts;
+                max_visible_table_index = i;
+            }
+        }
+
+        if (max_visible_table_index != std::numeric_limits<SizeT>::max()) {
+            const String &table_id_ref = table_kv[max_visible_table_index].second;
+            String drop_table_ts{};
+            kv_instance_->Get(KeyEncode::DropTableKey(db_id_str_, table_name, table_id_ref, max_commit_ts), drop_table_ts);
+
+            String rename_table_ts{};
+            kv_instance_->Get(KeyEncode::RenameTableKey(db_id_str_, table_name, table_id_ref, max_commit_ts), rename_table_ts);
+
+            if ((drop_table_ts.empty() || std::stoull(drop_table_ts) > read_ts_) &&
+                (rename_table_ts.empty() || std::stoull(rename_table_ts) > read_ts_)) {
+                table_id_strs_->emplace_back(table_id_ref);
+                table_names_->emplace_back(table_name);
+            }
+        }
     }
 
     return Status::OK();
@@ -221,7 +260,7 @@ String DBMeeta::GetDBTag(const String &tag) const { return KeyEncode::CatalogDbT
 
 Status DBMeeta::SetNextTableID(const String &table_id_str) {
     String next_table_id_key = GetDBTag(NEXT_TABLE_ID.data());
-    Status status = kv_instance_.Put(next_table_id_key, table_id_str);
+    Status status = kv_instance_->Put(next_table_id_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
