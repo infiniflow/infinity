@@ -53,7 +53,12 @@ Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_
         }
         // the key is committed before the txn or the key isn't committed
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
-        segment_ids.push_back(segment_id);
+        String drop_segment_ts{};
+        kv_instance->Get(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), drop_segment_ts);
+
+        if (drop_segment_ts.empty() || std::stoull(drop_segment_ts) > begin_ts) {
+            segment_ids.push_back(segment_id);
+        }
         iter->Next();
     }
     std::sort(segment_ids.begin(), segment_ids.end());
@@ -212,6 +217,22 @@ SizeT GetSegmentRowCount(KVInstance *kv_instance,
         segment_row_count += block_row_cnt;
     }
     return segment_row_count;
+}
+
+String GetLastPartOfKey(const String &key, char delimiter) {
+    size_t last_pos = key.rfind(delimiter);
+
+    if (last_pos != std::string::npos) {
+        return key.substr(last_pos + 1);
+    } else {
+        UnrecoverableError(fmt::format("No '{}' found", delimiter));
+    }
+    return key;
+}
+
+u64 GetTimestampFromKey(const String &key) {
+    String ts_str = GetLastPartOfKey(key, '|');
+    return std::stoull(ts_str);
 }
 
 } // namespace infinity

@@ -94,11 +94,10 @@ struct ExpressionIndexScanInfo {
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
-            base_table_ref->block_index_->table_meta_ =
-                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS(), new_txn->CommitTS());
+            base_table_ref->block_index_->table_meta_ = MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, new_txn);
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
-        auto& table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
+        auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
 
         Vector<String> *index_id_strs_ptr = nullptr;
         status = table_meta_->GetIndexIDs(index_id_strs_ptr);
@@ -114,7 +113,7 @@ struct ExpressionIndexScanInfo {
                 auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
                 table_index_meta_map.emplace_back(std::move(table_index_meta));
             }
-            SharedPtr<TableIndexMeeta>& it = table_index_meta_map[i];
+            SharedPtr<TableIndexMeeta> &it = table_index_meta_map[i];
 
             SharedPtr<IndexBase> index_base;
             std::tie(index_base, status) = it->GetIndexBase();

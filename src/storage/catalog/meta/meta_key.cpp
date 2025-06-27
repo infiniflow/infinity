@@ -42,8 +42,13 @@ String DBTagMetaKey::ToString() const { return fmt::format("db_tag: {}:{}", KeyE
 String TableMetaKey::ToString() const {
     return fmt::format("table: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
+
+String TableNameMetaKey::ToString() const {
+    return fmt::format("table name: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
+}
+
 String TableColumnMetaKey::ToString() const {
-    return fmt::format("table_column: {}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_), value_);
+    return fmt::format("table_column: {}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_, commit_ts_), value_);
 }
 String TableTagMetaKey::ToString() const {
     return fmt::format("table_tag: {}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_);
@@ -128,6 +133,16 @@ nlohmann::json DBTagMetaKey::ToJson() const {
 }
 
 nlohmann::json TableMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["table_id"] = std::stoull(table_id_str_);
+    json_res["table_name"] = table_name_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json TableNameMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["table_id"] = std::stoull(table_id_str_);
     json_res["table_name"] = table_name_;
@@ -286,6 +301,17 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         return table_meta_key;
     }
 
+    if (fields[0] == "catalog" && fields[1] == "tbl_name") {
+        const String &db_id_str = fields[2];
+        const String &table_name_str = fields[3];
+        const String &commit_ts_str = fields[4];
+        const String &table_id_str = value;
+
+        SharedPtr<TableNameMetaKey> table_name_meta_key = MakeShared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
+        table_name_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return table_name_meta_key;
+    }
+
     if (fields[0] == "catalog" && fields[1] == "seg") {
         const String &db_id_str = fields[2];
         const String &table_id_str = fields[3];
@@ -349,7 +375,9 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             const String &db_id_str = fields[2];
             const String &table_id_str = fields[3];
             const String &column_name_str = fields[4];
+            const String &commit_ts_str = fields[5];
             SharedPtr<TableColumnMetaKey> table_column_meta_key = MakeShared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
+            table_column_meta_key->commit_ts_ = std::stoull(commit_ts_str);
             table_column_meta_key->value_ = value;
             return table_column_meta_key;
         }
