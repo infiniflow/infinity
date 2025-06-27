@@ -143,7 +143,7 @@ public:
 
     i64 WALCompactThreshold();
 
-    i64 FullCheckpointInterval();
+    i64 CheckpointInterval();
     void SetFullCheckpointInterval(i64);
 
     i64 DeltaCheckpointInterval();

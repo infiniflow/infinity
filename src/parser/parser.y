@@ -12,7 +12,6 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 
 #include "expression.h"
 #include "parser_result.h"
-#include "defer_operation.h"
 #include "statement/alter_statement.h"
 #include "statement/copy_statement.h"
 #include "statement/create_statement.h"

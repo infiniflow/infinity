@@ -72,7 +72,7 @@ class TestMemIdx:
             assert data_dict["count(star)"] == [10]
 
             table_obj.insert([{"c1": 6, "c2": [0.3, 0.2, 0.1, 0.4]} for i in range(2)])
-            # wait for memindex dump & delta checkpoint to dump
+            # wait for memindex dump & checkpoint to dump
             time.sleep(5)
             table_obj.insert([{"c1": 8, "c2": [0.4, 0.3, 0.2, 0.1]}])
 
@@ -247,7 +247,7 @@ class TestMemIdx:
             assert data_dict["count(star)"] == [56]
 
             table_obj.insert([{"c1": 6, "c2": [0.3, 0.2, 0.1, 0.4]} for i in range(2)])
-            # wait for memindex dump & delta checkpoint to dump
+            # wait for memindex dump & checkpoint to dump
             time.sleep(5)
             table_obj.insert([{"c1": 8, "c2": [0.4, 0.3, 0.2, 0.1]}])
 
@@ -719,12 +719,6 @@ class TestMemIdx:
             # time.sleep(4)
 
         part1()
-
-        delta_paths = list(pathlib.Path(catalog_dir).rglob("*DELTA*"))
-        if len(delta_paths) < 1:
-            print("Warning: delta checkpoint not triggered. skip this test")
-            infinity_runner.clear()
-            return
 
         @decorator2
         def part2(infinity_obj):

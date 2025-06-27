@@ -56,7 +56,7 @@ memindex_memory_quota   = "1GB"
 
 [wal]
 wal_dir                       = "/var/infinity/follower/wal"
-full_checkpoint_interval      = "86400s"
+checkpoint_interval      = "86400s"
 wal_compact_threshold         = "1GB"
 
 # flush_at_once: write and flush log each commit
