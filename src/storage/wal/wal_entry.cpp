@@ -813,7 +813,12 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
                 column_ids.push_back(ReadBufAdv<ColumnID>(ptr));
             }
             String table_key = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropColumnsV2>(db_name, db_id, table_name, table_id, column_names, column_ids, table_key);
+            column_n = ReadBufAdv<i32>(ptr);
+            Vector<String> column_keys;
+            for (i32 i = 0; i < column_n; i++) {
+                column_keys.push_back(ReadBufAdv<String>(ptr));
+            }
+            cmd = MakeShared<WalCmdDropColumnsV2>(db_name, db_id, table_name, table_id, column_names, column_ids, table_key, column_keys);
             break;
         }
         case WalCommandType::CLEANUP: {
@@ -1134,7 +1139,7 @@ bool WalCmdDropColumnsV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDropColumnsV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
            table_id_ == other_cmd->table_id_ && column_names_ == other_cmd->column_names_ && column_ids_ == other_cmd->column_ids_ &&
-           table_key_ == other_cmd->table_key_;
+           table_key_ == other_cmd->table_key_ && column_keys_ == other_cmd->column_keys_;
 }
 
 bool WalCmdCleanup::operator==(const WalCmd &other) const {
@@ -1387,6 +1392,10 @@ i32 WalCmdDropColumnsV2::GetSizeInBytes() const {
     }
     res += sizeof(i32) + column_ids_.size() * sizeof(ColumnID);
     res += sizeof(i32) + table_key_.size();
+    res += sizeof(i32);
+    for (const auto &column_key : column_keys_) {
+        res += sizeof(i32) + column_key.size();
+    }
     return res;
 }
 
@@ -1789,6 +1798,10 @@ void WalCmdDropColumnsV2::WriteAdv(char *&buf) const {
         WriteBufAdv(buf, column_id);
     }
     WriteBufAdv(buf, this->table_key_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_keys_.size()));
+    for (const auto &column_key : column_keys_) {
+        WriteBufAdv(buf, column_key);
+    }
 }
 
 void WalCmdCleanup::WriteAdv(char *&buf) const {
@@ -2224,6 +2237,11 @@ String WalCmdDropColumnsV2::ToString() const {
     }
     ss << std::endl;
     ss << "table key: " << table_key_ << std::endl;
+    ss << "column keys: ";
+    for (auto &column_key : column_keys_) {
+        ss << column_key << " | ";
+    }
+    ss << std::endl;
     return std::move(ss).str();
 }
 

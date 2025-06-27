@@ -493,10 +493,10 @@ private:
     Status CommitImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
-    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
-    Status RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance);
+    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);
+    Status RollbackDelete(const DeleteTxnStore *delete_txn_store);
     Status CommitCompact(WalCmdCompactV2 *compact_cmd);
-    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
+    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd);
     Status CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);

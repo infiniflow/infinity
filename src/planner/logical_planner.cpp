@@ -1258,7 +1258,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                 ColumnID column_id = 0;
                 std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_def->name());
                 if (!status.ok()) {
-                    if (status.code() != ErrorCode::kNotFound) {
+                    if (status.code() != ErrorCode::kColumnNotExist) {
                         RecoverableError(status);
                     }
                     found = false;

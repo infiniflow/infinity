@@ -23,6 +23,7 @@ export enum class MetaType {
     kDB,
     kDBTag,
     kTable,
+    kTableName,
     kTableTag,
     kTableColumn,
     kSegment,
