@@ -438,7 +438,34 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192
+        assert table_obj.show_segments()['id'].to_list() == [0]
+        assert len(table_obj.show_blocks(0)) == 1024
+
         db_obj.drop_table("test_import_exceeding_rows"+suffix, ConflictType.Error)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "test_import_more_than_one_segment.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_more_than_one_segment(self, check_data, suffix):
+        if not check_data:
+            generate_big_rows_csv(1024 * 8192 + 1, "test_import_more_than_one_segment.csv")
+            copy_data("test_import_more_than_one_segment.csv")
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_import_more_than_one_segment"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_import_more_than_one_segment"+suffix,
+                                        {"c1": {"type": "int"}, "c2": {"type": "varchar"}})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "test_import_more_than_one_segment.csv"
+        res = table_obj.import_data(test_csv_dir)
+        assert res.error_code == ErrorCode.OK
+
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192 + 1
+        assert table_obj.show_segments()['id'].to_list() == [0, 1]
+        assert len(table_obj.show_blocks(0)) == 1024
+        assert len(table_obj.show_blocks(1)) == 1
+
+        db_obj.drop_table("test_import_more_than_one_segment"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
