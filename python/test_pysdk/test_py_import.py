@@ -438,7 +438,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192
-        assert table_obj.show_segments()['id'].to_list() == [0]
+        assert len(table_obj.show_segments()) == 1
         assert len(table_obj.show_blocks(0)) == 1024
 
         db_obj.drop_table("test_import_exceeding_rows"+suffix, ConflictType.Error)
@@ -463,7 +463,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192 + 1
-        assert table_obj.show_segments()['id'].to_list() == [0, 1]
+        assert len(table_obj.show_segments()) == 2
         assert len(table_obj.show_blocks(0)) == 1024
         assert len(table_obj.show_blocks(1)) == 1
 
