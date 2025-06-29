@@ -209,6 +209,15 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     SizeT segment_count = input_block_count % DEFAULT_BLOCK_PER_SEGMENT == 0
                         ? input_block_count / DEFAULT_BLOCK_PER_SEGMENT
                         : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
+
+    // If the number of input blocks is 0, infinity would output
+    // "IMPORT 0 Rows" instead of throwing an exception.
+    // It's debatable which is better. For now, we will keep the
+    // behavior unchanged in order to avoid a breaking change to users.
+    if (segment_count == 0) {
+        segment_count = 1;
+    }
+
     try {
         segment_ids = system_cache->ApplySegmentIDs(db_id, table_id, segment_count);
     } catch (const std::exception &e) {
