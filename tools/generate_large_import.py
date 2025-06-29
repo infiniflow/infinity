@@ -1,5 +1,5 @@
-# generate 'test/sql/dml/import/test_import_more_than_one_segment.slt'
-# generate 'test/data/csv/test_import_more_than_one_segment.csv'
+# generate 'test/sql/dml/import/test_slt_import_more_than_one_segment.slt'
+# generate 'test/data/csv/test_slt_import_more_than_one_segment.csv'
 
 import os
 import argparse
@@ -8,7 +8,7 @@ import random
 
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 8192 * 1024 + 1
-    table_name = "test_import_more_than_one_segment"
+    table_name = "test_slt_import_more_than_one_segment"
 
     csv_dir = "./test/data/csv"
     slt_dir = "./test/sql/dml/import"

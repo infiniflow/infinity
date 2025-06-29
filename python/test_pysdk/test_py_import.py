@@ -443,19 +443,21 @@ class TestInfinity:
 
         db_obj.drop_table("test_import_exceeding_rows"+suffix, ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "test_import_more_than_one_segment.csv",
+    @pytest.mark.parametrize("check_data", [{"file_name": "test_sdk_import_more_than_one_segment.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_more_than_one_segment(self, check_data, suffix):
+        file_name = "test_sdk_import_more_than_one_segment"
+        table_name = f"{file_name}{suffix}"
         if not check_data:
-            generate_big_rows_csv(1024 * 8192 + 1, "test_import_more_than_one_segment.csv")
-            copy_data("test_import_more_than_one_segment.csv")
+            generate_big_rows_csv(1024 * 8192 + 1, f"{file_name}.csv")
+            copy_data(f"{file_name}.csv")
 
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_import_more_than_one_segment"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_import_more_than_one_segment"+suffix,
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        table_obj = db_obj.create_table(table_name,
                                         {"c1": {"type": "int"}, "c2": {"type": "varchar"}})
 
-        test_csv_dir = common_values.TEST_TMP_DIR + "test_import_more_than_one_segment.csv"
+        test_csv_dir = common_values.TEST_TMP_DIR + f"{file_name}.csv"
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
@@ -465,7 +467,7 @@ class TestInfinity:
         assert len(table_obj.show_blocks(0)) == 1024
         assert len(table_obj.show_blocks(1)) == 1
 
-        db_obj.drop_table("test_import_more_than_one_segment"+suffix, ConflictType.Error)
+        db_obj.drop_table(table_name, ConflictType.Error)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
