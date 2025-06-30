@@ -567,24 +567,27 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
     return std::shared_ptr<ParsedExpr>(const_expr);
 }
 
-std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &constant_expr) {
-    LiteralType literal_type = (LiteralType)(int32_t)constant_expr["type"].get<int32_t>();
+std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_expr_str) {
+    simdjson::ondemand::parser parser;
+    simdjson::padded_string constant_expr_json(constant_expr_str);
+    simdjson::ondemand::document doc = parser.iterate(constant_expr_json);
+    LiteralType literal_type = (LiteralType)(int32_t)doc["type"].get<int32_t>();
     auto const_expr = new ConstantExpr(literal_type);
     switch (literal_type) {
         case LiteralType::kBoolean: {
-            const_expr->bool_value_ = constant_expr["value"].get<bool>();
+            const_expr->bool_value_ = doc["value"].get<bool>();
             break;
         }
         case LiteralType::kDouble: {
-            const_expr->double_value_ = constant_expr["value"].get<double>();
+            const_expr->double_value_ = doc["value"].get<double>();
             break;
         }
         case LiteralType::kString: {
-            const_expr->str_value_ = strdup(static_cast<std::string>(constant_expr["value"].get<std::string>()).c_str());
+            const_expr->str_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
             break;
         }
         case LiteralType::kInteger: {
-            const_expr->integer_value_ = constant_expr["value"].get<int64_t>();
+            const_expr->integer_value_ = doc["value"].get<int64_t>();
             break;
         }
         case LiteralType::kEmptyArray:
@@ -595,20 +598,20 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(simdjson::simdjson_result<
         case LiteralType::kTime:
         case LiteralType::kDateTime:
         case LiteralType::kTimestamp: {
-            const_expr->date_value_ = strdup(static_cast<std::string>(constant_expr["value"].get<std::string>()).c_str());
+            const_expr->date_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
             break;
         }
         case LiteralType::kIntegerArray: {
-            const_expr->long_array_ = constant_expr["value"].get<std::vector<int64_t>>();
+            const_expr->long_array_ = doc["value"].get<std::vector<int64_t>>();
             break;
         }
         case LiteralType::kDoubleArray: {
-            const_expr->double_array_ = constant_expr["value"].get<std::vector<double>>();
+            const_expr->double_array_ = doc["value"].get<std::vector<double>>();
             break;
         }
         case LiteralType::kSubArrayArray: {
-            for (simdjson::ondemand::array array = constant_expr["value"]; simdjson::simdjson_result<simdjson::ondemand::value> val : array) {
-                auto sub_arr = std::static_pointer_cast<ConstantExpr>(ConstantExpr::Deserialize(val));
+            for (simdjson::ondemand::array array = doc["value"]; simdjson::simdjson_result<simdjson::ondemand::value> val : array) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(ConstantExpr::Deserialize(val.raw_json()));
                 const_expr->sub_array_array_.push_back(std::move(sub_arr));
             }
             break;
@@ -617,18 +620,18 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(simdjson::simdjson_result<
             ParserError("Interval type is not supported in JSON serialization");
         }
         case LiteralType::kLongSparseArray: {
-            const_expr->long_sparse_array_.first = constant_expr["value"]["indices"].get<std::vector<int64_t>>();
-            const_expr->long_sparse_array_.second = constant_expr["value"]["data"].get<std::vector<int64_t>>();
+            const_expr->long_sparse_array_.first = doc["value"]["indices"].get<std::vector<int64_t>>();
+            const_expr->long_sparse_array_.second = doc["value"]["data"].get<std::vector<int64_t>>();
             break;
         }
         case LiteralType::kDoubleSparseArray: {
-            const_expr->double_sparse_array_.first = constant_expr["value"]["indices"].get<std::vector<int64_t>>();
-            const_expr->double_sparse_array_.second = constant_expr["value"]["data"].get<std::vector<double>>();
+            const_expr->double_sparse_array_.first = doc["value"]["indices"].get<std::vector<int64_t>>();
+            const_expr->double_sparse_array_.second = doc["value"]["data"].get<std::vector<double>>();
             break;
         }
         case LiteralType::kCurlyBracketsArray: {
-            for (simdjson::ondemand::array array = constant_expr["value"]; simdjson::simdjson_result<simdjson::ondemand::value> val : array) {
-                auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val));
+            for (simdjson::ondemand::array array = doc["value"]; simdjson::simdjson_result<simdjson::ondemand::value> val : array) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val.raw_json()));
                 const_expr->curly_brackets_array_.push_back(std::move(sub_arr));
             }
             break;

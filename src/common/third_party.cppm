@@ -178,6 +178,7 @@ export using simdjson::error_code;
 export using ondemand::parser;
 export using ondemand::document;
 export using ondemand::object;
+export using ondemand::array;
 export using ondemand::value;
 }
 
