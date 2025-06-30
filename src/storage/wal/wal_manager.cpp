@@ -709,9 +709,9 @@ Tuple<TransactionID, TxnTimeStamp> WalManager::ReplayWalEntries(const Vector<Sha
 
         UniquePtr<NewTxn> replay_txn = txn_mgr->BeginReplayTxn(replay_entry);
         for (const auto &cmd : replay_entry->cmds_) {
-            LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", cmd->ToString(), replay_entry->commit_ts_));
+            LOG_TRACE(fmt::format("Replay wal cmd: {}, txn id: {}, commit ts: {}", cmd->ToString(), replay_entry->txn_id_, replay_entry->commit_ts_));
 
-            Status status = replay_txn->ReplayWalCmd(cmd);
+            Status status = replay_txn->ReplayWalCmd(cmd, replay_entry->commit_ts_, replay_entry->txn_id_);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));
             }
