@@ -52,7 +52,7 @@ public:
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
-    Status GetIndexID(const String &index_name, String &index_key, String &index_id_str);
+    Status GetIndexID(const String &index_name, String &index_key, String &index_id_str, TxnTimeStamp &create_index_ts);
 
     Status InitSet(SharedPtr<TableDef> table_def);
 

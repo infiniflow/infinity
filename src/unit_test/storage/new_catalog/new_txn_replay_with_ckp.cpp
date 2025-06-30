@@ -112,10 +112,8 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
     }
 
     {
-        Vector<String> column_names;
-        column_names.push_back(column_def1->name());
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        Status status = txn->DropColumns(*db_name, *table_name, column_names);
+        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

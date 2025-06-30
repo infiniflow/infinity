@@ -458,10 +458,10 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     if (status.ok()) {
         if (table_id == create_table_cmd->table_id_) {
             LOG_WARN(fmt::format("Skipping replay create table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
-                                  *create_table_cmd->table_def_->table_name(),
-                                  create_table_cmd->table_id_,
-                                  commit_ts,
-                                  txn_id));
+                                 *create_table_cmd->table_def_->table_name(),
+                                 create_table_cmd->table_id_,
+                                 commit_ts,
+                                 txn_id));
             return Status::OK();
         } else {
             LOG_ERROR(fmt::format("Replay create table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
@@ -579,13 +579,14 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(fmt::format("Replay drop table: Table {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
-                                  drop_table_cmd->table_name_,
-                                  drop_table_cmd->table_id_,
-                                  drop_table_cmd->create_ts_,
-                                  table_commit_ts,
-                                  commit_ts,
-                                  txn_id));
+            LOG_ERROR(
+                fmt::format("Replay drop table: Table {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+                            drop_table_cmd->table_name_,
+                            drop_table_cmd->table_id_,
+                            drop_table_cmd->create_ts_,
+                            table_commit_ts,
+                            commit_ts,
+                            txn_id));
             return Status::UnexpectedError("Table commit timestamp mismatch during replay of table drop.");
         }
     }
@@ -846,7 +847,8 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     String index_key;
     String index_id;
-    status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
+    TxnTimeStamp create_index_ts;
+    status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id, create_index_ts);
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -969,7 +971,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     String index_key;
     String index_id;
-    status = table_meta->GetIndexID(index_name, index_key, index_id);
+    TxnTimeStamp create_index_ts;
+    status = table_meta->GetIndexID(index_name, index_key, index_id, create_index_ts);
     if (!status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -1019,6 +1022,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     txn_store->index_name_ = index_name;
     txn_store->index_id_str_ = index_id;
     txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
+    txn_store->create_ts_ = create_index_ts;
     txn_store->index_key_ = index_key;
 
     LOG_TRACE(fmt::format("NewTxn::DropIndexByName dropped index: {}.{}.{}", db_name, table_name, index_name));
@@ -1877,7 +1881,8 @@ Status
 NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Optional<TableIndexMeeta> &table_index_meta, String *index_key_ptr) {
     String index_key;
     String index_id_str;
-    Status status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+    TxnTimeStamp create_index_ts;
+    Status status = table_meta.GetIndexID(index_name, index_key, index_id_str, create_index_ts);
     if (!status.ok()) {
         return status;
     }

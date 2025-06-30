@@ -554,7 +554,8 @@ TEST_P(TestTxnCleanup, cleanup_and_drop_index) {
 
             String index_key;
             String index_id;
-            status = table_meta->GetIndexID(*index_name1_, index_key, index_id);
+            TxnTimeStamp create_index_ts;
+            status = table_meta->GetIndexID(*index_name1_, index_key, index_id, create_index_ts);
             EXPECT_FALSE(status.ok());
         }
     };
