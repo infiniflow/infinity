@@ -29,15 +29,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return SharedPtr<HnswIndex>();
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return SharedPtr<HnswIndex>();
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return SharedPtr<HnswIndex>();
+                        return UniquePtr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -49,15 +49,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             switch (index_hnsw->metric_type_) {
                 case MetricType::kMetricL2: {
                     using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return SharedPtr<HnswIndex>();
+                    return UniquePtr<HnswIndex>();
                 }
                 case MetricType::kMetricInnerProduct: {
                     using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return SharedPtr<HnswIndex>();
+                    return UniquePtr<HnswIndex>();
                 }
                 case MetricType::kMetricCosine: {
                     using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return SharedPtr<HnswIndex>();
+                    return UniquePtr<HnswIndex>();
                 }
                 default: {
                     return nullptr;
@@ -71,15 +71,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return SharedPtr<HnswIndex>();
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return SharedPtr<HnswIndex>();
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return SharedPtr<HnswIndex>();
+                        return UniquePtr<HnswIndex>();
                     }
                     default: {
                         return nullptr;

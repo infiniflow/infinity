@@ -33,11 +33,11 @@ static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {
     switch (index_bmp->compress_type_) {
         case BMPCompressType::kCompressed: {
             using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed, OwnMem>;
-            return SharedPtr<BMPIndex>();
+            return UniquePtr<BMPIndex>();
         }
         case BMPCompressType::kRaw: {
             using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw, OwnMem>;
-            return SharedPtr<BMPIndex>();
+            return UniquePtr<BMPIndex>();
         }
         default: {
             return nullptr;
@@ -104,7 +104,7 @@ BMPHandler::BMPHandler(const IndexBase *index_base, const ColumnDef *column_def,
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = MakeShared<IndexT>(term_num, block_size);
+                    index = MakeUnique<IndexT>(term_num, block_size);
                 } else {
                     UnrecoverableError("BMPHandler::BMPHandler: index does not own memory");
                 }
