@@ -83,11 +83,9 @@ export struct ObjStat {
 
     nlohmann::json Serialize() const;
 
-    void Deserialize(const nlohmann::json &obj);
-
     String ToString() const;
 
-    void Deserialize(const String &str);
+    void Deserialize(std::string_view str);
 
     SizeT GetSizeInBytes() const;
 
