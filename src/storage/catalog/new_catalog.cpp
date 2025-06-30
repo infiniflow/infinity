@@ -305,7 +305,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
                                                          std::move(meta_infos[1]),
                                                          std::stoull(meta_infos[2]),
                                                          std::stoull(meta_infos[3]),
-                                                         ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4])))));
+                                                         ColumnDef::FromJson(meta_infos[4])));
         } else if (type_str == "idx") {
             UniquePtr<TableIndexMetaKey> table_index_meta_key =
                 MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[4]), std::move(meta_infos[2]));
