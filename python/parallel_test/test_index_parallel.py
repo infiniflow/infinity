@@ -22,85 +22,85 @@ kThreadNum = 4
 
 class TestIndexParallel(TestSdk):
 
-    # @pytest.mark.parametrize("file_format", ["csv"])
-    # def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
-    #
-    #     def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
-    #         infinity_obj = connection_pool.get_conn()
-    #         db_obj = infinity_obj.get_database("default_db")
-    #         table_obj = db_obj.get_table("test_fulltext_index_parallel")
-    #
-    #         while time.time() < end_time:
-    #             operation = random.randint(0, 1)
-    #             if operation == 0:
-    #                 value = []
-    #                 for i in range(len(data["doctitle"])):
-    #                     value.append({"doctitle": data["doctitle"][i],
-    #                                   "docdate": data["docdate"][i], "body": data["body"][i]})
-    #                 table_obj.insert(value)
-    #                 print(f"thread {thread_id}: insert complete")
-    #             if operation == 1:
-    #                 print(f"thread {thread_id}: begin import")
-    #                 table_obj.import_data(file_path, {"delimiter": "\t"})
-    #                 print(f"thread {thread_id}: import complete")
-    #
-    #         connection_pool.release_conn(infinity_obj)
-    #
-    #     def read_worker(connection_pool: ConnectionPool, end_time):
-    #         infinity_obj = connection_pool.get_conn()
-    #         db_obj = infinity_obj.get_database("default_db")
-    #         table_obj = db_obj.get_table("test_fulltext_index_parallel")
-    #
-    #         while time.time() < end_time:
-    #             res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
-    #                 "body^5", "harmful chemical", 3).to_pl()
-    #             print(res)
-    #             time.sleep(0.1)
-    #
-    #         connection_pool.release_conn(infinity_obj)
-    #
-    #     # prepare data for insert
-    #     column_names = ["doctitle", "docdate", "body"]
-    #     file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
-    #                 "/enwiki_99." + file_format
-    #     df = pandas.read_csv(file_path,
-    #                          delimiter="\t",
-    #                          header=None,
-    #                          names=column_names)
-    #     data = {key: list(value.values())
-    #             for key, value in df.to_dict().items()}
-    #
-    #     # create index
-    #     connection_pool = get_infinity_connection_pool
-    #     infinity_obj = connection_pool.get_conn()
-    #     db_obj = infinity_obj.get_database("default_db")
-    #     res = db_obj.drop_table(
-    #         "test_fulltext_index_parallel", ConflictType.Ignore)
-    #     assert res.error_code == ErrorCode.OK
-    #     table_obj = db_obj.create_table("test_fulltext_index_parallel", {
-    #         "doctitle": {"type": "varchar"},
-    #         "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, ConflictType.Error)
-    #     table_obj.import_data(file_path, {"delimiter": "\t"})
-    #     res = table_obj.create_index("body_index",
-    #                                  index.IndexInfo("body",
-    #                                                  index.IndexType.FullText))
-    #     assert res.error_code == ErrorCode.OK
-    #
-    #     threads = []
-    #     end_time = time.time() + kRuningTime
-    #     for i in range(kInsertThreadNum):
-    #         threads.append(Thread(target=write_worker, args=[
-    #             connection_pool, data, file_path, end_time, i]))
-    #     threads.append(Thread(target=read_worker, args=[
-    #         connection_pool, end_time]))
-    #     for i in range(len(threads)):
-    #         threads[i].start()
-    #     for i in range(len(threads)):
-    #         threads[i].join()
-    #
-    #     res = db_obj.drop_table(
-    #         "test_fulltext_index_parallel", ConflictType.Error)
-    #     connection_pool.release_conn(infinity_obj)
+    @pytest.mark.parametrize("file_format", ["csv"])
+    def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
+
+        def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_fulltext_index_parallel")
+
+            while time.time() < end_time:
+                operation = random.randint(0, 1)
+                if operation == 0:
+                    value = []
+                    for i in range(len(data["doctitle"])):
+                        value.append({"doctitle": data["doctitle"][i],
+                                      "docdate": data["docdate"][i], "body": data["body"][i]})
+                    table_obj.insert(value)
+                    print(f"thread {thread_id}: insert complete")
+                if operation == 1:
+                    print(f"thread {thread_id}: begin import")
+                    table_obj.import_data(file_path, {"delimiter": "\t"})
+                    print(f"thread {thread_id}: import complete")
+
+            connection_pool.release_conn(infinity_obj)
+
+        def read_worker(connection_pool: ConnectionPool, end_time):
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_fulltext_index_parallel")
+
+            while time.time() < end_time:
+                res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+                    "body^5", "harmful chemical", 3).to_pl()
+                print(res)
+                time.sleep(0.1)
+
+            connection_pool.release_conn(infinity_obj)
+
+        # prepare data for insert
+        column_names = ["doctitle", "docdate", "body"]
+        file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
+                    "/enwiki_99." + file_format
+        df = pandas.read_csv(file_path,
+                             delimiter="\t",
+                             header=None,
+                             names=column_names)
+        data = {key: list(value.values())
+                for key, value in df.to_dict().items()}
+
+        # create index
+        connection_pool = get_infinity_connection_pool
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        res = db_obj.drop_table(
+            "test_fulltext_index_parallel", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table("test_fulltext_index_parallel", {
+            "doctitle": {"type": "varchar"},
+            "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, ConflictType.Error)
+        table_obj.import_data(file_path, {"delimiter": "\t"})
+        res = table_obj.create_index("body_index",
+                                     index.IndexInfo("body",
+                                                     index.IndexType.FullText))
+        assert res.error_code == ErrorCode.OK
+
+        threads = []
+        end_time = time.time() + kRuningTime
+        for i in range(kInsertThreadNum):
+            threads.append(Thread(target=write_worker, args=[
+                connection_pool, data, file_path, end_time, i]))
+        threads.append(Thread(target=read_worker, args=[
+            connection_pool, end_time]))
+        for i in range(len(threads)):
+            threads[i].start()
+        for i in range(len(threads)):
+            threads[i].join()
+
+        res = db_obj.drop_table(
+            "test_fulltext_index_parallel", ConflictType.Error)
+        connection_pool.release_conn(infinity_obj)
 
     @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw])
     @pytest.mark.parametrize("index_column_name", ["gender_vector"])

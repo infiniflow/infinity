@@ -123,6 +123,8 @@ public:
 
     Status RemoveFtIndexCache();
 
+    Status InvalidateFtIndexCache(SegmentID segment_id);
+
     Status GetNextColumnID(ColumnID &next_column_id);
 
     Status SetNextColumnID(ColumnID next_column_id);
