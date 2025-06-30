@@ -431,46 +431,6 @@ nlohmann::json DataType::Serialize() const {
     return json_res;
 }
 
-std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
-    const auto logical_type = data_type_json["data_type"].get<LogicalType>();
-
-    std::shared_ptr<TypeInfo> type_info{nullptr};
-    if (data_type_json.contains("type_info")) {
-        const nlohmann::json &type_info_json = data_type_json["type_info"];
-        switch (logical_type) {
-            case LogicalType::kArray: {
-                const auto element_type = DataType::Deserialize(type_info_json);
-                type_info = ArrayInfo::Make(std::move(*element_type));
-                break;
-            }
-                //            case LogicalType::kBitmap: {
-                //                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
-                //                break;
-                //            }
-            case LogicalType::kDecimal: {
-                type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
-                break;
-            }
-            case LogicalType::kTensor:
-            case LogicalType::kTensorArray:
-            case LogicalType::kMultiVector:
-            case LogicalType::kEmbedding: {
-                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"].get<EmbeddingDataType>(), type_info_json["dimension"]);
-                break;
-            }
-            case LogicalType::kSparse: {
-                type_info = SparseInfo::Deserialize(type_info_json);
-                break;
-            }
-            default:
-                // There's no type_info for other types
-                break;
-        }
-    }
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
-    return data_type;
-}
-
 std::shared_ptr<DataType> DataType::Deserialize(std::string_view data_type_str) {
     simdjson::ondemand::parser parser;
     simdjson::padded_string data_type_json(data_type_str);

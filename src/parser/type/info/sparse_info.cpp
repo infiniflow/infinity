@@ -101,11 +101,6 @@ nlohmann::json SparseInfo::Serialize() const {
     return res;
 }
 
-std::unique_ptr<SparseInfo> SparseInfo::Deserialize(const nlohmann::json &json) {
-    auto store_type = static_cast<SparseStoreType>(json["sort"].get<int8_t>());
-    return std::make_unique<SparseInfo>(json["data_type"], json["index_type"], json["dimension"], store_type);
-}
-
 std::unique_ptr<SparseInfo> SparseInfo::Deserialize(std::string_view json_str) {
     simdjson::ondemand::parser parser;
     simdjson::padded_string json(json_str);

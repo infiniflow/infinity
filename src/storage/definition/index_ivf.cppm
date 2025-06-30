@@ -89,9 +89,7 @@ public:
 
     nlohmann::json Serialize() const override;
 
-    static IndexIVFOption DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json);
-
-    static IndexIVFOption DeserializeIndexIVFOption(std::string_view ivf_option_json);
+    static IndexIVFOption DeserializeIndexIVFOption(std::string_view ivf_option_str);
 
     void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 

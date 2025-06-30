@@ -353,8 +353,6 @@ nlohmann::json IndexIVF::Serialize() const {
     return res;
 }
 
-IndexIVFOption IndexIVF::DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json) { return ivf_option_json; }
-
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroidOption &ivf_centroid_option) {
     simdjson::object obj = val.get_object();

@@ -88,8 +88,6 @@ public:
     virtual String BuildOtherParamsString() const { return ""; }
     virtual nlohmann::json Serialize() const;
 
-    static SharedPtr<IndexBase> Deserialize(const nlohmann::json &index_def_json);
-
     static SharedPtr<IndexBase> Deserialize(std::string_view index_def_str);
 
     inline String column_name() const { return column_names_[0]; }
