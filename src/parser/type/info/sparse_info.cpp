@@ -106,11 +106,14 @@ std::unique_ptr<SparseInfo> SparseInfo::Deserialize(const nlohmann::json &json) 
     return std::make_unique<SparseInfo>(json["data_type"], json["index_type"], json["dimension"], store_type);
 }
 
-std::unique_ptr<SparseInfo> SparseInfo::Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &json) {
-    return std::make_unique<SparseInfo>((EmbeddingDataType)(int8_t)json["data_type"].get<int8_t>(),
-                                        (EmbeddingDataType)(int8_t)json["index_type"].get<int8_t>(),
-                                        (size_t)json["dimension"].get<size_t>(),
-                                        (SparseStoreType)(int8_t)json["sort"].get<int8_t>());
+std::unique_ptr<SparseInfo> SparseInfo::Deserialize(std::string_view json_str) {
+    simdjson::ondemand::parser parser;
+    simdjson::padded_string json(json_str);
+    simdjson::ondemand::document doc = parser.iterate(json);
+    return std::make_unique<SparseInfo>((EmbeddingDataType)(int8_t)doc["data_type"].get<int8_t>(),
+                                        (EmbeddingDataType)(int8_t)doc["index_type"].get<int8_t>(),
+                                        (size_t)doc["dimension"].get<size_t>(),
+                                        (SparseStoreType)(int8_t)doc["sort"].get<int8_t>());
 }
 
 } // namespace infinity
