@@ -119,13 +119,13 @@ protected:
             }
             auto index = BMPAlg1::Load(*file_handle);
 
-            test_query(index);
+            test_query(*index);
 
             auto [file_handle2, status2] = VirtualStore::Open(save2_path, FileAccessMode::kWrite);
             if (!status2.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save2_path));
             }
-            index.SaveToPtr(*file_handle2);
+            index->SaveToPtr(*file_handle2);
         }
         {
             unsigned char *data_ptr = nullptr;
@@ -136,7 +136,7 @@ protected:
             }
             const char *ptr = reinterpret_cast<const char *>(data_ptr);
             auto index = BMPAlg2::LoadFromPtr(ptr, file_size);
-            test_query(index);
+            test_query(*index);
             VirtualStore::MunmapFile(save2_path);
         }
         {
@@ -147,7 +147,7 @@ protected:
             }
             auto index = BMPAlg1::LoadFromPtr(*file_handle, file_size);
 
-            test_query(index);
+            test_query(*index);
         }
     }
 };
