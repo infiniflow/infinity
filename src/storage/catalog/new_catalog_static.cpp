@@ -54,7 +54,7 @@ namespace infinity {
 
 // namespace {
 
-// String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
+// String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 
 // } // namespace
 

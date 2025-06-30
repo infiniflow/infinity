@@ -3927,7 +3927,12 @@ Status NewTxn::Cleanup() {
     }
 
     if (metas.empty()) {
-        LOG_TRACE("SIP cleanup, no data need to clean.");
+        LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        auto data_dir_str = buffer_mgr->GetFullDataDir();
+        auto data_dir = static_cast<Path>(*data_dir_str);
+        // Delete empty dir
+        VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
         return Status::OK();
     }
 

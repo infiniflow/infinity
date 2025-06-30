@@ -43,27 +43,22 @@ namespace infinity {
 
 void PhysicalCheck::Init(QueryContext *query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     output_names_ = MakeShared<Vector<String>>();
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
     switch (check_type_) {
         case CheckStmtType::kSystem: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
-            output_names_->emplace_back("meta");
-            output_names_->emplace_back("data");
-            output_types_->emplace_back(varchar_type);
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("mismatch_data");
             output_types_->emplace_back(varchar_type);
             break;
         }
         case CheckStmtType::kTable: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
-            output_names_->emplace_back("meta");
-            output_names_->emplace_back("data");
-            output_types_->emplace_back(varchar_type);
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("mismatch_data");
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -104,39 +99,19 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
 
-    bool is_vfs = query_context->global_config()->UseVFS();
-    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(is_vfs, CheckStmtType::kSystem, None);
-
-    auto meta_mismatch_size = meta_mismatch_entries.size();
-    auto data_mismatch_size = data_mismatch_entries.size();
-
-    Array<SizeT, 2> mismatch_size_array{meta_mismatch_size, data_mismatch_size};
-    auto max_mismatch_size = *std::ranges::max_element(mismatch_size_array);
+    auto data_mismatch_entries = meta_tree_ptr->CheckMetaDataMapping(CheckStmtType::kSystem, None);
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type};
 
     output_block_ptr->Init(column_types);
 
     {
-        for (const auto &meta_mismatch_entry : meta_mismatch_entries) {
-            Value value = Value::MakeVarchar(meta_mismatch_entry);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
         for (const auto &data_mismatch_entry : data_mismatch_entries) {
             Value value = Value::MakeVarchar(data_mismatch_entry);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-
-        auto column_idx = max_mismatch_size == meta_mismatch_size ? 1 : 0;
-
-        for (SizeT idx = mismatch_size_array[column_idx]; idx < max_mismatch_size; ++idx) {
-            Value value = Value::MakeVarchar("NULL");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_idx]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
     }
 
@@ -219,14 +194,7 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     }
 
     auto db_table_str = fmt::format("db_{}/tbl_{}", db_id_str, table_id_str);
-    bool is_vfs = query_context->global_config()->UseVFS();
-    auto [meta_mismatch_entries, data_mismatch_entries] = meta_tree_ptr->CheckMetaDataMapping(is_vfs, CheckStmtType::kTable, db_table_str);
-
-    auto meta_mismatch_size = meta_mismatch_entries.size();
-    auto data_mismatch_size = data_mismatch_entries.size();
-
-    Array<SizeT, 2> mismatch_size_array{meta_mismatch_size, data_mismatch_size};
-    auto max_mismatch_size = *std::ranges::max_element(mismatch_size_array);
+    auto data_mismatch_entries = meta_tree_ptr->CheckMetaDataMapping(CheckStmtType::kTable, db_table_str);
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -235,24 +203,10 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     output_block_ptr->Init(column_types);
 
     {
-        for (const auto &meta_mismatch_entry : meta_mismatch_entries) {
-            Value value = Value::MakeVarchar(meta_mismatch_entry);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-
         for (const auto &data_mismatch_entry : data_mismatch_entries) {
             Value value = Value::MakeVarchar(data_mismatch_entry);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-
-        auto column_idx = max_mismatch_size == meta_mismatch_size ? 1 : 0;
-
-        for (SizeT idx = mismatch_size_array[column_idx]; idx < max_mismatch_size; ++idx) {
-            Value value = Value::MakeVarchar("NULL");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_idx]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
     }
 
