@@ -121,3 +121,62 @@ select * from test_import_deleted_csv;
 
 statement ok
 DROP TABLE IF EXISTS test_import_deleted_csv;
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_export_deleted_parquet;
+
+statement ok
+CREATE TABLE sqllogic_test_export_deleted_parquet (col1 Boolean, col2 TINYINT, col3 BIGINT, col4 FLOAT);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_parquet VALUES(true, 0, 0, 0.000000);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_parquet VALUES(false, 1, 1, 1.000000);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_parquet VALUES(true, 2, 2, 2.000000);
+
+statement ok
+INSERT INTO sqllogic_test_export_deleted_parquet VALUES(false, 3, 3, 3.000000);
+
+query I
+select * from sqllogic_test_export_deleted_parquet;
+----
+true 0 0 0.000000
+false 1 1 1.000000
+true 2 2 2.000000
+false 3 3 3.000000
+
+statement ok
+DELETE FROM sqllogic_test_export_deleted_parquet WHERE col1 = false;
+
+query I
+select * from sqllogic_test_export_deleted_parquet;
+----
+true 0 0 0.000000
+true 2 2 2.000000
+
+statement ok
+COPY sqllogic_test_export_deleted_parquet TO '/var/infinity/test_data/tmp/test_export_deleted.parquet' WITH (FORMAT PARQUET);
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_export_deleted_parquet;
+
+statement ok
+DROP TABLE IF EXISTS test_import_deleted_parquet;
+
+statement ok
+CREATE TABLE test_import_deleted_parquet (col1 Boolean, col2 TINYINT, col3 BIGINT, col4 FLOAT);
+
+statement ok
+COPY test_import_deleted_parquet FROM '/var/infinity/test_data/tmp/test_export_deleted.parquet' WITH (FORMAT PARQUET);
+
+query I
+select * from test_import_deleted_parquet;
+----
+true 0 0 0.000000
+true 2 2 2.000000
+
+statement ok
+DROP TABLE IF EXISTS test_import_deleted_parquet;
