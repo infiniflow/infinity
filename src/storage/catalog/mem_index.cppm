@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module mem_index;
 
 import stl;
@@ -27,6 +29,7 @@ class MemoryIndexer;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
+class DummyIndexInMem;
 
 export struct MemIndexID {
     String db_name_;
@@ -39,6 +42,9 @@ export struct MemIndex {
     ~MemIndex();
 
     void ClearMemIndex();
+    SizeT GetMemUsed() const;
+    RowID GetBeginRowID();
+    SizeT GetRowCount();
 
     BaseMemIndex *GetBaseMemIndex(const MemIndexID &mem_index_id);
     const BaseMemIndex *GetBaseMemIndex() const;
@@ -73,6 +79,11 @@ export struct MemIndex {
         return memory_bmp_index_;
     }
 
+    SharedPtr<DummyIndexInMem> GetDummyIndex() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        return memory_dummy_index_;
+    }
+
     mutable std::mutex mtx_; // Used by append / mem index dump / clear
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
@@ -81,6 +92,7 @@ export struct MemIndex {
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
     SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
     SharedPtr<BMPIndexInMem> memory_bmp_index_{};
+    SharedPtr<DummyIndexInMem> memory_dummy_index_{};
 };
 
 } // namespace infinity

@@ -1440,27 +1440,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
 
             for (SizeT i = 0; i < table_index_metas.size(); ++i) {
                 const String &index_name = (*index_name_strs)[i];
-                SegmentIndexMeta segment_index_meta(segment_id, table_index_metas[i]);
-                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-
-                if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
-                    return Status::UnexpectedError(
-                        fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
-                }
-
-                SharedPtr<NewTxn> new_txn_shared = txn_mgr_->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
-                SharedPtr<DumpIndexTask> dump_index_task{};
-                if (mem_index->GetBaseMemIndex() != nullptr) {
-                    mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
-                    const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn_shared);
-
-                } else if (mem_index->GetEMVBIndex() != nullptr) {
-                    mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
-                    EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
-                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn_shared);
-                }
-
+                SharedPtr<DumpMemIndexTask> dump_index_task = MakeShared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id);
                 // Trigger dump index processor to dump mem index for new sealed segment
                 auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
                 dump_index_processor->Submit(dump_index_task);

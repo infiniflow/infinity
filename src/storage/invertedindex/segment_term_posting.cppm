@@ -19,7 +19,7 @@ public:
 
     SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
 
-    RowID GetBaseRowId() const { return base_row_id_; }
+    RowID GetBeginRowID() const { return base_row_id_; }
 
     bool HasNext();
 

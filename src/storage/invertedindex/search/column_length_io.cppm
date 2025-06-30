@@ -42,7 +42,7 @@ public:
             return column_lengths_[row_id - current_chunk_base_rowid_];
         }
         if (memory_indexer_.get() != nullptr) {
-            RowID base_rowid = memory_indexer_->GetBaseRowId();
+            RowID base_rowid = memory_indexer_->GetBeginRowID();
             u32 doc_count = memory_indexer_->GetDocCount();
             if (row_id >= base_rowid && row_id < base_rowid + doc_count) {
                 return memory_indexer_->GetColumnLength(row_id - base_rowid);

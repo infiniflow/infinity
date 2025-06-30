@@ -109,7 +109,7 @@ public:
 
     String GetBaseName() const { return base_name_; }
 
-    RowID GetBaseRowId() const { return base_row_id_; }
+    RowID GetBeginRowID() const override { return base_row_id_; }
 
     u32 GetDocCount() const {
         std::unique_lock<std::mutex> lock(mutex_);

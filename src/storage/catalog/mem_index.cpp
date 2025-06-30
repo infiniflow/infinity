@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 module mem_index;
 
 import stl;
@@ -33,6 +35,38 @@ import abstract_bmp;
 namespace infinity {
 
 MemIndex::~MemIndex() = default;
+
+SizeT MemIndex::GetMemUsed() const {
+    const BaseMemIndex *base_mem_index = GetBaseMemIndex();
+    if (base_mem_index == nullptr) {
+        return 0;
+    }
+    return base_mem_index->GetMemUsed();
+}
+
+RowID MemIndex::GetBeginRowID() {
+    const BaseMemIndex *base_mem_index = GetBaseMemIndex();
+    if (base_mem_index != nullptr) {
+        return base_mem_index->GetBeginRowID();
+    }
+    SharedPtr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
+    if (emvb_index != nullptr) {
+        return emvb_index->GetBeginRowID();
+    }
+    return RowID();
+}
+
+SizeT MemIndex::GetRowCount() {
+    const BaseMemIndex *base_mem_index = GetBaseMemIndex();
+    if (base_mem_index != nullptr) {
+        return base_mem_index->GetRowCount();
+    }
+    SharedPtr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
+    if (emvb_index != nullptr) {
+        return emvb_index->GetRowCount();
+    }
+    return 0;
+}
 
 void MemIndex::ClearMemIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
@@ -57,6 +91,8 @@ BaseMemIndex *MemIndex::GetBaseMemIndex(const MemIndexID &mem_index_id) {
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_dummy_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
         return nullptr;
     }
@@ -80,6 +116,8 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_dummy_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
         return nullptr;
     }
@@ -99,6 +137,8 @@ void MemIndex::SetBaseMemIndexInfo(const String &db_name, const String &table_na
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_dummy_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
         return;
     }

@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <thread>
 
 module dump_index_process;
@@ -72,39 +73,26 @@ void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
     ++task_count_;
 }
 
-void DumpIndexProcessor::DoDump(DumpIndexTask *dump_task) {
+void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-
-    SharedPtr<NewTxn> new_txn_shared = dump_task->new_txn_shared_;
-    String db_name{};
-    String table_name{};
-    String index_name{};
-    SegmentID segment_id{};
-    if (dump_task->mem_index_ != nullptr) {
-        db_name = dump_task->mem_index_->db_name_;
-        table_name = dump_task->mem_index_->table_name_;
-        index_name = dump_task->mem_index_->index_name_;
-        segment_id = dump_task->mem_index_->segment_id_;
-    } else if (dump_task->emvb_mem_index_ != nullptr) {
-        db_name = dump_task->emvb_mem_index_->db_name_;
-        table_name = dump_task->emvb_mem_index_->table_name_;
-        index_name = dump_task->emvb_mem_index_->index_name_;
-        segment_id = dump_task->emvb_mem_index_->segment_id_;
-    } else {
-        UnrecoverableError("Invalid mem index");
-    }
+    SharedPtr<NewTxn> new_txn_shared = nullptr;
+    String db_name = dump_task->db_name_;
+    String table_name = dump_task->table_name_;
+    String index_name = dump_task->index_name_;
+    SegmentID segment_id = dump_task->segment_id_;
+    RowID begin_row_id = dump_task->begin_row_id_;
 
     Status commit_status = Status::OK();
     Status rollback_status = Status::OK();
     i64 retry_count = 0;
     do {
-        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kDumpIndex);
+        SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
 
         if (!commit_status.ok()) {
             new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
         }
 
-        Status status = new_txn_shared->DumpMemIndex(db_name, table_name, index_name, segment_id);
+        Status status = new_txn_shared->DumpMemIndex(db_name, table_name, index_name, segment_id, begin_row_id);
         if (status.ok()) {
             commit_status = new_txn_mgr->CommitTxn(new_txn_shared.get());
             if (!commit_status.ok()) {
@@ -163,13 +151,13 @@ void DumpIndexProcessor::Process() {
                     running = false;
                     break;
                 }
-                case BGTaskType::kDumpIndex: {
+                case BGTaskType::kDumpMemIndex: {
                     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
                     if (storage_mode == StorageMode::kUnInitialized) {
                         UnrecoverableError("Uninitialized storage mode");
                     }
                     if (storage_mode == StorageMode::kWritable) {
-                        auto dump_task = static_cast<DumpIndexTask *>(bg_task.get());
+                        auto dump_task = static_cast<DumpMemIndexTask *>(bg_task.get());
                         LOG_DEBUG(dump_task->ToString());
                         // Trigger transaction to save the mem index
                         DoDump(dump_task);

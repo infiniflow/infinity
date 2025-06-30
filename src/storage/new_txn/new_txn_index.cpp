@@ -73,6 +73,7 @@ import bg_task;
 import mem_index_appender;
 import txn_context;
 import kv_utility;
+import dump_index_process;
 
 namespace infinity {
 
@@ -155,7 +156,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     return Status::OK();
 }
 
-Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, RowID begin_row_id) {
     Status status;
 
     Optional<DBMeeta> db_meta;
@@ -172,7 +173,14 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     // Return when there is no mem index to dump.
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
+        (begin_row_id != RowID() && mem_index->GetBaseMemIndex() != nullptr && begin_row_id != mem_index->GetBaseMemIndex()->GetBeginRowID())) {
+        LOG_INFO(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist.",
+                             db_name,
+                             table_name,
+                             index_name,
+                             segment_id,
+                             begin_row_id.ToUint64()));
         return Status::OK();
     }
 
@@ -785,7 +793,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                     LOG_TRACE(fmt::format("AppendMemIndex: memory_indexer_ is not null, base_row_id: {}, doc_count: {}",
                                           base_row_id.ToUint64(),
                                           mem_index->memory_indexer_->GetDocCount()));
-                    RowID exp_begin_row_id = mem_index->memory_indexer_->GetBaseRowId() + mem_index->memory_indexer_->GetDocCount();
+                    RowID exp_begin_row_id = mem_index->memory_indexer_->GetBeginRowID() + mem_index->memory_indexer_->GetDocCount();
                     assert(base_row_id >= exp_begin_row_id);
                     if (base_row_id > exp_begin_row_id) {
                         LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
@@ -885,6 +893,23 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             UnrecoverableError("Not implemented yet");
         }
     }
+
+    // Trigger dump if necessary
+    SizeT row_count = mem_index->GetRowCount();
+    SizeT row_quota = InfinityContext::instance().config()->MemIndexMemoryQuota();
+    if (row_count >= row_quota) {
+        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+        auto [db_name, table_name] = table_meta.GetDBTableName();
+        auto [index_base, _] = segment_index_meta.table_index_meta().GetIndexBase();
+        String index_name = *index_base->index_name_;
+        SegmentID segment_id = segment_index_meta.segment_id();
+        RowID begin_row_id = mem_index->GetBeginRowID();
+        SharedPtr<DumpMemIndexTask> dump_task = MakeShared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
+        DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
+        LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
+        dump_index_processor->Submit(std::move(dump_task));
+    }
+
     return Status::OK();
 }
 
@@ -1155,7 +1180,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         SegmentOffset block_offset = block_meta.block_capacity() * block_meta.block_id();
         RowID begin_row_id(segment_meta.segment_id(), block_offset);
 
-        RowID exp_begin_row_id = memory_indexer->GetBaseRowId() + memory_indexer->GetDocCount();
+        RowID exp_begin_row_id = memory_indexer->GetBeginRowID() + memory_indexer->GetDocCount();
         assert(begin_row_id >= exp_begin_row_id);
         if (begin_row_id > exp_begin_row_id) {
             LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
@@ -1738,6 +1763,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
     mem_index->ClearMemIndex();
+    auto *storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        auto *memindex_tracer = storage->memindex_tracer();
+        if (memindex_tracer != nullptr) {
+            memindex_tracer->DumpDone(mem_index);
+        }
+    }
     return Status::OK();
 }
 

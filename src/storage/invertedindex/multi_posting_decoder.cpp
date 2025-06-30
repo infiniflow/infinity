@@ -123,7 +123,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     }
     segment_cursor_ = locate_seg_cursor;
     SegmentPosting &cur_segment_posting = (*seg_postings_)[segment_cursor_];
-    base_row_id_ = cur_segment_posting.GetBaseRowId();
+    base_row_id_ = cur_segment_posting.GetBeginRowID();
     const SharedPtr<PostingWriter> &posting_writer = cur_segment_posting.GetInMemPostingWriter();
     if (posting_writer) {
         return MemSegMoveToSegment(posting_writer);

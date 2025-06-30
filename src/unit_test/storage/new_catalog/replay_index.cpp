@@ -285,7 +285,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        RowID begin_id = mem_index->memory_indexer_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
@@ -416,7 +416,7 @@ TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
         return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        RowID begin_id = mem_index->memory_indexer_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
@@ -665,7 +665,7 @@ TEST_P(TestTxnReplayIndex, test_populate_index) {
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        RowID begin_id = mem_index->memory_indexer_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });

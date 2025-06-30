@@ -392,7 +392,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        RowID begin_id = mem_index->memory_indexer_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
