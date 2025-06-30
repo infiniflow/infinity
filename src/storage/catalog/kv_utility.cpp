@@ -158,7 +158,7 @@ GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String 
         LOG_ERROR(fmt::format("Fail to get index definition from kv store, key: {}, cause: {}", index_def_key, status.message()));
         return nullptr;
     }
-    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_str);
+    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(std::string_view{index_def_str});
     return index_base;
 }
 
