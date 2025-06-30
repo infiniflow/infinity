@@ -86,23 +86,23 @@ String TableIndexTagMetaKey::ToString() const {
 }
 
 String SegmentIndexMetaKey::ToString() const {
-    return fmt::format("table_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
+    return fmt::format("segment_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
 }
 
 String SegmentIndexTagMetaKey::ToString() const {
-    return fmt::format("table_index_tag: {}:{}",
+    return fmt::format("segment_index_tag: {}:{}",
                        KeyEncode::CatalogIdxSegmentTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, tag_name_),
                        value_);
 }
 
 String ChunkIndexMetaKey::ToString() const {
-    return fmt::format("table_index: {}:{}",
+    return fmt::format("chunk_index: {}:{}",
                        KeyEncode::CatalogIdxChunkKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_),
                        commit_ts_);
 }
 
 String ChunkIndexTagMetaKey::ToString() const {
-    return fmt::format("table_index: {}:{}",
+    return fmt::format("chunk_index_tag: {}:{}",
                        KeyEncode::CatalogIdxChunkTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_, tag_name_),
                        value_);
 }
