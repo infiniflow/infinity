@@ -671,8 +671,8 @@ export struct WalCmdUpdateSegmentBloomFilterDataV2 final : public WalCmd {
 };
 
 export struct WalCmdCheckpoint final : public WalCmd {
-    WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, const String &catalog_path, const String &catalog_name)
-        : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path),
+    WalCmdCheckpoint(i64 max_commit_ts, const String &catalog_path, const String &catalog_name)
+        : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), catalog_path_(catalog_path),
           catalog_name_(catalog_name) {
         assert(!std::filesystem::path(catalog_path_).is_absolute());
     }
@@ -683,7 +683,6 @@ export struct WalCmdCheckpoint final : public WalCmd {
     String CompactInfo() const final;
 
     i64 max_commit_ts_{};
-    bool is_full_checkpoint_;
     String catalog_path_{};
     String catalog_name_{};
 };
@@ -974,9 +973,10 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
                         const String &table_id,
                         const Vector<String> &column_names,
                         const Vector<ColumnID> &column_ids,
-                        const String &table_key)
+                        const String &table_key,
+                        const Vector<String> &column_keys)
         : WalCmd(WalCommandType::DROP_COLUMNS_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
-          column_names_(column_names), column_ids_(column_ids), table_key_(table_key) {}
+          column_names_(column_names), column_ids_(column_ids), table_key_(table_key), column_keys_(column_keys) {}
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -993,6 +993,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
 
     // Redundant but useful in commit phase.
     String table_key_{};
+    Vector<String> column_keys_{};
 };
 
 export struct WalCmdCleanup : public WalCmd {
@@ -1044,7 +1045,7 @@ export struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
-    // Return if the entry is a full checkpoint or delta checkpoint.
+    // Return if the entry is a checkpoint.
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpointV2 *&checkpoint_cmd) const;
 
@@ -1091,7 +1092,7 @@ public:
     [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    // Locate the latest full checkpoint entry, and purge bad entries after it.
+    // Locate the latest checkpoint entry, and purge bad entries after it.
     void PurgeBadEntriesAfterLatestCheckpoint();
     List<String> wal_list_{};
     UniquePtr<WalEntryIterator> iter_{};

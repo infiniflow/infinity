@@ -173,11 +173,15 @@ String KeyEncode::CatalogIdxChunkTagKey(const String &db_id,
     return fmt::format("idx_chunk|{}|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, chunk_id, tag_name);
 }
 
-String KeyEncode::TableColumnKey(const String &db_id, const String &table_id, const String &column_name) {
-    return fmt::format("tbl|col|{}|{}|{}", db_id, table_id, column_name);
+String KeyEncode::TableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts) {
+    return fmt::format("tbl|col|{}|{}|{}|{}", db_id, table_id, column_name, ts);
 }
 
 String KeyEncode::TableColumnPrefix(const String &db_id, const String &table_id) { return fmt::format("tbl|col|{}|{}|", db_id, table_id); }
+
+String KeyEncode::TableColumnPrefix(const String &db_id, const String &table_id, const String &column_name) {
+    return fmt::format("tbl|col|{}|{}|{}", db_id, table_id, column_name);
+}
 
 String KeyEncode::TableColumnTagKey(const String &db_id, const String &table_id, const String &column_id, const String &tag_name) {
     return fmt::format("col|{}|{}|{}|{}", db_id, table_id, column_id, tag_name);
@@ -303,10 +307,20 @@ String KeyEncode::PMObjectKey(const String &key) { return fmt::format("pm|object
 
 String KeyEncode::PMObjectStatKey(const String &key) { return fmt::format("pm|object_stat|{}", key); }
 
-String KeyEncode::DropDBKey(const String &db_id_str, const String &db_name) { return fmt::format("drop|db|{}/{}", db_id_str, db_name); }
+String KeyEncode::DropDBKey(const String &db_name, const TxnTimeStamp &commit_ts, const String &db_id_str) {
+    return fmt::format("drop|db|{}/{}/{}", db_name, commit_ts, db_id_str);
+}
 
-String KeyEncode::DropTableKey(const String &db_id_str, const String &table_id_str, const String &table_name) {
-    return fmt::format("drop|tbl|{}/{}/{}", db_id_str, table_id_str, table_name);
+String KeyEncode::DropTableKey(const String &db_id_str, const String &table_name, const String &table_id_str, TxnTimeStamp create_ts) {
+    return fmt::format("drop|tbl|{}/{}/{}/{}", db_id_str, table_name, create_ts, table_id_str);
+}
+
+String KeyEncode::RenameTableKey(const String &db_id_str, const String &table_name, const String &table_id_str, TxnTimeStamp create_ts) {
+    return fmt::format("drop|tbl_name|{}/{}/{}/{}", db_id_str, table_name, create_ts, table_id_str);
+}
+
+String KeyEncode::DropTableKeyPrefix(const String &db_id_str, const String &table_name) {
+    return fmt::format("drop|tbl|{}/{}/", db_id_str, table_name);
 }
 
 String KeyEncode::DropSegmentKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id) {
@@ -317,6 +331,10 @@ String KeyEncode::DropBlockKey(const String &db_id_str, const String &table_id_s
     return fmt::format("drop|blk|{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id);
 }
 
+String KeyEncode::DropTableColumnKey(const String &db_id_str, const String &table_id_str, const String &column_name, TxnTimeStamp create_ts) {
+    return fmt::format("drop|tbl_col|{}/{}/{}/{}", db_id_str, table_id_str, column_name, create_ts);
+}
+
 String KeyEncode::DropBlockColumnKey(const String &db_id_str,
                                      const String &table_id_str,
                                      SegmentID segment_id,
@@ -325,8 +343,12 @@ String KeyEncode::DropBlockColumnKey(const String &db_id_str,
     return fmt::format("drop|blk_col|{}/{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id, column_def->ToJson().dump());
 }
 
-String KeyEncode::DropTableIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, const String &index_name) {
-    return fmt::format("drop|idx|{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, index_name);
+String KeyEncode::DropTableIndexKey(const String &db_id_str,
+                                    const String &table_id_str,
+                                    const String &index_name,
+                                    const TxnTimeStamp &commit_ts,
+                                    const String &index_id_str) {
+    return fmt::format("drop|idx|{}/{}/{}/{}/{}", db_id_str, table_id_str, index_name, commit_ts, index_id_str);
 }
 
 String KeyEncode::DropSegmentIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) {

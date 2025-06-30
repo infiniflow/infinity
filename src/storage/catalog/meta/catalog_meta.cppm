@@ -22,32 +22,24 @@ import status;
 namespace infinity {
 
 class KVInstance;
+class NewTxn;
 
 export class CatalogMeta {
 public:
-    CatalogMeta(KVInstance &kv_instance);
+    CatalogMeta(NewTxn *txn);
+    CatalogMeta(KVInstance *kv_instance);
 
     Status GetDBID(const String &db_name, String &db_key, String &db_id);
 
-    Status GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_names = nullptr) {
-        if (!db_id_strs_ || !db_names_) {
-            Status status = LoadDBIDs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        db_id_strs = &*db_id_strs_;
-        if (db_names) {
-            *db_names = &*db_names_;
-        }
-        return Status::OK();
-    }
+    Status GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_names = nullptr);
 
 private:
     Status LoadDBIDs();
 
 private:
-    KVInstance &kv_instance_;
+    NewTxn *txn_{};
+    TxnTimeStamp read_ts_{};
+    KVInstance *kv_instance_{};
 
     Optional<Vector<String>> db_id_strs_;
     Optional<Vector<String>> db_names_;

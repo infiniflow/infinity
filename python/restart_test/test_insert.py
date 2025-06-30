@@ -255,7 +255,7 @@ class TestInsert:
                 try:
                     time.sleep(0.2)
                     infinity_obj.flush_data()
-                    print("full checkpoint")
+                    print("checkpoint")
                     time.sleep(0.2)
                 except Exception as e:
                     print(e)

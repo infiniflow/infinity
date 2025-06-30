@@ -72,6 +72,7 @@ import buffer_handle;
 import bg_task;
 import mem_index_appender;
 import txn_context;
+import kv_utility;
 
 namespace infinity {
 
@@ -263,7 +264,7 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
 Status NewTxn::OptimizeAllIndexes() {
     // TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    CatalogMeta catalog_meta(*kv_instance_);
+    CatalogMeta catalog_meta(this);
     Vector<String> *db_id_strs_ptr = nullptr;
     Vector<String> *db_names_ptr = nullptr;
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
@@ -274,7 +275,7 @@ Status NewTxn::OptimizeAllIndexes() {
         const String &db_id_str = (*db_id_strs_ptr)[i];
         const String &db_name = (*db_names_ptr)[i];
 
-        DBMeeta db_meta(db_id_str, *kv_instance_);
+        DBMeeta db_meta(db_id_str, this);
         Vector<String> *table_id_strs_ptr = nullptr;
         Vector<String> *table_names_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
@@ -1911,9 +1912,7 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
 }
 
 Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
     String db_name = create_index_cmd->db_name_;
     String table_name = create_index_cmd->table_name_;
     String index_name = *create_index_cmd->index_base_->index_name_;
@@ -1922,7 +1921,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     String table_key = create_index_cmd->table_key_;
     String index_id_str = create_index_cmd->index_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     Optional<TableIndexMeeta> table_index_meta_opt;
     Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
@@ -1985,26 +1984,21 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
 }
 
 Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     const String &db_id_str = drop_index_cmd->db_id_;
     const String &table_id_str = drop_index_cmd->table_id_;
     const String &index_id_str = drop_index_cmd->index_id_;
     const String &index_key = drop_index_cmd->index_key_;
-
-    // delete index key
-    Status status = kv_instance_->Delete(index_key);
-    if (!status.ok()) {
-        return status;
-    }
+    const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(index_key);
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     auto ts_str = std::to_string(commit_ts);
-    kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_), ts_str);
+    kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, drop_index_cmd->index_name_, create_ts, index_id_str), ts_str);
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);
     SharedPtr<IndexBase> index_base;
+    Status status;
     std::tie(index_base, status) = table_index_meta.GetIndexBase();
     if (!status.ok()) {
         return status;
@@ -2017,14 +2011,13 @@ Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
 }
 
 Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = dump_index_cmd->db_id_;
     const String &table_id_str = dump_index_cmd->table_id_;
     const String &index_id_str = dump_index_cmd->index_id_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
 
     const String &index_id_str_ = dump_index_cmd->index_id_;
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);
@@ -2040,7 +2033,7 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
 
         auto ts_str = std::to_string(commit_ts);
-        kv_instance->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
+        kv_instance_->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
     return Status::OK();
 }

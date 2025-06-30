@@ -2319,7 +2319,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         //    t1      rename            commit (success)
         //    |----------|--------------------|
         //            |-------|-----------------|
-        //           t2     drop         commit (fail)
+        //           t2     drop         commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2350,7 +2350,7 @@ TEST_P(TestTxnTable, rename_table_test) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // drop db1
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);

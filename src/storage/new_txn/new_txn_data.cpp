@@ -503,7 +503,7 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
                                                 table_meta->table_id_str()));
     }
 
-    return PrepareCommitDelete(delete_cmd, kv_instance_.get());
+    return PrepareCommitDelete(delete_cmd);
 }
 
 Status NewTxn::DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids) {
@@ -562,6 +562,8 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
 Status NewTxn::Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
 
     //    LOG_INFO(fmt::format("Start to compact segment ids: {}", segment_ids.size()));
+    LOG_INFO(fmt::format("Compact db_name: {}, table_name: {}, segment ids: {}", db_name, table_name, fmt::join(segment_ids, " ")));
+
     this->SetTxnType(TransactionType::kCompact);
 
     this->CheckTxn(db_name);
@@ -628,11 +630,6 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         return status;
     }
 
-    //    LOG_TRACE(fmt::format("To remove segment: {}", segment_ids.size()));
-    status = table_meta.RemoveSegmentIDs1(segment_ids);
-    if (!status.ok()) {
-        return status;
-    }
     {
         // Put the data into local txn store
         if (base_txn_store_ != nullptr) {
@@ -752,10 +749,6 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
-        if (!status.ok()) {
-            return status;
-        }
-        status = table_meta.RemoveSegmentIDs1(compact_cmd->deprecated_segment_ids_);
         if (!status.ok()) {
             return status;
         }
@@ -1278,14 +1271,12 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
 
 Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     Status status;
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
     const String &db_id_str = import_cmd->db_id_;
     const String &table_id_str = import_cmd->table_id_;
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1316,9 +1307,8 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     const String &table_name = append_cmd->table_name_;
     const String &db_id_str = append_cmd->db_id_;
     const String &table_id_str = append_cmd->table_id_;
-    TxnTimeStamp begin_ts = BeginTS();
     TxnTimeStamp commit_ts = CommitTS();
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     SizeT copied_row_cnt = 0;
@@ -1452,14 +1442,12 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
     const String &db_id_str = delete_cmd->db_id_;
     const String &table_id_str = delete_cmd->table_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1506,13 +1494,11 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance 
     return Status::OK();
 }
 
-Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store) {
     const String &db_id_str = delete_txn_store->db_id_str_;
     const String &table_id_str = delete_txn_store->table_id_str_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
@@ -1544,7 +1530,6 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     const String &db_id_str = compact_cmd->db_id_;
     const String &table_id_str = compact_cmd->table_id_;
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     Vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
@@ -1557,7 +1542,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     WalSegmentInfo &segment_info = segment_infos[0];
     Vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
@@ -1605,7 +1590,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
                     kv_instance_->Put(KeyEncode::DropSegmentIndexKey(db_id_str, table_id_str, index_id_str, segment_id), ts_str);
                 }
             }
-            status = table_index_meta.RemoveSegmentIndexIDs(*segment_ids_ptr);
+            status = table_index_meta.RemoveSegmentIndexIDs(deprecated_ids);
             if (!status.ok()) {
                 return status;
             }

@@ -3228,19 +3228,19 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
     //    {
     //        {
     //            // option name
-    //            Value value = Value::MakeVarchar(FULL_CHECKPOINT_INTERVAL_OPTION_NAME);
+    //            Value value = Value::MakeVarchar(CHECKPOINT_INTERVAL_OPTION_NAME);
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
     //        }
     //        {
     //            // option name type
-    //            Value value = Value::MakeVarchar(std::to_string(global_config->FullCheckpointInterval()));
+    //            Value value = Value::MakeVarchar(std::to_string(global_config->CheckpointInterval()));
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
     //        }
     //        {
     //            // option name type
-    //            Value value = Value::MakeVarchar("Full checkpoint period interval");
+    //            Value value = Value::MakeVarchar("Checkpoint period interval");
     //            ValueExpression value_expr(value);
     //            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
     //        }

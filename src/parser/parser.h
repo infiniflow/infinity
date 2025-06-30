@@ -58,7 +58,6 @@ extern int sqldebug;
 
 #include "expression.h"
 #include "parser_result.h"
-#include "defer_operation.h"
 #include "statement/alter_statement.h"
 #include "statement/copy_statement.h"
 #include "statement/create_statement.h"
@@ -118,7 +117,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 122 "parser.h"
+#line 121 "parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -342,7 +341,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 105 "parser.y"
+#line 104 "parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -423,7 +422,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 427 "parser.h"
+#line 426 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

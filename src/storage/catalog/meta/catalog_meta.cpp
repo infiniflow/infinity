@@ -22,62 +22,119 @@ import kv_code;
 import kv_store;
 import infinity_exception;
 import third_party;
+import kv_utility;
+import default_values;
+import new_txn;
 
 namespace infinity {
 
-CatalogMeta::CatalogMeta(KVInstance &kv_instance) : kv_instance_(kv_instance) {}
+CatalogMeta::CatalogMeta(NewTxn *txn) : txn_(txn) {
+    if (txn == nullptr) {
+        UnrecoverableError("Null txn pointer");
+    }
+    read_ts_ = txn->BeginTS();
+    kv_instance_ = txn_->kv_instance();
+}
+
+CatalogMeta::CatalogMeta(KVInstance *kv_instance) : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
 
 Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id) {
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
-    auto iter2 = kv_instance_.GetIterator();
+    auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
-    SizeT found_count = 0;
 
-    Vector<String> error_db_keys;
+    Vector<Pair<String, String>> db_kvs;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-        if (found_count > 0) {
-            // Error branch
-            error_db_keys.push_back(db_key);
-        }
-        db_key = iter2->Key().ToString();
-        db_id = iter2->Value().ToString();
+        db_kvs.emplace_back(iter2->Key().ToString(), iter2->Value().ToString());
         iter2->Next();
-        ++found_count;
     }
 
-    if (found_count == 0) {
-        // No table, ignore it.
+    if (db_kvs.size() == 0) {
         return Status::DBNotExist(db_name);
     }
 
-    if (!error_db_keys.empty()) {
-        error_db_keys.push_back(db_key);
-        // join error_db_keys
-        String error_db_keys_str =
-            std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {
-                return a + ", " + b;
-            });
-        UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
+    SizeT max_visible_db_index = std::numeric_limits<SizeT>::max();
+    TxnTimeStamp max_commit_ts = 0;
+    for (SizeT i = 0; i < db_kvs.size(); ++i) {
+        String commit_ts_str = GetLastPartOfKey(db_kvs[i].first, '|');
+        TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
+        if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
+            max_commit_ts = commit_ts;
+            max_visible_db_index = i;
+        }
     }
 
+    if (max_visible_db_index == std::numeric_limits<SizeT>::max()) {
+        return Status::DBNotExist(db_name);
+    }
+
+    db_key = db_kvs[max_visible_db_index].first;
+    db_id = db_kvs[max_visible_db_index].second;
+
+    String drop_db_ts{};
+    kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id), drop_db_ts);
+
+    if (!drop_db_ts.empty() && std::stoull(drop_db_ts) <= read_ts_) {
+        return Status::DBNotExist(db_name);
+    }
+
+    return Status::OK();
+}
+
+Status CatalogMeta::GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_names) {
+    Status status = LoadDBIDs();
+    if (!status.ok()) {
+        return status;
+    }
+
+    db_id_strs = &*db_id_strs_;
+    if (db_names) {
+        *db_names = &*db_names_;
+    }
     return Status::OK();
 }
 
 Status CatalogMeta::LoadDBIDs() {
     Vector<String> db_id_strs;
     Vector<String> db_names;
+    Map<String, Vector<Pair<String, String>>> db_kvs_map;
 
-    auto iter2 = kv_instance_.GetIterator();
+    auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(KeyEncode::kCatalogDbHeader);
-
     while (iter2->Valid() && iter2->Key().starts_with(KeyEncode::kCatalogDbHeader)) {
         String key_str = iter2->Key().ToString();
+        String db_id = iter2->Value().ToString();
         size_t start = KeyEncode::kCatalogDbHeader.size();
         size_t end = key_str.find('|', start);
-        db_id_strs.emplace_back(iter2->Value().ToString());
-        db_names.emplace_back(key_str.substr(start, end - start));
+        String db_name = key_str.substr(start, end - start);
+        db_kvs_map[db_name].emplace_back(key_str, db_id);
         iter2->Next();
     }
+
+    for (const auto &[db_name, db_kv] : db_kvs_map) {
+        SizeT max_visible_db_index = std::numeric_limits<SizeT>::max();
+        TxnTimeStamp max_commit_ts = 0;
+        for (SizeT i = 0; i < db_kv.size(); ++i) {
+            String commit_ts_str = GetLastPartOfKey(db_kv[i].first, '|');
+            TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
+            if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
+                max_commit_ts = commit_ts;
+                max_visible_db_index = i;
+            }
+        }
+
+        if (max_visible_db_index != std::numeric_limits<SizeT>::max()) {
+            String drop_db_ts{};
+            const String& db_id = db_kv[max_visible_db_index].second;
+            kv_instance_->Get(KeyEncode::DropDBKey(db_name, max_commit_ts, db_id), drop_db_ts);
+
+            if (drop_db_ts.empty() || std::stoull(drop_db_ts) > read_ts_) {
+                db_id_strs.push_back(db_id);
+                db_names.push_back(db_name);
+            }
+        }
+    }
+
     db_id_strs_ = std::move(db_id_strs);
     db_names_ = std::move(db_names);
 

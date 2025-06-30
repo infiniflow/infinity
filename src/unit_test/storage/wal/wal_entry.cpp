@@ -244,7 +244,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "catalog", String("META_123.full.json")));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), "catalog", String("META_123.full.json")));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
@@ -380,8 +380,17 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         Vector<String> column_names;
         column_names.push_back("boolean_col");
         column_names.push_back("embedding_col");
-        entry->cmds_.push_back(
-            MakeShared<WalCmdDropColumnsV2>("db1", "1", "tbl1", "2", std::move(column_names), Vector<ColumnID>{3, 4}, "table_key"));
+        Vector<String> column_keys;
+        column_keys.push_back("column_key1");
+        column_keys.push_back("column_key2");
+        entry->cmds_.push_back(MakeShared<WalCmdDropColumnsV2>("db1",
+                                                               "1",
+                                                               "tbl1",
+                                                               "2",
+                                                               std::move(column_names),
+                                                               Vector<ColumnID>{3, 4},
+                                                               "table_key",
+                                                               std::move(column_keys)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();

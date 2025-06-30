@@ -211,7 +211,8 @@ public:
     HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
 public:
-    Status GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
+    Status GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vector<UniquePtr<MetaKey>> &metas, Vector<String> &drop_keys) const;
+    Vector<String> GetEncodeKeys(Vector<UniquePtr<MetaKey>> &metas) const;
 
     // Profile related methods
     void SetProfile(bool flag) { enable_profile_ = flag; }
@@ -246,7 +247,7 @@ public:
 
     static Status GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
 
-    static Status AddNewDB(KVInstance *kv_instance,
+    static Status AddNewDB(NewTxn *txn,
                            const String &db_id_str,
                            TxnTimeStamp commit_ts,
                            const String &db_name,
