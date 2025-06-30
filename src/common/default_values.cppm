@@ -67,6 +67,7 @@ export {
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
+    constexpr SizeT DEFAULT_BLOCK_PER_SEGMENT = DEFAULT_SEGMENT_CAPACITY / DEFAULT_BLOCK_CAPACITY;
     constexpr SizeT SEGMENT_OFFSET_IN_DOCID = 23;           // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
     constexpr u64 SEGMENT_MASK_IN_DOCID = 0x7FFFFF;         // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
     constexpr u32 INVALID_SEGMENT_ID = std::numeric_limits<u32>::max();

@@ -126,12 +126,33 @@ export struct MetaPmObject final : public MetaObject {
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
+    [[nodiscard]] bool ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &pred) const;
+
+    static std::function<bool(MetaKey *)> MakeColumnPredicate(std::string_view db_id_str, std::string_view table_id_str, ColumnID column_id);
+
+    static std::function<bool(MetaKey *)>
+    MakeBlockPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id, BlockID block_id);
+
+    static std::function<bool(MetaKey *)> MakeSegmentPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id);
+
+    static std::function<bool(MetaKey *)>
+    MakeSegmentIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str, SegmentID segment_id);
+
+    static std::function<bool(MetaKey *)> MakeChunkIndexPredicate(std::string_view db_id_str,
+                                                                  std::string_view table_id_str,
+                                                                  std::string_view index_id_str,
+                                                                  SegmentID segment_id,
+                                                                  ChunkID chunk_id);
+
+    static std::function<bool(MetaKey *)>
+    MakeTableIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str);
+
 public:
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
-    HashSet<String> GetMetaPathSet();
+    bool CheckData(const String &path);
     static HashSet<String> GetDataVfsPathSet();
     static HashSet<String> GetDataVfsOffPathSet();
-    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str);
+    Vector<String> CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str);
 
     Vector<MetaTableObject *> ListTables() const;
     SharedPtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
@@ -141,6 +162,7 @@ public:
     Map<String, String> system_tag_map_{};
     Map<String, SharedPtr<MetaDBObject>> db_map_{};
     Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
+    Vector<SharedPtr<MetaKey>> metas_;
 };
 
 } // namespace infinity
