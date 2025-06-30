@@ -389,6 +389,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
                                                                "2",
                                                                std::move(column_names),
                                                                Vector<ColumnID>{3, 4},
+                                                               Vector<TxnTimeStamp>{0, 0},
                                                                "table_key",
                                                                std::move(column_keys)));
     }

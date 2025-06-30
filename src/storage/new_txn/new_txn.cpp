@@ -782,6 +782,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     txn_store->table_id_ = std::stoull(table_meta->table_id_str());
     txn_store->column_names_ = column_names;
     txn_store->column_ids_ = column_ids;
+    txn_store->create_ts_ = {};
     txn_store->table_key_ = table_key;
     txn_store->column_keys_ = column_keys;
     return Status::OK();

@@ -300,20 +300,28 @@ SharedPtr<WalEntry> AddColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const
 }
 
 String DropColumnsTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, columns: {}",
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, columns: {}, create_ts: {}",
                        TransactionType2Str(type_),
                        db_name_,
                        db_id_str_,
                        table_name_,
                        table_id_str_,
-                       column_names_.size());
+                       column_names_.size(),
+                       create_ts_);
 }
 
 SharedPtr<WalEntry> DropColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command =
-        MakeShared<WalCmdDropColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_names_, column_ids_, table_key_, column_keys_);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropColumnsV2>(db_name_,
+                                                                    db_id_str_,
+                                                                    table_name_,
+                                                                    table_id_str_,
+                                                                    column_names_,
+                                                                    column_ids_,
+                                                                    create_ts_,
+                                                                    table_key_,
+                                                                    column_keys_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }

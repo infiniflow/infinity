@@ -317,6 +317,7 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
 
     Vector<String> column_names_{};
     Vector<ColumnID> column_ids_{};
+    Vector<TxnTimeStamp> create_ts_{};
     String table_key_{};
     Vector<String> column_keys_{};
 
