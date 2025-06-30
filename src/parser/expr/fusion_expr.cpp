@@ -41,79 +41,118 @@ void FusionExpr::JobAfterParser() {
     }
 }
 
-std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object) {
-    switch (json_object.type()) {
-        case nlohmann::json::value_t::boolean: {
+std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_str) {
+    simdjson::padded_string json(json_str);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(json);
+    switch (doc.type()) {
+        case simdjson::ondemand::json_type::boolean: {
             auto res = std::make_shared<ConstantExpr>(LiteralType::kBoolean);
-            res->bool_value_ = json_object.get<bool>();
+            res->bool_value_ = doc.get<bool>();
             return res;
         }
-        case nlohmann::json::value_t::number_unsigned:
-        case nlohmann::json::value_t::number_integer: {
-            auto res = std::make_shared<ConstantExpr>(LiteralType::kInteger);
-            res->integer_value_ = json_object.get<int64_t>();
-            return res;
-        }
-        case nlohmann::json::value_t::number_float: {
-            auto res = std::make_shared<ConstantExpr>(LiteralType::kDouble);
-            res->double_value_ = json_object.get<double>();
-            return res;
-        }
-        case nlohmann::json::value_t::string: {
-            auto res = std::make_shared<ConstantExpr>(LiteralType::kString);
-            auto str = json_object.get<std::string>();
-            res->str_value_ = strdup(json_object.get<std::string>().c_str());
-            return res;
-        }
-        case nlohmann::json::value_t::array: {
-            const uint32_t array_size = json_object.size();
-            if (array_size == 0) {
-                const auto error_info = "Empty json array!";
-                ParserError(error_info);
-                return nullptr;
-            }
-            switch (json_object[0].type()) {
-                case nlohmann::json::value_t::boolean:
-                case nlohmann::json::value_t::number_unsigned:
-                case nlohmann::json::value_t::number_integer: {
-                    auto res = std::make_shared<ConstantExpr>(LiteralType::kIntegerArray);
-                    res->long_array_.resize(array_size);
-                    for (uint32_t i = 0; i < array_size; ++i) {
-                        res->long_array_[i] = json_object[i].get<int64_t>();
-                    }
+        case simdjson::ondemand::json_type::number: {
+            simdjson::ondemand::number num = doc.get_number();
+            switch (num.get_number_type()) {
+                case simdjson::ondemand::number_type::signed_integer:
+                case simdjson::ondemand::number_type::unsigned_integer: {
+                    auto res = std::make_shared<ConstantExpr>(LiteralType::kInteger);
+                    res->integer_value_ = (int64_t)num;
                     return res;
                 }
-                case nlohmann::json::value_t::number_float: {
-                    auto res = std::make_shared<ConstantExpr>(LiteralType::kDoubleArray);
-                    res->double_array_.resize(array_size);
-                    for (uint32_t i = 0; i < array_size; ++i) {
-                        res->double_array_[i] = json_object[i].get<double>();
-                    }
-                    return res;
-                }
-                case nlohmann::json::value_t::array: {
-                    auto res = std::make_shared<ConstantExpr>(LiteralType::kSubArrayArray);
-                    res->sub_array_array_.resize(array_size);
-                    for (uint32_t i = 0; i < array_size; ++i) {
-                        res->sub_array_array_[i] = BuildConstantExprFromJson(json_object[i]);
-                    }
+                case simdjson::ondemand::number_type::floating_point_number: {
+                    auto res = std::make_shared<ConstantExpr>(LiteralType::kDouble);
+                    res->double_value_ = (double)num;
                     return res;
                 }
                 default: {
-                    const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                    const auto error_info = fmt::format("Unrecognized json object type in number");
                     ParserError(error_info);
                     return nullptr;
                 }
             }
         }
-        case nlohmann::json::value_t::object: {
+        case simdjson::ondemand::json_type::string: {
+            auto res = std::make_shared<ConstantExpr>(LiteralType::kString);
+            auto str = doc.get<std::string>();
+            res->str_value_ = strdup(((std::string)doc.get<std::string>()).c_str());
+            return res;
+        }
+        case simdjson::ondemand::json_type::array: {
+            const uint32_t array_size = doc.count_elements();
+            if (array_size == 0) {
+                const auto error_info = "Empty json array!";
+                ParserError(error_info);
+                return nullptr;
+            }
+            std::vector<std::string_view> json_strs(array_size);
+            std::vector<simdjson::ondemand::value> values(array_size);
+            for (size_t index = 0; auto field : doc.get_array()) {
+                values[index] = field.value();
+                json_strs[index++] = values[index].raw_json();
+            }
+            switch (values[0].type()) {
+                case simdjson::ondemand::json_type::boolean:
+                case simdjson::ondemand::json_type::number: {
+                    std::vector<simdjson::ondemand::number> nums(array_size);
+                    for (size_t index = 0; auto item : values) {
+                        nums[index++] = item.get_number();
+                    }
+                    switch (nums[0].get_number_type()) {
+                        case simdjson::ondemand::number_type::signed_integer:
+                        case simdjson::ondemand::number_type::unsigned_integer: {
+                            auto res = std::make_shared<ConstantExpr>(LiteralType::kIntegerArray);
+                            res->long_array_.resize(array_size);
+                            for (uint32_t i = 0; i < array_size; ++i) {
+                                res->long_array_[i] = (int64_t)nums[i];
+                            }
+                            return res;
+                        }
+                        case simdjson::ondemand::number_type::floating_point_number: {
+                            auto res = std::make_shared<ConstantExpr>(LiteralType::kDoubleArray);
+                            res->double_array_.resize(array_size);
+                            for (uint32_t i = 0; i < array_size; ++i) {
+                                res->double_array_[i] = (double)nums[i];
+                            }
+                            return res;
+                        }
+                        default: {
+                            const auto error_info = fmt::format("Unrecognized json object type in array");
+                            ParserError(error_info);
+                            return nullptr;
+                        }
+                    }
+                }
+                case simdjson::ondemand::json_type::array: {
+                    auto res = std::make_shared<ConstantExpr>(LiteralType::kSubArrayArray);
+                    res->sub_array_array_.resize(array_size);
+                    for (uint32_t i = 0; i < array_size; ++i) {
+                        res->sub_array_array_[i] = BuildConstantExprFromJson(json_strs[i]);
+                    }
+                    return res;
+                }
+                default: {
+                    const auto error_info = fmt::format("Unrecognized json object type in array");
+                    ParserError(error_info);
+                    return nullptr;
+                }
+            }
+        }
+        case simdjson::ondemand::json_type::object: {
             std::shared_ptr<ConstantExpr> res = nullptr;
-            for (auto iter = json_object.begin(); iter != json_object.end(); ++iter) {
-                int64_t key = std::stoll(iter.key());
-                const auto &value_obj = iter.value();
-                switch (value_obj.type()) {
-                    case nlohmann::json::value_t::number_unsigned:
-                    case nlohmann::json::value_t::number_integer: {
+            for (auto field : doc.get_object()) {
+                int64_t field_key = std::stoll(std::string((std::string_view)field.unescaped_key()));
+                auto field_value = field.value();
+                if (doc.type() != simdjson::ondemand::json_type::number) {
+                    const auto error_info = fmt::format("Unrecognized json object type in array");
+                    ParserError(error_info);
+                    return nullptr;
+                }
+
+                simdjson::ondemand::number num = field_value.get_number();
+                switch (num.get_number_type()) {
+                    case simdjson::ondemand::number_type::signed_integer:
+                    case simdjson::ondemand::number_type::unsigned_integer: {
                         if (res.get() == nullptr) {
                             res = std::make_shared<ConstantExpr>(LiteralType::kLongSparseArray);
                         } else if (res->literal_type_ != LiteralType::kLongSparseArray) {
@@ -121,11 +160,11 @@ std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &js
                             ParserError(error_info);
                             return nullptr;
                         }
-                        res->long_sparse_array_.first.push_back(key);
-                        res->long_sparse_array_.second.push_back(value_obj.get<int64_t>());
+                        res->long_sparse_array_.first.push_back(field_key);
+                        res->long_sparse_array_.second.push_back((int64_t)num);
                         break;
                     }
-                    case nlohmann::json::value_t::number_float: {
+                    case simdjson::ondemand::number_type::floating_point_number: {
                         if (res.get() == nullptr) {
                             res = std::make_shared<ConstantExpr>(LiteralType::kDoubleSparseArray);
                         } else if (res->literal_type_ != LiteralType::kDoubleSparseArray) {
@@ -133,12 +172,12 @@ std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &js
                             ParserError(error_info);
                             return nullptr;
                         }
-                        res->double_sparse_array_.first.push_back(key);
-                        res->double_sparse_array_.second.push_back(value_obj.get<double>());
+                        res->double_sparse_array_.first.push_back(field_key);
+                        res->double_sparse_array_.second.push_back((double)num);
                         break;
                     }
                     default: {
-                        const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                        const auto error_info = fmt::format("Unrecognized json object type in array");
                         ParserError(error_info);
                         return nullptr;
                     }
@@ -147,7 +186,7 @@ std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &js
             return res;
         }
         default: {
-            const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+            const auto error_info = fmt::format("Unrecognized json object type");
             ParserError(error_info);
             return nullptr;
         }
@@ -181,8 +220,7 @@ std::unique_ptr<MatchTensorExpr> GetFusionMatchTensorExpr(SearchOptions &search_
     column_expr->names_.emplace_back(column_name);
     auto cast_column_expr = static_cast<ParsedExpr *>(column_expr.release());
     match_tensor_expr->SetSearchColumn(cast_column_expr);
-    const auto json_obj = nlohmann::json::parse(search_tensor);
-    const auto tensor_expr = BuildConstantExprFromJson(json_obj);
+    const auto tensor_expr = BuildConstantExprFromJson(search_tensor);
     match_tensor_expr->SetQueryTensorStr(std::move(tensor_data_type), tensor_expr.get());
     return match_tensor_expr;
 }
