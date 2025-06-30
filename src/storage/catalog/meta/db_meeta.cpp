@@ -35,11 +35,11 @@ DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }
-    read_ts_ = txn->BeginTS();
+    txn_begin_ts_ = txn->BeginTS();
     kv_instance_ = txn_->kv_instance();
 }
 
-DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance) : db_id_str_(std::move(db_id_str)), read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance) : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
 
 const String &DBMeeta::db_id_str() const { return db_id_str_; }
 
@@ -145,7 +145,7 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     TxnTimeStamp max_commit_ts = 0;
     for (SizeT i = 0; i < table_kvs.size(); ++i) {
         TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(table_kvs[i].first);
-        if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
+        if (commit_ts <= txn_begin_ts_ && commit_ts > max_commit_ts) {
             max_commit_ts = commit_ts;
             max_visible_table_index = i;
         }
@@ -164,8 +164,8 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     String rename_table_ts{};
     kv_instance_->Get(KeyEncode::RenameTableKey(db_id_str_, table_name, table_id_str, max_commit_ts), rename_table_ts);
 
-    if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= read_ts_) ||
-        (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= read_ts_)) {
+    if ((!drop_table_ts.empty() && std::stoull(drop_table_ts) <= txn_begin_ts_) ||
+        (!rename_table_ts.empty() && std::stoull(rename_table_ts) <= txn_begin_ts_)) {
         return Status::TableNotExist(table_name);
     }
 
@@ -231,7 +231,7 @@ Status DBMeeta::LoadTableIDs() {
         for (SizeT i = 0; i < table_kv.size(); ++i) {
             String commit_ts_str = GetLastPartOfKey(table_kv[i].first, '|');
             TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
-            if (commit_ts <= read_ts_ && commit_ts > max_commit_ts) {
+            if (commit_ts <= txn_begin_ts_ && commit_ts > max_commit_ts) {
                 max_commit_ts = commit_ts;
                 max_visible_table_index = i;
             }
@@ -245,8 +245,8 @@ Status DBMeeta::LoadTableIDs() {
             String rename_table_ts{};
             kv_instance_->Get(KeyEncode::RenameTableKey(db_id_str_, table_name, table_id_ref, max_commit_ts), rename_table_ts);
 
-            if ((drop_table_ts.empty() || std::stoull(drop_table_ts) > read_ts_) &&
-                (rename_table_ts.empty() || std::stoull(rename_table_ts) > read_ts_)) {
+            if ((drop_table_ts.empty() || std::stoull(drop_table_ts) > txn_begin_ts_) &&
+                (rename_table_ts.empty() || std::stoull(rename_table_ts) > txn_begin_ts_)) {
                 table_id_strs_->emplace_back(table_id_ref);
                 table_names_->emplace_back(table_name);
             }

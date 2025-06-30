@@ -296,7 +296,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_create_ts;
+        status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         EXPECT_TRUE(status.ok());
     };
 
@@ -360,7 +361,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_create_ts;
+        status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(!status.ok());
         status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
@@ -390,7 +392,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_create_ts;
+        status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -407,7 +410,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta1;
         Optional<TableMeeta> table_meta1;
-        status = txn->GetDBMeta(*db_name, db_meta1);
+        TxnTimeStamp db_create_ts1;
+        status = txn->GetDBMeta(*db_name, db_meta1, db_create_ts1);
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
@@ -757,7 +761,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
             Status status;
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            status = txn->GetDBMeta(*db_name, db_meta);
+            TxnTimeStamp db_create_ts;
+            status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
             status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             auto [segment_ids, status1] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status1.ok());

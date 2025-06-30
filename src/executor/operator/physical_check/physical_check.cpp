@@ -134,7 +134,8 @@ void PhysicalCheck::ExecuteCheckTable(QueryContext *query_context, CheckOperator
     // }
 
     Optional<DBMeeta> db_meta;
-    Status status = new_txn->GetDBMeta(schema_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = new_txn->GetDBMeta(schema_name, db_meta, db_create_ts);
 
     if (!status.ok()) {
         output_names_->reserve(1);

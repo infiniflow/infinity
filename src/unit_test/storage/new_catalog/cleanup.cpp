@@ -274,7 +274,8 @@ TEST_P(TestTxnCleanup, cleanup_with_drop_db) {
         { // check drop db
             auto txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             Optional<DBMeeta> db_meta;
-            Status status = txn->GetDBMeta(*db_name_, db_meta);
+            TxnTimeStamp db_create_ts;
+            Status status = txn->GetDBMeta(*db_name_, db_meta, db_create_ts);
             EXPECT_FALSE(status.ok());
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());

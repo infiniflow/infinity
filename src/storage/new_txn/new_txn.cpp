@@ -182,7 +182,8 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     }
 
     Optional<DBMeeta> db_meta;
-    status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -272,7 +273,8 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     this->CheckTxnStatus();
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kDBNotExist) {
             return status;
@@ -294,7 +296,7 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     String db_id_str = db_meta->db_id_str();
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_id_ = std::stoull(db_id_str);
-    txn_store->create_ts_ = 0;
+    txn_store->create_ts_ = db_create_ts;
     return Status::OK();
 }
 
@@ -306,19 +308,22 @@ Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp comm
     if (status.ok()) {
         TxnTimeStamp db_commit_ts = std::stoull(drop_db_commit_ts_str);
         if (db_commit_ts == commit_ts) {
-            LOG_WARN(fmt::format("Skipping replay drop db: Database {} with id {} already dropped, commit ts: {}, txn: {}.",
+            LOG_WARN(fmt::format("Skipping replay drop db: Database {} with id {} and ts: {} already dropped, commit ts: {}, txn: {}.",
                                  drop_db_cmd->db_name_,
                                  drop_db_cmd->db_id_,
+                                 drop_db_cmd->create_ts_,
                                  commit_ts,
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(fmt::format("Replay drop db: Database {} with id {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
-                                  drop_db_cmd->db_name_,
-                                  drop_db_cmd->db_id_,
-                                  db_commit_ts,
-                                  commit_ts,
-                                  txn_id));
+            LOG_ERROR(
+                fmt::format("Replay drop db: Database {} with id {} and ts: {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+                            drop_db_cmd->db_name_,
+                            drop_db_cmd->db_id_,
+                            drop_db_cmd->create_ts_,
+                            db_commit_ts,
+                            commit_ts,
+                            txn_id));
             return Status::UnexpectedError("Database commit timestamp mismatch during replay of database drop.");
         }
     }
@@ -335,7 +340,8 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     this->CheckTxnStatus();
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -401,7 +407,8 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     this->CheckTxn(db_name);
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -474,7 +481,8 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
 
     // Get db meta to set next table id
     Optional<DBMeeta> db_meta;
-    status = GetDBMeta(create_table_cmd->db_name_, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(create_table_cmd->db_name_, db_meta, db_create_ts);
 
     // Get next table id of the db
     String next_table_id_key = KeyEncode::CatalogDbTagKey(create_table_cmd->db_id_, NEXT_TABLE_ID.data());
@@ -515,7 +523,8 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     this->CheckTxnStatus();
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -596,7 +605,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     this->CheckTxn(db_name);
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -792,7 +802,8 @@ Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeS
 
 Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1783,11 +1794,11 @@ Status NewTxn::PrepareCommit() {
     return Status::OK();
 }
 
-Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, String *db_key_ptr) {
+Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, String *db_key_ptr) {
     CatalogMeta catalog_meta(this);
     String db_key;
     String db_id_str;
-    Status status = catalog_meta.GetDBID(db_name, db_key, db_id_str);
+    Status status = catalog_meta.GetDBID(db_name, db_key, db_id_str, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1804,7 +1815,8 @@ Status NewTxn::GetTableMeta(const String &db_name,
                             Optional<TableMeeta> &table_meta,
                             String *table_key_ptr) {
     Status status;
-    status = this->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1838,7 +1850,8 @@ Status NewTxn::GetTableIndexMeta(const String &db_name,
                                  String *table_key_ptr,
                                  String *index_key_ptr) {
     Status status;
-    status = this->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1901,7 +1914,8 @@ Status NewTxn::PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
     String db_key;
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, &db_key);
+    TxnTimeStamp create_db_ts;
+    Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, create_db_ts, &db_key);
     if (!status.ok()) {
         return status;
     }
@@ -1924,7 +1938,8 @@ Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_
 
     // Get database ID
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -4586,7 +4601,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
 
 Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths) {
     Optional<DBMeeta> db_meta;
-    Status status = this->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }

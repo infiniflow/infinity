@@ -57,7 +57,7 @@ private:
 private:
     String db_id_str_;
     NewTxn *txn_{};
-    TxnTimeStamp read_ts_{};
+    TxnTimeStamp txn_begin_ts_{};
     KVInstance *kv_instance_{};
 
     Optional<String> comment_;

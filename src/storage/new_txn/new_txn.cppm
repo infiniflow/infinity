@@ -387,7 +387,7 @@ private:
     void CheckTxn(const String &db_name);
 
 public:
-    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, String *db_key = nullptr);
+    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_t, String *db_key = nullptr);
 
     Status GetTableMeta(const String &db_name,
                         const String &table_name,
