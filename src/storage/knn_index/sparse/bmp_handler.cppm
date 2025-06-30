@@ -42,38 +42,37 @@ class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 
-using AbstractBMP = std::variant<SharedPtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
-                                 SharedPtr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
-                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
-                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,
-                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kCompressed>>,
-                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kRaw>>,
-                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kCompressed>>,
-                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kRaw>>,
-                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kCompressed>>,
-                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kRaw>>,
-                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kCompressed>>,
-                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kRaw>>,
+using AbstractBMP = std::variant<UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
+                                 UniquePtr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
+                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
+                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,
+                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kCompressed>>,
+                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kRaw>>,
+                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kCompressed>>,
+                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kRaw>>,
+                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kCompressed>>,
+                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kRaw>>,
+                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kCompressed>>,
+                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kRaw>>,
 
-                                 SharedPtr<BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
-                                 SharedPtr<BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse>>,
+                                 UniquePtr<BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse>>,
 
                                  std::nullptr_t>;
 
 export class BMPHandler {
 public:
     BMPHandler() : bmp_(nullptr) {}
-    BMPHandler(const void *ptr) : bmp_(*reinterpret_cast<const AbstractBMP *>(ptr)) {}
     ~BMPHandler() {}
 
     static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true);
