@@ -979,6 +979,15 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
                           segment_index_meta.table_index_meta().table_meta().table_id_str(),
                           segment_index_meta.segment_id(),
                           segment_index_meta.table_index_meta().index_id_str()));
+    if (usage_flag != UsageFlag::kTransform) {
+        // Invalidate the fulltext index cache for this segment
+        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+        Status status = table_meta.InvalidateFtIndexCache(segment_index_meta.segment_id());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;

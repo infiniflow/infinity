@@ -199,27 +199,47 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    Optional<SegmentMeta> segment_meta;
     // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
     SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
     Vector<SegmentID> segment_ids;
+
+    SizeT input_block_count = input_blocks.size();
+    SizeT segment_count = input_block_count % DEFAULT_BLOCK_PER_SEGMENT == 0
+                        ? input_block_count / DEFAULT_BLOCK_PER_SEGMENT
+                        : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
+
+    // If the number of input blocks is 0, infinity would output
+    // "IMPORT 0 Rows" instead of throwing an exception.
+    // It's debatable which is better. For now, we will keep the
+    // behavior unchanged in order to avoid a breaking change to users.
+    if (segment_count == 0) {
+        segment_count = 1;
+    }
+
     try {
-        segment_ids = system_cache->ApplySegmentIDs(db_id, table_id, 1);
+        segment_ids = system_cache->ApplySegmentIDs(db_id, table_id, segment_count);
     } catch (const std::exception &e) {
         return Status::UnexpectedError(fmt::format("Database: {} or db is dropped: {}, cause: ", db_name, table_name, e.what()));
     }
-    LOG_TRACE(fmt::format("Import: apply segment id: {}", segment_ids[0]));
-    status = NewCatalog::AddNewSegmentWithID(table_meta, fake_commit_ts, segment_meta, segment_ids[0]);
-    if (!status.ok()) {
-        return status;
+    LOG_TRACE(fmt::format("Import: apply segment id starting at: {}, count {}", segment_ids[0], segment_count));
+
+    Vector<UniquePtr<SegmentMeta>> segment_metas;
+    segment_metas.reserve(segment_count);
+    for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
+        Optional<SegmentMeta> segment_meta;
+        status = NewCatalog::AddNewSegmentWithID(table_meta, fake_commit_ts, segment_meta, segment_ids[segment_idx]);
+        if (!status.ok()) {
+            return status;
+        }
+        segment_metas.emplace_back(MakeUnique<SegmentMeta>(segment_ids[segment_idx], table_meta));
     }
 
-    SizeT segment_row_cnt = 0;
-    Vector<SizeT> block_row_cnts;
-    for (SizeT j = 0; j < input_blocks.size(); ++j) {
-        const SharedPtr<DataBlock> &input_block = input_blocks[j];
+    Vector<SizeT> segment_row_cnts(segment_count, 0);
+    Vector<Vector<SizeT>> block_row_cnts(segment_count);
+    for (SizeT input_block_idx = 0; input_block_idx < input_blocks.size(); ++input_block_idx) {
+        const SharedPtr<DataBlock> &input_block = input_blocks[input_block_idx];
         if (!input_block->Finalized()) {
             UnrecoverableError("Attempt to import unfinalized data block");
         }
@@ -227,7 +247,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
         Optional<BlockMeta> block_meta;
         // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
-        status = NewCatalog::AddNewBlock1(*segment_meta, fake_commit_ts, block_meta);
+        SizeT segment_idx = input_block_idx / DEFAULT_BLOCK_PER_SEGMENT;
+        status = NewCatalog::AddNewBlock1(*segment_metas[segment_idx], fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
         }
@@ -238,7 +259,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             return status;
         }
 
-        if (j < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
+        if (input_block_idx < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
             UnrecoverableError("Attempt to import data block with different capacity");
         }
 
@@ -288,22 +309,26 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         // if (!status.ok()) {
         //     return status;
         // }
-        block_row_cnts.push_back(row_cnt);
-        segment_row_cnt += row_cnt;
+        block_row_cnts[segment_idx].push_back(row_cnt);
+        segment_row_cnts[segment_idx] += row_cnt;
     }
     // status = segment_meta->SetRowCnt(segment_row_cnt);
     // if (!status.ok()) {
     //     return status;
     // }
-
-    WalSegmentInfo segment_info(*segment_meta, begin_ts);
-    for (SizeT i = 0; i < block_row_cnts.size(); ++i) {
-        segment_info.block_infos_[i].row_count_ = block_row_cnts[i];
-    }
-    segment_info.row_count_ = segment_row_cnt;
-    status = this->AddSegmentVersion(segment_info, *segment_meta);
-    if (!status.ok()) {
-        return status;
+    Vector<WalSegmentInfo> segment_infos;
+    segment_infos.reserve(segment_count);
+    for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
+        WalSegmentInfo segment_info(*segment_metas[segment_idx], begin_ts);
+        for (SizeT i = 0; i < block_row_cnts[segment_idx].size(); ++i) {
+            segment_info.block_infos_[i].row_count_ = block_row_cnts[segment_idx][i];
+        }
+        segment_info.row_count_ = segment_row_cnts[segment_idx];
+        status = this->AddSegmentVersion(segment_info, *segment_metas[segment_idx]);
+        if (!status.ok()) {
+            return status;
+        }
+        segment_infos.emplace_back(segment_info);
     }
 
     // index
@@ -332,32 +357,36 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             import_txn_store->index_ids_str_.emplace_back(index_id_str);
             import_txn_store->index_ids_.emplace_back(std::stoull(index_id_str));
         }
-
-        import_txn_store->input_blocks_in_imports_.emplace(segment_ids[0], input_blocks);
-        import_txn_store->segment_infos_.emplace_back(segment_info);
-        import_txn_store->segment_ids_.emplace_back(segment_ids[0]);
-    } else {
-        ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-        import_txn_store->input_blocks_in_imports_.emplace(segment_ids[0], input_blocks);
-        import_txn_store->segment_infos_.emplace_back(segment_info);
-        import_txn_store->segment_ids_.emplace_back(segment_ids[0]);
     }
+    ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+    for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
+        SizeT input_block_start_idx = segment_idx * DEFAULT_BLOCK_PER_SEGMENT;
+        SizeT input_block_end_idx = std::min(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT, input_blocks.size());
+        import_txn_store->input_blocks_in_imports_.emplace(
+            segment_ids[segment_idx], Vector<SharedPtr<DataBlock>>(input_blocks.begin() + input_block_start_idx,
+                                                                   input_blocks.begin() + input_block_end_idx));
+    }
+    import_txn_store->segment_infos_.insert(import_txn_store->segment_infos_.end(), segment_infos.begin(), segment_infos.end());
+    import_txn_store->segment_ids_.insert(import_txn_store->segment_ids_.end(), segment_ids.begin(), segment_ids.end());
 
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_names_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
-        status = this->PopulateIndex(db_name,
-                                     table_name,
-                                     index_name,
-                                     table_key,
-                                     table_index_meta,
-                                     *segment_meta,
-                                     segment_row_cnt,
-                                     DumpIndexCause::kImport);
-        if (!status.ok()) {
-            return status;
+        for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
+            SizeT segment_row_cnt = segment_row_cnts[segment_idx];
+            status = this->PopulateIndex(db_name,
+                                         table_name,
+                                         index_name,
+                                         table_key,
+                                         table_index_meta,
+                                         *segment_metas[segment_idx],
+                                         segment_row_cnt,
+                                         DumpIndexCause::kImport);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
 
