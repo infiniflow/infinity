@@ -702,6 +702,19 @@ class table_http:
         self.net.raise_exception(r)
         return database_result()
 
+    def show_segments(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/segments"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return pd.DataFrame(r.json()['segments'])
+
+    def show_blocks(self, segment_id: int):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/segments/{segment_id}/blocks"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return pd.DataFrame(r.json()['blocks'])
 
 class table_http_result:
     def __init__(self, output: list, table_http: table_http):

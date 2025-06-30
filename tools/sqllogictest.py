@@ -36,6 +36,7 @@ from generate_multivector_parquet import generate as generate27
 from generate_multivector_knn_scan import generate as generate28
 from generate_groupby1 import generate as generate29
 from generate_unnest import generate as generate30
+from generate_large_import import generate as generate31
 
 
 class SpinnerThread(threading.Thread):
@@ -187,6 +188,7 @@ if __name__ == "__main__":
     generate28(args.generate_if_exists, args.copy)
     generate29(args.generate_if_exists, args.copy)
     generate30(args.generate_if_exists, args.copy)
+    generate31(args.generate_if_exists, args.copy)
 
     print("Generate file finshed.")
 
