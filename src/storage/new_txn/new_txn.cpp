@@ -414,7 +414,8 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     }
     String table_id_str;
     String table_key;
-    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str);
+    TxnTimeStamp create_table_ts;
+    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str, create_table_ts);
 
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
@@ -456,7 +457,7 @@ Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeS
     Status status = kv_instance_->Get(table_key, table_id);
     if (status.ok()) {
         if (table_id == create_table_cmd->table_id_) {
-            LOG_ERROR(fmt::format("Skipping replay create table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
+            LOG_WARN(fmt::format("Skipping replay create table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
                                   *create_table_cmd->table_def_->table_name(),
                                   create_table_cmd->table_id_,
                                   commit_ts,
@@ -530,7 +531,8 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     }
     String table_key;
     String table_id_str;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str);
+    TxnTimeStamp table_create_ts;
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kTableNotExist) {
             return status;
@@ -554,7 +556,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     txn_store->table_name_ = table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->table_id_ = std::stoull(table_id_str);
-    txn_store->create_ts_ = 0;
+    txn_store->create_ts_ = table_create_ts;
     txn_store->table_key_ = table_key;
     LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
     return Status::OK();
@@ -569,16 +571,18 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
     if (status.ok()) {
         TxnTimeStamp table_commit_ts = std::stoull(drop_table_commit_ts_str);
         if (table_commit_ts == commit_ts) {
-            LOG_WARN(fmt::format("Skipping replay drop table: Table {} with id {} already dropped, commit ts: {}, txn: {}.",
+            LOG_WARN(fmt::format("Skipping replay drop table: Table {} with id {} and ts {} already dropped, commit ts: {}, txn: {}.",
                                  drop_table_cmd->table_name_,
                                  drop_table_cmd->table_id_,
+                                 drop_table_cmd->create_ts_,
                                  commit_ts,
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(fmt::format("Replay drop table: Table {} with id {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+            LOG_ERROR(fmt::format("Replay drop table: Table {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
                                   drop_table_cmd->table_name_,
                                   drop_table_cmd->table_id_,
+                                  drop_table_cmd->create_ts_,
                                   table_commit_ts,
                                   commit_ts,
                                   txn_id));
@@ -614,7 +618,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     {
         String table_id;
         String table_key;
-        status = db_meta->GetTableID(new_table_name, table_key, table_id);
+        TxnTimeStamp create_table_ts;
+        status = db_meta->GetTableID(new_table_name, table_key, table_id, create_table_ts);
 
         if (status.ok()) {
             return Status::DuplicateTable(new_table_name);
@@ -625,7 +630,8 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
 
     String table_id_str;
     String table_key;
-    status = db_meta->GetTableID(old_table_name, table_key, table_id_str);
+    TxnTimeStamp create_table_ts;
+    status = db_meta->GetTableID(old_table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1830,7 +1836,8 @@ Status NewTxn::GetTableMeta(const String &db_name,
 Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key_ptr) {
     String table_key;
     String table_id_str;
-    Status status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    TxnTimeStamp create_table_ts;
+    Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }

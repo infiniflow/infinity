@@ -41,7 +41,7 @@ public:
 
     Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
 
-    Status GetTableID(const String &table_name, String &table_key, String &table_id_str);
+    Status GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp& create_table_ts);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo();
 

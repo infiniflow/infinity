@@ -39,7 +39,8 @@ DBMeeta::DBMeeta(String db_id_str, NewTxn *txn) : db_id_str_(std::move(db_id_str
     kv_instance_ = txn_->kv_instance();
 }
 
-DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance) : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
+DBMeeta::DBMeeta(String db_id_str, KVInstance *kv_instance)
+    : db_id_str_(std::move(db_id_str)), txn_begin_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
 
 const String &DBMeeta::db_id_str() const { return db_id_str_; }
 
@@ -125,7 +126,7 @@ Status DBMeeta::GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **tab
     return Status::OK();
 }
 
-Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str) {
+Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp &create_table_ts) {
 
     String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str_, table_name);
     auto iter2 = kv_instance_->GetIterator();
@@ -169,6 +170,7 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
         return Status::TableNotExist(table_name);
     }
 
+    create_table_ts = max_commit_ts;
     return Status::OK();
 }
 
