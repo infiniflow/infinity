@@ -91,7 +91,7 @@ public:
 
     static IndexIVFOption DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json);
 
-    static IndexIVFOption DeserializeIndexIVFOption(simdjson::simdjson_result<simdjson::value> &ivf_option_json);
+    static IndexIVFOption DeserializeIndexIVFOption(std::string_view ivf_option_json);
 
     void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 

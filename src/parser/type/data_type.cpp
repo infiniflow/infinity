@@ -471,15 +471,18 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
     return data_type;
 }
 
-std::shared_ptr<DataType> DataType::Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &data_type_json) {
-    const LogicalType logical_type = (LogicalType)(int8_t)data_type_json["data_type"].get<int8_t>();
+std::shared_ptr<DataType> DataType::Deserialize(std::string_view data_type_str) {
+    simdjson::ondemand::parser parser;
+    simdjson::padded_string data_type_json(data_type_str);
+    simdjson::ondemand::document doc = parser.iterate(data_type_json);
+
+    const LogicalType logical_type = (LogicalType)(int8_t)doc["data_type"].get<int8_t>();
 
     std::shared_ptr<TypeInfo> type_info{nullptr};
-    auto type_info_json = data_type_json["type_info"];
-    if (type_info_json.error() == simdjson::SUCCESS) {
+    if (auto type_info_json = doc["type_info"]; type_info_json.error() == simdjson::SUCCESS) {
         switch (logical_type) {
             case LogicalType::kArray: {
-                const auto element_type = DataType::Deserialize(type_info_json);
+                const auto element_type = DataType::Deserialize(type_info_json.raw_json());
                 type_info = ArrayInfo::Make(std::move(*element_type));
                 break;
             }
@@ -500,7 +503,7 @@ std::shared_ptr<DataType> DataType::Deserialize(simdjson::simdjson_result<simdjs
                 break;
             }
             case LogicalType::kSparse: {
-                type_info = SparseInfo::Deserialize(type_info_json);
+                type_info = SparseInfo::Deserialize(type_info_json.raw_json());
                 break;
             }
             default:

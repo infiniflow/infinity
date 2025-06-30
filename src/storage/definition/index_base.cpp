@@ -329,7 +329,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
     return res;
 }
 
-SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
+SharedPtr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str) {
     simdjson::padded_string index_def_json(index_def_str);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(index_def_json);
@@ -340,9 +340,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
     SharedPtr<String> index_name = MakeShared<String>(doc["index_name"].get<String>());
 
     SharedPtr<String> index_comment;
-    String index_comment_json;
-    simdjson::error_code error = doc["index_comment"].get<String>(index_comment_json);
-    if (error == simdjson::SUCCESS) {
+    if (String index_comment_json; doc["index_comment"].get<String>(index_comment_json) == simdjson::SUCCESS) {
         index_comment = MakeShared<String>(index_comment_json);
     } else {
         index_comment = MakeShared<String>();
@@ -352,8 +350,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
     Vector<String> column_names = doc["column_names"].get<Vector<String>>();
     switch (index_type) {
         case IndexType::kIVF: {
-            auto ivf_option_json = doc["ivf_option"];
-            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(ivf_option_json);
+            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(doc["ivf_option"].raw_json());
             res = MakeShared<IndexIVF>(index_name, index_comment, file_name, std::move(column_names), ivf_option);
             break;
         }
@@ -364,15 +361,11 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
             MetricType metric_type = StringToMetricType(doc["metric_type"].get<String>());
             HnswEncodeType encode_type = StringToHnswEncodeType(doc["encode_type"].get<String>());
             HnswBuildType build_type = HnswBuildType::kPlain;
-            String build_type_json;
-            simdjson::error_code error = doc["build_type"].get<String>(build_type_json);
-            if (error == simdjson::SUCCESS) {
+            if (String build_type_json; doc["build_type"].get<String>(build_type_json) == simdjson::SUCCESS) {
                 build_type = StringToHnswBuildType(build_type_json);
             }
             Optional<LSGConfig> lsg_config = None;
-            String lsg_config_json;
-            error = doc["lsg_config"].get<String>(lsg_config_json);
-            if (error == simdjson::SUCCESS) {
+            if (String lsg_config_json; doc["lsg_config"].get<String>(lsg_config_json) == simdjson::SUCCESS) {
                 lsg_config = LSGConfig::FromString(lsg_config_json);
             }
             res = MakeShared<IndexHnsw>(index_name,

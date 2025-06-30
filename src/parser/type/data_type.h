@@ -176,7 +176,7 @@ public:
     nlohmann::json Serialize() const;
 
     static std::shared_ptr<DataType> Deserialize(const nlohmann::json &data_type_json);
-    static std::shared_ptr<DataType> Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &data_type_json);
+    static std::shared_ptr<DataType> Deserialize(std::string_view data_type_str);
     static std::shared_ptr<DataType> StringDeserialize(const std::string &data_type_string);
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
