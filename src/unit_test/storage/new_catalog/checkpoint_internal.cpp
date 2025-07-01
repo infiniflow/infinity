@@ -773,3 +773,47 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
     RestartTxnMgr();
     checkpoint();
 }
+
+TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+
+        Status status = txn1->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("clean"), TransactionType::kNormal);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+        Optional<DBMeeta> db_meta;
+        Status status = txn->GetDBMeta(*db_name, db_meta);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+}
