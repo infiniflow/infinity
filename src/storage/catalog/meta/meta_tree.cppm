@@ -14,6 +14,8 @@
 
 module;
 
+#include <tuple>
+
 export module meta_tree;
 
 import stl;
@@ -126,28 +128,35 @@ export struct MetaPmObject final : public MetaObject {
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
-    [[nodiscard]] bool ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &pred) const;
+    struct MyHash {
+        template <typename T, typename... Ts>
+        static SizeT GetHash(T &&t, Ts &&...args) {
+            return std::hash<std::decay_t<T>>{}(t) ^ (... ^ (std::hash<std::decay_t<Ts>>{}(args) << 1));
+        }
 
-    static std::function<bool(MetaKey *)> MakeColumnPredicate(std::string_view db_id_str, std::string_view table_id_str, ColumnID column_id);
+        template <typename T> // is_tuple_like
+        SizeT operator()(const T &tuple) const noexcept {
+            return std::apply([](auto &&...elems) { return MyHash::GetHash(std::forward<decltype(elems)>(elems)...); }, tuple);
+        }
+    };
 
-    static std::function<bool(MetaKey *)>
-    MakeBlockPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id, BlockID block_id);
+    bool SegmentExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id) const;
 
-    static std::function<bool(MetaKey *)> MakeSegmentPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id);
+    bool BlockExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) const;
 
-    static std::function<bool(MetaKey *)>
-    MakeSegmentIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str, SegmentID segment_id);
+    bool ColumnExistInMetas(const String &db_id_str, const String &table_id_str, ColumnID column_id) const;
+    bool IndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str) const;
 
-    static std::function<bool(MetaKey *)> MakeChunkIndexPredicate(std::string_view db_id_str,
-                                                                  std::string_view table_id_str,
-                                                                  std::string_view index_id_str,
-                                                                  SegmentID segment_id,
-                                                                  ChunkID chunk_id);
+    bool SegmentIndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) const;
 
-    static std::function<bool(MetaKey *)>
-    MakeTableIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str);
+    bool ChunkIndexExistInMetas(const String &db_id_str,
+                                const String &table_id_str,
+                                const String &index_id_str,
+                                SegmentID segment_id,
+                                ChunkID chunk_id) const;
 
 public:
+    void Prepare();
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
     bool CheckData(const String &path);
     static HashSet<String> GetDataVfsPathSet();
@@ -163,6 +172,14 @@ public:
     Map<String, SharedPtr<MetaDBObject>> db_map_{};
     Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
     Vector<SharedPtr<MetaKey>> metas_;
+
+    // HashMap<MetaType, Tuple<String, String, SegmentID>> table_dic_;
+    HashSet<Tuple<String, String, SegmentID>, MyHash> segment_dic_;
+    HashSet<Tuple<String, String, SegmentID, BlockID>, MyHash> block_dic_;
+    HashSet<Tuple<String, String, ColumnID>, MyHash> column_dic_;
+    HashSet<Tuple<String, String, String>, MyHash> index_dic_;
+    HashSet<Tuple<String, String, String, SegmentID>, MyHash> segment_index_dic_;
+    HashSet<Tuple<String, String, String, SegmentID, ChunkID>, MyHash> chunk_index_dic_;
 };
 
 } // namespace infinity
