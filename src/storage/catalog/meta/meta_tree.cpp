@@ -956,65 +956,86 @@ bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<Str
     return true;
 }
 
-bool MetaTree::ExistInMetas(MetaType meta_type, const std::function<bool(MetaKey *)> &predicate) const {
-    return std::any_of(metas_.begin(), metas_.end(), [&](auto &meta) { return meta->type_ == meta_type && predicate(meta.get()); });
+void MetaTree::Prepare() {
+    for (const auto &meta : metas_) {
+        switch (meta->type_) {
+            // case MetaType::kTable: {
+            //
+            // }
+            case MetaType::kSegment: {
+                auto *segment_meta = static_cast<const SegmentMetaKey *>(meta.get());
+                segment_dic_.emplace(segment_meta->db_id_str_, segment_meta->table_id_str_, segment_meta->segment_id_);
+                break;
+            }
+            case MetaType::kBlock: {
+                auto *block_meta = static_cast<BlockMetaKey *>(meta.get());
+                block_dic_.emplace(block_meta->db_id_str_, block_meta->table_id_str_, block_meta->segment_id_, block_meta->block_id_);
+                break;
+            }
+            case MetaType::kTableColumn: {
+                auto *column_meta = static_cast<TableColumnMetaKey *>(meta.get());
+                auto json = column_meta->ToJson();
+                auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
+                column_dic_.emplace(column_meta->db_id_str_, column_meta->table_id_str_, meta_column_id);
+                break;
+            }
+            case MetaType::kTableIndex: {
+                auto *index_meta = static_cast<TableIndexMetaKey *>(meta.get());
+                index_dic_.emplace(index_meta->db_id_str_, index_meta->table_id_str_, index_meta->index_id_str_);
+                break;
+            }
+            case MetaType::kSegmentIndex: {
+                auto *segment_index_meta = static_cast<SegmentIndexMetaKey *>(meta.get());
+                segment_index_dic_.emplace(segment_index_meta->db_id_str_,
+                                           segment_index_meta->table_id_str_,
+                                           segment_index_meta->index_id_str_,
+                                           segment_index_meta->segment_id_);
+                break;
+            }
+            case MetaType::kChunkIndex: {
+                auto *chunk_index_meta = static_cast<ChunkIndexMetaKey *>(meta.get());
+                chunk_index_dic_.emplace(chunk_index_meta->db_id_str_,
+                                         chunk_index_meta->table_id_str_,
+                                         chunk_index_meta->index_id_str_,
+                                         chunk_index_meta->segment_id_,
+                                         chunk_index_meta->chunk_id_);
+                break;
+            }
+            default:;
+        }
+    }
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeColumnPredicate(std::string_view db_id_str, std::string_view table_id_str, ColumnID column_id) {
-    return [=](MetaKey *meta) {
-        auto *table_column_meta = static_cast<TableColumnMetaKey *>(meta);
-        auto json = table_column_meta->ToJson();
-        auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
-        return table_column_meta->db_id_str_ == db_id_str && table_column_meta->table_id_str_ == table_id_str && meta_column_id == column_id;
-    };
+bool MetaTree::SegmentExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id) const {
+    return segment_dic_.contains({db_id_str, table_id_str, segment_id});
 }
 
-std::function<bool(MetaKey *)>
-MetaTree::MakeBlockPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id, BlockID block_id) {
-    return [=](MetaKey *meta) {
-        auto *block_meta = static_cast<BlockMetaKey *>(meta);
-        return block_meta->db_id_str_ == db_id_str && block_meta->table_id_str_ == table_id_str && block_meta->segment_id_ == segment_id &&
-               block_meta->block_id_ == block_id;
-    };
+bool MetaTree::BlockExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) const {
+    return block_dic_.contains({db_id_str, table_id_str, segment_id, block_id});
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeSegmentPredicate(std::string_view db_id_str, std::string_view table_id_str, SegmentID segment_id) {
-    return [=](MetaKey *meta) {
-        auto *segment_meta = static_cast<SegmentMetaKey *>(meta);
-        return segment_meta->db_id_str_ == db_id_str && segment_meta->table_id_str_ == table_id_str && segment_meta->segment_id_ == segment_id;
-    };
+bool MetaTree::ColumnExistInMetas(const String &db_id_str, const String &table_id_str, ColumnID column_id) const {
+    return column_dic_.contains({db_id_str, table_id_str, column_id});
 }
 
-std::function<bool(MetaKey *)>
-MetaTree::MakeSegmentIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str, SegmentID segment_id) {
-    return [=](MetaKey *meta) {
-        auto *seg_idx = static_cast<SegmentIndexMetaKey *>(meta);
-        return seg_idx->db_id_str_ == db_id_str && seg_idx->table_id_str_ == table_id_str && seg_idx->index_id_str_ == index_id_str &&
-               seg_idx->segment_id_ == segment_id;
-    };
+bool MetaTree::IndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str) const {
+    return index_dic_.contains({db_id_str, table_id_str, index_id_str});
 }
 
-std::function<bool(MetaKey *)> MetaTree::MakeChunkIndexPredicate(std::string_view db_id_str,
-                                                                 std::string_view table_id_str,
-                                                                 std::string_view index_id_str,
-                                                                 SegmentID segment_id,
-                                                                 ChunkID chunk_id) {
-    return [=](MetaKey *meta) {
-        auto *chunk_idx = static_cast<ChunkIndexMetaKey *>(meta);
-        return chunk_idx->db_id_str_ == db_id_str && chunk_idx->table_id_str_ == table_id_str && chunk_idx->index_id_str_ == index_id_str &&
-               chunk_idx->segment_id_ == segment_id && chunk_idx->chunk_id_ == chunk_id;
-    };
+bool MetaTree::SegmentIndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) const {
+    return segment_index_dic_.contains({db_id_str, table_id_str, index_id_str, segment_id});
 }
 
-std::function<bool(MetaKey *)>
-MetaTree::MakeTableIndexPredicate(std::string_view db_id_str, std::string_view table_id_str, std::string_view index_id_str) {
-    return [=](MetaKey *meta) {
-        auto *tbl_idx = static_cast<TableIndexMetaKey *>(meta);
-        return tbl_idx->db_id_str_ == db_id_str && tbl_idx->table_id_str_ == table_id_str && tbl_idx->index_id_str_ == index_id_str;
-    };
+bool MetaTree::ChunkIndexExistInMetas(const String &db_id_str,
+                                      const String &table_id_str,
+                                      const String &index_id_str,
+                                      SegmentID segment_id,
+                                      ChunkID chunk_id) const {
+    return chunk_index_dic_.contains({db_id_str, table_id_str, index_id_str, segment_id, chunk_id});
 }
 
 bool MetaTree::CheckData(const String &path) {
+    Prepare();
     static const RE2 regex_column(R"(^(?:db_(\d+)/tbl_(\d+)/seg_(\d+)/blk_(\d+)/(?:version|(\d+)\.col|col_(\d+)_out))$)");
 
     static const RE2 regex_index(R"(^(?:db_(\d+)/tbl_(\d+)/idx_(\d+)/seg_(\d+)/(?:chunk_(\d+)\.idx|ft_(\d+)\.(\w+)))$)");
@@ -1065,20 +1086,18 @@ bool MetaTree::CheckData(const String &path) {
         return false;
     }
     if (suffix == "version") {
-        return !ExistInMetas(MetaType::kSegment, MakeSegmentPredicate(db_id_str, table_id_str, segment_id)) ||
-               !ExistInMetas(MetaType::kBlock, MakeBlockPredicate(db_id_str, table_id_str, segment_id, block_id));
+        return !SegmentExistInMetas(db_id_str, table_id_str, segment_id) || !BlockExistInMetas(db_id_str, table_id_str, segment_id, block_id);
     }
     if (suffix == "col" || suffix == "out") {
         auto column_id = static_cast<ColumnID>(std::stoull(suffix_id));
-        return !ExistInMetas(MetaType::kSegment, MakeSegmentPredicate(db_id_str, table_id_str, segment_id)) ||
-               !ExistInMetas(MetaType::kBlock, MakeBlockPredicate(db_id_str, table_id_str, segment_id, block_id)) ||
-               !ExistInMetas(MetaType::kTableColumn, MakeColumnPredicate(db_id_str, table_id_str, column_id));
+        return !SegmentExistInMetas(db_id_str, table_id_str, segment_id) || !BlockExistInMetas(db_id_str, table_id_str, segment_id, block_id) ||
+               !ColumnExistInMetas(db_id_str, table_id_str, column_id);
     }
     if (suffix == "idx") {
         auto chunk_id = static_cast<ChunkID>(std::stoull(suffix_id));
-        return !ExistInMetas(MetaType::kSegmentIndex, MakeSegmentIndexPredicate(db_id_str, table_id_str, index_id_str, segment_id)) ||
-               !ExistInMetas(MetaType::kChunkIndex, MakeChunkIndexPredicate(db_id_str, table_id_str, index_id_str, segment_id, chunk_id)) ||
-               !ExistInMetas(MetaType::kTableIndex, MakeTableIndexPredicate(db_id_str, table_id_str, index_id_str));
+        return !SegmentIndexExistInMetas(db_id_str, table_id_str, index_id_str, segment_id) ||
+               !ChunkIndexExistInMetas(db_id_str, table_id_str, index_id_str, segment_id, chunk_id) ||
+               !IndexExistInMetas(db_id_str, table_id_str, index_id_str);
     }
     return true;
 }

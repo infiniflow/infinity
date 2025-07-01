@@ -1438,6 +1438,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     CheckpointOption option{checkpoint_ts};
 
     current_ckp_ts_ = checkpoint_ts;
+    LOG_INFO(fmt::format("checkpoint ts: {}", current_ckp_ts_));
 
     if (last_ckp_ts > 0 and last_ckp_ts + 2 >= checkpoint_ts) {
         // last checkpoint ts: last checkpoint txn begin ts. checkpoint is the begin_ts of current txn
@@ -4439,6 +4440,8 @@ Status NewTxn::Rollback() {
 Status NewTxn::Cleanup() {
     TxnTimeStamp last_cleanup_ts = new_catalog_->GetLastCleanupTS();
     TxnTimeStamp oldest_txn_begin_ts = txn_mgr_->GetOldestAliveTS();
+    TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
+
     if (last_cleanup_ts >= oldest_txn_begin_ts) {
         LOG_TRACE("SKIP cleanup");
         return Status::OK();
@@ -4446,10 +4449,11 @@ Status NewTxn::Cleanup() {
 
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
+    TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
 
     Vector<String> dropped_keys;
     Vector<UniquePtr<MetaKey>> metas;
-    Status status = new_catalog_->GetCleanedMeta(begin_ts, kv_instance, metas, dropped_keys);
+    Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
     if (!status.ok()) {
         return status;
     }
