@@ -746,13 +746,11 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     if (!index_status.ok()) {
         return index_status;
     }
-    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-    segment_index_meta.GetOrSetMemIndex(mem_index);
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             SharedPtr<SecondaryIndexInMem> memory_secondary_index;
             {
-                std::unique_lock<std::mutex> lock(mem_index->mtx_);
                 if (mem_index->memory_secondary_index_.get() == nullptr) {
                     auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
                     if (!status.ok()) {
@@ -1123,8 +1121,7 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
     }
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
     Status status;
-    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-    segment_index_meta.GetOrSetMemIndex(mem_index);
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
@@ -1590,7 +1587,7 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
 Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+    SharedPtr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         UnrecoverableError("Invalid mem index");
     }
