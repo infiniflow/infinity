@@ -4697,7 +4697,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         }
         case WalCommandType::ADD_COLUMNS_V2: {
             auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
-            Status status = ReplayAddColumns(add_column_cmd, commit_ts, txn_id);
+            Status status = PrepareCommitAddColumns(add_column_cmd);
+            // Status status = ReplayAddColumns(add_column_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4705,7 +4706,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         }
         case WalCommandType::DROP_COLUMNS_V2: {
             auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
-            Status status = ReplayDropColumns(drop_column_cmd, commit_ts, txn_id);
+            Status status = PrepareCommitDropColumns(drop_column_cmd);
+            // Status status = ReplayDropColumns(drop_column_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
