@@ -758,9 +758,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String table_name = ReadBufAdv<String>(ptr);
             String table_id = ReadBufAdv<String>(ptr);
             String new_table_name = ReadBufAdv<String>(ptr);
-            TxnTimeStamp old_create_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             String old_table_key = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdRenameTableV2>(db_name, db_id, table_name, table_id, new_table_name, old_create_ts, old_table_key);
+            cmd = MakeShared<WalCmdRenameTableV2>(db_name, db_id, table_name, table_id, new_table_name, old_table_key);
             break;
         }
         case WalCommandType::ADD_COLUMNS: {
@@ -816,26 +815,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             for (i32 i = 0; i < column_n; i++) {
                 column_ids.push_back(ReadBufAdv<ColumnID>(ptr));
             }
-            column_n = ReadBufAdv<i32>(ptr);
-            Vector<TxnTimeStamp> column_create_ts;
-            for (i32 i = 0; i < column_n; ++i) {
-                column_create_ts.push_back(ReadBufAdv<TxnTimeStamp>(ptr));
-            }
             String table_key = ReadBufAdv<String>(ptr);
             column_n = ReadBufAdv<i32>(ptr);
             Vector<String> column_keys;
             for (i32 i = 0; i < column_n; i++) {
                 column_keys.push_back(ReadBufAdv<String>(ptr));
             }
-            cmd = MakeShared<WalCmdDropColumnsV2>(db_name,
-                                                  db_id,
-                                                  table_name,
-                                                  table_id,
-                                                  column_names,
-                                                  column_ids,
-                                                  column_create_ts,
-                                                  table_key,
-                                                  column_keys);
+            cmd = MakeShared<WalCmdDropColumnsV2>(db_name, db_id, table_name, table_id, column_names, column_ids, table_key, column_keys);
             break;
         }
         case WalCommandType::CLEANUP: {
@@ -1114,8 +1100,7 @@ bool WalCmdRenameTable::operator==(const WalCmd &other) const {
 bool WalCmdRenameTableV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRenameTableV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
-           table_id_ == other_cmd->table_id_ && new_table_name_ == other_cmd->new_table_name_ && old_create_ts_ == other_cmd->old_create_ts_ &&
-           old_table_key_ == other_cmd->old_table_key_;
+           table_id_ == other_cmd->table_id_ && new_table_name_ == other_cmd->new_table_name_ && old_table_key_ == other_cmd->old_table_key_;
 }
 
 bool WalCmdAddColumns::operator==(const WalCmd &other) const {
@@ -1158,7 +1143,7 @@ bool WalCmdDropColumnsV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDropColumnsV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
            table_id_ == other_cmd->table_id_ && column_names_ == other_cmd->column_names_ && column_ids_ == other_cmd->column_ids_ &&
-           table_key_ == other_cmd->table_key_ && create_ts_ == other_cmd->create_ts_ && column_keys_ == other_cmd->column_keys_;
+           table_key_ == other_cmd->table_key_ && column_keys_ == other_cmd->column_keys_;
 }
 
 bool WalCmdCleanup::operator==(const WalCmd &other) const {
@@ -1374,7 +1359,7 @@ i32 WalCmdRenameTable::GetSizeInBytes() const {
 
 i32 WalCmdRenameTableV2::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) +
-           table_id_.size() + sizeof(i32) + new_table_name_.size() + sizeof(TxnTimeStamp) + sizeof(i32) + old_table_key_.size();
+           table_id_.size() + sizeof(i32) + new_table_name_.size() + sizeof(i32) + old_table_key_.size();
 }
 
 i32 WalCmdAddColumns::GetSizeInBytes() const {
@@ -1410,7 +1395,6 @@ i32 WalCmdDropColumnsV2::GetSizeInBytes() const {
         res += sizeof(i32) + column_name.size();
     }
     res += sizeof(i32) + column_ids_.size() * sizeof(ColumnID);
-    res += sizeof(i32) + create_ts_.size() * sizeof(TxnTimeStamp);
     res += sizeof(i32) + table_key_.size();
     res += sizeof(i32);
     for (const auto &column_key : column_keys_) {
@@ -1770,7 +1754,6 @@ void WalCmdRenameTableV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_id_);
     WriteBufAdv(buf, this->new_table_name_);
-    WriteBufAdv(buf, this->old_create_ts_);
     WriteBufAdv(buf, this->old_table_key_);
 }
 
@@ -1820,10 +1803,6 @@ void WalCmdDropColumnsV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(this->column_ids_.size()));
     for (const auto &column_id : column_ids_) {
         WriteBufAdv(buf, column_id);
-    }
-    WriteBufAdv(buf, static_cast<i32>(this->create_ts_.size()));
-    for (auto ts : create_ts_) {
-        WriteBufAdv(buf, ts);
     }
     WriteBufAdv(buf, this->table_key_);
     WriteBufAdv(buf, static_cast<i32>(this->column_keys_.size()));
@@ -2210,7 +2189,6 @@ String WalCmdRenameTableV2::ToString() const {
     ss << "table name: " << table_name_ << std::endl;
     ss << "table id: " << table_id_ << std::endl;
     ss << "new table name: " << new_table_name_ << std::endl;
-    ss << "old create ts: " << old_create_ts_ << std::endl;
     ss << "old table key: " << old_table_key_ << std::endl;
     return std::move(ss).str();
 }
@@ -2265,11 +2243,6 @@ String WalCmdDropColumnsV2::ToString() const {
     ss << "columns: ";
     for (auto &column_name : column_names_) {
         ss << column_name << " | ";
-    }
-    ss << std::endl;
-    ss << "create ts: ";
-    for (auto ts : create_ts_) {
-        ss << ts << " | ";
     }
     ss << std::endl;
     ss << "table key: " << table_key_ << std::endl;
@@ -2571,14 +2544,13 @@ String WalCmdRenameTable::CompactInfo() const {
 }
 
 String WalCmdRenameTableV2::CompactInfo() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, old_talbe_key: {}, old_create_ts: {}, new table: {}",
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, old_talbe_key: {}, new table: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
                        db_name_,
                        db_id_,
                        table_name_,
                        table_id_,
                        old_table_key_,
-                       old_create_ts_,
                        new_table_name_);
 }
 

@@ -361,7 +361,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
             MakeShared<WalCmdDumpIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 0 /*segment_id*/, chunk_infos, deprecate_ids, "table_key"));
     }
     {
-        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", 1, "old_table_key"));
+        entry->cmds_.push_back(MakeShared<WalCmdRenameTableV2>("db1", "1", "tbl1", "2", "tbl2", "old_table_key"));
     }
     {
         Vector<SharedPtr<ColumnDef>> column_defs;
@@ -389,7 +389,6 @@ TEST_F(WalEntryTest, ReadWriteV2) {
                                                                "2",
                                                                std::move(column_names),
                                                                Vector<ColumnID>{3, 4},
-                                                               Vector<TxnTimeStamp>{0, 0},
                                                                "table_key",
                                                                std::move(column_keys)));
     }

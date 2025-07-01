@@ -89,13 +89,12 @@ SharedPtr<WalEntry> DropTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
     return wal_entry;
 }
 String RenameTableTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, old_table: {}, table_id: {}, old_create_ts: {}, new_table_name: {}",
+    return fmt::format("{}: database: {}, db_id: {}, old_table: {}, table_id: {}, new_table_name: {}",
                        TransactionType2Str(type_),
                        db_name_,
                        db_id_str_,
                        old_table_name_,
                        table_id_str_,
-                       old_create_ts_,
                        new_table_name_);
 }
 
@@ -103,7 +102,7 @@ SharedPtr<WalEntry> RenameTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
     SharedPtr<WalCmd> wal_command =
-        MakeShared<WalCmdRenameTableV2>(db_name_, db_id_str_, old_table_name_, table_id_str_, new_table_name_, old_create_ts_, old_table_key_);
+        MakeShared<WalCmdRenameTableV2>(db_name_, db_id_str_, old_table_name_, table_id_str_, new_table_name_, old_table_key_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
@@ -300,28 +299,20 @@ SharedPtr<WalEntry> AddColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const
 }
 
 String DropColumnsTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, columns: {}, create_ts: {}",
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, columns: {}",
                        TransactionType2Str(type_),
                        db_name_,
                        db_id_str_,
                        table_name_,
                        table_id_str_,
-                       column_names_.size(),
-                       create_ts_);
+                       column_names_.size());
 }
 
 SharedPtr<WalEntry> DropColumnsTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropColumnsV2>(db_name_,
-                                                                    db_id_str_,
-                                                                    table_name_,
-                                                                    table_id_str_,
-                                                                    column_names_,
-                                                                    column_ids_,
-                                                                    create_ts_,
-                                                                    table_key_,
-                                                                    column_keys_);
+    SharedPtr<WalCmd> wal_command =
+        MakeShared<WalCmdDropColumnsV2>(db_name_, db_id_str_, table_name_, table_id_str_, column_names_, column_ids_, table_key_, column_keys_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }

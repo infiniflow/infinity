@@ -79,6 +79,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
+    auto new_table_name = std::make_shared<std::string>("tb2");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
     SharedPtr<String> index_name = MakeShared<String>("index_name");
     SharedPtr<String> index_comment_ptr = MakeShared<String>("index_comment");
@@ -130,10 +131,18 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
     }
 
     {
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+        Status status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
         Vector<String> column_names;
         column_names.push_back(column_def1->name());
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop columns"), TransactionType::kNormal);
-        Status status = txn->DropColumns(*db_name, *table_name, column_names);
+        Status status = txn->DropColumns(*db_name, *new_table_name, column_names);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -141,7 +150,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name, ConflictType::kError);
+        Status status = txn->DropIndexByName(*db_name, *new_table_name, *index_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -149,7 +158,7 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *new_table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

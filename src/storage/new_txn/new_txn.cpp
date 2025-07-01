@@ -653,13 +653,58 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     txn_store->old_table_name_ = old_table_name;
     txn_store->table_id_str_ = table_id_str;
     txn_store->new_table_name_ = new_table_name;
-    txn_store->old_create_ts_ = 0;
     txn_store->old_table_key_ = table_key;
     LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
 }
 
-Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+
+    const String &db_id = rename_table_cmd->db_id_;
+    const String &old_table_name = rename_table_cmd->table_name_;
+    const String &old_table_key = rename_table_cmd->old_table_key_;
+    const String &table_id = rename_table_cmd->table_id_;
+    const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(old_table_key);
+
+    String rename_table_key = KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts);
+    String rename_table_commit_ts_str;
+    // TODO: Check if the table is already renamed in kv store
+    Status status = kv_instance_->Get(rename_table_key, rename_table_commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp rename_table_commit_ts = std::stoull(rename_table_commit_ts_str);
+        if (rename_table_commit_ts == commit_ts) {
+            LOG_WARN(fmt::format("Skipping replay rename table: Table {} with id {} already renamed to {}, commit ts: {}, txn: {}.",
+                                 old_table_name,
+                                 table_id,
+                                 rename_table_cmd->new_table_name_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay rename table: Table {} with id {} already renamed to {} with different commit ts {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  old_table_name,
+                                  table_id,
+                                  rename_table_cmd->new_table_name_,
+                                  rename_table_commit_ts,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Table commit timestamp mismatch during replay of table rename.");
+        }
+    }
+
+    String ts_str = std::to_string(commit_ts);
+    kv_instance_->Put(KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts), ts_str);
+
+    // create new table key
+    String new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
+    status = kv_instance_->Put(new_table_key, table_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
 
 Status NewTxn::AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs) {
 
@@ -850,7 +895,6 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     txn_store->table_id_ = std::stoull(table_meta->table_id_str());
     txn_store->column_names_ = column_names;
     txn_store->column_ids_ = column_ids;
-    txn_store->create_ts_ = {};
     txn_store->table_key_ = table_key;
     txn_store->column_keys_ = column_keys;
     return Status::OK();
@@ -1790,6 +1834,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RENAME_TABLE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of CREATE_DATABASE_V2 command.
+                    break;
+                }
                 auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
                 Status status = PrepareCommitRenameTable(rename_table_cmd);
                 if (!status.ok()) {
@@ -4602,6 +4650,9 @@ bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == Transactio
 Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commit_ts, i64 txn_id) {
     WalCommandType command_type = command->GetType();
     switch (command_type) {
+        case WalCommandType::DUMMY: {
+            return Status::UnexpectedError("Dummy WAL command");
+        }
         case WalCommandType::CREATE_DATABASE_V2: {
             auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
             Status status = ReplayCreateDb(create_db_cmd, commit_ts, txn_id);
@@ -4631,6 +4682,30 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
             auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
 
             Status status = ReplayDropTable(drop_table_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::RENAME_TABLE_V2: {
+            auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
+            Status status = ReplayRenameTable(rename_table_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::ADD_COLUMNS_V2: {
+            auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
+            Status status = ReplayAddColumns(add_column_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DROP_COLUMNS_V2: {
+            auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
+            Status status = ReplayDropColumns(drop_column_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4719,22 +4794,6 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::CHECKPOINT_V2: {
             auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
             Status status = PrepareCommitCheckpoint(checkpoint_cmd);
-            if (!status.ok()) {
-                return status;
-            }
-            break;
-        }
-        case WalCommandType::ADD_COLUMNS_V2: {
-            auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
-            Status status = ReplayAddColumns(add_column_cmd, commit_ts, txn_id);
-            if (!status.ok()) {
-                return status;
-            }
-            break;
-        }
-        case WalCommandType::DROP_COLUMNS_V2: {
-            auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
-            Status status = ReplayDropColumns(drop_column_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }

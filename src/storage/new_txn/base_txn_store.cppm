@@ -145,7 +145,6 @@ export struct RenameTableTxnStore : public BaseTxnStore {
     String old_table_name_{};
     String table_id_str_{};
     String new_table_name_{};
-    TxnTimeStamp old_create_ts_{};
     String old_table_key_{};
 
     String ToString() const final;
@@ -317,7 +316,6 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
 
     Vector<String> column_names_{};
     Vector<ColumnID> column_ids_{};
-    Vector<TxnTimeStamp> create_ts_{};
     String table_key_{};
     Vector<String> column_keys_{};
 
