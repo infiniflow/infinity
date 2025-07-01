@@ -70,6 +70,9 @@ String BlockMetaKey::ToString() const {
 }
 
 String BlockTagMetaKey::ToString() const {
+    if (tag_name_ == "fast_rough_filter") {
+        return fmt::format("block_tag: {}", KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str_, table_id_str_, segment_id_, block_id_, tag_name_));
+    }
     return fmt::format("block_tag: {}:{}",
                        KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str_, table_id_str_, segment_id_, block_id_, tag_name_),
                        value_);
