@@ -75,6 +75,10 @@ HnswFileWorker::~HnswFileWorker() {
         FreeInMemory();
         data_ = nullptr;
     }
+    if (mmap_data_ != nullptr) {
+        FreeFromMmapImpl();
+        mmap_data_ = nullptr;
+    }
 }
 
 void HnswFileWorker::AllocateInMemory() {

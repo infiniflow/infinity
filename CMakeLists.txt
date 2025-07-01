@@ -225,7 +225,10 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 endif()
 
 if(NOT INDEX_BUILD_METHOD STREQUAL "Variant")
-    ADD_DEFINITIONS(-D  INDEX_HANDLER)
+    message(STATUS "Add Environment Variable INDEX_HANDLER")
+    ADD_DEFINITIONS(-D INDEX_HANDLER)
+else()
+    message(STATUS "NOT USING INDEX_HANDLER")
 endif()
 
 # find_package(Boost REQUIRED)
