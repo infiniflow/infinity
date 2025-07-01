@@ -29,16 +29,7 @@ namespace infinity {
 
 export class SkipListReader {
 public:
-    explicit SkipListReader(const DocListFormatOption &doc_list_format_option)
-        : has_tf_list_(doc_list_format_option.HasTfList()), has_block_max_(doc_list_format_option.HasBlockMax()) {
-        if (has_tf_list_) {
-            ttf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
-        }
-        if (has_block_max_) {
-            block_max_tf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
-            block_max_tf_percentage_buffer_ = MakeUnique<u16[]>(SKIP_LIST_BUFFER_SIZE);
-        }
-    }
+    explicit SkipListReader(const DocListFormatOption &doc_list_format_option);
 
     explicit SkipListReader(const PositionListFormatOption &doc_list_format_option) {}
 

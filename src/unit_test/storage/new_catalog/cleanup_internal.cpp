@@ -106,6 +106,14 @@ public:
         infinity::InfinityContext::instance().UnInit();
     }
 
+    void Cleanup() {
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
     void CheckFilePaths() {
         auto *pm = infinity::InfinityContext::instance().persistence_manager();
         if (pm == nullptr) {
@@ -222,14 +230,9 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
             EXPECT_TRUE(status.ok());
         }
         new_txn_mgr_->PrintAllKeyValue();
-        {
-            auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
 
-            status = new_txn_mgr_->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
+
         this->CheckFilePaths();
     }
     {
@@ -301,10 +304,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
 
         this->CheckFilePaths();
 
@@ -316,10 +316,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_db) {
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
     }
 }
 
@@ -378,10 +375,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
 
         this->CheckFilePaths();
     }
@@ -437,10 +431,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
 
         this->CheckFilePaths();
 
@@ -452,10 +443,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_table) {
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
     }
 }
 
@@ -530,10 +518,8 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
+
         this->CheckFilePaths();
 
         {
@@ -548,10 +534,9 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+
+        Cleanup();
+
         this->CheckFilePaths();
     }
     {
@@ -599,10 +584,7 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
             EXPECT_TRUE(status.ok());
         }
 
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+        Cleanup();
 
         this->CheckFilePaths();
 
@@ -618,10 +600,8 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_index) {
             status = new_txn_mgr_->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        {
-            Status status = new_txn_mgr_->Cleanup();
-            EXPECT_TRUE(status.ok());
-        }
+
+        Cleanup();
     }
 }
 
@@ -698,7 +678,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
     }
     new_txn_mgr_->PrintAllKeyValue();
     {
-        Status status = new_txn_mgr_->Cleanup();
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     new_txn_mgr_->PrintAllKeyValue();
@@ -717,7 +700,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr_->Cleanup();
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -812,7 +798,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_optimize) {
     merge_index(segment_id, *index_name2);
 
     {
-        Status status = new_txn_mgr_->Cleanup();
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -830,7 +819,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_optimize) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr_->Cleanup();
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -899,7 +891,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_column) {
     }
 
     {
-        Status status = new_txn_mgr_->Cleanup();
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -920,7 +915,10 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_column) {
     new_txn_mgr_->PrintAllKeyValue();
 
     {
-        Status status = new_txn_mgr_->Cleanup();
+        auto *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("cleanup"), TransactionType::kCleanup);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr_->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -1022,10 +1020,8 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restar
 
     Init();
 
-    {
-        Status status = new_txn_mgr_->Cleanup();
-        EXPECT_TRUE(status.ok());
-    }
+    Cleanup();
+
     this->CheckFilePaths();
 
     {
@@ -1056,10 +1052,8 @@ TEST_P(TestTxnCleanupInternal, test_cleanup_drop_index_and_checkpoint_and_restar
 
     new_txn_mgr_->PrintAllKeyValue();
 
-    {
-        Status status = new_txn_mgr_->Cleanup();
-        EXPECT_TRUE(status.ok());
-    }
+    Cleanup();
+
     this->CheckFilePaths();
 }
 
@@ -1141,9 +1135,8 @@ TEST_P(TestTxnCleanupInternal, test_import_with_index_rollback_cleanup) {
         status = new_txn_mgr_->CommitTxn(txn_import);
         EXPECT_FALSE(status.ok());
     }
-    {
-        Status status = new_txn_mgr_->Cleanup();
-        EXPECT_TRUE(status.ok());
-    }
+
+    Cleanup();
+
     this->CheckFilePaths();
 }

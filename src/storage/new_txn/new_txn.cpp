@@ -77,6 +77,7 @@ import base_txn_store;
 import buffer_handle;
 import virtual_store;
 import txn_context;
+import kv_utility;
 
 namespace infinity {
 
@@ -253,13 +254,12 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
         return {nullptr, status};
     }
 
-    auto db_info = MakeShared<DatabaseInfo>();
+    auto [db_info, info_status] = db_meta->GetDatabaseInfo();
+    if (!info_status.ok()) {
+        return {nullptr, info_status};
+    }
     db_info->db_name_ = MakeShared<String>(db_name);
 
-    status = db_meta->GetDatabaseInfo(*db_info);
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
     return {std::move(db_info), Status::OK()};
 }
 
@@ -267,7 +267,7 @@ Status NewTxn::ListDatabase(Vector<String> &db_names) {
     Vector<String> *db_id_strs_ptr;
     Vector<String> *db_names_ptr;
 
-    CatalogMeta catalog_meta(*kv_instance_);
+    CatalogMeta catalog_meta(this);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
@@ -327,7 +327,7 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
-        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", *table_def->table_name())));
+        return Status::DuplicateTable(*table_def->table_name());
     } else if (status.code() != ErrorCode::kTableNotExist) {
         return status;
     }
@@ -452,6 +452,16 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return Status::NotSupport("Cannot delete all the columns of a table");
     }
 
+    Vector<String> column_keys;
+    for (const auto &column_name : column_names) {
+        String column_key;
+        std::tie(column_key, status) = table_meta->GetColumnKeyByColumnName(column_name);
+        if (!status.ok()) {
+            return status;
+        }
+        column_keys.emplace_back(column_key);
+    }
+
     Vector<String> *index_id_strs_ptr = nullptr;
     status = table_meta->GetIndexIDs(index_id_strs_ptr);
     if (!status.ok()) {
@@ -487,6 +497,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     txn_store->column_names_ = column_names;
     txn_store->column_ids_ = column_ids;
     txn_store->table_key_ = table_key;
+    txn_store->column_keys_ = column_keys;
     return Status::OK();
 }
 
@@ -553,10 +564,10 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     {
         String table_id;
         String table_key;
-        Status status = db_meta->GetTableID(new_table_name, table_key, table_id);
+        status = db_meta->GetTableID(new_table_name, table_key, table_id);
 
         if (status.ok()) {
-            return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", new_table_name)));
+            return Status::DuplicateTable(new_table_name);
         } else if (status.code() != ErrorCode::kTableNotExist) {
             return status;
         }
@@ -968,7 +979,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
     Vector<String> *db_id_strs_ptr;
-    CatalogMeta catalog_meta(*kv_instance_);
+    CatalogMeta catalog_meta(this);
     status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
         return status;
@@ -981,7 +992,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     base_txn_store_ = MakeShared<CheckpointTxnStore>();
     CheckpointTxnStore *txn_store = static_cast<CheckpointTxnStore *>(base_txn_store_.get());
     for (const String &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, *kv_instance_);
+        DBMeeta db_meta(db_id_str, this);
         status = this->CheckpointDB(db_meta, option, txn_store);
         if (!status.ok()) {
             return status;
@@ -1006,16 +1017,13 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
 }
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
-    TxnTimeStamp begin_ts = this->BeginTS();
-    TxnTimeStamp commit_ts = this->CommitTS();
-
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
         status = this->CheckpointTable(table_meta, option, ckp_txn_store);
         if (!status.ok()) {
             return status;
@@ -1377,7 +1385,7 @@ Status NewTxn::PrepareCommit() {
                 // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
                 if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
-                    Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                    Status status = PostCommitDumpIndex(dump_index_cmd);
                     if (!status.ok()) {
                         return status;
                     }
@@ -1390,7 +1398,7 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::DELETE_V2: {
                 auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
 
-                Status status = PrepareCommitDelete(delete_cmd, kv_instance_.get());
+                Status status = PrepareCommitDelete(delete_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1437,14 +1445,14 @@ Status NewTxn::PrepareCommit() {
 }
 
 Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, String *db_key_ptr) {
-    CatalogMeta catalog_meta(*kv_instance_);
+    CatalogMeta catalog_meta(this);
     String db_key;
     String db_id_str;
     Status status = catalog_meta.GetDBID(db_name, db_key, db_id_str);
     if (!status.ok()) {
         return status;
     }
-    db_meta.emplace(db_id_str, *kv_instance_);
+    db_meta.emplace(db_id_str, this);
     if (db_key_ptr) {
         *db_key_ptr = db_key;
     }
@@ -1469,15 +1477,13 @@ Status NewTxn::GetTableMeta(const String &db_name,
 }
 
 Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key_ptr) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     String table_key;
     String table_id_str;
     Status status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, this);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
     }
@@ -1545,7 +1551,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
 
     Optional<DBMeeta> db_meta;
     const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
-    Status status = NewCatalog::AddNewDB(kv_instance_.get(), create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
+    Status status = NewCatalog::AddNewDB(this, create_db_cmd->db_id_, commit_ts, create_db_cmd->db_name_, db_comment, db_meta);
     if (!status.ok()) {
         return status;
     }
@@ -1563,14 +1569,10 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
 
-    status = kv_instance_->Delete(db_key);
-    if (!status.ok()) {
-        return status;
-    }
+    String create_db_commit_ts = GetLastPartOfKey(db_key, '|');
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
     auto ts_str = std::to_string(commit_ts);
-    kv_instance_->Put(KeyEncode::DropDBKey(db_meta->db_id_str(), drop_db_cmd->db_name_), ts_str);
+    kv_instance_->Put(KeyEncode::DropDBKey(drop_db_cmd->db_name_, std::stoull(create_db_commit_ts), db_meta->db_id_str()), ts_str);
 
     return Status::OK();
 }
@@ -1603,34 +1605,28 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     const String &db_id_str = drop_table_cmd->db_id_;
     const String &table_id_str = drop_table_cmd->table_id_;
     const String &table_key = drop_table_cmd->table_key_;
+    TxnTimeStamp create_ts = infinity::GetTimestampFromKey(table_key);
 
-    // delete table key
-    Status status = kv_instance_->Delete(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
-    auto ts_str = std::to_string(commit_ts);
-    kv_instance_->Put(KeyEncode::DropTableKey(db_id_str, table_id_str, drop_table_cmd->table_name_), ts_str);
+    auto ts_str = std::to_string(txn_context_ptr_->commit_ts_);
+    kv_instance_->Put(KeyEncode::DropTableKey(db_id_str, drop_table_cmd->table_name_, table_id_str, create_ts), ts_str);
 
     return Status::OK();
 }
 
 Status NewTxn::CommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const String &db_id = rename_table_cmd->db_id_;
+    const String &old_table_name = rename_table_cmd->table_name_;
     const String &old_table_key = rename_table_cmd->old_table_key_;
     const String &table_id = rename_table_cmd->table_id_;
-    const String &db_id = rename_table_cmd->db_id_;
-    // delete table key
-    Status status = kv_instance_->Delete(old_table_key);
-    if (!status.ok()) {
-        return status;
-    }
+    const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(old_table_key);
+
+    String ts_str = std::to_string(commit_ts);
+    kv_instance_->Put(KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts), ts_str);
+
     // create new table key
     String new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
-    status = kv_instance_->Put(new_table_key, table_id);
+    Status status = kv_instance_->Put(new_table_key, table_id);
     if (!status.ok()) {
         return status;
     }
@@ -1689,24 +1685,27 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
         return status;
     }
 
-    for (const auto &column_name : drop_columns_cmd->column_names_) {
-        Status status = table_meta->DropColumn(column_name);
-        if (!status.ok()) {
-            return status;
-        }
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    auto ts_str = std::to_string(commit_ts);
+    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const String &column_key = drop_columns_cmd->column_keys_[i];
+        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
+        kv_instance_->Put(
+            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts),
+            ts_str);
     }
     return Status::OK();
 }
 
 Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
     Vector<String> *db_id_strs_ptr;
-    CatalogMeta catalog_meta(*kv_instance_);
+    CatalogMeta catalog_meta(this);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &db_id_str : *db_id_strs_ptr) {
-        DBMeeta db_meta(db_id_str, *kv_instance_);
+        DBMeeta db_meta(db_id_str, this);
         Status status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -1716,15 +1715,13 @@ Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
 }
 
 Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Vector<String> *table_id_strs_ptr;
     Status status = db_meta.GetTableIDs(table_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_, begin_ts, commit_ts);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
         Status status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
@@ -3745,7 +3742,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            Status status = CleanupInner(std::move(metas));
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -3770,7 +3767,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            Status status = CleanupInner(std::move(metas));
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -3780,6 +3777,30 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             break;
         }
         case TransactionType::kCreateIndex: {
+            CreateIndexTxnStore *create_index_txn_store = static_cast<CreateIndexTxnStore *>(base_txn_store_.get());
+            TableMeeta table_meta(create_index_txn_store->db_id_str_,
+                                  create_index_txn_store->table_id_str_,
+                                  kv_instance_.get(),
+                                  abort_ts,
+                                  MAX_TIMESTAMP);
+            Vector<String> *index_id_strs_ptr = nullptr;
+            Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+
+            if (std::find(index_id_strs_ptr->begin(), index_id_strs_ptr->end(), create_index_txn_store->index_id_str_) != index_id_strs_ptr->end()) {
+                Vector<UniquePtr<MetaKey>> metas;
+                metas.emplace_back(MakeUnique<TableIndexMetaKey>(create_index_txn_store->db_id_str_,
+                                                                 create_index_txn_store->table_id_str_,
+                                                                 create_index_txn_store->index_id_str_,
+                                                                 *create_index_txn_store->index_base_->index_name_));
+
+                Status status = CleanupInner(std::move(metas));
+                if (!status.ok()) {
+                    UnrecoverableError("During PostRollback, cleanup failed.");
+                }
+            }
             break;
         }
         case TransactionType::kDropIndex: {
@@ -3805,7 +3826,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
-            Status status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
+            Status status = CleanupInner(std::move(metas));
             // if (status.code_ == ErrorCode::kIOError) {
             //     // TODO: move metas to kv_store
             // } else
@@ -3816,7 +3837,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         }
         case TransactionType::kDelete: {
             DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(base_txn_store_.get());
-            Status status = RollbackDelete(delete_txn_store, kv_instance_.get());
+            Status status = RollbackDelete(delete_txn_store);
             if (!status.ok()) {
                 UnrecoverableError("Fail to rollback delete operation");
             }
@@ -3891,118 +3912,34 @@ Status NewTxn::Cleanup() {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
 
+    Vector<String> dropped_keys;
     Vector<UniquePtr<MetaKey>> metas;
-    Status status = new_catalog_->GetCleanedMeta(begin_ts, metas, kv_instance);
+    Status status = new_catalog_->GetCleanedMeta(begin_ts, kv_instance, metas, dropped_keys);
     if (!status.ok()) {
         return status;
     }
-    if (metas.empty()) {
-        LOG_TRACE("SIP cleanup, no data need to clean.");
-        return Status::OK();
-    }
 
-    for (auto &meta : metas) {
-        switch (meta->type_) {
-            case MetaType::kDB: {
-                auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
-                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kTable: {
-                auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kSegment: {
-                auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
-                Status status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kBlock: {
-                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
-                Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kBlockColumn: {
-                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
-                BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
-                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
-                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get(), UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kTableIndex: {
-                auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                Status status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kSegmentIndex: {
-                auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_index_meta_key->db_id_str_,
-                                      segment_index_meta_key->table_id_str_,
-                                      *kv_instance,
-                                      begin_ts,
-                                      MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
-                SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta);
-                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            case MetaType::kChunkIndex: {
-                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
-                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
-                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
-                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta, UsageFlag::kOther);
-                if (!status.ok()) {
-                    return status;
-                }
-                break;
-            }
-            default: {
-                UnrecoverableError("Unexpected");
-            }
+    for (auto &key : dropped_keys) {
+        status = kv_instance->Delete(key);
+        if (!status.ok()) {
+            return status;
         }
     }
 
-    status = buffer_mgr_->RemoveClean(kv_instance);
+    if (metas.empty()) {
+        LOG_TRACE("Cleanup: No data need to clean. Try to remove all empty directories...");
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        auto data_dir_str = buffer_mgr->GetFullDataDir();
+        auto data_dir = static_cast<Path>(*data_dir_str);
+        // Delete empty dir
+        VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+        return Status::OK();
+    }
 
-    auto data_dir_str = buffer_mgr_->GetFullDataDir();
-    auto data_dir = static_cast<Path>(*data_dir_str);
-    // Delete empty dir
-    VirtualStore::RecursiveCleanupAllEmptyDir(data_dir);
+    status = CleanupInner(std::move(metas));
+    if (!status.ok()) {
+        return status;
+    }
 
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -4012,27 +3949,25 @@ Status NewTxn::Cleanup() {
     CleanupTxnStore *txn_store = static_cast<CleanupTxnStore *>(base_txn_store_.get());
     txn_store->timestamp_ = begin_ts;
 
-    return status;
+    return Status::OK();
 }
 
-Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-
-    Vector<UniquePtr<MetaKey>> metas;
-    new_catalog->GetCleanedMeta(ts, metas, kv_instance);
-
-    return CleanupImpl(ts, kv_instance, std::move(metas));
-}
-
-Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas) {
-    TxnTimeStamp begin_ts = ts;
+Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
+    KVInstance *kv_instance = kv_instance_.get();
+    TxnTimeStamp begin_ts = BeginTS();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaType::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
-                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
+                String db_key = KeyEncode::CatalogDbKey(db_meta_key->db_name_, db_meta_key->commit_ts_);
+                Status status = kv_instance->Delete(db_key);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                DBMeeta db_meta(db_meta_key->db_id_str_, kv_instance);
+                status = NewCatalog::CleanDB(db_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4040,8 +3975,22 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
-                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
-                Status status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
+                String table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
+                Status status = kv_instance->Delete(table_key);
+                if (!status.ok()) {
+                    return status;
+                }
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                status = NewCatalog::CleanTable(table_meta, begin_ts, UsageFlag::kOther);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaType::kTableName: {
+                auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
+                String table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
+                Status status = kv_instance->Delete(table_key);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4049,9 +3998,14 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kSegment: {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
-                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
+                Status status = table_meta.RemoveSegmentIDs1({segment_meta_key->segment_id_});
+                if (!status.ok()) {
+                    return status;
+                }
+
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta);
-                Status status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
+                status = NewCatalog::CleanSegment(segment_meta, begin_ts, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4059,7 +4013,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kBlock: {
                 auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
-                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(block_meta_key->block_id_, segment_meta);
                 Status status = NewCatalog::CleanBlock(block_meta, UsageFlag::kOther);
@@ -4068,9 +4022,21 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
                 }
                 break;
             }
+            case MetaType::kTableColumn: {
+                auto *table_column_meta_key = static_cast<TableColumnMetaKey *>(meta.get());
+                String column_key = KeyEncode::TableColumnKey(table_column_meta_key->db_id_str_,
+                                                              table_column_meta_key->table_id_str_,
+                                                              table_column_meta_key->column_name_,
+                                                              table_column_meta_key->commit_ts_);
+                Status status = kv_instance->Delete(column_key);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             case MetaType::kBlockColumn: {
                 auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
-                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta);
                 ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta);
@@ -4082,9 +4048,18 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kTableIndex: {
                 auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                String index_key = KeyEncode::CatalogIndexKey(table_index_meta_key->db_id_str_,
+                                                              table_index_meta_key->table_id_str_,
+                                                              table_index_meta_key->index_name_,
+                                                              table_index_meta_key->commit_ts_);
+                Status status = kv_instance->Delete(index_key);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta);
-                Status status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
+                status = NewCatalog::CleanTableIndex(table_index_meta, UsageFlag::kOther);
                 if (!status.ok()) {
                     return status;
                 }
@@ -4094,7 +4069,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
                 auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_index_meta_key->db_id_str_,
                                       segment_index_meta_key->table_id_str_,
-                                      *kv_instance,
+                                      kv_instance,
                                       begin_ts,
                                       MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta);
@@ -4107,7 +4082,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
             }
             case MetaType::kChunkIndex: {
                 auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
-                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance, begin_ts, MAX_TIMESTAMP);
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, kv_instance, begin_ts, MAX_TIMESTAMP);
                 TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta);
                 SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta);
                 ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta);
@@ -4123,7 +4098,7 @@ Status NewTxn::CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vecto
         }
     }
 
-    Status status = buffer_mgr->RemoveClean(kv_instance);
+    Status status = buffer_mgr->RemoveClean(kv_instance_.get());
 
     auto data_dir_str = buffer_mgr->GetFullDataDir();
     auto data_dir = static_cast<Path>(*data_dir_str);
@@ -4198,7 +4173,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
                 return status;
             }
             if (append_cmd->db_id_ != db_meta->db_id_str() || append_cmd->table_id_ != table_meta->table_id_str()) {
-                return Status::CatalogError(fmt::format("WalCmdAppendV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                return Status::CatalogError(fmt::format("WalCmdAppendV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
                                                         append_cmd->db_id_,
                                                         append_cmd->table_id_,
                                                         db_meta->db_id_str(),
@@ -4216,7 +4191,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
                 return status;
             }
             if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
-                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the excpected value ({}, {})",
+                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
                                                         delete_cmd->db_id_,
                                                         delete_cmd->table_id_,
                                                         db_meta->db_id_str(),
@@ -4502,9 +4477,5 @@ String NewTxn::GetTableIdStr() {
 void NewTxn::AddSemaphore(UniquePtr<std::binary_semaphore> sema) { semas_.push_back(std::move(sema)); }
 
 const Vector<UniquePtr<std::binary_semaphore>> &NewTxn::semas() const { return semas_; }
-
-void NewTxn::AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key) { object_meta_keys_.push_back(std::move(object_meta_key)); }
-
-const Vector<UniquePtr<MetaKey>> &NewTxn::GetMetaKeyForBufferObject() const { return object_meta_keys_; };
 
 } // namespace infinity

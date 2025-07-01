@@ -72,6 +72,7 @@ import buffer_handle;
 import bg_task;
 import mem_index_appender;
 import txn_context;
+import kv_utility;
 
 namespace infinity {
 
@@ -121,7 +122,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
         ChunkID chunk_id = 0;
         {
-            Status status = segment_index_meta.GetNextChunkID(chunk_id);
+            status = segment_index_meta.GetNextChunkID(chunk_id);
             if (!status.ok()) {
                 return status;
             }
@@ -263,7 +264,7 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
 Status NewTxn::OptimizeAllIndexes() {
     // TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    CatalogMeta catalog_meta(*kv_instance_);
+    CatalogMeta catalog_meta(this);
     Vector<String> *db_id_strs_ptr = nullptr;
     Vector<String> *db_names_ptr = nullptr;
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
@@ -274,7 +275,7 @@ Status NewTxn::OptimizeAllIndexes() {
         const String &db_id_str = (*db_id_strs_ptr)[i];
         const String &db_name = (*db_names_ptr)[i];
 
-        DBMeeta db_meta(db_id_str, *kv_instance_);
+        DBMeeta db_meta(db_id_str, this);
         Vector<String> *table_id_strs_ptr = nullptr;
         Vector<String> *table_names_ptr = nullptr;
         status = db_meta.GetTableIDs(table_id_strs_ptr, &table_names_ptr);
@@ -428,13 +429,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             return status;
         }
     }
-
-    this->AddMetaKeyForBufferObject(
-        MakeUnique<ChunkIndexMetaKey>(chunk_index_meta->segment_index_meta().table_index_meta().table_meta().db_id_str(),
-                                      chunk_index_meta->segment_index_meta().table_index_meta().table_meta().table_id_str(),
-                                      chunk_index_meta->segment_index_meta().table_index_meta().index_id_str(),
-                                      chunk_index_meta->segment_index_meta().segment_id(),
-                                      chunk_index_meta->chunk_id()));
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -752,13 +746,11 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     if (!index_status.ok()) {
         return index_status;
     }
-    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-    segment_index_meta.GetOrSetMemIndex(mem_index);
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             SharedPtr<SecondaryIndexInMem> memory_secondary_index;
             {
-                std::unique_lock<std::mutex> lock(mem_index->mtx_);
                 if (mem_index->memory_secondary_index_.get() == nullptr) {
                     auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
                     if (!status.ok()) {
@@ -783,7 +775,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                         return status;
                     }
 
-                    SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+                    SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
                     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
                     String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                     mem_index->memory_indexer_ =
@@ -997,7 +989,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     Vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(chunk_index_meta);
 
-    // Put the index into local txn store
+    // Put the index info local txn store
     switch (dump_index_cause) {
         case DumpIndexCause::kCompact: {
             CompactTxnStore *compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
@@ -1126,16 +1118,16 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
         UnrecoverableError("Invalid index type");
     }
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
+    Status status;
+    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
     String full_path;
     {
-        SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+        SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
         full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
     }
-    Status status;
-    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-    segment_index_meta.GetOrSetMemIndex(mem_index);
     mem_index->memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
     MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
 
@@ -1352,7 +1344,7 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
     msg += " -> " + dst_base_name;
     LOG_INFO(msg);
 
-    SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+    SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
     ColumnIndexMerger column_index_merger(*index_dir, index_fulltext->flag_);
     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
     {
@@ -1591,7 +1583,7 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+    SharedPtr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         UnrecoverableError("Invalid mem index");
     }
@@ -1913,9 +1905,7 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
 }
 
 Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
     String db_name = create_index_cmd->db_name_;
     String table_name = create_index_cmd->table_name_;
     String index_name = *create_index_cmd->index_base_->index_name_;
@@ -1924,7 +1914,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     String table_key = create_index_cmd->table_key_;
     String index_id_str = create_index_cmd->index_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     Optional<TableIndexMeeta> table_index_meta_opt;
     Status status = new_catalog_->AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
@@ -1987,26 +1977,21 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
 }
 
 Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     const String &db_id_str = drop_index_cmd->db_id_;
     const String &table_id_str = drop_index_cmd->table_id_;
     const String &index_id_str = drop_index_cmd->index_id_;
     const String &index_key = drop_index_cmd->index_key_;
-
-    // delete index key
-    Status status = kv_instance_->Delete(index_key);
-    if (!status.ok()) {
-        return status;
-    }
+    const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(index_key);
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     auto ts_str = std::to_string(commit_ts);
-    kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, index_id_str, drop_index_cmd->index_name_), ts_str);
+    kv_instance_->Put(KeyEncode::DropTableIndexKey(db_id_str, table_id_str, drop_index_cmd->index_name_, create_ts, index_id_str), ts_str);
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
     TableIndexMeeta table_index_meta(index_id_str, table_meta);
     SharedPtr<IndexBase> index_base;
+    Status status;
     std::tie(index_base, status) = table_index_meta.GetIndexBase();
     if (!status.ok()) {
         return status;
@@ -2018,15 +2003,14 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = dump_index_cmd->db_id_;
     const String &table_id_str = dump_index_cmd->table_id_;
     const String &index_id_str = dump_index_cmd->index_id_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance, begin_ts, commit_ts);
+    TableMeeta table_meta(db_id_str, table_id_str, this);
 
     const String &index_id_str_ = dump_index_cmd->index_id_;
     TableIndexMeeta table_index_meta(index_id_str_, table_meta);
@@ -2042,7 +2026,7 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVIn
     for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
 
         auto ts_str = std::to_string(commit_ts);
-        kv_instance->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
+        kv_instance_->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
     return Status::OK();
 }

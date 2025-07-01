@@ -191,5 +191,4 @@ TEST_F(YearFunctionsTest, year_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
-    kv_store_ptr->Uninit();
 }

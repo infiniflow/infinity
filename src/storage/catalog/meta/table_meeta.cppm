@@ -29,18 +29,21 @@ class KVInstance;
 class TableDef;
 class TableInfo;
 class TableIndexReaderCache;
+class NewTxn;
 // struct SegmentUpdateTS;
 struct TableDetail;
 
 export class TableMeeta {
 public:
     // TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, UsageEnum usage);
-    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
 
-    KVInstance &kv_instance() const { return kv_instance_; }
+    KVInstance *kv_instance() const { return kv_instance_; }
 
     const String &table_id_str() const { return table_id_str_; }
     const String &db_id_str() const { return db_id_str_; }
@@ -97,6 +100,7 @@ public:
     Status CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts);
 
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
+    Tuple<String, Status> GetColumnKeyByColumnName(const String &column_name) const;
     SharedPtr<String> GetTableDir();
     // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIndexIDs1();
 
@@ -113,13 +117,13 @@ public:
 
     Status AddColumn(const ColumnDef &column_def);
 
-    Status DropColumn(const String &column_name);
-
     Status AddFtIndexCache(SharedPtr<TableIndexReaderCache> ft_index_cache);
 
     Status GetFtIndexCache(SharedPtr<TableIndexReaderCache> &ft_index_cache);
 
     Status RemoveFtIndexCache();
+
+    Status InvalidateFtIndexCache(SegmentID segment_id);
 
     Status GetNextColumnID(ColumnID &next_column_id);
 
@@ -157,7 +161,8 @@ private:
 
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_;
-    KVInstance &kv_instance_;
+    NewTxn *txn_{};
+    KVInstance *kv_instance_{};
     String db_id_str_;
     String table_id_str_;
 

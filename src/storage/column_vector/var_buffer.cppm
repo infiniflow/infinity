@@ -23,7 +23,6 @@ import logger;
 
 namespace infinity {
 
-struct BlockColumnEntry;
 class BufferManager;
 
 export class VarBuffer {

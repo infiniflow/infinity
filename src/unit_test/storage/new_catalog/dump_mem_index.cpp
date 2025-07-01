@@ -566,7 +566,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
@@ -1110,7 +1109,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
@@ -1129,8 +1127,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     auto column4_typeinfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
     auto column_def4 =
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kSparse, column4_typeinfo), "col4", std::set<ConstraintType>());
-    auto column_def5 =
-           std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>());
+    auto column_def5 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col5", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def3, column_def4});
@@ -1285,7 +1282,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
             col5->Initialize();
             append_to_col(*col5, Value::Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             input_block_4_columns->InsertVector(col5, 3);
-
         }
         input_block_4_columns->Finalize();
     }
@@ -1744,7 +1740,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
@@ -2106,7 +2101,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
             return std::make_pair(begin_id, row_cnt);
         });
 
-
         drop_db(*db_name);
     }
 
@@ -2368,7 +2362,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
@@ -2904,7 +2897,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
@@ -3182,7 +3174,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
@@ -3718,7 +3709,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_import) {
@@ -4458,7 +4448,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_append) {
@@ -5039,7 +5028,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
@@ -5623,7 +5611,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
@@ -6103,7 +6090,6 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
 
         drop_db(*db_name);
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
@@ -6198,7 +6184,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
         }
     };
 
-    auto CheckTable = [&](const Vector<SegmentID> &segment_ids, const Vector<ChunkID> &chunk_ids) {
+    auto CheckTable = [&](const Vector<SegmentID> &segment_ids, const Vector<ChunkID> &chunk_ids) { //
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
         Optional<DBMeeta> db_meta;
@@ -6465,7 +6451,6 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
 
         DropDB();
     }
-
 }
 
 TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
@@ -6610,7 +6595,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6639,7 +6624,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6668,7 +6653,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6696,7 +6681,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6726,7 +6711,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6754,7 +6739,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6783,7 +6768,7 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
@@ -6810,9 +6795,8 @@ TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckTable({3}, 0, {0});
+        CheckTable({2, 3}, 0, {0});
 
         DropDB();
     }
-
 }

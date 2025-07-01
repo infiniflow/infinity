@@ -23,6 +23,7 @@ export enum class MetaType {
     kDB,
     kDBTag,
     kTable,
+    kTableName,
     kTableTag,
     kTableColumn,
     kSegment,
@@ -38,7 +39,7 @@ export enum class MetaType {
     kChunkIndex,
     kChunkIndexTag,
     kSystemTag,
-    kPmPath,
+    kPmStat,
     kPmObject,
     kDrop,
 };

@@ -329,6 +329,129 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
     return res;
 }
 
+SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
+    simdjson::padded_string index_def_json(index_def_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(index_def_json);
+
+    SharedPtr<IndexBase> res = nullptr;
+    String index_type_name = doc["index_type"].get<String>();
+    IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
+    SharedPtr<String> index_name = MakeShared<String>(doc["index_name"].get<String>());
+
+    SharedPtr<String> index_comment;
+    String index_comment_json;
+    simdjson::error_code error = doc["index_comment"].get<String>(index_comment_json);
+    if (error == simdjson::SUCCESS) {
+        index_comment = MakeShared<String>(index_comment_json);
+    } else {
+        index_comment = MakeShared<String>();
+    }
+
+    String file_name = doc["file_name"].get<String>();
+    Vector<String> column_names = doc["column_names"].get<Vector<String>>();
+    switch (index_type) {
+        case IndexType::kIVF: {
+            auto ivf_option_json = doc["ivf_option"];
+            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(ivf_option_json);
+            res = MakeShared<IndexIVF>(index_name, index_comment, file_name, std::move(column_names), ivf_option);
+            break;
+        }
+        case IndexType::kHnsw: {
+            SizeT M = doc["M"].get<SizeT>();
+            SizeT ef_construction = doc["ef_construction"].get<SizeT>();
+            SizeT block_size = doc["block_size"].get<SizeT>();
+            MetricType metric_type = StringToMetricType(doc["metric_type"].get<String>());
+            HnswEncodeType encode_type = StringToHnswEncodeType(doc["encode_type"].get<String>());
+            HnswBuildType build_type = HnswBuildType::kPlain;
+            String build_type_json;
+            simdjson::error_code error = doc["build_type"].get<String>(build_type_json);
+            if (error == simdjson::SUCCESS) {
+                build_type = StringToHnswBuildType(build_type_json);
+            }
+            Optional<LSGConfig> lsg_config = None;
+            String lsg_config_json;
+            error = doc["lsg_config"].get<String>(lsg_config_json);
+            if (error == simdjson::SUCCESS) {
+                lsg_config = LSGConfig::FromString(lsg_config_json);
+            }
+            res = MakeShared<IndexHnsw>(index_name,
+                                        index_comment,
+                                        file_name,
+                                        std::move(column_names),
+                                        metric_type,
+                                        encode_type,
+                                        build_type,
+                                        M,
+                                        ef_construction,
+                                        block_size,
+                                        lsg_config);
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            SizeT R = doc["R"].get<SizeT>();
+            SizeT L = doc["L"].get<SizeT>();
+            SizeT num_pq_chunks = doc["num_pq_chunks"].get<SizeT>();
+            SizeT num_parts = doc["num_parts"].get<SizeT>();
+            MetricType metric_type = StringToMetricType(doc["metric_type"].get<String>());
+            DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(doc["encode_type"].get<String>());
+            res = MakeShared<IndexDiskAnn>(index_name,
+                                           index_comment,
+                                           file_name,
+                                           std::move(column_names),
+                                           metric_type,
+                                           encode_type,
+                                           R,
+                                           L,
+                                           num_pq_chunks,
+                                           num_parts);
+            break;
+        }
+        case IndexType::kFullText: {
+            String analyzer = doc["analyzer"].get<String>();
+            auto ft_res = MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer);
+            u8 flag_json;
+            simdjson::error_code error = doc["flag"].get<u8>(flag_json);
+            if (error == simdjson::SUCCESS) {
+                u8 flag = flag_json;
+                ft_res->flag_ = flag;
+            }
+            res = ft_res;
+            break;
+        }
+        case IndexType::kSecondary: {
+            res = MakeShared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
+            break;
+        }
+        case IndexType::kEMVB: {
+            u32 residual_pq_subspace_num = doc["pq_subspace_num"].get<u32>();
+            u32 residual_pq_subspace_bits = doc["pq_subspace_bits"].get<u32>();
+            res = MakeShared<IndexEMVB>(index_name,
+                                        index_comment,
+                                        file_name,
+                                        std::move(column_names),
+                                        residual_pq_subspace_num,
+                                        residual_pq_subspace_bits);
+            break;
+        }
+        case IndexType::kBMP: {
+            SizeT block_size = doc["block_size"].get<SizeT>();
+            auto compress_type = (BMPCompressType)(i8)doc["compress_type"].get<i8>();
+            res = MakeShared<IndexBMP>(index_name, index_comment, file_name, std::move(column_names), block_size, compress_type);
+            break;
+        }
+        case IndexType::kInvalid: {
+            String error_message = "Error index method while deserializing";
+            UnrecoverableError(error_message);
+        }
+        default: {
+            Status status = Status::NotSupport("Not implemented");
+            RecoverableError(status);
+        }
+    }
+    return res;
+}
+
 bool IndexBase::ContainsColumn(const String &column_name) const {
     for (SizeT i = 0; i < column_names_.size(); ++i) {
         if (column_names_[i] == column_name) {

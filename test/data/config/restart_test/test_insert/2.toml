@@ -10,6 +10,6 @@ log_level = "info"
 
 [buffer]
 [wal]
-full_checkpoint_interval = "1s"
+checkpoint_interval = "1s"
 
 [resource]

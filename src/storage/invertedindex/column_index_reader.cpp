@@ -66,13 +66,16 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             return status;
         }
     }
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
-
+    if (segment_ids_ptr->empty()) {
+        KVInstance &kv_instance = table_index_meta.kv_instance();
+        LOG_INFO(fmt::format("All kv_instance key and value: {}", kv_instance.ToString()));
+    }
     u64 column_len_sum = 0;
     u32 column_len_cnt = 0;
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+        SharedPtr<String> index_dir = segment_index_meta.GetSegmentIndexDir();
         SharedPtr<SegmentIndexFtInfo> ft_info_ptr;
         Status status = segment_index_meta.GetFtInfo(ft_info_ptr);
         if (!status.ok()) {
@@ -118,10 +121,8 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                 for (SizeT i = 0; i < chunk_info_ptr->row_cnt_; i++) {
                     chunk_column_len_sum += column_lengths[i];
                 }
-                status = segment_index_meta.UpdateFtInfo(chunk_column_len_sum, chunk_info_ptr->row_cnt_);
-                if (!status.ok()) {
-                    return status;
-                }
+                column_len_sum += chunk_column_len_sum;
+                column_len_cnt += chunk_info_ptr->row_cnt_;
             }
         }
 
@@ -238,8 +239,6 @@ void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mut
 
 SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
-    TxnTimeStamp commit_ts = txn->CommitTS();
-    // TransactionID txn_id = txn->TxnID();
     SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
     assert(cache_ts_ <= first_known_update_ts_);
@@ -253,7 +252,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
         // result.column2analyzer_ = MakeShared<Map<String, String>>();
 
-        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance(), begin_ts, commit_ts);
+        TableMeeta table_meta(db_id_str_, table_id_str_, txn);
         Vector<String> *index_id_strs = nullptr;
         {
             Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);

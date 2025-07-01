@@ -29,7 +29,6 @@ import status;
 
 namespace infinity {
 class TermDocIterator;
-class Txn;
 class NewTxn;
 class MemoryIndexer;
 class TableIndexMeeta;
@@ -135,8 +134,6 @@ public:
     void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
 
     SharedPtr<IndexReader> GetIndexReader(NewTxn *txn);
-
-    SharedPtr<IndexReader> GetIndexReader(Txn *txn);
 
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
     void Invalidate();

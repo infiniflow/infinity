@@ -112,5 +112,4 @@ TEST_F(ReverseFunctionsTest, reverse_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kVarchar);
         }
     }
-    kv_store_ptr->Uninit();
 }

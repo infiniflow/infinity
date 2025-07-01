@@ -355,6 +355,37 @@ nlohmann::json IndexIVF::Serialize() const {
 
 IndexIVFOption IndexIVF::DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json) { return ivf_option_json; }
 
+template <typename simdjson_value>
+auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroidOption &ivf_centroid_option) {
+    simdjson::object obj = val.get_object();
+    ivf_centroid_option.centroids_num_ratio_ = obj["centroids_num_ratio_"].get<float>();
+    ivf_centroid_option.min_points_per_centroid_ = obj["min_points_per_centroid_"].get<u32>();
+    ivf_centroid_option.max_points_per_centroid_ = obj["max_points_per_centroid_"].get<u32>();
+    return simdjson::SUCCESS;
+}
+template <typename simdjson_value>
+auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFStorageOption &ivf_storage_option) {
+    simdjson::object obj = val.get_object();
+    ivf_storage_option.type_ = (IndexIVFStorageOption::Type)(i8)obj["type_"].get<i8>();
+    ivf_storage_option.plain_storage_data_type_ = (EmbeddingDataType)(int8_t)obj["plain_storage_data_type_"].get<int8_t>();
+    ivf_storage_option.scalar_quantization_bits_ = obj["scalar_quantization_bits_"].get<u32>();
+    ivf_storage_option.product_quantization_subspace_num_ = obj["product_quantization_subspace_num_"].get<u32>();
+    ivf_storage_option.product_quantization_subspace_bits_ = obj["product_quantization_subspace_bits_"].get<u32>();
+    return simdjson::SUCCESS;
+}
+template <typename simdjson_value>
+auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFOption &ivf_option) {
+    simdjson::object obj = val.get_object();
+    ivf_option.metric_ = (MetricType)(i8)obj["metric_"].get<i8>();
+    ivf_option.centroid_option_ = obj["centroid_option_"].get<IndexIVFCentroidOption>();
+    ivf_option.storage_option_ = obj["storage_option_"].get<IndexIVFStorageOption>();
+    return simdjson::SUCCESS;
+}
+
+IndexIVFOption IndexIVF::DeserializeIndexIVFOption(simdjson::simdjson_result<simdjson::value> &ivf_option_json) {
+    return ivf_option_json.get<IndexIVFOption>();
+}
+
 String BuildIndexIVFStorageOptionStr();
 
 String IndexIVFCentroidOption::ToString() const {

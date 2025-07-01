@@ -294,6 +294,8 @@ public:
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
 
+    Status CleanupInner(const Vector<UniquePtr<MetaKey>> &metas);
+
 public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts);
 
@@ -491,10 +493,10 @@ private:
     Status CommitImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
-    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
-    Status RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance);
+    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);
+    Status RollbackDelete(const DeleteTxnStore *delete_txn_store);
     Status CommitCompact(WalCmdCompactV2 *compact_cmd);
-    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
+    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd);
     Status CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
@@ -542,9 +544,6 @@ private:
     bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
-    static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
-    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
-
     bool IsReplay() const;
 
     Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
@@ -582,7 +581,6 @@ public:
     void AddSemaphore(UniquePtr<std::binary_semaphore> sema);
     const Vector<UniquePtr<std::binary_semaphore>> &semas() const;
     void AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key);
-    const Vector<UniquePtr<MetaKey>> &GetMetaKeyForBufferObject() const;
 
 private:
     // Reference to external class
@@ -627,7 +625,6 @@ private:
     SizeT wal_size_{};
 
     // Use for commit and rollback
-    Vector<UniquePtr<MetaKey>> object_meta_keys_{};
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
 
 private:

@@ -71,12 +71,13 @@ TEST_P(TestTxnKVStoreTest, kv_store1) {
     const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
     // Test multi-version
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-    kv_store->Init(rocksdb_tmp_path);
+    Status status = kv_store->Init(rocksdb_tmp_path);
+    EXPECT_TRUE(status.ok());
     UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
     std::string value;
 
-    Status status = kv_instance1->Get("abc", value);
+    status = kv_instance1->Get("abc", value);
     EXPECT_FALSE(status.ok());
 
     status = kv_instance1->Put("abc", "def");
@@ -141,12 +142,13 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
     // Test disable WAL
     {
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init(rocksdb_tmp_path);
+        Status status = kv_store->Init(rocksdb_tmp_path);
+        EXPECT_TRUE(status.ok());
         UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
         std::string value;
 
-        Status status = kv_instance1->Get("abc", value);
+        status = kv_instance1->Get("abc", value);
         EXPECT_FALSE(status.ok());
 
         status = kv_instance1->Put("abc", "def");
@@ -161,7 +163,8 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
         EXPECT_TRUE(status.ok());
 
         kv_store = MakeUnique<KVStore>();
-        kv_store->Init(rocksdb_tmp_path);
+        status = kv_store->Init(rocksdb_tmp_path);
+        EXPECT_TRUE(status.ok());
         kv_instance1 = kv_store->GetInstance();
 
         status = kv_instance1->Get("abc", value);
@@ -182,12 +185,13 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
     {
         {
             UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-            kv_store->Init("/tmp/rocksdb_transaction_example");
+            Status status = kv_store->Init("/tmp/rocksdb_transaction_example");
+            EXPECT_TRUE(status.ok());
             UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
             std::string value;
 
-            Status status = kv_instance1->Get("abc", value);
+            status = kv_instance1->Get("abc", value);
             EXPECT_FALSE(status.ok());
 
             status = kv_instance1->Put("abc", "def");
@@ -207,12 +211,13 @@ TEST_P(TestTxnKVStoreTest, kv_store2) {
 
         {
             UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-            kv_store->Init("/tmp/rocksdb_transaction_example");
+            Status status = kv_store->Init("/tmp/rocksdb_transaction_example");
+            EXPECT_TRUE(status.ok());
             UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
             std::string value;
 
-            Status status = kv_instance1->Get("abc", value);
+            status = kv_instance1->Get("abc", value);
             EXPECT_TRUE(status.ok());
 
             status = kv_instance1->Commit();
@@ -235,7 +240,8 @@ TEST_P(TestTxnKVStoreTest, kv_store3) {
     // Test disable WAL
     {
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init(rocksdb_tmp_path);
+        Status status = kv_store->Init(rocksdb_tmp_path);
+        EXPECT_TRUE(status.ok());
 
         {
             UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
@@ -276,7 +282,7 @@ TEST_P(TestTxnKVStoreTest, kv_store3) {
             kv_instance2->Commit();
         }
 
-        Status status = kv_store->Uninit();
+        status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
         status = kv_store->Destroy(rocksdb_tmp_path);
         EXPECT_TRUE(status.ok());
@@ -290,10 +296,11 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
     // Backup
     {
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init(rocksdb_tmp_path);
+        Status status = kv_store->Init(rocksdb_tmp_path);
+        EXPECT_TRUE(status.ok());
         UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
-        Status status = kv_instance1->Put("db|db1|10", "10");
+        status = kv_instance1->Put("db|db1|10", "10");
         EXPECT_TRUE(status.ok());
 
         status = kv_instance1->Put("abc", "def");
@@ -322,7 +329,8 @@ TEST_P(TestTxnKVStoreTest, kv_store4) {
     {
         Status status = KVStore::RestoreFromBackup(rocksdb_backup_path, rocksdb_tmp_path);
         UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
-        kv_store->Init(rocksdb_tmp_path);
+        status = kv_store->Init(rocksdb_tmp_path);
+        EXPECT_TRUE(status.ok());
         {
             UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
             const String prefix = "db|db1|";
@@ -440,7 +448,8 @@ TEST_P(TestTxnKVStoreTest, kv_store6) {
     using namespace infinity;
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
     const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_transaction_example", GetFullTmpDir());
-    kv_store->Init(rocksdb_tmp_path);
+    Status status = kv_store->Init(rocksdb_tmp_path);
+    EXPECT_TRUE(status.ok());
     {
 
         UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
@@ -475,7 +484,7 @@ TEST_P(TestTxnKVStoreTest, kv_store6) {
 
         kv_store->Flush();
     }
-    Status status = kv_store->Uninit();
+    status = kv_store->Uninit();
     EXPECT_TRUE(status.ok());
     status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());

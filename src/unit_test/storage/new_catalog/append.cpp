@@ -3811,7 +3811,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |------------------|----------------|
-    //                    t2             create index     commit (success)
+    //                    t2             create index     commit (fail)
     {
         auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -3855,7 +3855,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  create index         commit (success)
+    //                    t2                  create index         commit (fail)
     {
         auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -3896,7 +3896,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|-----------------------------------------------|
     //                    |-------------|-----------------------|
     //                    t2        create index (success)    commit (success)
@@ -3939,7 +3939,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                    commit (success)
+    //    t1                                      append                                    commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|------------------------------|
     //                    t2                create index                 commit (success)
@@ -4027,7 +4027,7 @@ TEST_P(TestTxnAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|---------------|
     //                    t2                  create index   commit (success)

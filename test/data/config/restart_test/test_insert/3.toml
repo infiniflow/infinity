@@ -15,6 +15,6 @@ mem_index_capacity       = 8192
 memindex_memory_quota   = "10MB"
 
 [wal]
-full_checkpoint_interval = "1s"
+checkpoint_interval = "1s"
 
 [resource]

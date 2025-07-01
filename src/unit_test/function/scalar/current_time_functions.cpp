@@ -98,5 +98,4 @@ TEST_F(CurrentTimeFunctionsTest, current_time_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kTime);
         }
     }
-    kv_store_ptr->Uninit();
 }

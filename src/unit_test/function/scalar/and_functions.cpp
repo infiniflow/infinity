@@ -122,6 +122,4 @@ TEST_F(AndFunctionsTest, and_func) {
             EXPECT_EQ(v.value_.boolean, false);
         }
     }
-
-    kv_store_ptr->Uninit();
 }

@@ -242,8 +242,8 @@ QueryResult Infinity::Flush(const String &flush_type) {
 
     if (flush_type == "data") {
         flush_statement->type_ = FlushType::kData;
-    } else if (flush_type == "delta") {
-        flush_statement->type_ = FlushType::kDelta;
+    } else if (flush_type == "catalog") {
+        flush_statement->type_ = FlushType::kCatalog;
     } else {
         flush_statement->type_ = FlushType::kData;
     }

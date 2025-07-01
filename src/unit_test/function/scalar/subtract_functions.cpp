@@ -508,5 +508,4 @@ TEST_F(SubtractFunctionsTest, sub_func) {
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("-(Heterogeneous, Heterogeneous)->Heterogeneous", func.ToString().c_str());
     }
-    kv_store_ptr->Uninit();
 }

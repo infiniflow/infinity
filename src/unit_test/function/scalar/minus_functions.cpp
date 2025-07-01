@@ -363,5 +363,4 @@ TEST_F(MinusFunctionsTest, plus_func) {
 
         // TODO: complete it.
     }
-    kv_store_ptr->Uninit();
 }

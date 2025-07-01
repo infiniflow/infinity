@@ -135,21 +135,23 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
 }
 
 SharedPtr<MemIndex> NewCatalog::GetMemIndex(const String &mem_index_key) {
-    std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
+    std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
         return iter->second;
     }
-    return nullptr;
+    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+    mem_index_map_.emplace(mem_index_key, mem_index);
+    return mem_index;
 }
 
-bool NewCatalog::GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
+SharedPtr<MemIndex> NewCatalog::PopMemIndex(const String &mem_index_key) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
-        mem_index = iter->second;
-        return false;
+        SharedPtr<MemIndex> mem_index = iter->second;
+        mem_index_map_.erase(iter);
+        return mem_index;
     }
-    mem_index_map_.emplace(mem_index_key, mem_index);
-    return true;
+    return nullptr;
 }
 
 Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
@@ -271,20 +273,33 @@ void NewCatalog::DropSegmentUpdateTSByKey(const String &segment_update_ts_key) {
     segment_update_ts_map_.erase(segment_update_ts_key);
 }
 
-Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance) {
+Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vector<UniquePtr<MetaKey>> &metas, Vector<String> &drop_keys) const {
     auto GetCleanedMetaImpl = [&](const Vector<String> &keys) {
         const String &type_str = keys[1];
         const String &meta_str = keys[2];
         auto meta_infos = infinity::Partition(meta_str, '/');
         if (type_str == "db") {
-            metas.emplace_back(MakeUnique<DBMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1])));
+            metas.emplace_back(MakeUnique<DBMetaKey>(std::move(meta_infos[2]), std::move(meta_infos[0]), std::stoull(meta_infos[1])));
         } else if (type_str == "tbl") {
-            metas.emplace_back(MakeUnique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2])));
+            UniquePtr<TableMetaKey> table_meta_key =
+                MakeUnique<TableMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            table_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
+            metas.emplace_back(std::move(table_meta_key));
+        } else if (type_str == "tbl_name") {
+            UniquePtr<TableNameMetaKey> table_name_meta_key =
+                MakeUnique<TableNameMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[3]), std::move(meta_infos[1]));
+            table_name_meta_key->commit_ts_ = std::stoull(meta_infos[2]);
+            metas.emplace_back(std::move(table_name_meta_key));
         } else if (type_str == "seg") {
             metas.emplace_back(MakeUnique<SegmentMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2])));
         } else if (type_str == "blk") {
             metas.emplace_back(
                 MakeUnique<BlockMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::stoull(meta_infos[2]), std::stoull(meta_infos[3])));
+        } else if (type_str == "tbl_col") {
+            UniquePtr<TableColumnMetaKey> table_column_meta_key =
+                MakeUnique<TableColumnMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[2]));
+            table_column_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
+            metas.emplace_back(std::move(table_column_meta_key));
         } else if (type_str == "blk_col") {
             metas.emplace_back(MakeUnique<ColumnMetaKey>(std::move(meta_infos[0]),
                                                          std::move(meta_infos[1]),
@@ -292,10 +307,10 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &m
                                                          std::stoull(meta_infos[3]),
                                                          ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4])))));
         } else if (type_str == "idx") {
-            metas.emplace_back(MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]),
-                                                             std::move(meta_infos[1]),
-                                                             std::move(meta_infos[2]),
-                                                             std::move(meta_infos[3])));
+            UniquePtr<TableIndexMetaKey> table_index_meta_key =
+                MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[4]), std::move(meta_infos[2]));
+            table_index_meta_key->commit_ts_ = std::stoull(meta_infos[3]);
+            metas.emplace_back(std::move(table_index_meta_key));
         } else if (type_str == "idx_seg") {
             metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(std::move(meta_infos[0]),
                                                                std::move(meta_infos[1]),
@@ -317,7 +332,6 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &m
     iter->Seek(drop_prefix);
     String drop_key, drop_ts_str;
     TxnTimeStamp drop_ts;
-    Vector<String> drop_keys;
 
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
         drop_key = iter->Key().ToString();
@@ -332,12 +346,6 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &m
     for (const auto &drop_key : drop_keys) {
         auto keys = infinity::Partition(drop_key, '|');
         GetCleanedMetaImpl(keys);
-
-        // delete from kv_instance
-        Status status = kv_instance->Delete(drop_key);
-        if (!status.ok()) {
-            return status;
-        }
     }
     // Delete entities at lower hierarchy level first to avoid missing them when removing higher-level entities.
     std::sort(metas.begin(), metas.end(), [&](const UniquePtr<MetaKey> &lhs, const UniquePtr<MetaKey> &rhs) {
@@ -382,8 +390,24 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     Vector<SharedPtr<MetaKey>> meta_keys;
     meta_keys.reserve(meta_count);
 
+    Vector<String> dropped_keys;
+    Vector<UniquePtr<MetaKey>> metas;
+    Status status = GetCleanedMeta(MAX_TIMESTAMP, kv_instance_ptr.get(), metas, dropped_keys);
+    if (!status.ok()) {
+        LOG_ERROR((fmt::format("GetCleanedMeta failed: {}", status.message())));
+        return meta_keys;
+    }
+
+    // Get encode keys for dropped metas.
+    Vector<String> keys_encode = GetEncodeKeys(metas);
+
     for (SizeT idx = 0; idx < meta_count; ++idx) {
         const auto &pair = all_key_values[idx];
+        // Skip dropped metas.
+        if (!keys_encode.empty() && std::find(keys_encode.begin(), keys_encode.end(), pair.first) != keys_encode.end()) {
+            continue;
+        }
+
         SharedPtr<MetaKey> meta_key = MetaParse(pair.first, pair.second);
         if (meta_key == nullptr) {
             LOG_ERROR(fmt::format("Can't parse {}: {}: {}", idx, pair.first, pair.second));
@@ -394,8 +418,8 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     }
 
     auto new_end = std::remove_if(meta_keys.begin(), meta_keys.end(), [&](const auto &meta_key) {
-        if (meta_key->type_ == MetaType::kPmPath) {
-            auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
+        if (meta_key->type_ == MetaType::kPmObject) {
+            auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
             nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
             String object_key = pm_path_json["obj_key"];
             if (object_key == "KEY_EMPTY") {
@@ -440,5 +464,52 @@ SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_
 SystemCache *NewCatalog::GetSystemCachePtr() const { return system_cache_.get(); }
 
 KVStore *NewCatalog::kv_store() const { return kv_store_; }
+
+Vector<String> NewCatalog::GetEncodeKeys(Vector<UniquePtr<MetaKey>> &metas) const {
+    Vector<String> keys_encode;
+    keys_encode.reserve(metas.size());
+    for (auto &meta : metas) {
+        switch (meta->type_) {
+            case MetaType::kDB: {
+                auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
+                keys_encode.emplace_back(KeyEncode::CatalogDbKey(db_meta_key->db_name_, db_meta_key->commit_ts_));
+                break;
+            }
+            case MetaType::kTable:
+            case MetaType::kTableName: {
+                auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
+                keys_encode.emplace_back(
+                    KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_));
+                break;
+            }
+            case MetaType::kTableColumn: {
+                auto *table_column_meta_key = static_cast<TableColumnMetaKey *>(meta.get());
+                keys_encode.emplace_back(KeyEncode::TableColumnKey(table_column_meta_key->db_id_str_,
+                                                                   table_column_meta_key->table_id_str_,
+                                                                   table_column_meta_key->column_name_,
+                                                                   table_column_meta_key->commit_ts_));
+                break;
+            }
+            case MetaType::kSegment: {
+                auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
+                keys_encode.emplace_back(
+                    KeyEncode::CatalogTableSegmentKey(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, segment_meta_key->segment_id_));
+                break;
+            }
+            case MetaType::kTableIndex: {
+                auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
+                keys_encode.emplace_back(KeyEncode::CatalogIndexKey(table_index_meta_key->db_id_str_,
+                                                                    table_index_meta_key->table_id_str_,
+                                                                    table_index_meta_key->index_name_,
+                                                                    table_index_meta_key->commit_ts_));
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+    return keys_encode;
+}
 
 } // namespace infinity

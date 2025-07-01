@@ -115,22 +115,21 @@ TEST_F(BufferObjTest, test1) {
     String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
     auto base_dir = MakeShared<String>(GetFullDataDir());
-    auto persistence_dir = MakeShared<String>(data_dir + "/persistence");
 
-    UniquePtr<PersistenceManager> persistence_manager =
-        MakeUnique<PersistenceManager>(*persistence_dir, *base_dir, DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT);
-    BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager.get());
+    Storage *storage = InfinityContext::instance().storage();
+    PersistenceManager *persistence_manager = storage->persistence_manager();
+    BufferManager buffer_manager(memory_limit, base_dir, temp_dir, persistence_manager);
 
     SizeT test_size1 = 1024;
     auto file_dir1 = MakeShared<String>("dir1");
     auto test_fname1 = MakeShared<String>("test1");
-    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, buffer_manager.persistence_manager());
+    auto file_worker1 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir1, test_fname1, test_size1, persistence_manager);
     auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
     auto file_dir2 = MakeShared<String>("dir2");
     auto test_fname2 = MakeShared<String>("test2");
-    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, buffer_manager.persistence_manager());
+    auto file_worker2 = MakeUnique<DataFileWorker>(base_dir, temp_dir, file_dir2, test_fname2, test_size2, persistence_manager);
     auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     /// kEphemeral
@@ -165,7 +164,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        __attribute__((unused)) auto data1 = handle1.GetDataMut();
+        [[maybe_unused]] auto data1 = handle1.GetDataMut();
         // kFreed, kEphemeral -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         buf1->CheckState();
@@ -234,7 +233,7 @@ TEST_F(BufferObjTest, test1) {
     /// kEphemeral
     {
         auto handle1 = buf1->Load();
-        __attribute__((unused)) auto data1 = handle1.GetDataMut();
+        [[maybe_unused]] auto data1 = handle1.GetDataMut();
         // kFreed, kPersistent -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -249,7 +248,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        __attribute__((unused)) auto data1 = handle1.GetDataMut();
+        [[maybe_unused]] auto data1 = handle1.GetDataMut();
         // kUnloaded, kPersistent -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -264,7 +263,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        __attribute__((unused)) auto data1 = handle1.GetDataMut();
+        [[maybe_unused]] auto data1 = handle1.GetDataMut();
     }
 
     {
@@ -278,7 +277,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        __attribute__((unused)) auto data1 = handle1.GetDataMut();
+        [[maybe_unused]] auto data1 = handle1.GetDataMut();
     }
     {
         auto handle2 = buf2->Load();
@@ -293,7 +292,7 @@ TEST_F(BufferObjTest, test1) {
     }
     {
         auto handle1 = buf1->Load();
-        __attribute__((unused)) auto data1 = handle1.GetDataMut();
+        [[maybe_unused]] auto data1 = handle1.GetDataMut();
     }
     {
         auto handle2 = buf2->Load();

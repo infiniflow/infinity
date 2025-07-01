@@ -94,6 +94,4 @@ TEST_F(CurrentDateFunctionsTest, current_date_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kDate);
         }
     }
-
-    kv_store_ptr->Uninit();
 }

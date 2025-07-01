@@ -34,7 +34,7 @@ export default async function ProductsPage() {
           <p> data_dir: {configs['data_dir']} </p>
           <p>
             {' '}
-            full_checkpoint_interval: {configs['full_checkpoint_interval']}{' '}
+            checkpoint_interval: {configs['checkpoint_interval']}{' '}
           </p>
           <p> http_port: {configs['http_port']} </p>
           <p> log_dir: {configs['log_dir']} </p>

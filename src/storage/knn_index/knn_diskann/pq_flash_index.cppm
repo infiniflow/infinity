@@ -167,7 +167,7 @@ public:
             SizeT nblocks = DivRoundUp(nodes_to_expand.size(), BLOCK_SIZE);
             for (SizeT block = 0; block < nblocks && !finish_flag; block++) {
                 SizeT start = block * BLOCK_SIZE;
-                SizeT end = std::min((block + 1) * BLOCK_SIZE, nodes_to_expand.size());
+                SizeT end = std::min((block + 1) * BLOCK_SIZE, (SizeT)nodes_to_expand.size());
 
                 Vector<SizeT> nodes_to_read;
                 Vector<VectorDataType *> coord_buffers(end - start, nullptr); // nullptr for not reading coord in ReadNodes()

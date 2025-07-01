@@ -434,7 +434,6 @@ TEST_F(GreaterEqualsFunctionsTest, greater_equals_func) {
         }
     }
 
-    kv_store_ptr->Uninit();
     //    {
     //        Vector<SharedPtr<BaseExpression>> inputs;
     //        SharedPtr<DataType> data_type1 = MakeShared<DataType>(LogicalType::kVarchar);

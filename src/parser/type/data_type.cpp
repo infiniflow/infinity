@@ -471,6 +471,47 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
     return data_type;
 }
 
+std::shared_ptr<DataType> DataType::Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &data_type_json) {
+    const LogicalType logical_type = (LogicalType)(int8_t)data_type_json["data_type"].get<int8_t>();
+
+    std::shared_ptr<TypeInfo> type_info{nullptr};
+    auto type_info_json = data_type_json["type_info"];
+    if (type_info_json.error() == simdjson::SUCCESS) {
+        switch (logical_type) {
+            case LogicalType::kArray: {
+                const auto element_type = DataType::Deserialize(type_info_json);
+                type_info = ArrayInfo::Make(std::move(*element_type));
+                break;
+            }
+                //            case LogicalType::kBitmap: {
+                //                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+                //                break;
+                //            }
+            case LogicalType::kDecimal: {
+                type_info = DecimalInfo::Make((int64_t)type_info_json["precision"], (int64_t)type_info_json["scale"]);
+                break;
+            }
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
+            case LogicalType::kMultiVector:
+            case LogicalType::kEmbedding: {
+                type_info = EmbeddingInfo::Make((EmbeddingDataType)(int8_t)type_info_json["embedding_type"].get<int8_t>(),
+                                                (size_t)type_info_json["dimension"]);
+                break;
+            }
+            case LogicalType::kSparse: {
+                type_info = SparseInfo::Deserialize(type_info_json);
+                break;
+            }
+            default:
+                // There's no type_info for other types
+                break;
+        }
+    }
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
+    return data_type;
+}
+
 std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_type_string) {
     const LogicalType logical_type = Str2LogicalType(data_type_string);
 

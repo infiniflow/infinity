@@ -43,7 +43,6 @@ try:
     # Attempt to insert 10 rows
     rows = 10
 
-    start = time.time()
     for idx in range(rows):
         table_instance.insert([
                 {

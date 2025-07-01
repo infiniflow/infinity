@@ -274,7 +274,7 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
 
 void SignalHandler(int signal_number, siginfo_t *, void *) {
     switch (signal_number) {
-#ifdef ENABLE_JEMALLOC_PROF
+#if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
         case SIGUSR2: {
             // http://jemalloc.net/jemalloc.3.html
             malloc_stats_print(nullptr, nullptr, "admp");

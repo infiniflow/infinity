@@ -24,7 +24,7 @@ import global_resource_usage;
 namespace infinity {
 
 // TODO shenyushi: use definition in knn_exprs.h
-export enum class MetricType {
+export enum class MetricType : i8 {
     kMetricCosine,
     kMetricInnerProduct,
     kMetricL2,
@@ -89,6 +89,8 @@ public:
     virtual nlohmann::json Serialize() const;
 
     static SharedPtr<IndexBase> Deserialize(const nlohmann::json &index_def_json);
+
+    static SharedPtr<IndexBase> Deserialize(const String &index_def_str);
 
     inline String column_name() const { return column_names_[0]; }
 

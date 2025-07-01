@@ -32,6 +32,7 @@ import infinity_context;
 import background_process;
 import new_txn;
 import new_txn_manager;
+import kv_store;
 
 namespace infinity {
 
@@ -50,9 +51,11 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     }
 
     switch (flush_type_) {
-        case FlushType::kDelta:
+        case FlushType::kCatalog:
+            FlushCatalog(query_context, operator_state);
+            break;
         case FlushType::kData: {
-            FlushData1(query_context, operator_state);
+            FlushData(query_context, operator_state);
             break;
         }
         case FlushType::kLog: {
@@ -68,7 +71,18 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     return true;
 }
 
-void PhysicalFlush::FlushData1(QueryContext *query_context, OperatorState *operator_state) {
+void PhysicalFlush::FlushCatalog(QueryContext *query_context, OperatorState *operator_state) {
+    NewTxn *new_txn = query_context->GetNewTxn();
+    NewTxnManager *new_txn_mgr = new_txn->txn_mgr();
+    Status status = new_txn_mgr->kv_store()->Flush();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    LOG_TRACE("Flush catalog successfully");
+    return;
+}
+
+void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     auto *wal_manager = query_context->storage()->wal_manager();
     if (wal_manager->IsCheckpointing()) {
         LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by command");
