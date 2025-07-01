@@ -29,15 +29,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return static_cast<HnswIndex *>(nullptr);
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return static_cast<HnswIndex *>(nullptr);
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
-                        return static_cast<HnswIndex *>(nullptr);
+                        return UniquePtr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -49,15 +49,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             switch (index_hnsw->metric_type_) {
                 case MetricType::kMetricL2: {
                     using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return static_cast<HnswIndex *>(nullptr);
+                    return UniquePtr<HnswIndex>();
                 }
                 case MetricType::kMetricInnerProduct: {
                     using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return static_cast<HnswIndex *>(nullptr);
+                    return UniquePtr<HnswIndex>();
                 }
                 case MetricType::kMetricCosine: {
                     using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
-                    return static_cast<HnswIndex *>(nullptr);
+                    return UniquePtr<HnswIndex>();
                 }
                 default: {
                     return nullptr;
@@ -71,15 +71,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return static_cast<HnswIndex *>(nullptr);
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return static_cast<HnswIndex *>(nullptr);
+                        return UniquePtr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
-                        return static_cast<HnswIndex *>(nullptr);
+                        return UniquePtr<HnswIndex>();
                     }
                     default: {
                         return nullptr;
@@ -114,17 +114,6 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *co
     }
 }
 
-HnswHandler::~HnswHandler() {
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                delete index;
-            }
-        },
-        hnsw_);
-}
-
 AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
     if (own_mem) {
         return InitAbstractIndexT<true>(index_base, column_def);
@@ -152,7 +141,7 @@ HnswHandler::HnswHandler(const IndexBase *index_base, const ColumnDef *column_de
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction);
                 } else {
                     UnrecoverableError("HnswHandler::HnswHandler: index does not own memory");
                 }
@@ -237,7 +226,7 @@ SizeT HnswHandler::GetSizeInBytes() const {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return SizeT(0);
             } else {
-                using IndexT = typename std::remove_pointer_t<T>;
+                using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     return index->GetSizeInBytes();
                 } else {
@@ -308,8 +297,7 @@ void HnswHandler::Load(LocalFileHandle &file_handle) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    delete index;
-                    index = IndexT::Load(file_handle).release();
+                    index = IndexT::Load(file_handle);
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }
@@ -327,8 +315,7 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    delete index;
-                    index = IndexT::LoadFromPtr(file_handle, file_size).release();
+                    index = IndexT::LoadFromPtr(file_handle, file_size);
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }
@@ -348,8 +335,7 @@ void HnswHandler::LoadFromPtr(const char *ptr, SizeT size) {
                 if constexpr (IndexT::kOwnMem) {
                     UnrecoverableError("Invalid index type.");
                 } else {
-                    delete index;
-                    index = IndexT::LoadFromPtr(ptr, size).release();
+                    index = IndexT::LoadFromPtr(ptr, size);
                 }
             }
         },
@@ -399,15 +385,13 @@ void HnswHandler::CompressToLVQ() {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                using IndexT = typename std::remove_pointer_t<T>;
+                using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
+                    using HnswIndexDataType = IndexT::DataType;
                     if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
                         UnrecoverableError("Invalid index type.");
                     } else {
-                        auto *p = std::move(*index).CompressToLVQ().release();
-                        delete index;
-                        hnsw_ = p;
+                        hnsw_ = std::move(*index).CompressToLVQ();
                     }
                 } else {
                     UnrecoverableError("Invalid index type.");
