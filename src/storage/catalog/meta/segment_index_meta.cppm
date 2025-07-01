@@ -76,11 +76,8 @@ public:
 
     Status UninitSet1(UsageFlag usage_flag);
 
-    // read mem index should use this function
     SharedPtr<MemIndex> GetMemIndex();
-
-    // write mem index should use this function
-    bool GetOrSetMemIndex(SharedPtr<MemIndex> &mem_index);
+    SharedPtr<MemIndex> PopMemIndex();
 
     SharedPtr<String> GetSegmentIndexDir() const;
 
