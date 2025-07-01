@@ -38,16 +38,17 @@ import infinity_exception;
 
 namespace infinity {
 
-Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts) {
+Vector<SegmentID>
+GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Vector<SegmentID> segment_ids;
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
     auto iter = kv_instance->GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-            LOG_DEBUG(fmt::format("SKIP SEGMENT: {} {} {}", iter->Key().ToString(), commit_ts, begin_ts));
+        TxnTimeStamp segment_commit_ts = std::stoull(iter->Value().ToString());
+        if (segment_commit_ts > begin_ts and segment_commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            LOG_DEBUG(fmt::format("SKIP SEGMENT: {} {} {}", iter->Key().ToString(), segment_commit_ts, begin_ts));
             iter->Next();
             continue;
         }
@@ -56,7 +57,7 @@ Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_
         String drop_segment_ts{};
         kv_instance->Get(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), drop_segment_ts);
 
-        if (drop_segment_ts.empty() || std::stoull(drop_segment_ts) > begin_ts) {
+        if (drop_segment_ts.empty() || (std::stoull(drop_segment_ts) > begin_ts && std::stoull(drop_segment_ts) != commit_ts)) {
             segment_ids.push_back(segment_id);
         }
         iter->Next();
