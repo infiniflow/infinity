@@ -347,7 +347,7 @@ void QueryContext::CreateQueryProfiler() {
     query_profiler_flag = catalog->GetProfile();
 
     if (query_profiler_flag or explain_analyze_) {
-        if (query_profiler_ == nullptr) {
+        if (query_profiler_.get() == nullptr) {
             query_profiler_ = MakeShared<QueryProfiler>(query_profiler_flag);
         }
     }
@@ -451,14 +451,14 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     SharedPtr<NewTxn> new_txn{};
     if (base_statement->type_ == StatementType::kFlush) {
         new_txn = txn_manager->BeginTxnShared(MakeUnique<String>(base_statement->ToString()), TransactionType::kNewCheckpoint);
-        if (new_txn == nullptr) {
+        if (new_txn.get() == nullptr) {
             RecoverableError(Status::FailToStartTxn("System is checkpointing"));
         }
     } else {
         new_txn = txn_manager->BeginTxnShared(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
     }
 
-    if (new_txn == nullptr) {
+    if (new_txn.get() == nullptr) {
         UnrecoverableError("Cannot get new transaction.");
     }
 

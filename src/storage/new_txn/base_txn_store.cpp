@@ -16,6 +16,7 @@ module;
 
 #include <ranges>
 #include <vector>
+#include <ranges>
 
 module base_txn_store;
 
@@ -141,21 +142,21 @@ SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
 
 String OptimizeIndexTxnStore::ToString() const {
     std::string result;
-    for (const auto &store_entry : entries_) {
-        result += fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_key: {}, index: {}, index_id: {}, segment_id: {}, "
-                              "new_chunk_infos: {}, deprecate_chunks: {}\n",
-                              TransactionType2Str(type_),
-                              store_entry.db_name_,
-                              store_entry.db_id_str_,
-                              store_entry.table_name_,
-                              store_entry.table_id_str_,
-                              store_entry.table_key_,
-                              store_entry.index_name_,
-                              store_entry.index_id_str_,
-                              store_entry.segment_id_,
-                              fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), " "),
-                              fmt::join(store_entry.deprecate_chunks_, " "));
-    }
+//    for (const auto &store_entry : entries_) {
+//        result += fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_key: {}, index: {}, index_id: {}, segment_id: {}, "
+//                              "new_chunk_infos: {}, deprecate_chunks: {}\n",
+//                              TransactionType2Str(type_),
+//                              store_entry.db_name_,
+//                              store_entry.db_id_str_,
+//                              store_entry.table_name_,
+//                              store_entry.table_id_str_,
+//                              store_entry.table_key_,
+//                              store_entry.index_name_,
+//                              store_entry.index_id_str_,
+//                              store_entry.segment_id_,
+//                              fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), " "),
+//                              fmt::join(store_entry.deprecate_chunks_, " "));
+//    }
     return result;
 }
 

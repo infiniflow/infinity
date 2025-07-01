@@ -96,7 +96,7 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
             break;
         }
         case EmbeddingDataType::kElemUInt8: {
-            Embedding2JsonInternal<uint8_t>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<u8>(embedding, dimension, embedding_json);
             break;
         }
         case EmbeddingDataType::kElemFloat16: {

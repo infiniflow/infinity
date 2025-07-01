@@ -13,6 +13,17 @@ import third_party;
 
 namespace infinity {
 
+explicit SkipListReader::SkipListReader(const DocListFormatOption &doc_list_format_option)
+    : has_tf_list_(doc_list_format_option.HasTfList()), has_block_max_(doc_list_format_option.HasBlockMax()) {
+    if (has_tf_list_) {
+        ttf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
+    }
+    if (has_block_max_) {
+        block_max_tf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
+        block_max_tf_percentage_buffer_ = MakeUnique<u16[]>(SKIP_LIST_BUFFER_SIZE);
+    }
+}
+
 bool SkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32 &offset, u32 &delta) {
     u32 current_doc_id = current_doc_id_;
     u32 current_offset = current_offset_;

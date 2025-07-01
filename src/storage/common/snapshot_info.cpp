@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <memory>
 
 module snapshot_info;
 

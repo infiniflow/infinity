@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <string>
 
 module chunk_index_meta;
 

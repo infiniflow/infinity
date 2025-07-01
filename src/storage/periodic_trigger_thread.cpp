@@ -58,19 +58,19 @@ void PeriodicTriggerThread::Run() {
             break;
         }
 
-        if (checkpoint_trigger_ != nullptr && checkpoint_trigger_->Check()) {
+        if (checkpoint_trigger_.get() != nullptr && checkpoint_trigger_->Check()) {
             checkpoint_trigger_->Trigger();
         }
 
-        if (compact_segment_trigger_ != nullptr && compact_segment_trigger_->Check()) {
+        if (compact_segment_trigger_.get() != nullptr && compact_segment_trigger_->Check()) {
             compact_segment_trigger_->Trigger();
         }
 
-        if (optimize_index_trigger_ != nullptr && optimize_index_trigger_->Check()) {
+        if (optimize_index_trigger_.get() != nullptr && optimize_index_trigger_->Check()) {
             optimize_index_trigger_->Trigger();
         }
 
-        if (new_cleanup_trigger_ != nullptr && new_cleanup_trigger_->Check()) {
+        if (new_cleanup_trigger_.get() != nullptr && new_cleanup_trigger_->Check()) {
             // new_cleanup_trigger_->Trigger();
         }
     }

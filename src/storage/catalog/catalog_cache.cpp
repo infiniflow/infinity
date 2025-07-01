@@ -46,7 +46,7 @@ SharedPtr<AppendPrepareInfo> TableCache::PrepareAppendNolock(SizeT row_count, Tr
 
     SharedPtr<AppendPrepareInfo> append_info = MakeShared<AppendPrepareInfo>();
     append_info->transaction_id_ = txn_id;
-    if (unsealed_segment_cache_ == nullptr) {
+    if (unsealed_segment_cache_.get() == nullptr) {
         // Used when system is restarted and all segments are sealed.
         unsealed_segment_cache_ = MakeShared<SegmentCache>(next_segment_id_, row_count);
         unsealed_segment_cache_->sealed_ = false;

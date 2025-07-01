@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <ostream>
+#include <cstdint>
 
 export module graph_store;
 
