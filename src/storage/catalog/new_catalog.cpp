@@ -135,21 +135,23 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
 }
 
 SharedPtr<MemIndex> NewCatalog::GetMemIndex(const String &mem_index_key) {
-    std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
+    std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
         return iter->second;
     }
-    return nullptr;
+    SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
+    mem_index_map_.emplace(mem_index_key, mem_index);
+    return mem_index;
 }
 
-bool NewCatalog::GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
+SharedPtr<MemIndex> NewCatalog::PopMemIndex(const String &mem_index_key) {
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);
     if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
-        mem_index = iter->second;
-        return false;
+        SharedPtr<MemIndex> mem_index = iter->second;
+        mem_index_map_.erase(iter);
+        return mem_index;
     }
-    mem_index_map_.emplace(mem_index_key, mem_index);
-    return true;
+    return nullptr;
 }
 
 Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
