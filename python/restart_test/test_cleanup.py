@@ -174,7 +174,7 @@ class TestCleanup:
 
             res = table_obj.drop_index(index_name)
             assert res.error_code == infinity.ErrorCode.OK
-
+            infinity_obj.flush_data()
             res = infinity_obj.cleanup()
             assert res.error_code == infinity.ErrorCode.OK
 
@@ -213,7 +213,7 @@ class TestCleanup:
             assert count_star == insert_n
 
             db_obj.drop_table(table_name, ConflictType.Error)
-
+            infinity_obj.flush_data()
             infinity_obj.cleanup()
 
             dropped_dirs = pathlib.Path(data_dir).rglob(f"*tbl_{table_id}*")
@@ -259,7 +259,7 @@ class TestCleanup:
             )
 
             table_obj.drop_index(drop_index_name)
-
+            infinity_obj.flush_data()
             infinity_obj.cleanup()
             dropped_index_dirs = pathlib.Path("/var/infinity/data").rglob(
                 f"*idx_{drop_index_id}*"
@@ -310,7 +310,7 @@ class TestCleanup:
 
             # wait for compaction
             time.sleep(3)
-
+            infinity_obj.flush_data()
             infinity_obj.cleanup()
             time.sleep(1)
 
