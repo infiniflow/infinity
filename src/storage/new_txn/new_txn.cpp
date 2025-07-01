@@ -308,22 +308,24 @@ Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp comm
     if (status.ok()) {
         TxnTimeStamp db_commit_ts = std::stoull(drop_db_commit_ts_str);
         if (db_commit_ts == commit_ts) {
-            LOG_WARN(fmt::format("Skipping replay drop db: Database {} with id {} and ts: {} already dropped, commit ts: {}, txn: {}.",
+            LOG_WARN(fmt::format("Skipping replay drop db: Database {} created at {} with id {} and ts: {} already dropped, commit ts: {}, txn: {}.",
                                  drop_db_cmd->db_name_,
+                                 drop_db_cmd->create_ts_,
                                  drop_db_cmd->db_id_,
                                  drop_db_cmd->create_ts_,
                                  commit_ts,
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(
-                fmt::format("Replay drop db: Database {} with id {} and ts: {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
-                            drop_db_cmd->db_name_,
-                            drop_db_cmd->db_id_,
-                            drop_db_cmd->create_ts_,
-                            db_commit_ts,
-                            commit_ts,
-                            txn_id));
+            LOG_ERROR(fmt::format("Replay drop db: Database {} created at {} with id {} and ts: {} already dropped with different commit ts {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  drop_db_cmd->db_name_,
+                                  drop_db_cmd->create_ts_,
+                                  drop_db_cmd->db_id_,
+                                  drop_db_cmd->create_ts_,
+                                  db_commit_ts,
+                                  commit_ts,
+                                  txn_id));
             return Status::UnexpectedError("Database commit timestamp mismatch during replay of database drop.");
         }
     }
@@ -571,22 +573,24 @@ Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp c
     if (status.ok()) {
         TxnTimeStamp table_commit_ts = std::stoull(drop_table_commit_ts_str);
         if (table_commit_ts == commit_ts) {
-            LOG_WARN(fmt::format("Skipping replay drop table: Table {} with id {} and ts {} already dropped, commit ts: {}, txn: {}.",
+            LOG_WARN(fmt::format("Skipping replay drop table: Table {} created at {} with id {} and ts {} already dropped, commit ts: {}, txn: {}.",
                                  drop_table_cmd->table_name_,
+                                 drop_table_cmd->create_ts_,
                                  drop_table_cmd->table_id_,
                                  drop_table_cmd->create_ts_,
                                  commit_ts,
                                  txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(
-                fmt::format("Replay drop table: Table {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
-                            drop_table_cmd->table_name_,
-                            drop_table_cmd->table_id_,
-                            drop_table_cmd->create_ts_,
-                            table_commit_ts,
-                            commit_ts,
-                            txn_id));
+            LOG_ERROR(fmt::format(
+                "Replay drop table: Table {} created at {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+                drop_table_cmd->table_name_,
+                drop_table_cmd->create_ts_,
+                drop_table_cmd->table_id_,
+                drop_table_cmd->create_ts_,
+                table_commit_ts,
+                commit_ts,
+                txn_id));
             return Status::UnexpectedError("Table commit timestamp mismatch during replay of table drop.");
         }
     }
@@ -708,7 +712,54 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     return Status::OK();
 }
 
-Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // This implementation might have error, since not check the column id and create timestamp
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    String table_key;
+    Status status = GetTableMeta(add_columns_cmd->db_name_, add_columns_cmd->table_name_, db_meta, table_meta, &table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Construct added columns name map
+    Set<SizeT> column_idx_set;
+    Set<String> column_name_set;
+    for (const auto &column_def : add_columns_cmd->column_defs_) {
+        column_idx_set.insert(column_def->id());
+        column_name_set.insert(column_def->name());
+    }
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
+    std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+
+    // TODO: TS also needed, check the column name / id / ts, Skip if they are same.
+    for (auto &column_def : *old_column_defs) {
+        if (column_name_set.contains(column_def->name())) {
+            LOG_WARN(fmt::format("Skipping replay add columns: Duplicate column name: {} in table: {}.{}.",
+                                 column_def->name(),
+                                 add_columns_cmd->db_name_,
+                                 add_columns_cmd->table_name_));
+            return Status::OK();
+        }
+        if (column_idx_set.contains(column_def->id())) {
+            return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", column_def->id()));
+        }
+    }
+
+    // If columns don't exist, create them
+    status = PrepareCommitAddColumns(add_columns_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
+    LOG_TRACE(fmt::format("Replay add columns to table: {}.{}.", add_columns_cmd->db_name_, add_columns_cmd->table_name_));
+    return Status::OK();
+}
 
 Status NewTxn::DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names) {
 
@@ -805,7 +856,66 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     return Status::OK();
 }
 
-Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+
+    const String &db_name = drop_columns_cmd->db_name_;
+    const String &table_name = drop_columns_cmd->table_name_;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const String &column_key = drop_columns_cmd->column_keys_[i];
+        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
+        String drop_column_key =
+            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts);
+        String drop_column_commit_ts_str;
+        status = kv_instance_->Get(drop_column_key, drop_column_commit_ts_str);
+        if (status.ok()) {
+            TxnTimeStamp drop_column_commit_ts = std::stoull(drop_column_commit_ts_str);
+            if (drop_column_commit_ts == commit_ts) {
+                LOG_WARN(fmt::format("Skipping replay drop column: Column {} created at {} in table {}.{} already dropped, commit ts: {}, txn: {}.",
+                                     drop_columns_cmd->column_names_[i],
+                                     create_ts,
+                                     db_name,
+                                     table_name,
+                                     commit_ts,
+                                     txn_id));
+                continue;
+            } else {
+                LOG_ERROR(fmt::format(
+                    "Replay drop column: Column {} created at {} in table {}.{} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+                    drop_columns_cmd->column_names_[i],
+                    create_ts,
+                    db_name,
+                    table_name,
+                    drop_column_commit_ts,
+                    commit_ts,
+                    txn_id));
+                return Status::UnexpectedError("Column commit timestamp mismatch during replay of column drop.");
+            }
+        }
+    }
+
+    status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto ts_str = std::to_string(commit_ts);
+    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const String &column_key = drop_columns_cmd->column_keys_[i];
+        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
+        kv_instance_->Put(
+            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts),
+            ts_str);
+    }
+    return Status::OK();
+}
 
 Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
     Optional<DBMeeta> db_meta;
@@ -1042,22 +1152,25 @@ Status NewTxn::ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp c
     if (status.ok()) {
         TxnTimeStamp index_commit_ts = std::stoull(drop_index_commit_ts_str);
         if (index_commit_ts == commit_ts) {
-            LOG_WARN(fmt::format("Skipping replay drop index: Index {} already dropped in table {} of database {}, commit ts: {}, txn: {}.",
-                                 drop_index_cmd->index_name_,
-                                 drop_index_cmd->table_name_,
-                                 drop_index_cmd->db_name_,
-                                 commit_ts,
-                                 txn_id));
+            LOG_WARN(
+                fmt::format("Skipping replay drop index: Index {} created at {} already dropped in table {} of database {}, commit ts: {}, txn: {}.",
+                            drop_index_cmd->index_name_,
+                            drop_index_cmd->create_ts_,
+                            drop_index_cmd->table_name_,
+                            drop_index_cmd->db_name_,
+                            commit_ts,
+                            txn_id));
             return Status::OK();
         } else {
-            LOG_ERROR(fmt::format(
-                "Replay drop index: Index {} already dropped in table {} of database {} with different commit ts {}, commit ts: {}, txn: {}.",
-                drop_index_cmd->index_name_,
-                drop_index_cmd->table_name_,
-                drop_index_cmd->db_name_,
-                index_commit_ts,
-                commit_ts,
-                txn_id));
+            LOG_ERROR(fmt::format("Replay drop index: Index {} created at {} already dropped in table {} of database {} with different commit ts {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  drop_index_cmd->index_name_,
+                                  drop_index_cmd->create_ts_,
+                                  drop_index_cmd->table_name_,
+                                  drop_index_cmd->db_name_,
+                                  index_commit_ts,
+                                  commit_ts,
+                                  txn_id));
             return Status::UnexpectedError("Index commit timestamp mismatch during replay of index drop.");
         }
     }
@@ -1685,6 +1798,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::ADD_COLUMNS_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of ADD_COLUMNS_V2 command.
+                    break;
+                }
                 auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
                 Status status = PrepareCommitAddColumns(add_column_cmd);
                 if (!status.ok()) {
@@ -1693,6 +1810,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DROP_COLUMNS_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_COLUMNS_V2 command.
+                    break;
+                }
                 auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
                 Status status = PrepareCommitDropColumns(drop_column_cmd);
                 if (!status.ok()) {
@@ -4598,6 +4719,22 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::CHECKPOINT_V2: {
             auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
             Status status = PrepareCommitCheckpoint(checkpoint_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::ADD_COLUMNS_V2: {
+            auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
+            Status status = ReplayAddColumns(add_column_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DROP_COLUMNS_V2: {
+            auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
+            Status status = ReplayDropColumns(drop_column_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }

@@ -100,12 +100,40 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
     }
 
     {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        auto default_value1 = std::make_shared<ConstantExpr>(LiteralType::kInteger);
+        {
+            int64_t num = 1;
+            default_value1->integer_value_ = num;
+        }
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kInteger), "col3", std::set<ConstraintType>(), "", default_value1);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        Status status = txn->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         ConflictType conflict_type_{ConflictType::kError};
         const String file_name = "";
         Vector<String> column_names{"col2"};
         SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, index_comment_ptr, file_name, column_names);
         Status status = txn->CreateIndex(*db_name, *table_name, index_base, conflict_type_);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop columns"), TransactionType::kNormal);
+        Status status = txn->DropColumns(*db_name, *table_name, column_names);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
