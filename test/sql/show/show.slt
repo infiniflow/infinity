@@ -6,6 +6,9 @@ statement ok
 DROP DATABASE IF EXISTS db1;
 
 statement ok
+CLEAN DATA;
+
+statement ok
 CREATE database db1;
 
 statement ok
