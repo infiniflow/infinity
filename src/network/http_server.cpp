@@ -208,12 +208,12 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
             if (field_element.contains("default")) {
                 switch (column_type->type()) {
                     case LogicalType::kSparse: {
-                        default_expr = BuildConstantSparseExprFromJson(field_element["default"],
+                        default_expr = BuildConstantSparseExprFromJson(field_element["default"].dump(),
                                                                        dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
                         break;
                     }
                     default: {
-                        default_expr = BuildConstantExprFromJson(field_element["default"]);
+                        default_expr = BuildConstantExprFromJson(field_element["default"].dump());
                         break;
                     }
                 }
@@ -1188,7 +1188,7 @@ public:
                             if (value.size() == 1 && value.begin().key() == "array") {
                                 SharedPtr<ConstantExpr> array_expr;
                                 try {
-                                    auto array_result = BuildConstantExprFromJson(value);
+                                    auto array_result = BuildConstantExprFromJson(value.dump());
                                     if (!array_result) {
                                         throw std::runtime_error("Empty return value!");
                                     }

@@ -219,117 +219,7 @@ nlohmann::json IndexBase::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json) {
-    SharedPtr<IndexBase> res = nullptr;
-    String index_type_name = index_def_json["index_type"];
-    IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
-    SharedPtr<String> index_name = MakeShared<String>(index_def_json["index_name"]);
-
-    SharedPtr<String> index_comment;
-    if (index_def_json.contains("index_comment")) {
-        index_comment = MakeShared<String>(index_def_json["index_comment"]);
-    } else {
-        index_comment = MakeShared<String>();
-    }
-
-    String file_name = index_def_json["file_name"];
-    Vector<String> column_names = index_def_json["column_names"];
-    switch (index_type) {
-        case IndexType::kIVF: {
-            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(index_def_json["ivf_option"]);
-            res = MakeShared<IndexIVF>(index_name, index_comment, file_name, std::move(column_names), ivf_option);
-            break;
-        }
-        case IndexType::kHnsw: {
-            SizeT M = index_def_json["M"];
-            SizeT ef_construction = index_def_json["ef_construction"];
-            SizeT block_size = index_def_json["block_size"];
-            MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
-            HnswBuildType build_type = HnswBuildType::kPlain;
-            if (index_def_json.contains("build_type")) {
-                build_type = StringToHnswBuildType(index_def_json["build_type"]);
-            }
-            Optional<LSGConfig> lsg_config = None;
-            if (index_def_json.contains("lsg_config")) {
-                lsg_config = LSGConfig::FromString(index_def_json["lsg_config"]);
-            }
-            res = MakeShared<IndexHnsw>(index_name,
-                                        index_comment,
-                                        file_name,
-                                        std::move(column_names),
-                                        metric_type,
-                                        encode_type,
-                                        build_type,
-                                        M,
-                                        ef_construction,
-                                        block_size,
-                                        lsg_config);
-            break;
-        }
-        case IndexType::kDiskAnn: {
-            SizeT R = index_def_json["R"];
-            SizeT L = index_def_json["L"];
-            SizeT num_pq_chunks = index_def_json["num_pq_chunks"];
-            SizeT num_parts = index_def_json["num_parts"];
-            MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(index_def_json["encode_type"]);
-            res = MakeShared<IndexDiskAnn>(index_name,
-                                           index_comment,
-                                           file_name,
-                                           std::move(column_names),
-                                           metric_type,
-                                           encode_type,
-                                           R,
-                                           L,
-                                           num_pq_chunks,
-                                           num_parts);
-            break;
-        }
-        case IndexType::kFullText: {
-            String analyzer = index_def_json["analyzer"];
-            auto ft_res = MakeShared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer);
-            if (index_def_json.contains("flag")) {
-                u8 flag = index_def_json["flag"];
-                ft_res->flag_ = flag;
-            }
-            res = ft_res;
-            break;
-        }
-        case IndexType::kSecondary: {
-            res = MakeShared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names));
-            break;
-        }
-        case IndexType::kEMVB: {
-            u32 residual_pq_subspace_num = index_def_json["pq_subspace_num"];
-            u32 residual_pq_subspace_bits = index_def_json["pq_subspace_bits"];
-            res = MakeShared<IndexEMVB>(index_name,
-                                        index_comment,
-                                        file_name,
-                                        std::move(column_names),
-                                        residual_pq_subspace_num,
-                                        residual_pq_subspace_bits);
-            break;
-        }
-        case IndexType::kBMP: {
-            SizeT block_size = index_def_json["block_size"];
-            auto compress_type = static_cast<BMPCompressType>(index_def_json["compress_type"]);
-            res = MakeShared<IndexBMP>(index_name, index_comment, file_name, std::move(column_names), block_size, compress_type);
-            break;
-        }
-        case IndexType::kInvalid: {
-            String error_message = "Error index method while deserializing";
-            UnrecoverableError(error_message);
-        }
-        default: {
-            Status status = Status::NotSupport("Not implemented");
-            RecoverableError(status);
-        }
-    }
-    return res;
-}
-
-SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
+SharedPtr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str) {
     simdjson::padded_string index_def_json(index_def_str);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(index_def_json);
@@ -340,9 +230,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
     SharedPtr<String> index_name = MakeShared<String>(doc["index_name"].get<String>());
 
     SharedPtr<String> index_comment;
-    String index_comment_json;
-    simdjson::error_code error = doc["index_comment"].get<String>(index_comment_json);
-    if (error == simdjson::SUCCESS) {
+    if (String index_comment_json; doc["index_comment"].get<String>(index_comment_json) == simdjson::SUCCESS) {
         index_comment = MakeShared<String>(index_comment_json);
     } else {
         index_comment = MakeShared<String>();
@@ -352,8 +240,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
     Vector<String> column_names = doc["column_names"].get<Vector<String>>();
     switch (index_type) {
         case IndexType::kIVF: {
-            auto ivf_option_json = doc["ivf_option"];
-            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(ivf_option_json);
+            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(doc["ivf_option"].raw_json());
             res = MakeShared<IndexIVF>(index_name, index_comment, file_name, std::move(column_names), ivf_option);
             break;
         }
@@ -364,15 +251,11 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const String &index_def_str) {
             MetricType metric_type = StringToMetricType(doc["metric_type"].get<String>());
             HnswEncodeType encode_type = StringToHnswEncodeType(doc["encode_type"].get<String>());
             HnswBuildType build_type = HnswBuildType::kPlain;
-            String build_type_json;
-            simdjson::error_code error = doc["build_type"].get<String>(build_type_json);
-            if (error == simdjson::SUCCESS) {
+            if (String build_type_json; doc["build_type"].get<String>(build_type_json) == simdjson::SUCCESS) {
                 build_type = StringToHnswBuildType(build_type_json);
             }
             Optional<LSGConfig> lsg_config = None;
-            String lsg_config_json;
-            error = doc["lsg_config"].get<String>(lsg_config_json);
-            if (error == simdjson::SUCCESS) {
+            if (String lsg_config_json; doc["lsg_config"].get<String>(lsg_config_json) == simdjson::SUCCESS) {
                 lsg_config = LSGConfig::FromString(lsg_config_json);
             }
             res = MakeShared<IndexHnsw>(index_name,

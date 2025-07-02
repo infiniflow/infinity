@@ -38,9 +38,7 @@ export struct ObjAddr {
 
     nlohmann::json Serialize() const;
 
-    void Deserialize(const nlohmann::json &obj);
-
-    void Deserialize(const String &str);
+    void Deserialize(std::string_view obj_str);
 
     SizeT GetSizeInBytes() const;
 

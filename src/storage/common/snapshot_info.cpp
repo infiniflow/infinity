@@ -50,14 +50,17 @@ nlohmann::json BlockColumnSnapshotInfo::Serialize() {
     return json_res;
 }
 
-SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(const nlohmann::json &column_block_json) {
+SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(std::string_view column_block_str) {
+    simdjson::padded_string column_block_json(column_block_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(column_block_json);
     auto column_block_snapshot = MakeShared<BlockColumnSnapshotInfo>();
-    column_block_snapshot->column_id_ = column_block_json["column_id"];
-    column_block_snapshot->filename_ = column_block_json["filename"];
-    if (column_block_json.contains("outlines")) {
-        for (const auto &outline_snapshot : column_block_json["outlines"]) {
+    column_block_snapshot->column_id_ = doc["column_id"].get<ColumnID>();
+    column_block_snapshot->filename_ = doc["filename"].get<String>();
+    if (simdjson::array array; doc["outlines"].get(array) == simdjson::SUCCESS) {
+        for (auto outline_snapshot : array) {
             auto outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
-            outline_snapshot_info->filename_ = outline_snapshot;
+            outline_snapshot_info->filename_ = outline_snapshot.get<String>();
             column_block_snapshot->outline_snapshots_.emplace_back(outline_snapshot_info);
         }
     }
@@ -74,12 +77,15 @@ nlohmann::json BlockSnapshotInfo::Serialize() {
     return json_res;
 }
 
-SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(const nlohmann::json &block_json) {
+SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(std::string_view block_str) {
+    simdjson::padded_string block_json(block_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(block_json);
     auto block_snapshot = MakeShared<BlockSnapshotInfo>();
-    block_snapshot->block_id_ = block_json["block_id"];
-    block_snapshot->block_dir_ = block_json["block_dir"];
-    for (const auto &column_block_json : block_json["columns"]) {
-        auto column_block_snapshot = BlockColumnSnapshotInfo::Deserialize(column_block_json);
+    block_snapshot->block_id_ = doc["block_id"].get<BlockID>();
+    block_snapshot->block_dir_ = doc["block_dir"].get<String>();
+    for (auto column_block_json : doc["columns"]) {
+        auto column_block_snapshot = BlockColumnSnapshotInfo::Deserialize(column_block_json.raw_json());
         block_snapshot->column_block_snapshots_.emplace_back(column_block_snapshot);
     }
     return block_snapshot;
@@ -102,19 +108,22 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
     return json_res;
 }
 
-SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::json &segment_json) {
+SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(std::string_view segment_str) {
+    simdjson::padded_string segment_json(segment_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(segment_json);
     auto segment_snapshot = MakeShared<SegmentSnapshotInfo>();
-    segment_snapshot->segment_id_ = segment_json["segment_id"];
-    segment_snapshot->segment_dir_ = segment_json["segment_dir"];
+    segment_snapshot->segment_id_ = doc["segment_id"].get<SegmentID>();
+    segment_snapshot->segment_dir_ = doc["segment_dir"].get<String>();
 
-    segment_snapshot->first_delete_ts_ = segment_json["first_delete_ts"];
-    segment_snapshot->deprecate_ts_ = segment_json["deprecate_ts"];
-    segment_snapshot->row_count_ = segment_json["row_count"];
-    segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
-    segment_snapshot->status_ = static_cast<SegmentStatus>(segment_json["segment_status"]);
+    segment_snapshot->first_delete_ts_ = doc["first_delete_ts"].get<TxnTimeStamp>();
+    segment_snapshot->deprecate_ts_ = doc["deprecate_ts"].get<TxnTimeStamp>();
+    segment_snapshot->row_count_ = doc["row_count"].get<TxnTimeStamp>();
+    segment_snapshot->actual_row_count_ = doc["actual_row_count"].get<TxnTimeStamp>();
+    segment_snapshot->status_ = (SegmentStatus)(u8)doc["segment_status"].get<u8>();
 
-    for (const auto &block_json : segment_json["blocks"]) {
-        auto block_snapshot = BlockSnapshotInfo::Deserialize(block_json);
+    for (auto block_json : doc["blocks"]) {
+        auto block_snapshot = BlockSnapshotInfo::Deserialize(block_json.raw_json());
         segment_snapshot->block_snapshots_.emplace_back(block_snapshot);
     }
     return segment_snapshot;
@@ -125,7 +134,7 @@ nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
     return json_res;
 }
 
-SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(const nlohmann::json &chunk_index_json) {
+SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(std::string_view chunk_index_str) {
     auto chunk_index_snapshot = MakeShared<ChunkIndexSnapshotInfo>();
     return chunk_index_snapshot;
 }
@@ -139,11 +148,14 @@ nlohmann::json SegmentIndexSnapshotInfo::Serialize() {
     return json_res;
 }
 
-SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(const nlohmann::json &segment_index_json) {
+SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(std::string_view segment_index_str) {
+    simdjson::padded_string segment_index_json(segment_index_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(segment_index_json);
     auto segment_index_snapshot = MakeShared<SegmentIndexSnapshotInfo>();
-    segment_index_snapshot->segment_id_ = segment_index_json["segment_id"];
-    for (const auto &chunk_index_json : segment_index_json["chunk_indexes"]) {
-        auto chunk_index_snapshot = ChunkIndexSnapshotInfo::Deserialize(chunk_index_json);
+    segment_index_snapshot->segment_id_ = doc["segment_id"].get<SegmentID>();
+    for (auto chunk_index_json : doc["chunk_indexes"]) {
+        auto chunk_index_snapshot = ChunkIndexSnapshotInfo::Deserialize(chunk_index_json.raw_json());
         segment_index_snapshot->chunk_index_snapshots_.emplace_back(chunk_index_snapshot);
     }
     return segment_index_snapshot;
@@ -159,12 +171,15 @@ nlohmann::json TableIndexSnapshotInfo::Serialize() {
     return json_res;
 }
 
-SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(const nlohmann::json &table_index_json) {
+SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(std::string_view table_index_str) {
+    simdjson::padded_string table_index_json(table_index_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(table_index_json);
     auto table_index_snapshot = MakeShared<TableIndexSnapshotInfo>();
-    table_index_snapshot->index_dir_ = MakeShared<String>(table_index_json["index_dir"]);
-    table_index_snapshot->index_base_ = IndexBase::Deserialize(table_index_json["index_base"]);
-    for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
-        auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
+    table_index_snapshot->index_dir_ = MakeShared<String>(doc["index_dir"].get<String>());
+    table_index_snapshot->index_base_ = IndexBase::Deserialize(doc["index_base"].raw_json());
+    for (auto segment_index_json : doc["segment_indexes"]) {
+        auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json.raw_json());
         table_index_snapshot->index_by_segment_.emplace(segment_index_snapshot->segment_id_, segment_index_snapshot);
     }
     return table_index_snapshot;
@@ -387,68 +402,70 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
         RecoverableError(status);
     }
 
-    nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+    simdjson::padded_string snapshot_meta_json(json_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(snapshot_meta_json);
 
     //    LOG_INFO(snapshot_meta_json.dump());
 
     SharedPtr<TableSnapshotInfo> table_snapshot = MakeShared<TableSnapshotInfo>();
 
-    table_snapshot->snapshot_name_ = snapshot_meta_json["snapshot_name"];
-    SnapshotScope scope = static_cast<SnapshotScope>(snapshot_meta_json["snapshot_scope"]);
+    table_snapshot->snapshot_name_ = doc["snapshot_name"].get<String>();
+    SnapshotScope scope = (SnapshotScope)(uint8_t)doc["snapshot_scope"].get<uint8_t>();
     if (scope != SnapshotScope::kTable) {
         return {nullptr, Status::Unknown("Invalid snapshot scope")};
     }
 
     table_snapshot->scope_ = SnapshotScope::kTable;
-    table_snapshot->version_ = snapshot_meta_json["version"];
-    table_snapshot->db_name_ = snapshot_meta_json["database_name"];
-    table_snapshot->table_name_ = snapshot_meta_json["table_name"];
-    table_snapshot->table_comment_ = snapshot_meta_json["table_comment"];
+    table_snapshot->version_ = doc["version"].get<SizeT>();
+    table_snapshot->db_name_ = doc["database_name"].get<String>();
+    table_snapshot->table_name_ = doc["table_name"].get<String>();
+    table_snapshot->table_comment_ = doc["table_comment"].get<String>();
 
-    table_snapshot->txn_id_ = snapshot_meta_json["txn_id"];
-    table_snapshot->begin_ts_ = snapshot_meta_json["begin_ts"];
-    table_snapshot->commit_ts_ = snapshot_meta_json["commit_ts"];
-    table_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
-    table_snapshot->table_entry_dir_ = snapshot_meta_json["table_entry_dir"];
-    table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
-    table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
-    table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
-    table_snapshot->row_count_ = snapshot_meta_json["row_count"];
+    table_snapshot->txn_id_ = doc["txn_id"].get<TxnTimeStamp>();
+    table_snapshot->begin_ts_ = doc["begin_ts"].get<TxnTimeStamp>();
+    table_snapshot->commit_ts_ = doc["commit_ts"].get<TxnTimeStamp>();
+    table_snapshot->max_commit_ts_ = doc["max_commit_ts"].get<TxnTimeStamp>();
+    table_snapshot->table_entry_dir_ = doc["table_entry_dir"].get<String>();
+    table_snapshot->next_column_id_ = doc["next_column_id"].get<ColumnID>();
+    table_snapshot->unsealed_id_ = doc["unsealed_id"].get<SegmentID>();
+    table_snapshot->next_segment_id_ = doc["next_segment_id"].get<SegmentID>();
+    table_snapshot->row_count_ = doc["row_count"].get<SizeT>();
 
-    for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
-        SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
-        i64 column_id = column_def_json["column_id"];
-        String column_name = column_def_json["column_name"];
+    for (simdjson::array array = doc["column_definition"]; simdjson::simdjson_result<simdjson::value> column_def_json : array) {
+        SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json.raw_json());
+        i64 column_id = column_def_json["column_id"].get<i64>();
+        String column_name = column_def_json["column_name"].get<String>();
 
         std::set<ConstraintType> constraints;
-        if (column_def_json.contains("constraints")) {
-            for (const auto &column_constraint : column_def_json["constraints"]) {
-                ConstraintType constraint = column_constraint;
+        if (simdjson::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
+            for (auto column_constraint : constraints_json) {
+                ConstraintType constraint = (ConstraintType)(char)column_constraint.get<char>();
                 constraints.emplace(constraint);
             }
         }
 
         String comment;
-        if (column_def_json.contains("column_comment")) {
-            comment = column_def_json["column_comment"];
+        if (String comment_json; doc["column_comment"].get(comment_json) == simdjson::SUCCESS) {
+            comment = comment_json;
         }
 
         SharedPtr<ParsedExpr> default_expr = nullptr;
-        if (column_def_json.contains("default")) {
-            default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+        if (auto default_expr_json = doc["default"]; default_expr_json.error() == simdjson::SUCCESS) {
+            default_expr = ConstantExpr::Deserialize(default_expr_json);
         }
 
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
         table_snapshot->columns_.emplace_back(column_def);
     }
 
-    for (const auto &segment_meta_json : snapshot_meta_json["segments"]) {
-        SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json);
+    for (simdjson::array array = doc["segments"]; auto segment_meta_json : array) {
+        SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json.raw_json());
         table_snapshot->segment_snapshots_.emplace(segment_snapshot->segment_id_, segment_snapshot);
     }
 
-    for (const auto &table_index_meta_json : snapshot_meta_json["table_indexes"]) {
-        SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json);
+    for (simdjson::array array = doc["table_indexes"]; auto table_index_meta_json : array) {
+        SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json.raw_json());
         table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
     }
 

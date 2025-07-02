@@ -520,12 +520,11 @@ void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorS
         if (!stream_reader->ReadLine(json_str)) {
             break;
         }
-        nlohmann::json line_json = nlohmann::json::parse(json_str);
 
         if (!import_ctx->CheckInit()) {
             import_ctx->Init();
         }
-        JSONLRowHandler(line_json, import_ctx->GetColumnVectors());
+        JSONLRowHandler(json_str, import_ctx->GetColumnVectors());
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
@@ -540,47 +539,44 @@ void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorS
 }
 
 void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
-    nlohmann::json json_arr;
-    {
-        auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-
-        i64 file_size = file_handle->FileSize();
-        if (file_size == -1) {
-            UnrecoverableError("Can't get file size");
-        }
-        String json_str(file_size, 0);
-        auto [read_n, status_read] = file_handle->Read(json_str.data(), file_size);
-        if (!status_read.ok()) {
-            UnrecoverableError(status_read.message());
-        }
-        if ((i64)read_n != file_size) {
-            String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
-            UnrecoverableError(error_message);
-        }
-
-        if (read_n == 0) {
-            auto result_msg = MakeUnique<String>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
-            import_op_state->result_msg_ = std::move(result_msg);
-            return;
-        }
-
-        json_arr = nlohmann::json::parse(json_str);
+    auto [file_handle, status] = VirtualStore::Open(file_path_, FileAccessMode::kRead);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
-    if (!json_arr.is_array()) {
+    i64 file_size = file_handle->FileSize();
+    if (file_size == -1) {
+        UnrecoverableError("Can't get file size");
+    }
+    String json_str(file_size, 0);
+    auto [read_n, status_read] = file_handle->Read(json_str.data(), file_size);
+    if (!status_read.ok()) {
+        UnrecoverableError(status_read.message());
+    }
+    if ((i64)read_n != file_size) {
+        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+        UnrecoverableError(error_message);
+    }
+    if (read_n == 0) {
+        auto result_msg = MakeUnique<String>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
+        import_op_state->result_msg_ = std::move(result_msg);
+        return;
+    }
+
+    simdjson::padded_string json_arr(json_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_arr);
+    if (doc.type() != simdjson::json_type::array) {
         auto result_msg = MakeUnique<String>(fmt::format("Invalid json format, IMPORT 0 rows"));
         import_op_state->result_msg_ = std::move(result_msg);
         return;
     }
 
     auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
-    for (const auto &json_entry : json_arr) {
+    for (auto element : doc.get_array()) {
         if (!import_ctx->CheckInit()) {
             import_ctx->Init();
         }
-        JSONLRowHandler(json_entry, import_ctx->GetColumnVectors());
+        JSONLRowHandler(element.value().raw_json(), import_ctx->GetColumnVectors());
         import_ctx->AddRowCnt();
 
         if (import_ctx->CheckFull()) {
@@ -671,82 +667,126 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
     }
 }
 
-SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object) {
-    switch (json_object.type()) {
-        case nlohmann::json::value_t::boolean: {
+SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
+    simdjson::padded_string json_str(object_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    switch (doc.type()) {
+        case simdjson::json_type::boolean: {
             auto res = MakeShared<ConstantExpr>(LiteralType::kBoolean);
-            res->bool_value_ = json_object.get<bool>();
+            res->bool_value_ = doc.get<bool>();
             return res;
         }
-        case nlohmann::json::value_t::number_unsigned:
-        case nlohmann::json::value_t::number_integer: {
-            auto res = MakeShared<ConstantExpr>(LiteralType::kInteger);
-            res->integer_value_ = json_object.get<i64>();
-            return res;
+        case simdjson::json_type::number: {
+            simdjson::number num = doc.get_number();
+            switch (num.get_number_type()) {
+                case simdjson::number_type::unsigned_integer:
+                case simdjson::number_type::signed_integer: {
+                    auto res = MakeShared<ConstantExpr>(LiteralType::kInteger);
+                    res->integer_value_ = (i64)num;
+                    return res;
+                }
+                case simdjson::number_type::floating_point_number: {
+                    auto res = MakeShared<ConstantExpr>(LiteralType::kDouble);
+                    res->double_value_ = (double)num;
+                    return res;
+                }
+                default: {
+                    const auto error_info = fmt::format("Unrecognized object number type");
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+            }
         }
-        case nlohmann::json::value_t::number_float: {
-            auto res = MakeShared<ConstantExpr>(LiteralType::kDouble);
-            res->double_value_ = json_object.get<double>();
-            return res;
-        }
-        case nlohmann::json::value_t::string: {
+        case simdjson::json_type::string: {
             auto res = MakeShared<ConstantExpr>(LiteralType::kString);
-            const auto str = json_object.get<String>();
+            const String str = doc.get<String>();
             res->str_value_ = strdup(str.c_str());
             return res;
         }
-        case nlohmann::json::value_t::array: {
-            const u32 array_size = json_object.size();
+        case simdjson::json_type::array: {
+            const u32 array_size = doc.count_elements();
             if (array_size == 0) {
                 const auto error_info = "Empty json array!";
                 RecoverableError(Status::ImportFileFormatError(error_info));
                 return nullptr;
             }
-            switch (json_object[0].type()) {
-                case nlohmann::json::value_t::boolean:
-                case nlohmann::json::value_t::number_unsigned:
-                case nlohmann::json::value_t::number_integer: {
-                    auto res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
-                    res->long_array_.resize(array_size);
-                    for (u32 i = 0; i < array_size; ++i) {
-                        res->long_array_[i] = json_object[i].get<i64>();
+            std::vector<std::string_view> json_strs(array_size);
+            std::vector<simdjson::value> values(array_size);
+            for (size_t index = 0; auto field : doc.get_array()) {
+                values[index] = field.value();
+                json_strs[index++] = values[index].raw_json();
+            }
+            switch (values[0].type()) {
+                case simdjson::json_type::boolean:
+                case simdjson::json_type::number: {
+                    std::vector<simdjson::number> nums(array_size);
+                    for (size_t index = 0; auto item : values) {
+                        nums[index++] = item.get_number();
                     }
-                    return res;
-                }
-                case nlohmann::json::value_t::number_float: {
-                    auto res = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
-                    res->double_array_.resize(array_size);
-                    for (u32 i = 0; i < array_size; ++i) {
-                        res->double_array_[i] = json_object[i].get<double>();
+                    switch (nums[0].get_number_type()) {
+                        case simdjson::number_type::unsigned_integer:
+                        case simdjson::number_type::signed_integer: {
+                            auto res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                            res->long_array_.resize(array_size);
+                            for (u32 i = 0; i < array_size; ++i) {
+                                res->long_array_[i] = (i64)nums[i];
+                            }
+                            return res;
+                        }
+                        case simdjson::number_type::floating_point_number: {
+                            auto res = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                            res->double_array_.resize(array_size);
+                            for (u32 i = 0; i < array_size; ++i) {
+                                res->double_array_[i] = (double)nums[i];
+                            }
+                            return res;
+                        }
+                        default: {
+                            const auto error_info = fmt::format("Unrecognized object number type");
+                            RecoverableError(Status::ImportFileFormatError(error_info));
+                            return nullptr;
+                        }
                     }
-                    return res;
                 }
-                case nlohmann::json::value_t::array: {
+                case simdjson::json_type::array: {
                     auto res = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
                     res->sub_array_array_.resize(array_size);
                     for (u32 i = 0; i < array_size; ++i) {
-                        res->sub_array_array_[i] = BuildConstantExprFromJson(json_object[i]);
+                        res->sub_array_array_[i] = BuildConstantExprFromJson(json_strs[i]);
                     }
                     return res;
                 }
                 default: {
-                    const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                    const auto error_info = fmt::format("Unrecognized json object type in array");
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
             }
         }
-        case nlohmann::json::value_t::object: {
-            if (json_object.size() == 1 && json_object.begin().key() == "array") {
-                const auto &array_obj = json_object.begin().value();
-                if (array_obj.type() != nlohmann::json::value_t::array) {
-                    const auto error_info = fmt::format("Unrecognized json object type in array: {}, expect array!", array_obj.type_name());
+        case simdjson::json_type::object: {
+            const u32 array_size = doc.count_fields();
+            if (array_size != 1) {
+                const auto error_info = fmt::format("Unrecognized json object size: Expacted 1, but got {}", array_size);
+                RecoverableError(Status::ImportFileFormatError(error_info));
+                return nullptr;
+            }
+            for (auto obj : doc.get_object()) {
+                String key = String((std::string_view)obj.unescaped_key());
+                if (key != "array") {
+                    const auto error_info = fmt::format("Unrecognized json key name: Expacted array, but got {}", key);
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+                auto value = obj.value();
+                if (value.type() != simdjson::json_type::array) {
+                    const auto error_info = fmt::format("Unrecognized json object type in array");
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
                 auto res = MakeShared<ConstantExpr>(LiteralType::kCurlyBracketsArray);
-                for (const auto &elem : array_obj) {
-                    auto elem_expr = BuildConstantExprFromJson(elem);
+                for (auto elem : value) {
+                    auto elem_expr = BuildConstantExprFromJson(elem.raw_json());
                     if (!elem_expr) {
                         RecoverableError(Status::ImportFileFormatError("Failed to build expr for element of array!"));
                         return nullptr;
@@ -754,21 +794,17 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
                     res->curly_brackets_array_.push_back(std::move(elem_expr));
                 }
                 return res;
-            } else {
-                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
-                RecoverableError(Status::ImportFileFormatError(error_info));
-                return nullptr;
             }
         }
         default: {
-            const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+            const auto error_info = fmt::format("Unrecognized json object type");
             RecoverableError(Status::ImportFileFormatError(error_info));
             return nullptr;
         }
     }
 }
 
-SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &json_object, const SparseInfo *sparse_info) {
+SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_sv, const SparseInfo *sparse_info) {
     SharedPtr<ConstantExpr> res = nullptr;
     switch (sparse_info->DataType()) {
         case EmbeddingDataType::kElemBit: {
@@ -796,63 +832,91 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             return nullptr;
         }
     }
-    if (json_object.size() == 0) {
-        return res;
-    }
-    switch (json_object.type()) {
-        case nlohmann::json::value_t::array: {
-            const u32 array_size = json_object.size();
-            switch (json_object[0].type()) {
-                case nlohmann::json::value_t::number_unsigned:
-                case nlohmann::json::value_t::number_integer: {
+    simdjson::padded_string json(object_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json);
+    switch (doc.type()) {
+        case simdjson::json_type::array: {
+            const u32 array_size = doc.count_elements();
+            if (array_size == 0) {
+                return res;
+            }
+            std::vector<std::string_view> json_strs(array_size);
+            std::vector<simdjson::value> values(array_size);
+            for (size_t index = 0; auto field : doc.get_array()) {
+                values[index] = field.value();
+                json_strs[index++] = values[index].raw_json();
+            }
+            if (values[0].type() != simdjson::json_type::number) {
+                const auto error_info = fmt::format("Unrecognized json object type");
+                RecoverableError(Status::ImportFileFormatError(error_info));
+                return nullptr;
+            }
+            std::vector<simdjson::number> nums(array_size);
+            for (size_t index = 0; auto item : values) {
+                nums[index++] = item.get_number();
+            }
+            switch (nums[0].get_number_type()) {
+                case simdjson::number_type::unsigned_integer:
+                case simdjson::number_type::signed_integer: {
                     res->long_array_.resize(array_size);
                     for (u32 i = 0; i < array_size; ++i) {
-                        res->long_array_[i] = json_object[i].get<i64>();
+                        res->long_array_[i] = (i64)nums[i];
                     }
                     return res;
                 }
                 default: {
-                    const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                    const auto error_info = fmt::format("Unrecognized json object type in array");
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
             }
         }
-        case nlohmann::json::value_t::object: {
+        case simdjson::json_type::object: {
+            const u32 object_size = doc.count_fields();
+            if (object_size == 0) {
+                return res;
+            }
             HashSet<i64> key_set;
-            for (auto iter = json_object.begin(); iter != json_object.end(); ++iter) {
-                i64 key = std::stoll(iter.key());
-                auto [_, insert_ok] = key_set.insert(key);
+            for (auto field : doc.get_object()) {
+                i64 field_key = std::stoll(String((std::string_view)field.unescaped_key()));
+                auto field_value = field.value();
+                auto [_, insert_ok] = key_set.insert(field_key);
                 if (!insert_ok) {
-                    const auto error_info = fmt::format("Duplicate key {} in sparse array!", key);
+                    const auto error_info = fmt::format("Duplicate key {} in sparse array!", field_key);
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
+                if (field_value.type() != simdjson::json_type::number) {
+                    const auto error_info = fmt::format("Unrecognized json object type in array");
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+
+                simdjson::number num = field_value.get_number();
                 if (res->literal_type_ == LiteralType::kLongSparseArray) {
-                    const auto &value_obj = iter.value();
-                    switch (value_obj.type()) {
-                        case nlohmann::json::value_t::number_unsigned:
-                        case nlohmann::json::value_t::number_integer: {
-                            res->long_sparse_array_.first.push_back(key);
-                            res->long_sparse_array_.second.push_back(value_obj.get<i64>());
+                    switch (num.get_number_type()) {
+                        case simdjson::number_type::unsigned_integer:
+                        case simdjson::number_type::signed_integer: {
+                            res->long_sparse_array_.first.push_back(field_key);
+                            res->long_sparse_array_.second.push_back((i64)num);
                             break;
                         }
                         default: {
-                            const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                            const auto error_info = fmt::format("Unrecognized json object type in array");
                             RecoverableError(Status::ImportFileFormatError(error_info));
                             return nullptr;
                         }
                     }
                 } else {
-                    const auto &value_obj = iter.value();
-                    switch (value_obj.type()) {
-                        case nlohmann::json::value_t::number_float: {
-                            res->double_sparse_array_.first.push_back(key);
-                            res->double_sparse_array_.second.push_back(value_obj.get<double>());
+                    switch (num.get_number_type()) {
+                        case simdjson::number_type::floating_point_number: {
+                            res->double_sparse_array_.first.push_back(field_key);
+                            res->double_sparse_array_.second.push_back((double)num);
                             break;
                         }
                         default: {
-                            const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                            const auto error_info = fmt::format("Unrecognized json object type in array");
                             RecoverableError(Status::ImportFileFormatError(error_info));
                             return nullptr;
                         }
@@ -862,64 +926,67 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             return res;
         }
         default: {
-            const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+            const auto error_info = fmt::format("Unrecognized json object type");
             RecoverableError(Status::ImportFileFormatError(error_info));
             return nullptr;
         }
     }
 }
 
-void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<SharedPtr<ColumnVector>> &column_vectors) {
+void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<ColumnVector>> &column_vectors) {
+    simdjson::padded_string json_str(line_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
     for (SizeT i = 0; auto &column_vector_ptr : column_vectors) {
         ColumnVector &column_vector = *column_vector_ptr;
         const ColumnDef *column_def = table_info_->GetColumnDefByIdx(i++);
 
-        if (line_json.contains(column_def->name_)) {
+        if (simdjson::value val; doc[column_def->name_].get(val) == simdjson::SUCCESS) {
             switch (column_vector.data_type()->type()) {
                 case LogicalType::kBoolean: {
-                    bool v = line_json[column_def->name_];
+                    bool v = val.get<bool>();
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
                 case LogicalType::kTinyInt: {
-                    i8 v = line_json[column_def->name_];
+                    i8 v = val.get<i8>();
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
                 case LogicalType::kSmallInt: {
-                    i16 v = line_json[column_def->name_];
+                    i16 v = val.get<i16>();
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
                 case LogicalType::kInteger: {
-                    i32 v = line_json[column_def->name_];
+                    i32 v = val.get<i32>();
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
                 case LogicalType::kBigInt: {
-                    i64 v = line_json[column_def->name_];
+                    i64 v = val.get<i64>();
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
                 case LogicalType::kFloat16: {
-                    float v = line_json[column_def->name_];
+                    float v = val.get<float>();
                     Float16T float16_v(v);
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&float16_v));
                     break;
                 }
                 case LogicalType::kBFloat16: {
-                    float v = line_json[column_def->name_];
+                    float v = val.get<float>(v);
                     BFloat16T bfloat16_v(v);
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&bfloat16_v));
                     break;
                 }
                 case LogicalType::kFloat: {
-                    float v = line_json[column_def->name_];
+                    float v = val.get<float>(v);
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
                 case LogicalType::kDouble: {
-                    double v = line_json[column_def->name_];
+                    double v = val.get<double>(v);
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
                     break;
                 }
@@ -928,7 +995,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                 case LogicalType::kDateTime:
                 case LogicalType::kTimestamp:
                 case LogicalType::kVarchar: {
-                    std::string_view str_view = line_json[column_def->name_].get<std::string_view>();
+                    std::string_view str_view = doc[column_def->name_];
                     column_vector.AppendByStringView(str_view);
                     break;
                 }
@@ -937,7 +1004,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                     SizeT dim = embedding_info->Dimension();
                     switch (embedding_info->Type()) {
                         case EmbeddingDataType::kElemBit: {
-                            const auto i8_embedding = line_json[column_def->name_].get<Vector<i8>>();
+                            const Vector<i8> i8_embedding = doc[column_def->name_].get<Vector<i8>>();
                             const SizeT embedding_dim = i8_embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -958,7 +1025,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemUInt8: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<u8>>();
+                            const Vector<u8> embedding = doc[column_def->name_].get<Vector<u8>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -969,7 +1036,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemInt8: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<i8>>();
+                            const Vector<i8> embedding = doc[column_def->name_].get<Vector<i8>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -980,7 +1047,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemInt16: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<i16>>();
+                            const Vector<i16> embedding = doc[column_def->name_].get<Vector<i16>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -991,7 +1058,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemInt32: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<i32>>();
+                            const Vector<i32> embedding = doc[column_def->name_].get<Vector<i32>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -1002,7 +1069,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemInt64: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<i64>>();
+                            const Vector<i64> embedding = doc[column_def->name_].get<Vector<i64>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -1013,7 +1080,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemFloat16: {
-                            const auto f_embedding = line_json[column_def->name_].get<Vector<float>>();
+                            const Vector<float> f_embedding = doc[column_def->name_].get<Vector<float>>();
                             SizeT embedding_dim = f_embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -1028,7 +1095,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemBFloat16: {
-                            const auto f_embedding = line_json[column_def->name_].get<Vector<float>>();
+                            const Vector<float> f_embedding = doc[column_def->name_].get<Vector<float>>();
                             SizeT embedding_dim = f_embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -1043,7 +1110,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemFloat: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<float>>();
+                            const Vector<float> embedding = doc[column_def->name_].get<Vector<float>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -1054,7 +1121,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                             break;
                         }
                         case EmbeddingDataType::kElemDouble: {
-                            const auto embedding = line_json[column_def->name_].get<Vector<double>>();
+                            const Vector<double> embedding = doc[column_def->name_].get<Vector<double>>();
                             SizeT embedding_dim = embedding.size();
                             if (embedding_dim != dim) {
                                 Status status = Status::InvalidJsonFormat(
@@ -1077,7 +1144,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                 case LogicalType::kTensor:
                 case LogicalType::kTensorArray: {
                     // build ConstantExpr
-                    SharedPtr<ConstantExpr> const_expr = BuildConstantExprFromJson(line_json[column_def->name_]);
+                    SharedPtr<ConstantExpr> const_expr = BuildConstantExprFromJson(doc[column_def->name_].raw_json());
                     if (const_expr.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid json object."));
                     }
@@ -1086,7 +1153,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Sha
                 }
                 case LogicalType::kSparse: {
                     const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
-                    SharedPtr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(line_json[column_def->name_], sparse_info);
+                    SharedPtr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(doc[column_def->name_].raw_json(), sparse_info);
                     const_expr->TrySortSparseVec(column_def);
                     if (const_expr.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid json object."));

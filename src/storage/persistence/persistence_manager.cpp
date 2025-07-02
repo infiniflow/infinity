@@ -43,15 +43,13 @@ nlohmann::json ObjAddr::Serialize() const {
     return obj;
 }
 
-void ObjAddr::Deserialize(const nlohmann::json &obj) {
-    obj_key_ = obj["obj_key"];
-    part_offset_ = obj["part_offset"];
-    part_size_ = obj["part_size"];
-}
-
-void ObjAddr::Deserialize(const String &str) {
-    nlohmann::json obj = nlohmann::json::parse(str);
-    Deserialize(obj);
+void ObjAddr::Deserialize(std::string_view obj_str) {
+    simdjson::padded_string obj_json(obj_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(obj_json);
+    obj_key_ = doc["obj_key"].get<String>();
+    part_offset_ = doc["part_offset"].get<SizeT>();
+    part_size_ = doc["part_size"].get<SizeT>();
 }
 
 SizeT ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(SizeT) + sizeof(SizeT); }
