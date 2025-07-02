@@ -17,7 +17,6 @@ module;
 module snapshot;
 
 import stl;
-import txn;
 import new_txn;
 import new_txn_manager;
 import query_context;
@@ -56,10 +55,12 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
 
 Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
+    // might need to change this
     const String &db_name = query_context->schema_name();
 
     Optional<DBMeeta> db_meta;
-    Status status = txn_ptr->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }

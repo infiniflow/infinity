@@ -81,24 +81,9 @@ Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapsho
     
     LOG_INFO(fmt::format("Atomically moved snapshot directory: {} -> {}", snapshot_path, deleted_path));
 
-    //delete file in deleted_directory
-    for (const auto &entry : std::filesystem::directory_iterator(deleted_path)) {
-        if (entry.is_directory()) {
-            // Don't search the directory recursively
-        } else {
-            // Just the file base name
-            if (entry.path().stem() == snapshot_name) {
-                String extension = entry.path().extension();
-                if (extension == ".json" or extension == ".lz4") {
-                    LOG_INFO(fmt::format("Delete file: {}", entry.path().string()));
-                    VirtualStore::DeleteFile(entry.path().string());
-                }
-            } else {
-                String filename = entry.path().filename();
-                LOG_WARN(fmt::format("Invalid snapshot file name: {}", filename));
-            }
-        }
-    }
+    // Remove the entire deleted snapshot directory and all its contents
+    LOG_INFO(fmt::format("Removing snapshot directory: {}", deleted_path));
+    VirtualStore::RemoveDirectory(deleted_path);
 
 
     return Status::OK();

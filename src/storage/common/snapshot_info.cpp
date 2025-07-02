@@ -355,7 +355,7 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
             for (const auto &chunk_index_snapshot : segment_index_snapshot->chunk_index_snapshots_) {
                 if (chunk_index_snapshot->full_text_files_.empty()) {
                     files.emplace_back(
-                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->index_filename_));
+                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, VirtualStore::ConcatenatePath("seg_" + std::to_string(segment_index_snapshot->segment_id_), chunk_index_snapshot->index_filename_)));
                 } else {
                     files.insert(files.end(), chunk_index_snapshot->full_text_files_.cbegin(), chunk_index_snapshot->full_text_files_.cend());
                 }

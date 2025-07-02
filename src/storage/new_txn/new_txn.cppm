@@ -301,6 +301,7 @@ private:
     Status ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
 public:
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
@@ -539,7 +540,7 @@ private:
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
-    Status CommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
+    Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
@@ -619,7 +620,7 @@ public:
                                              const String &snapshot_name,
                                              RestoreTableTxnStore *txn_store);
 
-    Status ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd);
+
 
     Status Dummy();
     void SetWalSize(i64 wal_size);

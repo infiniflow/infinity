@@ -1449,7 +1449,8 @@ Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(c
     this->CheckTxn(db_name);
     SharedPtr<DatabaseSnapshotInfo> database_snapshot_info;
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -1464,9 +1465,9 @@ Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(c
         return {nullptr, status};
     }
 
-    String *db_comment = nullptr;
-    status = db_meta->GetComment(db_comment);
-    database_snapshot_info->db_comment_ = *db_comment;
+    // String *db_comment = nullptr;
+    // status = db_meta->GetComment(db_comment);
+    // database_snapshot_info->db_comment_ = *db_comment;
     database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
     for (size_t i = 0; i < table_ids_ptr->size(); i++) {
         Optional<TableMeeta> table_meta;
@@ -1491,13 +1492,15 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     this->CheckTxn(db_name);
     
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
     String table_id_str;
     String table_key;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str);
+    TxnTimeStamp table_create_ts;
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
 
     if (status.ok()) {
         // if (conflict_type == ConflictType::kIgnore) {
@@ -2159,7 +2162,7 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
-                Status status = CommitRestoreTableSnapshot(restore_table_snapshot_cmd);
+                Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2475,7 +2478,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
     return Status::OK();
 }
 
-Status NewTxn::CommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
+Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -2483,7 +2486,8 @@ Status NewTxn::CommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *rest
 
     // Get database ID
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -4789,48 +4793,48 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
             
-            // Clean up metadata entries that were created
-            Vector<UniquePtr<MetaKey>> metas;
-            for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
-                metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_, 
-                                                              restore_table_txn_store->table_id_str_, 
-                                                              segment_info.segment_id_));
-                for (const auto &block_id : segment_info.block_ids_) {
-                metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_, 
-                                                            restore_table_txn_store->table_id_str_, 
-                                                            segment_info.segment_id_,
-                                                            block_id));
-                    for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
-                        metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_, 
-                                                                    restore_table_txn_store->table_id_str_, 
-                                                                    segment_info.segment_id_,
-                                                                    block_id,
-                                                                    column_def));
-                        }
-                }
+            // // Clean up metadata entries that were created
+            // Vector<UniquePtr<MetaKey>> metas;
+            // for (const auto &segment_info : restore_table_txn_store->segment_infos_) {
+            //     metas.emplace_back(MakeUnique<SegmentMetaKey>(restore_table_txn_store->db_id_str_, 
+            //                                                   restore_table_txn_store->table_id_str_, 
+            //                                                   segment_info.segment_id_));
+            //     for (const auto &block_id : segment_info.block_ids_) {
+            //     metas.emplace_back(MakeUnique<BlockMetaKey>(restore_table_txn_store->db_id_str_, 
+            //                                                 restore_table_txn_store->table_id_str_, 
+            //                                                 segment_info.segment_id_,
+            //                                                 block_id));
+            //         for (const auto &column_def : restore_table_txn_store->table_def_->columns()) {
+            //             metas.emplace_back(MakeUnique<ColumnMetaKey>(restore_table_txn_store->db_id_str_, 
+            //                                                         restore_table_txn_store->table_id_str_, 
+            //                                                         segment_info.segment_id_,
+            //                                                         block_id,
+            //                                                         column_def));
+            //             }
+            //     }
                                                               
-            }
+            // }
             
-            for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
-                for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
-                    metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_, 
-                                                                       restore_table_txn_store->table_id_str_, 
-                                                                       index_cmd.index_id_, 
-                                                                       segment_index_info.segment_id_));
-                    for (const auto &chunk_info : segment_index_info.chunk_infos_) {
-                    metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_, 
-                                                                        restore_table_txn_store->table_id_str_, 
-                                                                        index_cmd.index_id_, 
-                                                                        segment_index_info.segment_id_,
-                                                                        chunk_info.chunk_id_));
-                    }
-                }
-            }
+            // for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+            //     for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
+            //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_, 
+            //                                                            restore_table_txn_store->table_id_str_, 
+            //                                                            index_cmd.index_id_, 
+            //                                                            segment_index_info.segment_id_));
+            //         for (const auto &chunk_info : segment_index_info.chunk_infos_) {
+            //         metas.emplace_back(MakeUnique<ChunkIndexMetaKey>(restore_table_txn_store->db_id_str_, 
+            //                                                             restore_table_txn_store->table_id_str_, 
+            //                                                             index_cmd.index_id_, 
+            //                                                             segment_index_info.segment_id_,
+            //                                                             chunk_info.chunk_id_));
+            //         }
+            //     }
+            // }
             
-            Status cleanup_status = CleanupImpl(CommitTS(), kv_instance_.get(), std::move(metas));
-            if (!cleanup_status.ok()) {
-                LOG_WARN(fmt::format("Failed to cleanup metadata during restore table rollback: {}", cleanup_status.message()));
-            }
+            // Status cleanup_status = CleanupInner(std::move(metas));
+            // if (!cleanup_status.ok()) {
+            //     LOG_WARN(fmt::format("Failed to cleanup metadata during restore table rollback: {}", cleanup_status.message()));
+            // }
             
             break;
         }
@@ -5244,7 +5248,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commi
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
             auto *restore_table_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
 
-            Status status = ReplayRestoreTableSnapshot(restore_table_cmd);
+            Status status = ReplayRestoreTableSnapshot(restore_table_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -5545,12 +5549,44 @@ Status NewTxn::ProcessSnapshotRestorationData(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd) {
+Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     const String &db_name = restore_table_cmd->db_name_;
-    this->CheckTxn(db_name);
+
+    // Check if the table already exists
+    String table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
+    String table_id;
+    Status status = kv_instance_->Get(table_key, table_id);
+    if (status.ok()) {
+        if (table_id == restore_table_cmd->table_id_) {
+            LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
+                                 *restore_table_cmd->table_def_->table_name(),
+                                 restore_table_cmd->table_id_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+                                  *restore_table_cmd->table_def_->table_name(),
+                                  restore_table_cmd->table_id_,
+                                  table_id,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
+        }
+    }
+
+    // check if the data still exist in the system
+    String data_dir = InfinityContext::instance().config()->DataDir();
+    String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, db_name), restore_table_cmd->table_name_);
+    if (!VirtualStore::Exists(table_data_dir)) {
+        LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
+        return Status::OK();
+    }
     
+    // if exist proceed
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -5564,7 +5600,13 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    //TODO: modify after the new pr
+    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd);
+
+    if (!status.ok()) {
+        return status;
+    }
+
+
 
     // String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     // String snapshot_name = restore_table_cmd->snapshot_name_;

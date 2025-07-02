@@ -686,7 +686,7 @@ Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> ChunkIndexMeta::MapMetaToSnapSh
 
     chunk_index_snapshot_info->chunk_info_ = chunk_info;
 
-    chunk_index_snapshot_info->index_filename_ = IndexFileName(segment_index_meta_.segment_id(), chunk_id);
+    chunk_index_snapshot_info->index_filename_ = IndexFileName(chunk_id);
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
@@ -694,8 +694,8 @@ Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> ChunkIndexMeta::MapMetaToSnapSh
     }
     const auto &index_dir = table_index_meta.GetTableIndexDir();
     if (index_base->index_type_ == IndexType::kFullText) {
-        Path path = Path(*index_dir) / chunk_info_->base_name_;
-        String index_prefix = path.string();
+        String index_prefix = VirtualStore::ConcatenatePath(*index_dir, "seg_" + std::to_string(segment_index_meta_.segment_id()));
+        index_prefix = VirtualStore::ConcatenatePath(index_prefix, chunk_info_->base_name_);
         String posting_file = index_prefix + POSTING_SUFFIX;
         String dict_file = index_prefix + DICT_SUFFIX;
         String len_file = index_prefix + LENGTH_SUFFIX;

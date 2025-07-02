@@ -241,13 +241,6 @@ Status SegmentIndexMeta::RestoreSet(const ChunkID &next_chunk_id) {
             return status;
         }
     }
-    {
-        SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-        bool setted = GetOrSetMemIndex(mem_index);
-        if (!setted) {
-            return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
-        }
-    }
     return Status::OK();
 }
 
