@@ -22,6 +22,7 @@ import command_statement;
 import index_base;
 import third_party;
 import column_def;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -34,12 +35,12 @@ export struct SnapshotInfo {
 };
 
 export struct OutlineSnapshotInfo {
-    String filename_;
+    String filepath_;
 };
 
 export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
-    String filename_;
+    String filepath_;
     u64 last_chunk_offset_;
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 
@@ -52,6 +53,7 @@ export struct BlockSnapshotInfo {
     SizeT row_count_;
     SizeT row_capacity_;
     String block_dir_;
+    TxnTimeStamp create_ts_;
     Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
     String fast_rough_filter_;
 
@@ -65,6 +67,7 @@ export struct SegmentSnapshotInfo {
     SegmentStatus status_;
     TxnTimeStamp first_delete_ts_;
     TxnTimeStamp deprecate_ts_;
+    TxnTimeStamp create_ts_;
     TxnTimeStamp row_count_;
     TxnTimeStamp actual_row_count_;
     Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
@@ -75,8 +78,9 @@ export struct SegmentSnapshotInfo {
 
 export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
-    String base_name_;
-    Vector<String> files_;
+    String index_filename_;
+    Vector<String> full_text_files_; // full text files of the chunk
+    SharedPtr<ChunkIndexMetaInfo> chunk_info_;
     nlohmann::json Serialize();
     static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(std::string_view chunk_index_str);
 };
@@ -91,21 +95,26 @@ export struct SegmentIndexSnapshotInfo {
 export struct TableIndexSnapshotInfo {
     SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
-    Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
+    SharedPtr<String> index_id_str_;
+    Vector<SharedPtr<SegmentIndexSnapshotInfo>> segment_index_snapshots_{};
     nlohmann::json Serialize();
     static SharedPtr<TableIndexSnapshotInfo> Deserialize(std::string_view table_index_str);
 };
 
 export struct TableSnapshotInfo : public SnapshotInfo {
+    String db_id_str_;
+    String table_id_str_;
     String db_name_;
     String table_name_;
     String table_comment_{};
 
     TxnTimeStamp txn_id_{};
-    TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
+    // TODO: remove these two fields and figure out why they are here in the first place
+    // TxnTimeStamp begin_ts_{};
+    // TxnTimeStamp commit_ts_{};
     TxnTimeStamp max_commit_ts_{};
-    String table_entry_dir_{};
+    TxnTimeStamp create_ts_{};
+    String table_entry_dir_{}; // no longer in use
     ColumnID next_column_id_{};
     SegmentID unsealed_id_{};
     SegmentID next_segment_id_{};
@@ -115,9 +124,26 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
 
     Vector<String> GetFiles() const;
-    void Serialize(const String &save_path);
+    Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
     String ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+    static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_table_id_str);
+};
+
+export struct DatabaseSnapshotInfo : public SnapshotInfo {
+    String db_id_str_;
+    String db_name_;
+    String db_comment_{};
+    String db_next_table_id_str_{};
+    Vector<SharedPtr<TableSnapshotInfo>> table_snapshots_{};
+
+    Vector<String> GetFiles() const;
+    Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
+    String ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
+    static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+    static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_db_id_str);
 };
 
 } // namespace infinity

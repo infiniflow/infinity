@@ -29,6 +29,7 @@ import internal_types;
 import persistence_manager;
 import column_def;
 import global_resource_usage;
+import snapshot_info;
 
 namespace infinity {
 
@@ -94,6 +95,11 @@ export enum class WalCommandType : i8 {
     COMPACT_V2 = 105,
 
     // -----------------------------
+    // Snapshot
+    // -----------------------------
+    RESTORE_TABLE_SNAPSHOT = 110,
+    RESTORE_DATABASE_SNAPSHOT = 111,
+    // -----------------------------
     // Other
     // -----------------------------
     OPTIMIZE = 101,
@@ -109,7 +115,7 @@ export struct WalBlockInfo {
     u16 row_count_{};
     u16 row_capacity_{};
     Vector<Pair<u32, u64>> outline_infos_;
-    Vector<String> paths_;
+    Vector<String> paths_; // the last one is the block version file, previous ones are column files
     AddrSerializer addr_serializer_;
     mutable SizeT pm_size_ = 0; // tmp for test. should delete when stable
 
@@ -151,6 +157,25 @@ export struct WalSegmentInfo {
     String ToString() const;
 };
 
+export struct WalSegmentInfoV2 {
+    SegmentID segment_id_{};
+    Vector<BlockID> block_ids_;
+
+    WalSegmentInfoV2() = default;
+
+    explicit WalSegmentInfoV2(SegmentID segment_id, const Vector<BlockID> &block_ids);
+
+    bool operator==(const WalSegmentInfoV2 &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalSegmentInfoV2 ReadBufferAdv(const char *&ptr);
+
+    String ToString() const;
+};
+
 export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
     String base_name_{};
@@ -159,6 +184,7 @@ export struct WalChunkIndexInfo {
     mutable SizeT pm_size_; // tmp for test. should delete when stable
     RowID base_rowid_{};
     u32 row_count_{};
+    u32 index_size_{};
     TxnTimeStamp deprecate_ts_{};
 
     WalChunkIndexInfo() = default;
@@ -403,6 +429,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
         : WalCmd(WalCommandType::CREATE_INDEX_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           index_id_(index_id), index_base_(index_base), table_key_(table_key) {}
 
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -417,8 +444,29 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
     SharedPtr<IndexBase> index_base_{};
     Vector<WalSegmentIndexInfo> segment_index_infos_;
 
+    static WalCmdCreateIndexV2 ReadBufferAdv(const char *&ptr, i32 max_bytes);
     // Redundant but useful in commit phase.
     String table_key_{};
+};
+
+export struct WalRestoreIndexV2 final {
+    WalRestoreIndexV2(const String &index_id,
+                        const SharedPtr<IndexBase> &index_base,
+                        const Vector<WalSegmentIndexInfo> &segment_index_infos)
+        : index_id_(index_id), index_base_(index_base), segment_index_infos_(segment_index_infos) {}
+    WalRestoreIndexV2() = default;
+    bool operator==(const WalRestoreIndexV2 &other) const;
+    [[nodiscard]] i32 GetSizeInBytes() const;
+    void WriteAdv(char *&buf) const;
+    String ToString() const;
+    String CompactInfo() const;
+
+    String index_id_{};
+    SharedPtr<IndexBase> index_base_{};
+    Vector<WalSegmentIndexInfo> segment_index_infos_;
+
+    static WalRestoreIndexV2 ReadBufferAdv(const char *&ptr, i32 max_bytes);
+    void WriteBufferAdv(char *&buf) const;
 };
 
 export struct WalCmdDropIndex final : public WalCmd {
@@ -1014,6 +1062,45 @@ export struct WalCmdCleanup : public WalCmd {
     String CompactInfo() const final;
 
     i64 timestamp_{};
+};
+
+export struct WalCmdRestoreTableSnapshot : public WalCmd {
+    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files)
+        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
+          files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+    static WalCmdRestoreTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
+    String db_name_{};
+    String db_id_{};
+    String table_name_{};
+    String table_id_{};
+    String snapshot_name_{};
+    SharedPtr<TableDef> table_def_{};
+    Vector<String> files_;
+    Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
+    Vector<WalCmdCreateIndexV2> index_cmds_;// index commands to restore indexes
+};
+
+export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
+    WalCmdRestoreDatabaseSnapshot(const String &db_name, const String &db_id_str, const Vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), restore_table_wal_cmds_(restore_table_wal_cmds) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+
+    String db_name_{};
+    String db_id_str_{};
+    
+    Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };
 
 export struct WalEntryHeader {

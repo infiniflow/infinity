@@ -21,7 +21,6 @@ CREATE TABLE ddl3 (i INTEGER);
 #----
 #1
 
-
 statement error
 CREATE TABLE ddl1 (i INTEGER);
 

@@ -22,11 +22,13 @@ import internal_types;
 import third_party;
 import new_catalog;
 
+
 namespace infinity {
 
 class KVInstance;
 class SegmentIndexMeta;
 class BufferObj;
+struct ChunkIndexSnapshotInfo; 
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;
@@ -39,6 +41,11 @@ export struct ChunkIndexMetaInfo {
 
     void ToJson(nlohmann::json &json) const;
 
+    void FromJson(const nlohmann::json &json);
+
+    nlohmann::json Serialize();
+
+    static SharedPtr<ChunkIndexMetaInfo> Deserialize(const nlohmann::json &chunk_index_json);
     void FromJson(std::string_view json_str);
 
     static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
@@ -71,6 +78,8 @@ public:
 
     Status RestoreSet();
 
+    Status RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_info);
+
     Status UninitSet(UsageFlag usage_flag);
 
     Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
@@ -79,12 +88,16 @@ public:
 
     Status FilePaths(Vector<String> &paths);
 
+    Tuple<SharedPtr<ChunkIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo(ChunkID chunk_id);
+
 private:
     Status LoadChunkInfo();
 
     Status LoadIndexBuffer();
 
     String GetChunkIndexTag(const String &tag) const;
+
+
 
 private:
     KVInstance &kv_instance_;

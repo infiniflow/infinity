@@ -32,6 +32,7 @@ import new_catalog;
 import fast_rough_filter;
 import column_def;
 import kv_utility;
+import snapshot_info;
 
 namespace infinity {
 
@@ -123,6 +124,29 @@ Status SegmentMeta::InitSet() {
             return status;
         }
     }
+    return Status::OK();
+}
+
+// called when restore segment from snapshot with segment meta
+// restore segment meta from snapshot with segment meta
+Status SegmentMeta::RestoreSet() {
+
+    {
+        Status status;
+        status = SetNextBlockID(next_block_id_.value_or(0));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    {
+        Status status = SetFirstDeleteTS(first_delete_ts_.value_or(UNCOMMIT_TS));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+
     return Status::OK();
 }
 
@@ -248,6 +272,16 @@ Status SegmentMeta::LoadFirstDeleteTS() {
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
+}
+
+TxnTimeStamp SegmentMeta::GetCreateTimestampFromKV() const {
+    String segment_key = KeyEncode::CatalogTableSegmentKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
+    String create_ts_str;
+    Status status = kv_instance_.Get(segment_key, create_ts_str);
+    if (!status.ok()) {
+        return 0;
+    }
+    return std::stoull(create_ts_str);
 }
 
 Status SegmentMeta::Init() {
@@ -536,5 +570,69 @@ Status SegmentMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_fil
     fast_rough_filter_ = fast_rough_filter;
     return Status::OK();
 }
+
+Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo(){
+
+    SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
+    Status status;
+    // TODO: FIGURE OUT WHAT SegmentDir do
+    // auto [segment_dir_ptr, status] = GetSegmentDir();
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
+    // segment_snapshot_info->segment_dir_ = *segment_dir_ptr;
+    segment_snapshot_info->segment_id_ = segment_id_;
+    segment_snapshot_info->create_ts_ = GetCreateTimestampFromKV();
+    status = GetFirstDeleteTS(segment_snapshot_info->first_delete_ts_);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    std::tie(segment_snapshot_info->row_count_, status) = GetRowCnt1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::tie(block_ids_ptr, status) = GetBlockIDs1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, *this);
+        auto [block_snapshot, block_status] = block_meta.MapMetaToSnapShotInfo();
+        if (!block_status.ok()) {
+            return {nullptr, block_status};
+        }
+        segment_snapshot_info->block_snapshots_.push_back(block_snapshot);
+    }
+
+    return {std::move(segment_snapshot_info), Status::OK()};
+}
+
+Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info){
+
+    Status status = RestoreSet();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const BlockID &block_id : segment_info.block_ids_) {
+        status = AddBlockWithID(commit_ts(), block_id);
+        if (!status.ok()) {
+            return status;
+        }
+        BlockMeta block_meta(block_id, *this);
+        status = block_meta.RestoreFromSnapshot();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+
+
 
 } // namespace infinity
