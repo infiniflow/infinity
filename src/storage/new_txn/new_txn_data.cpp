@@ -361,7 +361,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
     for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
         SizeT input_block_start_idx = segment_idx * DEFAULT_BLOCK_PER_SEGMENT;
-        SizeT input_block_end_idx = std::min(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT, input_blocks.size());
+        SizeT input_block_end_idx = std::min(std::size_t(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT), input_blocks.size());
         import_txn_store->input_blocks_in_imports_.emplace(
             segment_ids[segment_idx], Vector<SharedPtr<DataBlock>>(input_blocks.begin() + input_block_start_idx,
                                                                    input_blocks.begin() + input_block_end_idx));
