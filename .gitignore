@@ -19,7 +19,25 @@
 # CMake files (optional - include if you want to track these)
 !CMakeLists.txt
 
-
+tmp/dump.txt
+third_party/pcre2/pcre2_chartables.c
+src/bin/compilation_config.cppm
+cmake/third_party/pcre2/pcre2_chartables.c
+cmake/build_version.cc
+CMakeCache.txt
+CMakeFiles/3.29.0/CompilerIdC/CMakeCCompilerId.c
+CMakeFiles/3.29.0/CompilerIdCXX/CMakeCXXCompilerId.cpp
+CMakeFiles/TargetDirectories.txt
+build/CMakeCache.txt
+build/build_version.cc
+build/CMakeFiles/
+build/CMakeFiles/3.29.0/
+build/CMakeFiles/3.29.0/CompilerIdC/
+build/CMakeFiles/3.29.0/CompilerIdCXX/
+build/CMakeFiles/TargetDirectories.txt
+build/CMakeFiles/
+build/third_party/pcre2/pcre2_chartables.c
+build_version.cc
 # Documentation files (optional)
 !*.md
 !*.txt
