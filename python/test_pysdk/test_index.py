@@ -640,6 +640,7 @@ class TestInfinity:
             "test_insert_data_fulltext_index_search" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("offline", [False, True])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_empty_fulltext_index(self, file_format, suffix, offline):
