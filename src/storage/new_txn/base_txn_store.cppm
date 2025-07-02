@@ -100,6 +100,7 @@ export struct DropDBTxnStore : public BaseTxnStore {
     String db_name_{};
     String db_id_str_{};
     u64 db_id_{};
+    TxnTimeStamp create_ts_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -129,6 +130,7 @@ export struct DropTableTxnStore : public BaseTxnStore {
     String table_name_{};
     String table_id_str_{};
     u64 table_id_{};
+    TxnTimeStamp create_ts_{};
     String table_key_{};
 
     String ToString() const final;
@@ -178,6 +180,7 @@ export struct DropIndexTxnStore : public BaseTxnStore {
     String index_name_{};
     String index_id_str_{};
     u64 index_id_{};
+    TxnTimeStamp create_ts_{};
     String index_key_{};
 
     String ToString() const final;

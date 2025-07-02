@@ -1083,6 +1083,8 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     return Status::OK();
 }
 
+Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt) {
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
@@ -1582,6 +1584,8 @@ Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimizeV2 *optimize_cmd) {
     return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
 }
 
+Status NewTxn::ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     SharedPtr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
@@ -1904,7 +1908,7 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
+Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     String db_name = create_index_cmd->db_name_;
     String table_name = create_index_cmd->table_name_;
@@ -1976,7 +1980,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
+Status NewTxn::PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     const String &db_id_str = drop_index_cmd->db_id_;
     const String &table_id_str = drop_index_cmd->table_id_;
     const String &index_id_str = drop_index_cmd->index_id_;
@@ -2003,7 +2007,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd) {
+Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = dump_index_cmd->db_id_;
     const String &table_id_str = dump_index_cmd->table_id_;
