@@ -19,10 +19,14 @@
 # CMake files (optional - include if you want to track these)
 !CMakeLists.txt
 
+# Ignore CMake build files
+CMakeFiles/
+**/CMakeFiles/
+cmake-build-*/
+build/
 
-# Documentation files (optional)
-!*.md
-!*.txt
+
+
 
 # Git related files (needed for git to work)
 !.gitignore
