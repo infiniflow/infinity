@@ -91,6 +91,7 @@ struct DumpMemIndexTxnStore;
 struct DeleteTxnStore;
 struct DropTableTxnStore;
 struct RenameTableTxnStore;
+struct RestoreTableTxnStore;
 struct UpdateTxnStore;
 class BufferManager;
 class IndexBase;
@@ -256,14 +257,16 @@ public:
     // // Snapshot OPs
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
 
-    Status RestoreTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
+    Status RestoreTableSnapshot(const String &db_name, const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
 
     Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds);
 
     Status DropTableSnapShot(const String &db_name, const String &table_name);
 
-    Status GetTableSnapShot(const String &db_name, const String &table_name); // need output
+    Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const String &db_name);
+
+    Status RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info);
 
 private:
     Status OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
@@ -594,6 +597,16 @@ public:
                                   SegmentID segment_id,
                                   ChunkID chunk_id,
                                   Vector<String> &file_paths);
+    Status ProcessSnapshotRestorationData(const String &db_name,
+                                             const String &db_id_str,
+                                             const String &table_name,
+                                             const String &table_id_str,
+                                             const SharedPtr<TableDef> &table_def,
+                                             const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
+                                             const String &snapshot_name,
+                                             RestoreTableTxnStore *txn_store);
+
+    Status ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd);
 
     Status Dummy();
     void SetWalSize(i64 wal_size);

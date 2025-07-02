@@ -33,20 +33,19 @@ import logger;
 
 namespace infinity {
 
-Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
+Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name, const String &db_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     auto *txn_mgr = txn_ptr->txn_mgr();
-    const String &db_name = query_context->schema_name();
 
-    SharedPtr<TableSnapshotInfo> table_snapshot;
+    SharedPtr<DatabaseSnapshotInfo> database_snapshot;
     Status status;
-    std::tie(table_snapshot, status) = txn_ptr->GetTableSnapshotInfo(db_name, table_name);
+    std::tie(database_snapshot, status) = txn_ptr->GetDatabaseSnapshotInfo(db_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    table_snapshot->snapshot_name_ = snapshot_name;
+    database_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
-    status = table_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
+    status = database_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
     if (!status.ok()) {
         return status;
     }
@@ -54,7 +53,7 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     return Status::OK();
 }
 
-Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
+Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
     const String &db_name = query_context->schema_name();
 
@@ -71,9 +70,6 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
 
     SharedPtr<TableSnapshotInfo> table_snapshot;
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    if (!status.ok()) {
-        return status;
-    }
 
     // check txn_type
     LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));

@@ -249,6 +249,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp commit_
 
             String dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
             String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+            
             if (!VirtualStore::Exists(dst_dir)) {
                 Status mkdir_status = VirtualStore::MakeDirectory(dst_dir);
                 if (!mkdir_status.ok()) {
@@ -285,56 +286,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp commit_
     }
 
     // Create metadata JSON
-    nlohmann::json json_res;
-    json_res["version"] = version_;
-    json_res["snapshot_name"] = snapshot_name_;
-    json_res["snapshot_scope"] = SnapshotScope::kTable;
-    json_res["database_name"] = db_name_;
-    json_res["table_name"] = table_name_;
-    json_res["db_id_str"] = db_id_str_;
-    json_res["table_id_str"] = table_id_str_;
-    
-    json_res["table_comment"] = table_comment_;
-
-    json_res["txn_id"] = txn_id_;
-    json_res["max_commit_ts"] = max_commit_ts_;
-    json_res["create_ts"] = create_ts_;
-
-    json_res["next_column_id"] = next_column_id_;
-    json_res["unsealed_id"] = unsealed_id_;
-    json_res["next_segment_id"] = next_segment_id_;
-    json_res["row_count"] = row_count_;
-
-    for (const auto &column_def : this->columns_) {
-        nlohmann::json column_def_json;
-        column_def_json["column_type"] = column_def->type()->Serialize();
-        column_def_json["column_id"] = column_def->id();
-        column_def_json["column_name"] = column_def->name();
-
-        for (const auto &column_constraint : column_def->constraints_) {
-            column_def_json["constraints"].emplace_back(column_constraint);
-        }
-
-        if (!(column_def->comment().empty())) {
-            column_def_json["column_comment"] = column_def->comment();
-        }
-
-        if (column_def->has_default_value()) {
-            auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
-            column_def_json["default"] = default_expr->Serialize();
-        }
-
-        json_res["column_definition"].emplace_back(column_def_json);
-    }
-
-    for (const auto &segment_snapshot_pair : segment_snapshots_) {
-        json_res["segments"].emplace_back(segment_snapshot_pair.second->Serialize());
-    }
-
-    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
-        json_res["table_indexes"].emplace_back(table_index_snapshot_pair.second->Serialize());
-    }
-
+    nlohmann::json json_res = CreateSnapshotMetadataJSON();
     String json_string = json_res.dump();
 
     // Write metadata to temporary location
@@ -524,6 +476,60 @@ String TableSnapshotInfo::ToString() const {
                        version_);
 }
 
+nlohmann::json TableSnapshotInfo::CreateSnapshotMetadataJSON() const {
+    nlohmann::json json_res;
+    json_res["version"] = version_;
+    json_res["snapshot_name"] = snapshot_name_;
+    json_res["snapshot_scope"] = SnapshotScope::kTable;
+    json_res["database_name"] = db_name_;
+    json_res["table_name"] = table_name_;
+    json_res["db_id_str"] = db_id_str_;
+    json_res["table_id_str"] = table_id_str_;
+    
+    json_res["table_comment"] = table_comment_;
+
+    json_res["txn_id"] = txn_id_;
+    json_res["max_commit_ts"] = max_commit_ts_;
+    json_res["create_ts"] = create_ts_;
+
+    json_res["next_column_id"] = next_column_id_;
+    json_res["unsealed_id"] = unsealed_id_;
+    json_res["next_segment_id"] = next_segment_id_;
+    json_res["row_count"] = row_count_;
+
+    for (const auto &column_def : this->columns_) {
+        nlohmann::json column_def_json;
+        column_def_json["column_type"] = column_def->type()->Serialize();
+        column_def_json["column_id"] = column_def->id();
+        column_def_json["column_name"] = column_def->name();
+
+        for (const auto &column_constraint : column_def->constraints_) {
+            column_def_json["constraints"].emplace_back(column_constraint);
+        }
+
+        if (!(column_def->comment().empty())) {
+            column_def_json["column_comment"] = column_def->comment();
+        }
+
+        if (column_def->has_default_value()) {
+            auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
+            column_def_json["default"] = default_expr->Serialize();
+        }
+
+        json_res["column_definition"].emplace_back(column_def_json);
+    }
+
+    for (const auto &segment_snapshot_pair : segment_snapshots_) {
+        json_res["segments"].emplace_back(segment_snapshot_pair.second->Serialize());
+    }
+
+    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
+        json_res["table_indexes"].emplace_back(table_index_snapshot_pair.second->Serialize());
+    }
+
+    return json_res;
+}
+
 // copy files from snapshot back to data
 Status TableSnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir, 
                            const String& snapshot_name,
@@ -570,6 +576,293 @@ Status TableSnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir,
             return copy_status;
         }
     }
+    return Status::OK();
+}
+
+Vector<String> DatabaseSnapshotInfo::GetFiles() const {
+    Vector<String> files;
+    for (const auto &table_snapshot : table_snapshots_) {
+        Vector<String> table_files = table_snapshot->GetFiles();
+        files.insert(files.end(), table_files.begin(), table_files.end());
+    }
+    return files;
+}
+
+Status DatabaseSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp commit_ts) {
+    Config *config = InfinityContext::instance().config();
+    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+
+    // Create temporary directory for atomic operation
+    String temp_snapshot_dir = fmt::format("{}/temp_{}_{}", 
+                                          save_dir, 
+                                          snapshot_name_, 
+                                          commit_ts);
+    
+    // Create temporary directory
+    Status create_temp_status = VirtualStore::MakeDirectory(temp_snapshot_dir);
+    if (!create_temp_status.ok()) {
+        return create_temp_status;
+    }
+
+    // Get files from all table snapshots
+    Vector<String> original_files = GetFiles();
+
+    // Copy files to temporary location
+    if (persistence_manager != nullptr) {
+        PersistResultHandler pm_handler(persistence_manager);
+        for (const auto &file : original_files) {
+            PersistReadResult result = persistence_manager->GetObjCache(file);
+            DeferFn defer_fn([&]() {
+                auto res = persistence_manager->PutObjCache(file);
+                pm_handler.HandleWriteResult(res);
+            });
+
+            const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
+            if (!obj_addr.Valid()) {
+                // Clean up temp directory on failure
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                String error_message = fmt::format("Failed to find object for local path {}", file);
+                return Status::FileNotFound(error_message);
+            }
+            String read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
+            LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
+
+            auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+            if (!reader_open_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return reader_open_status;
+            }
+
+            auto seek_status = reader_handle->Seek(obj_addr.part_offset_);
+            if (!seek_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return seek_status;
+            }
+
+            auto file_size = obj_addr.part_size_;
+            auto buffer = std::make_unique<char[]>(file_size);
+            auto [nread, read_status] = reader_handle->Read(buffer.get(), file_size);
+
+            String dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
+            String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+            
+            if (!VirtualStore::Exists(dst_dir)) {
+                Status mkdir_status = VirtualStore::MakeDirectory(dst_dir);
+                if (!mkdir_status.ok()) {
+                    VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                    return mkdir_status;
+                }
+            }
+
+            auto [write_file_handle, writer_open_status] = VirtualStore::Open(dst_file_path, FileAccessMode::kWrite);
+            if (!writer_open_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return writer_open_status;
+            }
+
+            Status write_status = write_file_handle->Append(buffer.get(), file_size);
+            if (!write_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return write_status;
+            }
+            write_file_handle->Sync();
+        }
+    } else {
+        String data_dir = config->DataDir();
+        for (const auto &file : original_files) {
+            String src_file_path = fmt::format("{}/{}", data_dir, file);
+            String dst_file_path = fmt::format("{}/{}", temp_snapshot_dir, file);
+            
+            Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+            if (!copy_status.ok()) {
+                VirtualStore::RemoveDirectory(temp_snapshot_dir);
+                return copy_status;
+            }
+        }
+    }
+
+    // Create metadata JSON
+    nlohmann::json json_res = CreateSnapshotMetadataJSON();
+    String json_string = json_res.dump();
+
+    // Write metadata to temporary location
+    String temp_meta_path = fmt::format("{}/{}.json", temp_snapshot_dir, snapshot_name_);
+    auto [snapshot_file_handle, status] = VirtualStore::Open(temp_meta_path, FileAccessMode::kWrite);
+    if (!status.ok()) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return status;
+    }
+
+    status = snapshot_file_handle->Append(json_string.data(), json_string.size());
+    if (!status.ok()) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return status;
+    }
+    snapshot_file_handle->Sync();
+
+    // Atomically move temporary directory to final location
+    String final_snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
+    
+    // Ensure save directory exists
+    if (!VirtualStore::Exists(save_dir)) {
+        Status mkdir_status = VirtualStore::MakeDirectory(save_dir);
+        if (!mkdir_status.ok()) {
+            VirtualStore::RemoveDirectory(temp_snapshot_dir);
+            return mkdir_status;
+        }
+    } 
+    if (VirtualStore::Exists(final_snapshot_dir)) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return Status::SnapshotAlreadyExists(snapshot_name_);
+    }
+    
+    // Atomic rename operation
+    try {
+        Status rename_status = VirtualStore::Rename(temp_snapshot_dir, final_snapshot_dir);
+        if (!rename_status.ok()) {
+            VirtualStore::RemoveDirectory(temp_snapshot_dir);
+            return rename_status;
+        }
+    } catch (const std::exception &e) {
+        VirtualStore::RemoveDirectory(temp_snapshot_dir);
+        return Status::SnapshotAlreadyExists(snapshot_name_);
+    }
+
+    LOG_INFO(fmt::format("Atomic database snapshot creation completed: {}", json_res.dump()));
+    return Status::OK();
+}
+
+String DatabaseSnapshotInfo::ToString() const {
+    return fmt::format("DatabaseSnapshotInfo: db_name: {}, snapshot_name: {}, version: {}",
+                       db_name_,
+                       snapshot_name_,
+                       version_);
+}
+
+nlohmann::json DatabaseSnapshotInfo::CreateSnapshotMetadataJSON() const {
+    nlohmann::json json_res;
+    json_res["version"] = version_;
+    json_res["snapshot_name"] = snapshot_name_;
+    json_res["snapshot_scope"] = SnapshotScope::kDatabase;
+    json_res["database_name"] = db_name_;
+    json_res["db_id_str"] = db_id_str_;
+    json_res["db_comment"] = db_comment_;
+    json_res["db_next_table_id_str"] = db_next_table_id_str_;
+
+    // Serialize all table snapshots
+    for (const auto &table_snapshot : table_snapshots_) {
+        json_res["table_snapshots"].emplace_back(table_snapshot->CreateSnapshotMetadataJSON());
+    }
+
+    return json_res;
+}
+
+Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
+    // Config *config = InfinityContext::instance().config();
+    
+    // // Read metadata JSON file
+    // String metadata_path = fmt::format("{}/{}/{}.json", config->DataDir(), snapshot_dir, snapshot_name);
+    
+    // auto [file_handle, open_status] = VirtualStore::Open(metadata_path, FileAccessMode::kRead);
+    // if (!open_status.ok()) {
+    //     return {nullptr, open_status};
+    // }
+    
+    // // Get file size
+    // auto [file_size, size_status] = file_handle->GetFileSize();
+    // if (!size_status.ok()) {
+    //     return {nullptr, size_status};
+    // }
+    
+    // // Read JSON content
+    // auto buffer = std::make_unique<char[]>(file_size);
+    // auto [nread, read_status] = file_handle->Read(buffer.get(), file_size);
+    // if (!read_status.ok()) {
+    //     return {nullptr, read_status};
+    // }
+    
+    // // Parse JSON
+    // nlohmann::json json_data;
+    // try {
+    //     json_data = nlohmann::json::parse(buffer.get(), buffer.get() + file_size);
+    // } catch (const std::exception &e) {
+    //     return {nullptr, Status::InvalidSnapshotMetadata(fmt::format("Failed to parse JSON: {}", e.what()))};
+    // }
+    
+    // // Validate snapshot scope
+    // if (!json_data.contains("snapshot_scope") || json_data["snapshot_scope"] != SnapshotScope::kDatabase) {
+    //     return {nullptr, Status::InvalidSnapshotMetadata("Invalid snapshot scope, expected database snapshot")};
+    // }
+    
+    // Create DatabaseSnapshotInfo object
+    auto database_snapshot = MakeShared<DatabaseSnapshotInfo>();
+    
+    // // Deserialize basic fields
+    // database_snapshot->version_ = json_data["version"];
+    // database_snapshot->snapshot_name_ = json_data["snapshot_name"];
+    // database_snapshot->scope_ = static_cast<SnapshotScope>(json_data["snapshot_scope"]);
+    // database_snapshot->db_name_ = json_data["database_name"];
+    // database_snapshot->db_id_str_ = json_data["db_id_str"];
+    // database_snapshot->db_comment_ = json_data["db_comment"];
+    // database_snapshot->db_next_table_id_str_ = json_data["db_next_table_id_str"];
+    
+    // // Deserialize table snapshots
+    // if (json_data.contains("table_snapshots")) {
+    //     for (const auto &table_snapshot_json : json_data["table_snapshots"]) {
+    //         auto [table_snapshot, table_status] = TableSnapshotInfo::Deserialize(snapshot_dir, table_snapshot_json["snapshot_name"]);
+    //         if (!table_status.ok()) {
+    //             return {nullptr, table_status};
+    //         }
+    //         database_snapshot->table_snapshots_.emplace_back(table_snapshot);
+    //     }
+    // }
+    
+    return {database_snapshot, Status::OK()};
+}
+
+Status DatabaseSnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir, 
+                           const String& snapshot_name,
+                           const Vector<String>& files_to_restore,
+                           const String& new_database_id_str) {
+    Config* config = InfinityContext::instance().config();
+    
+    for (const auto& file : files_to_restore) {
+        String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+        
+        // Replace the old database_id_str with the new one in the file path
+        String modified_file = file;
+        
+        // Find and replace the db_* pattern in the file path
+        // Look for pattern: /db_* where * can be any number of digits
+        size_t db_pos = modified_file.find("db_");
+        if (db_pos != String::npos) {
+            // Find the end of the database ID (next '/' or end of string)
+            size_t db_end = modified_file.find('/', db_pos + 3);
+            if (db_end == String::npos) {
+                db_end = modified_file.length();
+            }
+            
+            // Extract the old database ID from the path
+            String old_db_id_in_path = modified_file.substr(db_pos + 3, db_end - (db_pos + 3));
+            
+            // Replace the old database ID with the new one
+            modified_file.replace(db_pos + 3, old_db_id_in_path.length(), new_database_id_str);
+        }
+        
+        String dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
+        
+        // Create destination directory
+        String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+        if (!VirtualStore::Exists(dst_dir)) {
+            VirtualStore::MakeDirectory(dst_dir);
+        }
+        
+        Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+        if (!copy_status.ok()) {
+            return copy_status;
+        }
+    }
+    
     return Status::OK();
 }
     

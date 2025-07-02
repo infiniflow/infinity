@@ -126,8 +126,24 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     Vector<String> GetFiles() const;
     Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
     String ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
     static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_table_id_str);
+};
+
+export struct DatabaseSnapshotInfo : public SnapshotInfo {
+    String db_id_str_;
+    String db_name_;
+    String db_comment_{};
+    String db_next_table_id_str_{};
+    Vector<SharedPtr<TableSnapshotInfo>> table_snapshots_{};
+
+    Vector<String> GetFiles() const;
+    Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
+    String ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
+    static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+    static Status RestoreSnapshotFiles(const String& snapshot_dir, const String& snapshot_name, const Vector<String>& files_to_restore, const String& new_db_id_str);
 };
 
 } // namespace infinity

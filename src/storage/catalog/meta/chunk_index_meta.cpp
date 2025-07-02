@@ -75,7 +75,15 @@ void ChunkIndexMetaInfo::FromJson(const nlohmann::json &json) {
     base_name_ = json["base_name"].get<String>();
     base_row_id_ = RowID::FromUint64(json["base_row_id"].get<u64>());
     row_cnt_ = json["row_count"].get<u64>();
-    index_size_ = json["index_size"].get<u64>();
+    
+    if (json.contains("index_size")) {
+        LOG_INFO(fmt::format("Raw index_size JSON value: {}", json["index_size"].dump()));
+        index_size_ = json["index_size"].get<u64>();
+        LOG_INFO(fmt::format("Parsed index_size: {}", index_size_));
+    } else {
+        LOG_WARN(fmt::format("index_size key missing in JSON"));
+        index_size_ = 0;
+    }
 }
 
 ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta)

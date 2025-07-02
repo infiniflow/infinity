@@ -354,7 +354,9 @@ Tuple<SharedPtr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMetaToSnapShotI
     block_column_snapshot_info->last_chunk_offset_ = last_chunk_offset;
 
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots;
-    for (const String &outline_filename : column_file_paths) {
+    // start at the second column file path
+    for (SizeT i = 1; i < column_file_paths.size(); ++i) {
+        const String &outline_filename = column_file_paths[i];
         SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
         outline_snapshot_info->filepath_ = outline_filename;
         outline_snapshots.push_back(outline_snapshot_info);

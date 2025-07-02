@@ -124,6 +124,7 @@ export struct RestoreTableTxnStore : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
 
     String db_name_{};
+    String snapshot_name_{};
     String db_id_str_{};
     u64 db_id_{};
     String table_name_{};
@@ -132,6 +133,19 @@ export struct RestoreTableTxnStore : public BaseTxnStore {
     SharedPtr<TableDef> table_def_{};
     Vector<WalSegmentInfoV2> segment_infos_{};
     Vector<WalCmdCreateIndexV2> index_cmds_{};
+    Vector<String> files_{};
+
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+
+};
+
+export struct RestoreDatabaseTxnStore : public BaseTxnStore {
+    RestoreDatabaseTxnStore() : BaseTxnStore(TransactionType::kRestoreDatabase) {}
+
+    String db_name_{};
+    String db_id_str_{};
+    Vector<SharedPtr<RestoreTableTxnStore>> restore_table_txn_stores_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

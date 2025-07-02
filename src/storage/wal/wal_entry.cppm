@@ -101,7 +101,7 @@ export enum class WalCommandType : i8 {
     // Snapshot
     // -----------------------------
     RESTORE_TABLE_SNAPSHOT = 110,
-
+    RESTORE_DATABASE_SNAPSHOT = 111,
     // -----------------------------
     // Other
     // -----------------------------
@@ -1062,9 +1062,31 @@ export struct WalCmdCleanup : public WalCmd {
 };
 
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
-    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds)
-        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),table_def_(table_def_),
-          segment_infos_(segment_infos), index_cmds_(index_cmds) {}
+    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files)
+        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
+          files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+    static WalCmdRestoreTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
+    String db_name_{};
+    String db_id_{};
+    String table_name_{};
+    String table_id_{};
+    String snapshot_name_{};
+    SharedPtr<TableDef> table_def_{};
+    Vector<String> files_;
+    Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
+    Vector<WalCmdCreateIndexV2> index_cmds_;// index commands to restore indexes
+};
+
+export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
+    WalCmdRestoreDatabaseSnapshot(const String &db_name, const String &db_id_str, const Vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), restore_table_wal_cmds_(restore_table_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1073,14 +1095,10 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     String CompactInfo() const final;
 
     String db_name_{};
-    String db_id_{};
-    String table_name_{};
-    String table_id_{};
-    SharedPtr<TableDef> table_def_{};
-    Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
-    Vector<WalCmdCreateIndexV2> index_cmds_;// index commands to restore indexes
+    String db_id_str_{};
+    
+    Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };
-
 
 export struct WalEntryHeader {
     i32 size_{}; // size of header + payload + 4 bytes pad. There's 4 bytes pad just after the payload storing

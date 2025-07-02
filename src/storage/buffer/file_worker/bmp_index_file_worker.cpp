@@ -185,6 +185,10 @@ bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
+    
+    // DEBUG: Validate the file size and metadata
+    LOG_INFO(fmt::format("BMP ReadFromMmapImpl: file_size={}, expected_index_size={}", size, index_size_));
+    
 #ifdef INDEX_HANDLER
     mmap_data_ = reinterpret_cast<u8 *>(new BMPHandlerPtr(BMPHandler::Make(index_base_.get(), column_def_.get(), false).release()));
     auto *bmp_handler = reinterpret_cast<BMPHandlerPtr *>(mmap_data_);
