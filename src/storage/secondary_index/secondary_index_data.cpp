@@ -31,6 +31,7 @@ import secondary_index_pgm;
 import logger;
 import buffer_handle;
 import buffer_obj;
+import table_index_meeta;
 
 namespace infinity {
 
@@ -45,7 +46,7 @@ struct SecondaryIndexChunkDataReader {
     SecondaryIndexChunkDataReader(BufferObj *buffer_obj, u32 row_count) {
         handle_ = buffer_obj->Load();
         row_count_ = row_count;
-        auto *index = static_cast<const SecondaryIndexData *>(handle_.GetData());
+        auto *index = static_cast<const SecondaryIndexDataBase<HighCardinalityTag> *>(handle_.GetData());
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);
     }
@@ -95,14 +96,15 @@ struct SecondaryIndexChunkMerger {
     }
 };
 
+// High cardinality implementation (current implementation)
 template <typename RawValueType>
-class SecondaryIndexDataT final : public SecondaryIndexData {
+class SecondaryIndexDataT final : public SecondaryIndexDataBase<HighCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     UniquePtr<OrderedKeyType[]> key_;
     UniquePtr<SegmentOffset[]> offset_;
 
 public:
-    SecondaryIndexDataT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexData(chunk_row_count) {
+    SecondaryIndexDataT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexDataBase<HighCardinalityTag>(chunk_row_count) {
         pgm_index_ = GenerateSecondaryPGMIndex<OrderedKeyType>();
         key_ = MakeUnique<OrderedKeyType[]>(chunk_row_count_);
         offset_ = MakeUnique<SegmentOffset[]>(chunk_row_count_);
@@ -159,7 +161,73 @@ public:
     }
 };
 
-SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+// Low cardinality implementation (simplified version without GetResultCnt optimization)
+template <typename RawValueType>
+class SecondaryIndexDataLowCardinalityT final : public SecondaryIndexDataBase<LowCardinalityTag> {
+    using OrderedKeyType = ConvertToOrderedType<RawValueType>;
+    UniquePtr<OrderedKeyType[]> key_;
+    UniquePtr<SegmentOffset[]> offset_;
+
+public:
+    SecondaryIndexDataLowCardinalityT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexDataBase<LowCardinalityTag>(chunk_row_count) {
+        pgm_index_ = GenerateSecondaryPGMIndex<OrderedKeyType>();
+        key_ = MakeUnique<OrderedKeyType[]>(chunk_row_count_);
+        offset_ = MakeUnique<SegmentOffset[]>(chunk_row_count_);
+        key_ptr_ = key_.get();
+        offset_ptr_ = offset_.get();
+    }
+
+    void SaveIndexInner(LocalFileHandle &file_handle) const override {
+        file_handle.Append(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        file_handle.Append(offset_ptr_, chunk_row_count_ * sizeof(SegmentOffset));
+        pgm_index_->SaveIndex(file_handle);
+    }
+
+    void ReadIndexInner(LocalFileHandle &file_handle) override {
+        file_handle.Read(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        file_handle.Read(offset_ptr_, chunk_row_count_ * sizeof(SegmentOffset));
+        pgm_index_->LoadIndex(file_handle);
+    }
+
+    void InsertData(const void *ptr) override {
+        auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
+        if (!map_ptr) {
+            UnrecoverableError("InsertData(): error: map_ptr type error.");
+        }
+        if (map_ptr->size() != chunk_row_count_) {
+            UnrecoverableError(fmt::format("InsertData(): error: map size: {} != chunk_row_count_: {}", map_ptr->size(), chunk_row_count_));
+        }
+        u32 i = 0;
+        for (const auto &[key, offset] : *map_ptr) {
+            key_[i] = key;
+            offset_[i] = offset;
+            ++i;
+        }
+        if (i != chunk_row_count_) {
+            UnrecoverableError(fmt::format("InsertData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
+        }
+        pgm_index_->BuildIndex(chunk_row_count_, key_.get());
+    }
+
+    void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) override {
+        SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
+        OrderedKeyType key = {};
+        u32 offset = 0;
+        u32 i = 0;
+        while (merger.GetNextDataPair(key, offset)) {
+            key_[i] = key;
+            offset_[i] = offset;
+            ++i;
+        }
+        if (i != chunk_row_count_) {
+            UnrecoverableError(fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
+        }
+        pgm_index_->BuildIndex(chunk_row_count_, key_.get());
+    }
+};
+
+SecondaryIndexDataBase<HighCardinalityTag> *
+GetSecondaryIndexData(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
         return nullptr;
@@ -202,6 +270,84 @@ SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, 
             UnrecoverableError(fmt::format("Need to add secondary index support for data type: {}", data_type->ToString()));
             return nullptr;
         }
+    }
+}
+
+// Template specialization for HighCardinalityTag
+template <>
+SecondaryIndexDataBase<HighCardinalityTag> *
+GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+    return GetSecondaryIndexData(data_type, chunk_row_count, allocate);
+}
+
+// Template specialization for LowCardinalityTag
+template <>
+SecondaryIndexDataBase<LowCardinalityTag> *
+GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+    if (!(data_type->CanBuildSecondaryIndex())) {
+        UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
+        return nullptr;
+    }
+    switch (data_type->type()) {
+        case LogicalType::kTinyInt: {
+            return new SecondaryIndexDataLowCardinalityT<TinyIntT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kSmallInt: {
+            return new SecondaryIndexDataLowCardinalityT<SmallIntT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kInteger: {
+            return new SecondaryIndexDataLowCardinalityT<IntegerT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kBigInt: {
+            return new SecondaryIndexDataLowCardinalityT<BigIntT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kFloat: {
+            return new SecondaryIndexDataLowCardinalityT<FloatT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kDouble: {
+            return new SecondaryIndexDataLowCardinalityT<DoubleT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kDate: {
+            return new SecondaryIndexDataLowCardinalityT<DateT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kTime: {
+            return new SecondaryIndexDataLowCardinalityT<TimeT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kDateTime: {
+            return new SecondaryIndexDataLowCardinalityT<DateTimeT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kTimestamp: {
+            return new SecondaryIndexDataLowCardinalityT<TimestampT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kVarchar: {
+            return new SecondaryIndexDataLowCardinalityT<VarcharT>(chunk_row_count, allocate);
+        }
+        default: {
+            UnrecoverableError(fmt::format("Need to add secondary index support for data type: {}", data_type->ToString()));
+            return nullptr;
+        }
+    }
+}
+
+void *GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type,
+                                     const u32 chunk_row_count,
+                                     const bool allocate,
+                                     TableIndexMeeta *table_index_meeta) {
+    if (!table_index_meeta) {
+        // Default to HighCardinality if no meeta provided
+        return static_cast<void *>(GetSecondaryIndexData(data_type, chunk_row_count, allocate));
+    }
+
+    auto [cardinality, status] = table_index_meeta->GetSecondaryIndexCardinality();
+    if (!status.ok()) {
+        // Default to HighCardinality if unable to determine
+        cardinality = SecondaryIndexCardinality::kHighCardinality;
+    }
+
+    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+        return static_cast<void *>(GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, chunk_row_count, allocate));
+    } else {
+        return static_cast<void *>(GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, chunk_row_count, allocate));
     }
 }
 
