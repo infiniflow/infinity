@@ -131,7 +131,7 @@ TEST_F(LSGBuildTest, test_avg) {
         }
     }
 
-    for (SizeT i = 0; i < element_size; ++i) {
+    for (std::size_t i = 0; i < element_size; ++i) {
         printf("i: %zu, avg: %f, avg_gt: %f\n", i, avg[i], avg_gt[i]);
         ASSERT_GE(avg[i], avg_gt[i]);
     }

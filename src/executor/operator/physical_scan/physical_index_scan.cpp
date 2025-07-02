@@ -190,7 +190,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     SegmentOffset segment_row_count = 0;
     const auto &segment_block_index_ = base_table_ref_->block_index_->new_segment_block_index_;
     if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
-        UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+        UnrecoverableError(fmt::format("Cannot find SegmentMeta for segment id: {}", segment_id));
     } else {
         segment_meta = iter->second.segment_meta_.get();
         segment_row_count = iter->second.segment_offset();

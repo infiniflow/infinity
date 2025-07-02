@@ -218,13 +218,11 @@ public:
     constexpr static SizeT kAlign = 8;
     constexpr static bool kOwnMem = true;
 
-private:
     BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt,
            BlockFwd<DataType, IdxType, BMPOwnMem::kTrue> block_fwd,
            VecPtr<BMPDocID, BMPOwnMem::kTrue> doc_ids)
         : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
 
-public:
     BMPAlg() = default;
     BMPAlg(SizeT term_num, SizeT block_size) : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(term_num, block_size) {}
 
@@ -338,7 +336,7 @@ public:
         file_handle.Sync();
     }
 
-    static BMPAlg<DataType, IdxType, CompressType> Load(LocalFileHandle &file_handle) {
+    static UniquePtr<BMPAlg<DataType, IdxType, CompressType>> Load(LocalFileHandle &file_handle) {
         SizeT size;
         file_handle.Read(&size, sizeof(size));
         auto buffer = MakeUnique<char[]>(size);
@@ -377,7 +375,7 @@ public:
         file_handle.Sync();
     }
 
-    static BMPAlg<DataType, IdxType, CompressType> LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
+    static UniquePtr<BMPAlg<DataType, IdxType, CompressType>> LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
         auto buffer = MakeUnique<char[]>(file_size);
         file_handle.Read(buffer.get(), file_size);
         const char *p = buffer.get();
@@ -389,7 +387,7 @@ public:
         if (SizeT(p - buffer.get()) != file_size) {
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - buffer.get() != file_size: {} != {}", p - buffer.get(), file_size));
         }
-        return BMPAlg(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids));
+        return MakeUnique<BMPAlg>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids));
     }
 
 private:
@@ -437,7 +435,7 @@ private:
         WriteBufVecAdv(p, this->doc_ids_.data(), this->doc_ids_.size());
     }
 
-    static BMPAlg<DataType, IdxType, CompressType> ReadAdv(const char *&p) {
+    static UniquePtr<BMPAlg<DataType, IdxType, CompressType>> ReadAdv(const char *&p) {
         auto postings = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(p);
         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>::ReadAdv(p);
         SizeT doc_num = ReadBufAdv<SizeT>(p);
@@ -445,7 +443,7 @@ private:
         for (SizeT i = 0; i < doc_num; ++i) {
             doc_ids[i] = ReadBufAdv<BMPDocID>(p);
         }
-        return BMPAlg(std::move(postings), std::move(block_fwd), std::move(doc_ids));
+        return MakeUnique<BMPAlg>(std::move(postings), std::move(block_fwd), std::move(doc_ids));
     }
 
 private:
@@ -462,14 +460,12 @@ public:
     constexpr static bool kOwnMem = false;
     constexpr static SizeT kAlign = 8;
 
-private:
     BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kFalse> bm_ivt,
            BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> block_fwd,
            VecPtr<BMPDocID, BMPOwnMem::kFalse> doc_ids)
         : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
 
-public:
-    static BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> LoadFromPtr(const char *&p, SizeT size) {
+    static UniquePtr<BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>> LoadFromPtr(const char *&p, SizeT size) {
         if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
         }
@@ -489,7 +485,7 @@ public:
         if (SizeT(p - start) != size) {
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
         }
-        return BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt),
+        return MakeUnique<BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>>(std::move(bm_ivt),
                                                                           std::move(block_fwd),
                                                                           VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
     }

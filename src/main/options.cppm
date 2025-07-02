@@ -141,7 +141,7 @@ export enum class GlobalOptionIndex : i8 {
     kTempDir = 22,
     kWALDir = 23,
     kWALCompactThreshold = 24,
-    kFullCheckpointInterval = 25,
+    kCheckpointInterval = 25,
     kFlushMethodAtCommit = 26,
     kResourcePath = 27,
     kRecordRunningQuery = 28,

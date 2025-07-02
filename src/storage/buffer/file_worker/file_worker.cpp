@@ -209,19 +209,17 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
     return {std::move(defer_fn), std::move(read_path)};
 }
 
-Status FileWorker::CleanupFile(KVInstance *kv_instance) const {
+Status FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
         String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
         PersistWriteResult result = persistence_manager_->Cleanup(path);
         handler.HandleWriteResult(result);
         // Delete from RocksDB
-        if (kv_instance != nullptr) {
-            auto *kv_store = InfinityContext::instance().storage()->kv_store();
-            String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
-            kv_store->Delete(relevant_full_path);
-            LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
-        }
+        auto *kv_store = InfinityContext::instance().storage()->kv_store();
+        String relevant_full_path = KeyEncode::PMObjectKey(fmt::format("{}/{}", *file_dir_, *file_name_));
+        kv_store->Delete(relevant_full_path);
+        LOG_TRACE(fmt::format("Fileworker: cleanup pm object key: {}", relevant_full_path));
         return Status::OK();
     }
 

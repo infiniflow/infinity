@@ -35,7 +35,7 @@ export struct IndexIVFCentroidOption {
 };
 
 export struct IndexIVFStorageOption {
-    enum class Type {
+    enum class Type : i8 {
         kPlain,               // for floating-point, i8, u8
         kScalarQuantization,  // for floating-point, quantization for every dimension
         kProductQuantization, // for floating-point, centroid tag for several subspaces
@@ -90,6 +90,8 @@ public:
     nlohmann::json Serialize() const override;
 
     static IndexIVFOption DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json);
+
+    static IndexIVFOption DeserializeIndexIVFOption(simdjson::simdjson_result<simdjson::value> &ivf_option_json);
 
     void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 

@@ -24,14 +24,11 @@ import posting_iterator;
 import index_defines;
 // import memory_indexer;
 import internal_types;
-import segment_index_entry;
 import logger;
 import status;
 
 namespace infinity {
-struct TableEntry;
 class TermDocIterator;
-class Txn;
 class NewTxn;
 class MemoryIndexer;
 class TableIndexMeeta;
@@ -50,8 +47,6 @@ struct ColumnReaderChunkInfo {
 export class ColumnIndexReader {
 public:
     ~ColumnIndexReader();
-
-    void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn);
 
     Status Open(optionflag_t flag, TableIndexMeeta &table_index_meta);
 
@@ -74,7 +69,6 @@ private:
 
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
     Map<SegmentID, SharedPtr<SegmentIndexFtInfo>> segment_index_ft_infos_;
 
     u64 total_df_ = 0;
@@ -135,15 +129,11 @@ export struct IndexReader {
 
 export class TableIndexReaderCache {
 public:
-    inline explicit TableIndexReaderCache(TableEntry *table_entry_ptr) : table_entry_ptr_(table_entry_ptr) {}
-
     TableIndexReaderCache(String db_id_str, String table_id_str) : db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
     void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
 
     SharedPtr<IndexReader> GetIndexReader(NewTxn *txn);
-
-    SharedPtr<IndexReader> GetIndexReader(Txn *txn);
 
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
     void Invalidate();
@@ -156,7 +146,6 @@ public:
 
 private:
     std::mutex mutex_;
-    TableEntry *table_entry_ptr_ = nullptr;
     String db_id_str_;
     String table_id_str_;
 

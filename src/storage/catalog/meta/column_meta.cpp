@@ -91,7 +91,7 @@ Status ColumnMeta::InitSet() {
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_id));
+        auto filename = MakeShared<String>(fmt::format("col_{}_out", column_id));
         auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_dir_ptr,
@@ -143,7 +143,7 @@ Status ColumnMeta::LoadSet() {
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", col_def->id()));
+        auto filename = MakeShared<String>(fmt::format("col_{}_out", col_def->id()));
 
         SizeT chunk_offset = 0;
         // status = this->GetChunkOffset(chunk_offset);
@@ -196,7 +196,7 @@ Status ColumnMeta::RestoreSet(const ColumnDef *column_def) {
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_def->id()));
+        auto filename = MakeShared<String>(fmt::format("col_{}_out", column_def->id()));
 
         // NO LONGER USING CHUNK OFFSET
         // SizeT chunk_offset = 0;
@@ -243,7 +243,7 @@ Status ColumnMeta::FilePaths(Vector<String> &paths) {
     {
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
-            String outline_filename = fmt::format("col_{}_out_0", column_id);
+            String outline_filename = fmt::format("col_{}_out", column_id);
             paths.push_back(*block_meta_.GetBlockDir() + "/" + outline_filename);
         }
     }
@@ -319,7 +319,7 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        String outline_filename = fmt::format("col_{}_out_0", column_id);
+        String outline_filename = fmt::format("col_{}_out", column_id);
         String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
         outline_buffer_ = buffer_mgr->GetBufferObject(outline_filepath);
         if (outline_buffer_ == nullptr) {

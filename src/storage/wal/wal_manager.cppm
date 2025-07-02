@@ -25,33 +25,12 @@ namespace infinity {
 
 class Storage;
 class BGTaskProcessor;
-struct TableEntry;
-class Txn;
 class NewTxn;
-struct SegmentEntry;
-class Catalog;
 class CheckpointTaskBase;
 class ForceCheckpointTask;
 class BottomExecutor;
 
 struct WalEntry;
-struct WalCmdCreateDatabase;
-struct WalCmdDropDatabase;
-struct WalCmdCreateTable;
-struct WalCmdDropTable;
-struct WalCmdCreateIndex;
-struct WalCmdDropIndex;
-struct WalCmdAppend;
-struct WalCmdImport;
-struct WalCmdDelete;
-struct WalCmdCheckpoint;
-struct WalCmdCompact;
-struct WalCmdOptimize;
-struct WalCmdDumpIndex;
-struct WalCmdRenameTable;
-struct WalCmdAddColumns;
-struct WalCmdDropColumns;
-struct WalSegmentInfo;
 
 export enum class StorageMode {
     kUnInitialized,

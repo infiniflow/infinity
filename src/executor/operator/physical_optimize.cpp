@@ -28,7 +28,6 @@ import third_party;
 import status;
 import logger;
 import base_table_ref;
-import table_index_meta;
 
 import wal_manager;
 import infinity_context;

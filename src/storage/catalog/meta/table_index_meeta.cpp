@@ -39,7 +39,7 @@ import segment_index_meta;
 namespace infinity {
 
 TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta)
-    : kv_instance_(table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
+    : kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
 
 TableIndexMeeta::~TableIndexMeeta() = default;
 

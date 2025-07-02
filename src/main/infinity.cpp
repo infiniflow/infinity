@@ -242,8 +242,8 @@ QueryResult Infinity::Flush(const String &flush_type) {
 
     if (flush_type == "data") {
         flush_statement->type_ = FlushType::kData;
-    } else if (flush_type == "delta") {
-        flush_statement->type_ = FlushType::kDelta;
+    } else if (flush_type == "catalog") {
+        flush_statement->type_ = FlushType::kCatalog;
     } else {
         flush_statement->type_ = FlushType::kData;
     }
@@ -1323,27 +1323,6 @@ QueryResult Infinity::TestCommand(const String &command_content) {
 
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
 
-    return result;
-}
-
-QueryResult Infinity::AdminShowCatalogs() {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
-
-    auto admin_statement = MakeUnique<AdminStatement>();
-    admin_statement->admin_type_ = AdminStmtType::kListCatalogs;
-    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
-    return result;
-}
-
-QueryResult Infinity::AdminShowCatalog(i64 index) {
-    UniquePtr<QueryContext> query_context_ptr;
-    GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);
-
-    auto admin_statement = MakeUnique<AdminStatement>();
-    admin_statement->admin_type_ = AdminStmtType::kShowCatalog;
-    admin_statement->catalog_file_index_ = index;
-    QueryResult result = query_context_ptr->QueryStatement(admin_statement.get());
     return result;
 }
 

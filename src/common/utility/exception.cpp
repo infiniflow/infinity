@@ -24,7 +24,6 @@ import stl;
 import logger;
 import third_party;
 import infinity_context;
-import cleanup_scanner;
 import new_txn_manager;
 import txn_context;
 

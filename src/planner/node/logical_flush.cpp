@@ -40,9 +40,9 @@ String LogicalFlush::ToString(i64 &space) const {
     }
 
     switch (flush_type_) {
-        case FlushType::kDelta:
+        case FlushType::kCatalog:
             ss << String(space, ' ') << "-> "
-               << "Flush Delta: ";
+               << "Flush Catalog: ";
             break;
         case FlushType::kData:
             ss << String(space, ' ') << "-> "

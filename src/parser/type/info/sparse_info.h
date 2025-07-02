@@ -92,6 +92,8 @@ public:
 
     static std::unique_ptr<SparseInfo> Deserialize(const nlohmann::json &json);
 
+    static std::unique_ptr<SparseInfo> Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &json);
+
     inline EmbeddingDataType DataType() const noexcept { return data_type_; }
 
     inline EmbeddingDataType IndexType() const noexcept { return index_type_; }

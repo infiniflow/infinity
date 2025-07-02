@@ -178,7 +178,7 @@ private:
 
 public:
     SharedPtr<MemIndex> GetMemIndex(const String &mem_index_key);
-    bool GetOrSetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
+    SharedPtr<MemIndex> PopMemIndex(const String &mem_index_key);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
@@ -211,7 +211,8 @@ public:
     HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
 public:
-    void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas, KVInstance *kv_instance);
+    Status GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vector<UniquePtr<MetaKey>> &metas, Vector<String> &drop_keys) const;
+    Vector<String> GetEncodeKeys(Vector<UniquePtr<MetaKey>> &metas) const;
 
     // Profile related methods
     void SetProfile(bool flag) { enable_profile_ = flag; }
@@ -227,8 +228,6 @@ public:
     void ResizeProfileHistory(SizeT new_size) { history_.Resize(new_size); }
 
     SizeT ProfileHistorySize() const { return history_.HistoryCapacity(); }
-
-    Status IncrLatestID(String &id_str, std::string_view id_name);
 
     void SetLastCleanupTS(TxnTimeStamp cleanup_ts);
     TxnTimeStamp GetLastCleanupTS() const;
@@ -248,14 +247,14 @@ public:
 
     static Status GetAllMemIndexes(NewTxn *txn, Vector<SharedPtr<MemIndex>> &mem_indexes, Vector<MemIndexID> &mem_index_ids);
 
-    static Status AddNewDB(KVInstance *kv_instance,
+    static Status AddNewDB(NewTxn *txn,
                            const String &db_id_str,
                            TxnTimeStamp commit_ts,
                            const String &db_name,
                            const String *db_comment,
                            Optional<DBMeeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta, const String &db_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -264,7 +263,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta, const String &table_name, TxnTimeStamp begin_ts, UsageFlag usage_flag);
+    static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 
     Status AddNewTableIndex(TableMeeta &table_meta,
                             const String &index_id_str,
@@ -272,11 +271,8 @@ public:
                             const SharedPtr<IndexBase> &index_base,
                             Optional<TableIndexMeeta> &table_index_meta);
 
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, const String &index_name, UsageFlag usage_flag);
-    static Status CleanTableIndex(TableIndexMeeta &table_index_meta,
-                                  const String &index_name,
-                                  const Vector<ChunkInfoForCreateIndex> &meta_infos,
-                                  UsageFlag usage_flag);
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta, UsageFlag usage_flag);
+
     // static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
     static Status AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta);

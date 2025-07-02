@@ -114,13 +114,7 @@ curl --request GET \
      --url http://localhost:23820/instance/logs \
      --header 'accept: application/json'
 
-# show delta checkpoints
-echo -e '\n\n-- show delta checkpoint'
-curl --request GET \
-     --url http://localhost:23820/instance/delta_checkpoint \
-     --header 'accept: application/json'
-
-# show global checkpoints
+# show checkpoints
 echo -e '\n\n-- show global checkpoint'
 curl --request GET \
      --url http://localhost:23820/instance/global_checkpoint \

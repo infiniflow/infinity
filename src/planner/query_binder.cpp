@@ -50,7 +50,6 @@ import limit_binder;
 import subquery_table_ref;
 import cross_product_table_ref;
 
-import table_entry_type;
 import block_index;
 import cast_expression;
 import search_expression;
@@ -455,11 +454,6 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     }
     table_info->db_name_ = MakeShared<String>(db_name);
     table_info->table_name_ = MakeShared<String>(table_name);
-
-    if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
-        Status status = Status::SyntaxError("Currently, collection isn't supported.");
-        RecoverableError(status);
-    }
 
     String alias = from_table->GetTableName();
     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -1123,13 +1117,8 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
 
 UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {
     SharedPtr<BaseTableRef> base_table_ref = nullptr;
-    if (statement.compact_type_ == CompactStatementType::kManual) {
-        const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
-        base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
-    } else {
-        const auto &compact_statement = static_cast<const AutoCompactStatement &>(statement);
-        base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
-    }
+    const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
+    base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
     return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
 }
 

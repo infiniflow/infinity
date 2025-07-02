@@ -324,10 +324,8 @@ SizeT PhysicalExport::ExportToFileInner(QueryContext *query_context,
                     }
                     default: {
                         ColumnMeta column_meta(select_column_idx, *block_meta);
-                        Status status = NewCatalog::GetColumnVector(column_meta,
-                                                                    block_row_count,
-                                                                    ColumnVectorTipe::kReadOnly,
-                                                                    column_vectors[block_column_idx]);
+                        Status status =
+                            NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vectors[block_column_idx]);
                         if (!status.ok()) {
                             UnrecoverableError("Failed to get column vector");
                         }
@@ -538,24 +536,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     SizeT row_count{0};
     SizeT file_no_{0};
     bool switch_to_new_file = false;
-    auto consume_block = [&](Vector<ColumnVector> &column_vectors,
-                             const Bitmask *bitmask,
-                             const DeleteFilter *delete_filter,
-                             SegmentOffset segment_offset,
-                             bool use_new_filter,
-                             const SizeT block_row_count) -> bool {
+    auto consume_block =
+        [&](Vector<ColumnVector> &column_vectors, const Bitmask *bitmask, SegmentOffset segment_offset, const SizeT block_row_count) -> bool {
         Vector<u32> block_rows_for_output;
         for (SizeT start_block_row_idx = 0; start_block_row_idx < block_row_count; ++start_block_row_idx) {
             bool need_switch_to_new_file = false;
             for (block_rows_for_output.clear(); start_block_row_idx < block_row_count; ++start_block_row_idx) {
-                if (use_new_filter) {
-                    if (!bitmask->IsTrue(start_block_row_idx)) {
-                        continue;
-                    }
-                } else {
-                    if (!(*delete_filter)(segment_offset + start_block_row_idx)) {
-                        continue;
-                    }
+                if (!bitmask->IsTrue(start_block_row_idx)) {
+                    continue;
                 }
                 if (offset > 0) {
                     --offset;
@@ -630,10 +618,8 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                     }
                     default: {
                         ColumnMeta column_meta(select_column_idx, *block_meta);
-                        Status status = NewCatalog::GetColumnVector(column_meta,
-                                                                    block_row_count,
-                                                                    ColumnVectorTipe::kReadOnly,
-                                                                    column_vectors[block_column_idx]);
+                        Status status =
+                            NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vectors[block_column_idx]);
                         if (!status.ok()) {
                             RecoverableError(status);
                         }
@@ -645,7 +631,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            if (!consume_block(column_vectors, &bitmask, nullptr, 0, true, block_row_count)) {
+            if (!consume_block(column_vectors, &bitmask, 0, block_row_count)) {
                 goto new_label_return;
             }
         }

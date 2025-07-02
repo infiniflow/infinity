@@ -56,7 +56,6 @@ import global_block_id;
 import block_index;
 import column_def;
 import internal_types;
-import fix_heap;
 import type_info;
 import embedding_info;
 import buffer_manager;
@@ -180,6 +179,7 @@ void PhysicalMatchTensorScan::CheckColumn() {
 void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     Status status;
     SizeT search_column_id = SearchColumnID();
+    auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
     segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
@@ -208,12 +208,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     RecoverableError(status);
                 }
 
-                ColumnID column_id = 0;
-                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-                if (!status.ok()) {
-                    RecoverableError(status);
-                }
-                if (column_id != search_column_id) {
+                if (index_base->column_name() != search_column_name) {
                     // search_column_id isn't in this table index
                     continue;
                 }
@@ -241,12 +236,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(status);
             }
 
-            ColumnID column_id = 0;
-            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (column_id != search_column_id) {
+            if (index_base->column_name() != search_column_name) {
                 // search_column_id isn't in this table index
                 LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
                 Status error_status = Status::ColumnNotExist(index_base->column_name());
@@ -294,9 +284,6 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntri
 
 // TODO: how many threads for brute force scan?
 SizeT PhysicalMatchTensorScan::TaskletCount() {
-    if (!block_metas_ && !segment_index_metas_) {
-        return block_column_entries_.size() + index_entries_.size();
-    }
     return (block_metas_ ? block_metas_->size() : 0) + (segment_index_metas_ ? segment_index_metas_->size() : 0);
 }
 
@@ -378,7 +365,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             LOG_TRACE(
                 fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
             // TODO: now only have EMVB index
-            // const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
             auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
             if (!status.ok()) {
                 UnrecoverableError(status.message());

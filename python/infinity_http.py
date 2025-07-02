@@ -3,7 +3,6 @@ import time
 
 import requests
 import logging
-import json
 from test_pysdk.common.common_data import *
 from infinity.common import ConflictType, InfinityException, SparseVector, SortType
 from typing import Optional, Any
@@ -153,21 +152,21 @@ class infinity_http:
         return database_result()
 
     def set_role_standalone(self, node_name):
-        url = f"admin/node/current"
+        url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], {"role": "standalone", "name": node_name})
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
 
     def set_role_admin(self):
-        url = f"admin/node/current"
+        url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], {"role": "admin"})
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
 
     def set_role_leader(self, node_name):
-        url = f"admin/node/current"
+        url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], {"role": "leader", "name": node_name})
         r = self.net.request(url, "post", h, d)
@@ -175,7 +174,7 @@ class infinity_http:
         return database_result()
 
     def set_role_follower(self, node_name, leader_addr):
-        url = f"admin/node/current"
+        url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], {"role": "follower", "name": node_name, "address": leader_addr})
         r = self.net.request(url, "post", h, d)
@@ -183,7 +182,7 @@ class infinity_http:
         return database_result()
 
     def set_role_learner(self, node_name, leader_addr):
-        url = f"admin/node/current"
+        url = "admin/node/current"
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], {"role": "learner", "name": node_name, "address": leader_addr})
         r = self.net.request(url, "post", h, d)
@@ -257,7 +256,7 @@ class infinity_http:
         return database_result(database_name=r.json()["database_name"])
 
     def show_nodes(self):
-        url = f"admin/nodes"
+        url = "admin/nodes"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
@@ -280,7 +279,7 @@ class infinity_http:
                                node_status=r.json()["node"]["status"])
 
     def show_current_node(self):
-        url = f"admin/node/current"
+        url = "admin/node/current"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
@@ -310,35 +309,35 @@ class infinity_http:
         return database_result()
 
     def show_admin_variables(self):
-        url = f"admin/variables"
+        url = "admin/variables"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         return database_result(data=r.json()["role"])
 
     def show_admin_configs(self):
-        url = f"admin/configs"
+        url = "admin/configs"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         return database_result(data=r.json())
 
     def show_admin_catalogs(self):
-        url = f"admin/catalogs"
+        url = "admin/catalogs"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         return database_result(data=r.json())
 
     def show_admin_logs(self):
-        url = f"admin/logs"
+        url = "admin/logs"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         return database_result(data=r.json())
 
     def list_nodes(self):
-        url = f"admin/nodes"
+        url = "admin/nodes"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
@@ -450,7 +449,7 @@ class database_http:
     # not implemented, just to pass test
     def show_tables(self):
         self.get_all_tables()
-        return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
+        return database_result(columns=["database", "table", "column_count", "block_count", "block_capacity",
                                         "segment_count", "segment_capacity", "comment"])
 
 
@@ -703,6 +702,19 @@ class table_http:
         self.net.raise_exception(r)
         return database_result()
 
+    def show_segments(self):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/segments"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return pd.DataFrame(r.json()['segments'])
+
+    def show_blocks(self, segment_id: int):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/segments/{segment_id}/blocks"
+        h = self.net.set_up_header(["accept", "content-type"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return pd.DataFrame(r.json()['blocks'])
 
 class table_http_result:
     def __init__(self, output: list, table_http: table_http):

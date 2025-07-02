@@ -129,7 +129,7 @@ public:
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildFlushDelta(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildFlushCatalog(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildFlushData(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

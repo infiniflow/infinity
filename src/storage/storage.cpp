@@ -49,7 +49,6 @@ import log_file;
 import query_context;
 import infinity_context;
 import memindex_tracer;
-import cleanup_scanner;
 import persistence_manager;
 import extra_ddl_info;
 import virtual_store;
@@ -259,7 +258,10 @@ Status Storage::AdminToWriter() {
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
     kv_store_ = MakeUnique<KVStore>();
-    kv_store_->Init(config_ptr_->CatalogDir());
+    Status status = kv_store_->Init(config_ptr_->CatalogDir());
+    if (!status.ok()) {
+        return status;
+    }
     new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
 
     Vector<SharedPtr<WalEntry>> replay_entries;
@@ -341,9 +343,9 @@ Status Storage::AdminToWriter() {
 
     auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    Status status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
+    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
     if (!status.ok()) {
-        UnrecoverableError("Failed to checkpoint");
+        UnrecoverableError(fmt::format("Failed to checkpoint: {}", status.message()));
     }
     status = new_txn_mgr_->CommitTxn(new_txn);
     if (!status.ok()) {
@@ -372,8 +374,8 @@ Status Storage::AdminToWriter() {
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
     periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval);
 
-    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-    periodic_trigger_thread_->checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec);
+    i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
+    periodic_trigger_thread_->checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
 
     periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval);
 
@@ -403,7 +405,6 @@ Status Storage::UnInitFromReader() {
         }
 
         new_catalog_.reset();
-        kv_store_->Uninit();
         kv_store_.reset();
 
         if (memory_index_tracer_ != nullptr) {
@@ -501,8 +502,8 @@ Status Storage::ReaderToWriter() {
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
     i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
     //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-    periodic_trigger_thread_->checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+    i64 checkpoint_interval_sec = config_ptr_->CheckpointInterval() > 0 ? config_ptr_->CheckpointInterval() : 0;
+    periodic_trigger_thread_->checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(checkpoint_interval_sec);
     periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
     periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
     periodic_trigger_thread_->Start();
@@ -539,7 +540,6 @@ Status Storage::WriterToAdmin() {
     }
 
     new_catalog_.reset();
-    kv_store_->Uninit();
     kv_store_.reset();
 
     memory_index_tracer_.reset();
@@ -664,7 +664,6 @@ Status Storage::UnInitFromWriter() {
         new_txn_mgr_->Stop();
         new_txn_mgr_.reset();
     }
-    kv_store_->Uninit();
     kv_store_.reset();
 
     if (buffer_mgr_ != nullptr) {
@@ -829,7 +828,7 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     }
 
     if (persistence_manager_) {
-        persistence_manager_->Deserialize(kv_instance.get());
+        persistence_manager_->SetKvStore(kv_store_.get());
     }
 
     status = kv_instance->Commit();

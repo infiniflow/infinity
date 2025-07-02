@@ -17,7 +17,6 @@ module;
 module vector_buffer;
 
 import stl;
-import fix_heap;
 import buffer_obj;
 import buffer_manager;
 import buffer_handle;

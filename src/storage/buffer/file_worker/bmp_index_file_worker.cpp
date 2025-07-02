@@ -55,7 +55,7 @@ BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> data_dir,
         String index_path = GetFilePath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
-            // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
+            // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = file_handle->FileSize();
         }
     }
@@ -66,6 +66,10 @@ BMPIndexFileWorker::~BMPIndexFileWorker() {
     if (data_ != nullptr) {
         FreeInMemory();
         data_ = nullptr;
+    }
+    if (mmap_data_ != nullptr) {
+        FreeFromMmapImpl();
+        mmap_data_ = nullptr;
     }
 }
 
@@ -168,9 +172,9 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
                     if (from_spill) {
-                        index = new IndexT(IndexT::Load(*file_handle_));
+                        index = IndexT::Load(*file_handle_).release();
                     } else {
-                        index = new IndexT(IndexT::LoadFromPtr(*file_handle_, file_size));
+                        index = IndexT::LoadFromPtr(*file_handle_, file_size).release();
                     }
                 } else {
                     UnrecoverableError("BMPIndexFileWorker::ReadFromFileImpl: index does not own memory");
@@ -205,7 +209,7 @@ bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (!IndexT::kOwnMem) {
                     const auto *p = static_cast<const char *>(ptr);
-                    index = new IndexT(IndexT::LoadFromPtr(p, size));
+                    index = IndexT::LoadFromPtr(p, size).release();
                 } else {
                     UnrecoverableError("BMPIndexFileWorker::ReadFromMmapImpl: index own memory");
                 }

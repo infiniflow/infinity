@@ -300,6 +300,4 @@ TEST_F(MinFunctionTest, min_func) {
 
         EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
     }
-
-    kv_store_ptr->Uninit();
 }

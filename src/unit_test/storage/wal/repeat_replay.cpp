@@ -36,8 +36,6 @@ import data_type;
 import logical_type;
 import table_def;
 import data_block;
-import block_entry;
-import segment_entry;
 import value;
 import internal_types;
 import buffer_manager;
@@ -194,20 +192,21 @@ TEST_P(RepeatReplayTest, append) {
     }
     { // replay with no checkpoint, only replay wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
+        infinity::InfinityContext::instance().InitPhase2(); // auto checkpoint when initialize
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         CheckTable(new_txn_mgr, 1);
         TestAppend();
         CheckTable(new_txn_mgr, 2);
         infinity::InfinityContext::instance().UnInit();
     }
-    { // replay with full checkpoint + wal
+    { // replay with checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
+        infinity::InfinityContext::instance().InitPhase2(); // auto checkpoint when initialize
 
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         CheckTable(new_txn_mgr, 2);
-        { //  manually add delta checkpoint
+        {
+            //  manually add checkpoint
             std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
@@ -222,9 +221,9 @@ TEST_P(RepeatReplayTest, append) {
         CheckTable(new_txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
     }
-    for (int i = 0; i < 2; ++i) { // replay with full checkpoint + delta checkpoint + wal
+    for (int i = 0; i < 2; ++i) { // replay with checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
+        infinity::InfinityContext::instance().InitPhase2(); // auto checkpoint when initialize
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         CheckTable(new_txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
@@ -316,7 +315,7 @@ TEST_P(RepeatReplayTest, import) {
     }
     { // replay with no checkpoint, only replay wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
+        infinity::InfinityContext::instance().InitPhase2(); // auto checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -326,15 +325,16 @@ TEST_P(RepeatReplayTest, import) {
         CheckTable(new_txn_mgr, 2);
         infinity::InfinityContext::instance().UnInit();
     }
-    { // replay with full checkpoint + wal
+    { // replay with checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
+        infinity::InfinityContext::instance().InitPhase2(); // auto checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
 
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
         CheckTable(new_txn_mgr, 2);
-        { //  manually add delta checkpoint
+        {
+            //  manually add checkpoint
             std::shared_ptr<TxnTimeStamp> ckp_commit_ts = std::make_shared<TxnTimeStamp>(0);
             NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
             WalManager *wal_manager_{};
@@ -349,9 +349,9 @@ TEST_P(RepeatReplayTest, import) {
         CheckTable(new_txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
     }
-    for (int i = 0; i < 2; ++i) { // replay with full checkpoint + delta checkpoint + wal
+    for (int i = 0; i < 2; ++i) { // replay with checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
+        infinity::InfinityContext::instance().InitPhase2(); // auto checkpoint when initialize
 
         NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         CheckTable(new_txn_mgr, 3);

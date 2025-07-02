@@ -479,7 +479,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
         case WalCommandType::DROP_DATABASE_V2: {
             String db_name = ReadBufAdv<String>(ptr);
             String db_id = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropDatabaseV2>(db_name, db_id);
+            TxnTimeStamp create_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            cmd = MakeShared<WalCmdDropDatabaseV2>(db_name, db_id, create_ts);
             break;
         }
         case WalCommandType::CREATE_TABLE: {
@@ -508,8 +509,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String db_id = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String table_id = ReadBufAdv<String>(ptr);
+            TxnTimeStamp create_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             String table_key = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropTableV2>(db_name, db_id, table_name, table_id, table_key);
+            cmd = MakeShared<WalCmdDropTableV2>(db_name, db_id, table_name, table_id, create_ts, table_key);
             break;
         }
         case WalCommandType::IMPORT: {
@@ -656,10 +658,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
         }
         case WalCommandType::CHECKPOINT: {
             i64 max_commit_ts = ReadBufAdv<i64>(ptr);
-            bool is_full_checkpoint = ReadBufAdv<i8>(ptr);
             String catalog_path = ReadBufAdv<String>(ptr);
             String catalog_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path, catalog_name);
+            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path, catalog_name);
             break;
         }
         case WalCommandType::CHECKPOINT_V2: {
@@ -714,8 +715,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String table_id = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_id = ReadBufAdv<String>(ptr);
+            TxnTimeStamp create_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             String index_key = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropIndexV2>(db_name, db_id, table_name, table_id, index_name, index_id, index_key);
+            cmd = MakeShared<WalCmdDropIndexV2>(db_name, db_id, table_name, table_id, index_name, index_id, create_ts, index_key);
             break;
         }
         case WalCommandType::COMPACT: {
@@ -893,7 +895,12 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
                 column_ids.push_back(ReadBufAdv<ColumnID>(ptr));
             }
             String table_key = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropColumnsV2>(db_name, db_id, table_name, table_id, column_names, column_ids, table_key);
+            column_n = ReadBufAdv<i32>(ptr);
+            Vector<String> column_keys;
+            for (i32 i = 0; i < column_n; i++) {
+                column_keys.push_back(ReadBufAdv<String>(ptr));
+            }
+            cmd = MakeShared<WalCmdDropColumnsV2>(db_name, db_id, table_name, table_id, column_names, column_ids, table_key, column_keys);
             break;
         }
         case WalCommandType::CLEANUP: {
@@ -1010,7 +1017,7 @@ bool WalCmdDropDatabase::operator==(const WalCmd &other) const {
 
 bool WalCmdDropDatabaseV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDropDatabaseV2 *>(&other);
-    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_;
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && create_ts_ == other_cmd->create_ts_;
 }
 
 bool WalCmdCreateTable::operator==(const WalCmd &other) const {
@@ -1033,7 +1040,7 @@ bool WalCmdDropTable::operator==(const WalCmd &other) const {
 bool WalCmdDropTableV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDropTableV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
-           table_id_ == other_cmd->table_id_ && table_key_ == other_cmd->table_key_;
+           table_id_ == other_cmd->table_id_ && create_ts_ == other_cmd->create_ts_ && table_key_ == other_cmd->table_key_;
 }
 
 bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
@@ -1058,7 +1065,8 @@ bool WalCmdDropIndex::operator==(const WalCmd &other) const {
 bool WalCmdDropIndexV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDropIndexV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
-           table_id_ == other_cmd->table_id_ && index_name_ == other_cmd->index_name_ && index_key_ == other_cmd->index_key_;
+           table_id_ == other_cmd->table_id_ && index_name_ == other_cmd->index_name_ && create_ts_ == other_cmd->create_ts_ &&
+           index_key_ == other_cmd->index_key_;
 }
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
@@ -1179,7 +1187,7 @@ bool WalCmdUpdateSegmentBloomFilterDataV2::operator==(const WalCmd &other) const
 
 bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpoint *>(&other);
-    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
+    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_;
 }
 
 bool WalCmdCheckpointV2::operator==(const WalCmd &other) const {
@@ -1293,7 +1301,7 @@ bool WalCmdDropColumnsV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDropColumnsV2 *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && db_id_ == other_cmd->db_id_ && table_name_ == other_cmd->table_name_ &&
            table_id_ == other_cmd->table_id_ && column_names_ == other_cmd->column_names_ && column_ids_ == other_cmd->column_ids_ &&
-           table_key_ == other_cmd->table_key_;
+           table_key_ == other_cmd->table_key_ && column_keys_ == other_cmd->column_keys_;
 }
 
 bool WalCmdCleanup::operator==(const WalCmd &other) const {
@@ -1350,7 +1358,7 @@ i32 WalCmdCreateDatabaseV2::GetSizeInBytes() const {
 i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
 i32 WalCmdDropDatabaseV2::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size() + sizeof(TxnTimeStamp);
 }
 
 i32 WalCmdCreateTable::GetSizeInBytes() const {
@@ -1391,7 +1399,7 @@ i32 WalCmdDropTable::GetSizeInBytes() const {
 
 i32 WalCmdDropTableV2::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size() + sizeof(i32) + this->table_name_.size() +
-           sizeof(i32) + this->table_id_.size() + sizeof(i32) + this->table_key_.size();
+           sizeof(i32) + this->table_id_.size() + sizeof(TxnTimeStamp) + sizeof(i32) + this->table_key_.size();
 }
 
 i32 WalCmdDropIndex::GetSizeInBytes() const {
@@ -1401,8 +1409,8 @@ i32 WalCmdDropIndex::GetSizeInBytes() const {
 
 i32 WalCmdDropIndexV2::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size() + sizeof(i32) + this->table_name_.size() +
-           sizeof(i32) + this->table_id_.size() + sizeof(i32) + this->index_name_.size() + sizeof(i32) + this->index_id_.size() + sizeof(i32) +
-           this->index_key_.size();
+           sizeof(i32) + this->table_id_.size() + sizeof(i32) + this->index_name_.size() + sizeof(i32) + this->index_id_.size() +
+           sizeof(TxnTimeStamp) + sizeof(i32) + this->index_key_.size();
 }
 
 i32 WalCmdImport::GetSizeInBytes() const {
@@ -1476,7 +1484,7 @@ i32 WalCmdUpdateSegmentBloomFilterDataV2::GetSizeInBytes() const {
 }
 
 i32 WalCmdCheckpoint::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(max_commit_ts_) + sizeof(i8) + sizeof(i32) + catalog_path_.size() + sizeof(i32) + catalog_name_.size();
+    return sizeof(WalCommandType) + sizeof(max_commit_ts_) + sizeof(i32) + catalog_path_.size() + sizeof(i32) + catalog_name_.size();
 }
 
 i32 WalCmdCheckpointV2::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(max_commit_ts_); }
@@ -1583,6 +1591,10 @@ i32 WalCmdDropColumnsV2::GetSizeInBytes() const {
     }
     res += sizeof(i32) + column_ids_.size() * sizeof(ColumnID);
     res += sizeof(i32) + table_key_.size();
+    res += sizeof(i32);
+    for (const auto &column_key : column_keys_) {
+        res += sizeof(i32) + column_key.size();
+    }
     return res;
 }
 
@@ -1641,6 +1653,7 @@ void WalCmdDropDatabaseV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_DATABASE_V2);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_id_);
+    WriteBufAdv(buf, this->create_ts_);
 }
 
 void WalCmdCreateTable::WriteAdv(char *&buf) const {
@@ -1697,6 +1710,7 @@ void WalCmdDropTableV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_id_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_id_);
+    WriteBufAdv(buf, this->create_ts_);
     WriteBufAdv(buf, this->table_key_);
 }
 
@@ -1715,6 +1729,7 @@ void WalCmdDropIndexV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_id_);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_id_);
+    WriteBufAdv(buf, this->create_ts_);
     WriteBufAdv(buf, this->index_key_);
 }
 
@@ -1877,7 +1892,6 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     assert(!std::filesystem::path(catalog_path_).is_absolute());
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
-    WriteBufAdv(buf, i8(this->is_full_checkpoint_));
     WriteBufAdv(buf, this->catalog_path_);
     WriteBufAdv(buf, this->catalog_name_);
 }
@@ -2047,6 +2061,10 @@ void WalCmdDropColumnsV2::WriteAdv(char *&buf) const {
         WriteBufAdv(buf, column_id);
     }
     WriteBufAdv(buf, this->table_key_);
+    WriteBufAdv(buf, static_cast<i32>(this->column_keys_.size()));
+    for (const auto &column_key : column_keys_) {
+        WriteBufAdv(buf, column_key);
+    }
 }
 
 void WalCmdCleanup::WriteAdv(char *&buf) const {
@@ -2084,6 +2102,7 @@ String WalCmdDropDatabaseV2::ToString() const {
     ss << "Drop Database: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "db id: " << db_id_ << std::endl;
+    ss << "create ts: " << create_ts_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -2121,6 +2140,7 @@ String WalCmdDropTableV2::ToString() const {
     ss << "db id: " << db_id_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "table id: " << table_id_ << std::endl;
+    ss << "create ts: " << create_ts_ << std::endl;
     ss << "table key: " << table_key_ << std::endl;
     return std::move(ss).str();
 }
@@ -2170,6 +2190,7 @@ String WalCmdDropIndexV2::ToString() const {
     ss << "table id: " << table_id_ << std::endl;
     ss << "index name: " << index_name_ << std::endl;
     ss << "index id: " << index_id_ << std::endl;
+    ss << "create ts: " << create_ts_ << std::endl;
     ss << "index key: " << index_key_ << std::endl;
     return std::move(ss).str();
 }
@@ -2285,7 +2306,6 @@ String WalCmdCheckpoint::ToString() const {
     ss << "Checkpoint: " << std::endl;
     ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
     ss << "max commit ts: " << max_commit_ts_ << std::endl;
-    ss << "is full checkpoint: " << is_full_checkpoint_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -2424,7 +2444,6 @@ String WalCmdRenameTableV2::ToString() const {
     ss << "db id: " << db_id_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "table id: " << table_id_ << std::endl;
-    ss << "old table key: " << old_table_key_ << std::endl;
     ss << "new table name: " << new_table_name_ << std::endl;
     ss << "old table key: " << old_table_key_ << std::endl;
     return std::move(ss).str();
@@ -2483,6 +2502,11 @@ String WalCmdDropColumnsV2::ToString() const {
     }
     ss << std::endl;
     ss << "table key: " << table_key_ << std::endl;
+    ss << "column keys: ";
+    for (auto &column_key : column_keys_) {
+        ss << column_key << " | ";
+    }
+    ss << std::endl;
     return std::move(ss).str();
 }
 
@@ -2501,7 +2525,7 @@ String WalCmdCreateDatabaseV2::CompactInfo() const {
 String WalCmdDropDatabase::CompactInfo() const { return fmt::format("{}: database: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_); }
 
 String WalCmdDropDatabaseV2::CompactInfo() const {
-    return fmt::format("{}: database: {}, db_id: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, db_id_);
+    return fmt::format("{}: database: {}, db_id: {}, create_ts: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, db_id_, create_ts_);
 }
 
 String WalCmdCreateTable::CompactInfo() const {
@@ -2526,7 +2550,12 @@ String WalCmdDropTable::CompactInfo() const {
 }
 
 String WalCmdDropTableV2::CompactInfo() const {
-    return fmt::format("{}: database: {}, table: {}, table_id: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, table_name_, table_id_);
+    return fmt::format("{}: database: {}, table: {}, table_id: {}, create_ts: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       table_id_,
+                       create_ts_);
 }
 
 String WalCmdCreateIndex::CompactInfo() const {
@@ -2553,14 +2582,15 @@ String WalCmdDropIndex::CompactInfo() const {
 }
 
 String WalCmdDropIndexV2::CompactInfo() const {
-    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}",
+    return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, index: {}, index_id: {}, create_ts_: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
                        db_name_,
                        db_id_,
                        table_name_,
                        table_id_,
                        index_name_,
-                       index_id_);
+                       index_id_,
+                       create_ts_);
 }
 
 String WalCmdImport::CompactInfo() const {
@@ -2644,11 +2674,10 @@ String WalCmdUpdateSegmentBloomFilterDataV2::CompactInfo() const {
 }
 
 String WalCmdCheckpoint::CompactInfo() const {
-    return fmt::format("{}: path: {}, max_commit_ts: {}, full_checkpoint: {}",
+    return fmt::format("{}: path: {}, max_commit_ts: {},",
                        WalCmd::WalCommandTypeToString(GetType()),
                        fmt::format("{}/{}", catalog_path_, catalog_name_),
-                       max_commit_ts_,
-                       is_full_checkpoint_);
+                       max_commit_ts_);
 }
 
 String WalCmdCheckpointV2::CompactInfo() const {

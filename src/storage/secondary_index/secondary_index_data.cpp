@@ -29,7 +29,6 @@ import infinity_exception;
 import third_party;
 import secondary_index_pgm;
 import logger;
-import chunk_index_entry;
 import buffer_handle;
 import buffer_obj;
 
@@ -38,19 +37,11 @@ namespace infinity {
 template <typename RawValueType>
 struct SecondaryIndexChunkDataReader {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    // ChunkIndexEntry *chunk_index_;
     BufferHandle handle_;
     u32 row_count_ = 0;
     u32 next_offset_ = 0;
     const void *key_ptr_ = nullptr;
     const SegmentOffset *offset_ptr_ = nullptr;
-    SecondaryIndexChunkDataReader(ChunkIndexEntry *chunk_index) {
-        handle_ = chunk_index->GetIndex();
-        row_count_ = chunk_index->GetRowCount();
-        auto *index = static_cast<const SecondaryIndexData *>(handle_.GetData());
-        std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
-        assert(index->GetChunkRowCount() == row_count_);
-    }
     SecondaryIndexChunkDataReader(BufferObj *buffer_obj, u32 row_count) {
         handle_ = buffer_obj->Load();
         row_count_ = row_count;
@@ -74,19 +65,6 @@ struct SecondaryIndexChunkMerger {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     Vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
     std::priority_queue<Tuple<OrderedKeyType, u32, u32>, Vector<Tuple<OrderedKeyType, u32, u32>>, std::greater<Tuple<OrderedKeyType, u32, u32>>> pq_;
-    explicit SecondaryIndexChunkMerger(const Vector<ChunkIndexEntry *> &old_chunks) {
-        readers_.reserve(old_chunks.size());
-        for (ChunkIndexEntry *chunk : old_chunks) {
-            readers_.emplace_back(chunk);
-        }
-        OrderedKeyType key = {};
-        u32 offset = 0;
-        for (u32 i = 0; i < readers_.size(); ++i) {
-            if (readers_[i].GetNextDataPair(key, offset)) {
-                pq_.emplace(key, offset, i);
-            }
-        }
-    }
     explicit SecondaryIndexChunkMerger(const Vector<Pair<u32, BufferObj *>> &buffer_objs) {
         readers_.reserve(buffer_objs.size());
         for (const auto &[row_count, buffer_obj] : buffer_objs) {
@@ -160,22 +138,6 @@ public:
         }
         if (i != chunk_row_count_) {
             UnrecoverableError(fmt::format("InsertData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
-        }
-        pgm_index_->BuildIndex(chunk_row_count_, key_.get());
-    }
-
-    void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks) override {
-        SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
-        OrderedKeyType key = {};
-        u32 offset = 0;
-        u32 i = 0;
-        while (merger.GetNextDataPair(key, offset)) {
-            key_[i] = key;
-            offset_[i] = offset;
-            ++i;
-        }
-        if (i != chunk_row_count_) {
-            UnrecoverableError(fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
         }
         pgm_index_->BuildIndex(chunk_row_count_, key_.get());
     }

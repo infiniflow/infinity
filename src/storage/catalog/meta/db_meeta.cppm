@@ -24,66 +24,41 @@ namespace infinity {
 
 class KVInstance;
 class DatabaseInfo;
+class NewTxn;
 
 export class DBMeeta {
 public:
-    DBMeeta(String db_id_str, KVInstance &kv_instance);
+    DBMeeta(String db_id_str, NewTxn *txn);
+    DBMeeta(String db_id_str, KVInstance *kv_instance);
 
-    const String &db_id_str() const { return db_id_str_; }
+    const String &db_id_str() const;
 
-    KVInstance &kv_instance() const { return kv_instance_; }
+    KVInstance *kv_instance() const { return kv_instance_; }
 
     Status InitSet(const String *comment = nullptr);
 
     Status UninitSet(UsageFlag usage_flag);
 
-    Status GetComment(String *&comment) {
-        if (!comment_) {
-            Status status = LoadComment();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        comment = &*comment_;
-        return Status::OK();
-    }
+    Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr);
 
-    Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr) {
-        if (!table_id_strs_ || !table_names_) {
-            Status status = LoadTableIDs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        table_id_strs = &*table_id_strs_;
-        if (table_names) {
-            *table_names = &*table_names_;
-        }
-        return Status::OK();
-    }
+    Status GetTableID(const String &table_name, String &table_key, String &table_id_str, TxnTimeStamp& create_table_ts);
 
-    Status GetTableID(const String &table_name, String &table_key, String &table_id_str);
-
-    Status GetTableName(const String &table_id_str, String &table_key, String &table_name) const;
-
-    Status GetDBName(const String &db_id_str, String &db_name) const;
-
-    Status GetDatabaseInfo(DatabaseInfo &db_info);
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo();
 
     Tuple<String, Status> GetNextTableID();
 
     Status SetNextTableID(const String &table_id_str);
 
 private:
-    Status LoadComment();
-
+    Status GetComment(String *&comment);
     Status LoadTableIDs();
-
     String GetDBTag(const String &tag) const;
 
 private:
     String db_id_str_;
-    KVInstance &kv_instance_;
+    NewTxn *txn_{};
+    TxnTimeStamp txn_begin_ts_{};
+    KVInstance *kv_instance_{};
 
     Optional<String> comment_;
     Optional<Vector<String>> table_id_strs_;

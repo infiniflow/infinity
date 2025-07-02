@@ -24,7 +24,6 @@ import global_resource_usage;
 
 namespace infinity {
 
-class CleanupTask;
 class NewCleanupTask;
 
 export class PeriodicTrigger {
@@ -69,18 +68,9 @@ private:
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CheckpointPeriodicTrigger(i64 interval, WalManager *wal_mgr, bool full_checkpoint)
-        : PeriodicTrigger(interval), wal_mgr_(wal_mgr), is_full_checkpoint_(full_checkpoint) {}
-
-    CheckpointPeriodicTrigger(i64 interval) : PeriodicTrigger(interval), new_checkpoint_(true) {}
+    explicit CheckpointPeriodicTrigger(i64 interval) : PeriodicTrigger(interval) {}
 
     virtual void Trigger() override;
-
-private:
-    WalManager *const wal_mgr_{};
-    bool is_full_checkpoint_{};
-
-    bool new_checkpoint_ = false;
 };
 
 export class CompactSegmentPeriodicTrigger final : public PeriodicTrigger {

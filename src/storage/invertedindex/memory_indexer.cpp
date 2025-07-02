@@ -60,7 +60,6 @@ import third_party;
 import infinity_context;
 import defer_op;
 import blocking_queue;
-import segment_index_entry;
 import persistence_manager;
 import utility;
 import persist_result_handler;
@@ -68,8 +67,6 @@ import virtual_store;
 import local_file_handle;
 import mem_usage_change;
 import bg_task;
-import table_index_meta;
-import table_entry;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -80,16 +77,10 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
-MemoryIndexer::MemoryIndexer(const String &index_dir,
-                             const String &base_name,
-                             RowID base_row_id,
-                             optionflag_t flag,
-                             const String &analyzer,
-                             SegmentIndexEntry *segment_index_entry)
+MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
       analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
-      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL),
-      segment_index_entry_(segment_index_entry) {
+      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
@@ -535,21 +526,7 @@ void MemoryIndexer::Reset() {
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
-    if (segment_index_entry_ == nullptr) {
-        return MemIndexTracerInfo(MakeShared<String>(index_name_),
-                                  MakeShared<String>(table_name_),
-                                  MakeShared<String>(db_name_),
-                                  MemUsed(),
-                                  doc_count_);
-    }
-
-    auto *table_index_entry = segment_index_entry_->table_index_entry();
-    SharedPtr<String> index_name = table_index_entry->GetIndexName();
-    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-    SharedPtr<String> table_name = table_entry->GetTableName();
-    SharedPtr<String> db_name = table_entry->GetDBName();
-
-    return MemIndexTracerInfo(index_name, table_name, db_name, MemUsed(), doc_count_);
+    return MemIndexTracerInfo(MakeShared<String>(index_name_), MakeShared<String>(table_name_), MakeShared<String>(db_name_), MemUsed(), doc_count_);
 }
 
 const ChunkIndexMetaInfo MemoryIndexer::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{base_name_, base_row_id_, GetDocCount(), 0}; }

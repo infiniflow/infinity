@@ -28,7 +28,6 @@ export class KVInstance;
 export class KVIterator {
 public:
     explicit KVIterator(rocksdb::Iterator *iterator_);
-    KVIterator(rocksdb::Transaction *transaction, rocksdb::ReadOptions &read_options, const String &upper_bound);
     ~KVIterator();
 
     void Seek(const String &key);
@@ -39,8 +38,6 @@ public:
 
 private:
     rocksdb::Iterator *iterator_{};
-    UniquePtr<rocksdb::Slice> lower_bound_{};
-    UniquePtr<rocksdb::Slice> upper_bound_{};
 };
 
 class KVInstance {
@@ -58,6 +55,7 @@ public:
     UniquePtr<KVIterator> GetIterator();
     UniquePtr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
     Vector<Pair<String, String>> GetAllKeyValue();
+    String ToString() const;
 
     Status Commit();
     Status Rollback();
@@ -70,7 +68,7 @@ private:
 class KVStore {
 public:
     KVStore() = default;
-    ~KVStore() = default;
+    ~KVStore();
 
     Status Init(const String &db_path);
     Status Uninit();

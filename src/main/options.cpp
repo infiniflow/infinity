@@ -90,7 +90,7 @@ GlobalOptions::GlobalOptions() {
 
     name2index_[String(WAL_DIR_OPTION_NAME)] = GlobalOptionIndex::kWALDir;
     name2index_[String(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;
-    name2index_[String(FULL_CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kFullCheckpointInterval;
+    name2index_[String(CHECKPOINT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCheckpointInterval;
 
     name2index_[String(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
     name2index_[String(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;

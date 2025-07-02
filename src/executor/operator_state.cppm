@@ -33,7 +33,6 @@ import status;
 import internal_types;
 import column_def;
 import data_type;
-import segment_entry;
 import hash_table;
 
 namespace infinity {
@@ -400,11 +399,10 @@ export struct ReadCacheState : public OperatorState {
 
 // Compact
 export struct CompactOperatorState : public OperatorState {
-    CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data);
+    CompactOperatorState(SharedPtr<CompactStateData> compact_state_data);
     ~CompactOperatorState();
 
     SizeT compact_idx_{};
-    Vector<Vector<SegmentEntry *>> segment_groups_;
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
@@ -513,10 +511,7 @@ export struct KnnScanSourceState : public SourceState {
 };
 
 export struct CompactSourceState : public SourceState {
-    explicit CompactSourceState(Vector<Vector<SegmentEntry *>> segment_groups)
-        : SourceState(SourceStateType::kCompact), segment_groups_(std::move(segment_groups)) {}
-
-    Vector<Vector<SegmentEntry *>> segment_groups_;
+    explicit CompactSourceState() : SourceState(SourceStateType::kCompact) {}
 };
 
 export struct EmptySourceState : public SourceState {

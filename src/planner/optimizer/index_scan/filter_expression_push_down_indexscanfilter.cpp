@@ -39,10 +39,8 @@ import third_party;
 import scalar_function;
 import scalar_function_set;
 import index_base;
-import table_index_entry;
 import new_catalog;
 import value;
-import table_index_meta;
 import meta_info;
 import roaring_bitmap;
 import query_node;
@@ -54,7 +52,6 @@ import doc_iterator;
 import search_driver;
 import status;
 import parse_fulltext_options;
-import table_entry;
 import block_index;
 
 import new_txn;
@@ -91,18 +88,16 @@ struct ExpressionIndexScanInfo {
     };
 
     // for index scan
-    HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
     TableMeeta *table_meta_ = nullptr;
     HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
 
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
-            base_table_ref->block_index_->table_meta_ =
-                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS(), new_txn->CommitTS());
+            base_table_ref->block_index_->table_meta_ = MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, new_txn);
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
-        auto& table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
+        auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;
 
         Vector<String> *index_id_strs_ptr = nullptr;
         status = table_meta_->GetIndexIDs(index_id_strs_ptr);
@@ -118,7 +113,7 @@ struct ExpressionIndexScanInfo {
                 auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
                 table_index_meta_map.emplace_back(std::move(table_index_meta));
             }
-            SharedPtr<TableIndexMeeta>& it = table_index_meta_map[i];
+            SharedPtr<TableIndexMeeta> &it = table_index_meta_map[i];
 
             SharedPtr<IndexBase> index_base;
             std::tie(index_base, status) = it->GetIndexBase();
@@ -153,10 +148,7 @@ struct ExpressionIndexScanInfo {
             case ExpressionType::kColumn: {
                 auto *column_expression = static_cast<const ColumnExpression *>(expression.get());
                 const ColumnID column_id = column_expression->binding().column_idx;
-                if (candidate_column_index_map_.contains(column_id)) {
-                    tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
-                                                                                          : Enum::kSecondaryIndexColumnExprOrAfterCast;
-                } else if (new_candidate_column_index_map_.contains(column_id)) {
+                if (new_candidate_column_index_map_.contains(column_id)) {
                     tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
                                                                                           : Enum::kSecondaryIndexColumnExprOrAfterCast;
                 }
@@ -459,12 +451,7 @@ private:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
                             SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
-                            return IndexFilterEvaluatorSecondary::Make(function_expression,
-                                                                       column_id,
-                                                                       nullptr,
-                                                                       secondary_index,
-                                                                       compare_type,
-                                                                       value);
+                            return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
                         }
                         case FilterCompareType::kAlwaysTrue: {
                             return MakeUnique<IndexFilterEvaluatorAllTrue>();

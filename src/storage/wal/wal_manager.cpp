@@ -25,7 +25,6 @@ import new_txn;
 import storage;
 import virtual_store;
 import third_party;
-import table_entry_type;
 import infinity_context;
 import data_access_state;
 import status;
@@ -45,7 +44,6 @@ import index_base;
 import base_table_ref;
 import cluster_manager;
 import admin_statement;
-import cleanup_scanner;
 import global_resource_usage;
 import txn_state;
 import meta_info;
@@ -233,25 +231,6 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
         }
     }
 
-    auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_checkpoint_ts);
-    if (!catalog_fileinfo.has_value()) {
-        String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
-        UnrecoverableError(error_message);
-    }
-    auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
-
-    SharedPtr<WalEntry> ckp_wal_entry = MakeShared<WalEntry>();
-    String full_ckp_filename = std::filesystem::path(full_catalog_fileinfo.path_).filename();
-    ckp_wal_entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(full_catalog_fileinfo.max_commit_ts_, true, "catalog", full_ckp_filename));
-    // Use max ckp commit ts
-    ckp_wal_entry->commit_ts_ = std::max(ckp_wal_entry->commit_ts_, full_catalog_fileinfo.max_commit_ts_);
-    for (const auto &delta_catalog_file : delta_catalog_fileinfo_array) {
-        String delta_ckp_filename = std::filesystem::path(delta_catalog_file.path_).filename();
-        ckp_wal_entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(delta_catalog_file.max_commit_ts_, false, "catalog", delta_ckp_filename));
-        ckp_wal_entry->commit_ts_ = std::max(ckp_wal_entry->commit_ts_, delta_catalog_file.max_commit_ts_);
-    }
-    log_entries.emplace_back(ckp_wal_entry);
-
     std::reverse(log_entries.begin(), log_entries.end());
     log_strings.reserve(log_entries.size());
 
@@ -322,7 +301,7 @@ void WalManager::NewFlush() {
             }
 
             if (txn->GetTxnType() == TransactionType::kNewCheckpoint) {
-                LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, txn_id: {}, swap to new wal file",
+                LOG_INFO(fmt::format("Checkpoint begin at {}, cur txn commit_ts: {}, txn_id: {}, swap to new wal file",
                                      txn->BeginTS(),
                                      txn->CommitTS(),
                                      txn->TxnID()));
@@ -730,9 +709,9 @@ Tuple<TransactionID, TxnTimeStamp> WalManager::ReplayWalEntries(const Vector<Sha
 
         UniquePtr<NewTxn> replay_txn = txn_mgr->BeginReplayTxn(replay_entry);
         for (const auto &cmd : replay_entry->cmds_) {
-            LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", cmd->ToString(), replay_entry->commit_ts_));
+            LOG_TRACE(fmt::format("Replay wal cmd: {}, txn id: {}, commit ts: {}", cmd->ToString(), replay_entry->txn_id_, replay_entry->commit_ts_));
 
-            Status status = replay_txn->ReplayWalCmd(cmd);
+            Status status = replay_txn->ReplayWalCmd(cmd, replay_entry->commit_ts_, replay_entry->txn_id_);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));
             }

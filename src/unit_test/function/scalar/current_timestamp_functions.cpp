@@ -94,5 +94,4 @@ TEST_F(CurrentTimestampFunctionsTest, current_timestamp_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kTimestamp);
         }
     }
-    kv_store_ptr->Uninit();
 }

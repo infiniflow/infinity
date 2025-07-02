@@ -37,11 +37,33 @@ import create_index_info;
 import segment_meta;
 import kv_utility;
 import column_index_reader;
+import new_txn;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
     : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn)
+    : txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str) {
+    if (txn == nullptr) {
+        UnrecoverableError("Null txn pointer");
+    }
+    begin_ts_ = txn->BeginTS();
+    commit_ts_ = txn->CommitTS();
+    kv_instance_ = txn->kv_instance();
+}
+
+Status TableMeeta::GetComment(TableInfo &table_info) {
+    if (!comment_) {
+        Status status = LoadComment();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    table_info.table_comment_ = MakeShared<String>(*comment_);
+    return Status::OK();
+}
 
 Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
     if (!index_id_strs_ || !index_names_) {
@@ -57,38 +79,46 @@ Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **
     return Status::OK();
 }
 
-Status TableMeeta::GetIndexID(const String &index_name, String &index_key, String &index_id_str) {
+Status TableMeeta::GetIndexID(const String &index_name, String &index_key, String &index_id_str, TxnTimeStamp &create_index_ts) {
     String index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id_str_, table_id_str_, index_name);
-    auto iter2 = kv_instance_.GetIterator();
+    auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(index_key_prefix);
-    SizeT found_count = 0;
 
-    Vector<String> error_index_keys;
+    Vector<Pair<String, String>> index_kvs;
     while (iter2->Valid() && iter2->Key().starts_with(index_key_prefix)) {
-        if (found_count > 0) {
-            // Error branch
-            error_index_keys.push_back(index_key);
-        }
-        index_key = iter2->Key().ToString();
-        index_id_str = iter2->Value().ToString();
+        index_kvs.emplace_back(iter2->Key().ToString(), iter2->Value().ToString());
         iter2->Next();
-        ++found_count;
     }
 
-    if (found_count == 0) {
+    if (index_kvs.empty()) {
         return Status::IndexNotExist(index_name);
     }
 
-    if (!error_index_keys.empty()) {
-        error_index_keys.push_back(index_key);
-        // join error_index_keys
-        String error_index_keys_str =
-            std::accumulate(std::next(error_index_keys.begin()), error_index_keys.end(), error_index_keys.front(), [](String a, String b) {
-                return std::move(a) + ", " + std::move(b);
-            });
-        UnrecoverableError(fmt::format("Found multiple index keys: {}", error_index_keys_str));
+    SizeT max_visible_index_index = std::numeric_limits<SizeT>::max();
+    TxnTimeStamp max_commit_ts = 0;
+    for (SizeT i = 0; i < index_kvs.size(); ++i) {
+        TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(index_kvs[i].first);
+        if ((commit_ts <= begin_ts_ || (txn_ != nullptr && txn_->IsReplay() && commit_ts == commit_ts_)) && commit_ts > max_commit_ts) {
+            max_commit_ts = commit_ts;
+            max_visible_index_index = i;
+        }
     }
 
+    if (max_visible_index_index == std::numeric_limits<SizeT>::max()) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    index_id_str = index_kvs[max_visible_index_index].second;
+    index_key = index_kvs[max_visible_index_index].first;
+
+    String drop_index_ts{};
+    kv_instance_->Get(KeyEncode::DropTableIndexKey(db_id_str_, table_id_str_, index_name, max_commit_ts, index_id_str), drop_index_ts);
+
+    if (!drop_index_ts.empty() && std::stoull(drop_index_ts) <= begin_ts_) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    create_index_ts = max_commit_ts;
     return Status::OK();
 }
 
@@ -170,7 +200,7 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
-    auto iter = kv_instance_.GetIterator();
+    auto iter = kv_instance_->GetIterator();
     iter->Seek(segment_id_prefix);
     Vector<String> delete_keys;
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
@@ -187,7 +217,7 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
         iter->Next();
     }
     for (const String &key : delete_keys) {
-        Status status = kv_instance_.Delete(key);
+        Status status = kv_instance_->Delete(key);
         if (!status.ok()) {
             return status;
         }
@@ -242,7 +272,7 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
 
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_.Put(segment_id_key, commit_ts_str);
+    status = kv_instance_->Put(segment_id_key, commit_ts_str);
     if (!status.ok()) {
         return {0, status};
     }
@@ -252,13 +282,13 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
 Status TableMeeta::AddSegmentWithID(TxnTimeStamp commit_ts, SegmentID segment_id) {
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    return kv_instance_.Put(segment_id_key, commit_ts_str);
+    return kv_instance_->Put(segment_id_key, commit_ts_str);
 }
 
 Status TableMeeta::CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts) {
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
     String commit_ts_str = fmt::format("{}", commit_ts);
-    Status status = kv_instance_.Put(segment_id_key, commit_ts_str);
+    Status status = kv_instance_->Put(segment_id_key, commit_ts_str);
     if (!status.ok()) {
         return status;
     }
@@ -272,7 +302,7 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     if (table_def->table_comment() != nullptr and !table_def->table_comment()->empty()) {
         String &table_comment = *table_def->table_comment();
         String table_comment_key = GetTableTag("comment");
-        status = kv_instance_.Put(table_comment_key, table_comment);
+        status = kv_instance_->Put(table_comment_key, table_comment);
         if (!status.ok()) {
             return status;
         }
@@ -287,14 +317,14 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
 
     // Create the next segment id;
     String table_latest_segment_id_key = GetTableTag("next_segment_id");
-    status = kv_instance_.Put(table_latest_segment_id_key, "0");
+    status = kv_instance_->Put(table_latest_segment_id_key, "0");
     if (!status.ok()) {
         return status;
     }
 
     // Create next index id;
     String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
-    status = kv_instance_.Put(next_index_id_key, "0");
+    status = kv_instance_->Put(next_index_id_key, "0");
     if (!status.ok()) {
         return status;
     }
@@ -310,8 +340,8 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     // }
 
     for (const auto &column : table_def->columns()) {
-        String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name());
-        status = kv_instance_.Put(column_key, column->ToJson().dump());
+        String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name(), commit_ts_);
+        status = kv_instance_->Put(column_key, column->ToJson().dump());
         if (!status.ok()) {
             return status;
         }
@@ -353,28 +383,28 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
 
     // Create next index id;
     String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
-    status = kv_instance_.Delete(next_index_id_key);
+    status = kv_instance_->Delete(next_index_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // delete table segment id;
     String table_latest_segment_id_key = GetTableTag("next_segment_id");
-    status = kv_instance_.Delete(table_latest_segment_id_key);
+    status = kv_instance_->Delete(table_latest_segment_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // Delete table column id;
     String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
-    status = kv_instance_.Delete(table_latest_column_id_key);
+    status = kv_instance_->Delete(table_latest_column_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // Delete table comment
     String table_comment_key = GetTableTag("comment");
-    status = kv_instance_.Delete(table_comment_key);
+    status = kv_instance_->Delete(table_comment_key);
     if (!status.ok()) {
         return status;
     }
@@ -397,7 +427,7 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     String unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
-    status = kv_instance_.Delete(unsealed_seg_id_key);
+    status = kv_instance_->Delete(unsealed_seg_id_key);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kNotFound) {
             return status;
@@ -405,12 +435,12 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
-    auto iter2 = kv_instance_.GetIterator();
+    auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(table_column_prefix);
 
     while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
         String table_column_key = iter2->Key().ToString();
-        status = kv_instance_.Delete(table_column_key);
+        status = kv_instance_->Delete(table_column_key);
         if (!status.ok()) {
             return status;
         }
@@ -418,12 +448,12 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
     }
 
     String index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
-    auto iter = kv_instance_.GetIterator();
+    auto iter = kv_instance_->GetIterator();
     iter->Seek(index_prefix);
 
     while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
         String index_key = iter->Key().ToString();
-        status = kv_instance_.Delete(index_key);
+        status = kv_instance_->Delete(index_key);
         if (!status.ok()) {
             return status;
         }
@@ -444,13 +474,6 @@ Status TableMeeta::UninitSet(UsageFlag usage_flag) {
 
 Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     Status status;
-
-    String *table_comment = nullptr;
-    status = GetComment(table_comment);
-    if (!status.ok()) {
-        return status;
-    }
-    table_info.table_comment_ = MakeShared<String>(*table_comment);
 
     table_info.table_full_dir_ =
         MakeShared<String>(fmt::format("{}/db_{}/tbl_{}", InfinityContext::instance().config()->DataDir(), db_id_str_, table_id_str_));
@@ -484,10 +507,13 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail, const String &db_na
     if (!status.ok()) {
         return status;
     }
+    status = GetComment(table_info);
+    if (!status.ok()) {
+        return status;
+    }
     table_detail.db_name_ = MakeShared<String>(db_name);
     table_detail.table_name_ = MakeShared<String>(table_name);
     table_detail.table_comment_ = table_info.table_comment_;
-    table_detail.table_entry_type_ = table_info.table_entry_type_;
     table_detail.column_count_ = table_info.column_count_;
     table_detail.row_count_ = table_info.row_count_;
 
@@ -515,33 +541,10 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail, const String &db_na
 }
 
 Status TableMeeta::AddColumn(const ColumnDef &column_def) {
-    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name());
+    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name(), commit_ts_);
     String column_name_value;
-    Status status = kv_instance_.Get(column_key, column_name_value);
-    if (status.code() == ErrorCode::kNotFound) {
-        status = kv_instance_.Put(column_key, column_def.ToJson().dump());
-        if (!status.ok()) {
-            return status;
-        }
-    } else {
-        return Status::DuplicateColumnName(column_def.name());
-    }
-    return Status::OK();
-}
-
-Status TableMeeta::DropColumn(const String &column_name) {
-    String column_name_value;
-    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
-    Status status = kv_instance_.Get(column_key, column_name_value);
-    if (status.ok()) {
-        status = kv_instance_.Delete(column_key);
-        if (!status.ok()) {
-            return status;
-        }
-    } else {
-        return Status::ColumnNotExist(column_name);
-    }
-    return Status::OK();
+    Status status = kv_instance_->Put(column_key, column_def.ToJson().dump());
+    return status;
 }
 
 Status TableMeeta::AddFtIndexCache(SharedPtr<TableIndexReaderCache> ft_index_cache) {
@@ -575,6 +578,28 @@ Status TableMeeta::RemoveFtIndexCache() {
     return Status::OK();
 }
 
+Status TableMeeta::InvalidateFtIndexCache(SegmentID segment_id) {
+    String ft_index_cache_key = GetTableTag("ft_index_cache");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    SharedPtr<TableIndexReaderCache> ft_index_cache;
+    Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
+    if (!status.ok()) {
+        if (status.code() == ErrorCode::kCatalogError) {
+            return Status::OK();
+        }
+        return status;
+    }
+    ColumnID next_column_id;
+    status = GetNextColumnID(next_column_id);
+    if (!status.ok()) {
+        return status;
+    }
+    for (ColumnID column_id = 0; column_id < next_column_id; ++column_id) {
+        ft_index_cache->InvalidateSegmentColumn(column_id, segment_id);
+    }
+    return Status::OK();
+}
+
 Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
     if (!next_column_id_) {
         Status status = LoadNextColumnID();
@@ -589,7 +614,7 @@ Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
 Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
     String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str = fmt::format("{}", next_column_id);
-    Status status = kv_instance_.Put(table_latest_column_id_key, next_column_id_str);
+    Status status = kv_instance_->Put(table_latest_column_id_key, next_column_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -611,7 +636,7 @@ Status TableMeeta::UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &seg
 Status TableMeeta::LoadComment() {
     String table_comment_key = GetTableTag("comment");
     String table_comment;
-    Status status = kv_instance_.Get(table_comment_key, table_comment);
+    Status status = kv_instance_->Get(table_comment_key, table_comment);
     if (!status.ok() && status.code() != ErrorCode::kNotFound) { // not found is ok
         LOG_ERROR(fmt::format("Fail to get table comment from kv store, key: {}, cause: {}", table_comment_key, status.message()));
         return status;
@@ -622,17 +647,44 @@ Status TableMeeta::LoadComment() {
 
 Status TableMeeta::LoadColumnDefs() {
     Vector<SharedPtr<ColumnDef>> column_defs;
+    Map<String, Vector<Pair<String, String>>> column_kvs_map;
+    String column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
+    auto iter = kv_instance_->GetIterator();
+    iter->Seek(column_prefix);
+    while (iter->Valid() && iter->Key().starts_with(column_prefix)) {
+        String column_key = iter->Key().ToString();
+        String column_value = iter->Value().ToString();
+        size_t start = column_prefix.size();
+        size_t end = column_key.find('|', start);
+        String column_name = column_key.substr(start, end - start);
+        column_kvs_map[column_name].emplace_back(column_key, column_value);
+        iter->Next();
+    }
 
-    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
-    auto iter2 = kv_instance_.GetIterator();
-    iter2->Seek(table_column_prefix);
-    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
-        String column_key = iter2->Key().ToString();
-        String column_value = iter2->Value().ToString();
-        [[maybe_unused]] String column_name = column_key.substr(column_key.find_last_of('|') + 1);
-        auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
-        column_defs.emplace_back(column_def);
-        iter2->Next();
+    for (const auto &[column_name, column_kv] : column_kvs_map) {
+        SizeT max_visible_column_index = std::numeric_limits<SizeT>::max();
+        TxnTimeStamp max_commit_ts = 0;
+        for (SizeT i = 0; i < column_kv.size(); ++i) {
+            String commit_ts_str = GetLastPartOfKey(column_kv[i].first, '|');
+            TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
+            if ((commit_ts <= begin_ts_ || commit_ts == commit_ts_) && commit_ts > max_commit_ts) {
+                {
+                    max_commit_ts = commit_ts;
+                    max_visible_column_index = i;
+                }
+            }
+        }
+
+        if (max_visible_column_index != std::numeric_limits<SizeT>::max()) {
+            String drop_column_ts{};
+            const String &column_value = column_kv[max_visible_column_index].second;
+            kv_instance_->Get(KeyEncode::DropTableColumnKey(db_id_str_, table_id_str_, column_name, max_commit_ts), drop_column_ts);
+
+            if (drop_column_ts.empty() || std::stoull(drop_column_ts) > begin_ts_) {
+                auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
+                column_defs.push_back(column_def);
+            }
+        }
     }
     std::sort(column_defs.begin(), column_defs.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) { return a->id_ < b->id_; });
     column_defs_ = std::move(column_defs);
@@ -653,24 +705,51 @@ Status TableMeeta::LoadColumnDefs() {
 // }
 
 Status TableMeeta::LoadSegmentIDs1() {
-    segment_ids1_ = infinity::GetTableSegments(&kv_instance_, db_id_str_, table_id_str_, begin_ts_);
+    segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     return Status::OK();
 }
 
 Status TableMeeta::LoadIndexIDs() {
     Vector<String> index_id_strs;
     Vector<String> index_names;
+    Map<String, Vector<Pair<String, String>>> index_kvs_map;
     String index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
-    auto iter = kv_instance_.GetIterator();
+    auto iter = kv_instance_->GetIterator();
     iter->Seek(index_prefix);
     while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
-        String column_key = iter->Key().ToString();
+        String index_key = iter->Key().ToString();
+        String index_id = iter->Value().ToString();
         size_t start = index_prefix.size();
-        size_t end = column_key.find('|', start);
-        index_names.emplace_back(column_key.substr(start, end - start));
-        index_id_strs.emplace_back(iter->Value().ToString());
+        size_t end = index_key.find('|', start);
+        String index_name = index_key.substr(start, end - start);
+        index_kvs_map[index_name].emplace_back(index_key, index_id);
         iter->Next();
     }
+
+    for (const auto &[index_name, index_kv] : index_kvs_map) {
+        SizeT max_visible_index_index = std::numeric_limits<SizeT>::max();
+        TxnTimeStamp max_commit_ts = 0;
+        for (SizeT i = 0; i < index_kv.size(); ++i) {
+            String commit_ts_str = GetLastPartOfKey(index_kv[i].first, '|');
+            TxnTimeStamp commit_ts = std::stoull(commit_ts_str);
+            if (commit_ts <= begin_ts_ && commit_ts > max_commit_ts) {
+                max_commit_ts = commit_ts;
+                max_visible_index_index = i;
+            }
+        }
+
+        if (max_visible_index_index != std::numeric_limits<SizeT>::max()) {
+            String drop_index_ts{};
+            const String &index_id = index_kv[max_visible_index_index].second;
+            kv_instance_->Get(KeyEncode::DropTableIndexKey(db_id_str_, table_id_str_, index_name, max_commit_ts, index_id), drop_index_ts);
+
+            if (drop_index_ts.empty() || std::stoull(drop_index_ts) > begin_ts_) {
+                index_id_strs.push_back(index_id);
+                index_names.push_back(index_name);
+            }
+        }
+    }
+
     index_id_strs_ = std::move(index_id_strs);
     index_names_ = std::move(index_names);
     return Status::OK();
@@ -691,7 +770,7 @@ Status TableMeeta::LoadIndexIDs() {
 Status TableMeeta::LoadUnsealedSegmentID() {
     String unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
     String unsealed_seg_id_str;
-    Status status = kv_instance_.Get(unsealed_seg_id_key, unsealed_seg_id_str);
+    Status status = kv_instance_->Get(unsealed_seg_id_key, unsealed_seg_id_str);
     if (!status.ok()) {
         LOG_DEBUG(fmt::format("Fail to get unsealed segment id from kv store, key: {}, cause: {}", unsealed_seg_id_key, status.message()));
         return status;
@@ -703,7 +782,7 @@ Status TableMeeta::LoadUnsealedSegmentID() {
 Status TableMeeta::LoadNextColumnID() {
     String table_latest_column_id_key = GetTableTag(NEXT_COLUMN_ID.data());
     String next_column_id_str;
-    Status status = kv_instance_.Get(table_latest_column_id_key, next_column_id_str);
+    Status status = kv_instance_->Get(table_latest_column_id_key, next_column_id_str);
     if (!status.ok()) {
         LOG_ERROR(fmt::format("Fail to get next column id from kv store, key: {}, cause: {}", table_latest_column_id_key, status.message()));
         return status;
@@ -730,7 +809,7 @@ Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
     unsealed_segment_id_ = unsealed_segment_id;
     String unsealed_id_key = GetTableTag("unsealed_segment_id");
     String unsealed_id_str = fmt::format("{}", unsealed_segment_id);
-    Status status = kv_instance_.Put(unsealed_id_key, unsealed_id_str);
+    Status status = kv_instance_->Put(unsealed_id_key, unsealed_id_str);
     if (!status.ok()) {
         LOG_ERROR(fmt::format("Fail to set unsealed segment id from kv store, {}:{}, cause: {}", unsealed_id_key, unsealed_id_str, status.message()));
         return status;
@@ -740,20 +819,58 @@ Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
 
 Status TableMeeta::DelUnsealedSegmentID() {
     String unsealed_id_key = GetTableTag("unsealed_segment_id");
-    Status status = kv_instance_.Delete(unsealed_id_key);
+    Status status = kv_instance_->Delete(unsealed_id_key);
     return status;
 }
 
 Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column_name) {
-    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
-    String column_value_str;
-    Status status = kv_instance_.Get(column_key, column_value_str);
+    Status status;
+    SharedPtr<ColumnDef> column_def = nullptr;
+    std::tie(column_def, status) = GetColumnDefByColumnName(column_name);
     if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to get column id by column name: key: {}, cause: {}", column_key, status.message()));
         return {INVALID_COLUMN_ID, status};
     }
-    auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value_str));
+
     return {column_def->id_, Status::OK()};
+}
+
+Tuple<String, Status> TableMeeta::GetColumnKeyByColumnName(const String &column_name) const {
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    String column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_, column_name);
+    auto iter = kv_instance_->GetIterator();
+    iter->Seek(column_prefix);
+
+    Vector<Pair<String, String>> column_kvs;
+    while (iter->Valid() && iter->Key().starts_with(column_prefix)) {
+        column_kvs.emplace_back(iter->Key().ToString(), iter->Value().ToString());
+        iter->Next();
+    }
+
+    if (column_kvs.empty()) {
+        return {"", Status::ColumnNotExist(column_name)};
+    }
+
+    SizeT max_visible_column_index = std::numeric_limits<SizeT>::max();
+    TxnTimeStamp max_commit_ts = 0;
+    for (SizeT i = 0; i < column_kvs.size(); ++i) {
+        TxnTimeStamp commit_ts = infinity::GetTimestampFromKey(column_kvs[i].first);
+        if ((commit_ts <= begin_ts_ || commit_ts == commit_ts_) && commit_ts > max_commit_ts) {
+            max_commit_ts = commit_ts;
+            max_visible_column_index = i;
+        }
+    }
+
+    if (max_visible_column_index == std::numeric_limits<SizeT>::max()) {
+        return {"", Status::ColumnNotExist(column_name)};
+    }
+
+    String drop_column_ts{};
+    kv_instance_->Get(KeyEncode::DropTableColumnKey(db_id_str_, table_id_str_, column_name, max_commit_ts), drop_column_ts);
+    if (!drop_column_ts.empty() && std::stoull(drop_column_ts) <= begin_ts_) {
+        return {"", Status::ColumnNotExist(column_name)};
+    }
+
+    return {column_kvs[max_visible_column_index].first, Status::OK()};
 }
 
 SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_)}; }
@@ -774,7 +891,7 @@ SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_i
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     if (!segment_ids1_) {
-        segment_ids1_ = infinity::GetTableSegments(&kv_instance_, db_id_str_, table_id_str_, begin_ts_);
+        segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
     return {&*segment_ids1_, Status::OK()};
 }
@@ -783,9 +900,15 @@ Status TableMeeta::CheckSegments(const Vector<SegmentID> &segment_ids) {
     for (SegmentID segment_id : segment_ids) {
         String segment_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
         String commit_ts_str;
-        Status status = kv_instance_.Get(segment_key, commit_ts_str);
+        Status status = kv_instance_->Get(segment_key, commit_ts_str);
         if (!status.ok()) {
             return status;
+        }
+
+        String drop_segment_ts{};
+        kv_instance_->Get(KeyEncode::DropSegmentKey(db_id_str_, table_id_str_, segment_id), drop_segment_ts);
+        if (!drop_segment_ts.empty() && std::stoull(drop_segment_ts) <= begin_ts_) {
+            return Status::SegmentNotExist(segment_id);
         }
     }
     return Status::OK();
@@ -833,13 +956,13 @@ Status TableMeeta::GetNextRowID(RowID &next_row_id) {
 Tuple<String, Status> TableMeeta::GetNextIndexID() {
     String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
     String next_index_id_str;
-    Status status = kv_instance_.Get(next_index_id_key, next_index_id_str);
+    Status status = kv_instance_->Get(next_index_id_key, next_index_id_str);
     if (!status.ok()) {
         LOG_ERROR(fmt::format("Fail to get next index id from kv store, key: {}, cause: {}", next_index_id_key, status.message()));
         return {"", status};
     }
     String next_index_id = fmt::format("{}", std::stoull(next_index_id_str) + 1);
-    status = kv_instance_.Put(next_index_id_key, next_index_id);
+    status = kv_instance_->Put(next_index_id_key, next_index_id);
     if (!status.ok()) {
         LOG_ERROR(
             fmt::format("Fail to set next index id to kv store, key: {}, value: {}, cause: {}", next_index_id_key, next_index_id, status.message()));
@@ -850,7 +973,7 @@ Tuple<String, Status> TableMeeta::GetNextIndexID() {
 
 Status TableMeeta::SetNextIndexID(const String &index_id_str) {
     String next_index_id_key = GetTableTag(NEXT_INDEX_ID.data());
-    Status status = kv_instance_.Put(next_index_id_key, index_id_str);
+    Status status = kv_instance_->Put(next_index_id_key, index_id_str);
     if (!status.ok()) {
         LOG_ERROR(
             fmt::format("Fail to set next index id to kv store, key: {}, value: {}, cause: {}", next_index_id_key, index_id_str, status.message()));

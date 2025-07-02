@@ -42,8 +42,6 @@ import memindex_tracer;
 import infinity_context;
 import third_party;
 import buffer_obj;
-import table_index_meta;
-import table_entry;
 
 namespace infinity {
 
@@ -51,11 +49,9 @@ IVFIndexInMem::IVFIndexInMem(const RowID begin_row_id,
                              const IndexIVFOption &ivf_option,
                              const LogicalType column_logical_type,
                              const EmbeddingDataType embedding_data_type,
-                             const u32 embedding_dimension,
-                             SegmentIndexEntry *segment_index_entry)
+                             const u32 embedding_dimension)
     : begin_row_id_{begin_row_id},
-      ivf_index_storage_{new IVF_Index_Storage(ivf_option, column_logical_type, embedding_data_type, embedding_dimension)},
-      segment_index_entry_(segment_index_entry) {}
+      ivf_index_storage_{new IVF_Index_Storage(ivf_option, column_logical_type, embedding_data_type, embedding_dimension)} {}
 
 IVFIndexInMem::~IVFIndexInMem() {
     std::unique_lock lock(rw_mutex_);
@@ -120,25 +116,15 @@ public:
 
     MemIndexTracerInfo GetInfo() const override {
         const auto mem = MemoryUsed();
-        if (segment_index_entry_ == nullptr) {
-            return MemIndexTracerInfo(MakeShared<String>(index_name_),
-                                      MakeShared<String>(table_name_),
-                                      MakeShared<String>(db_name_),
-                                      mem,
-                                      input_row_count_);
-        }
-
-        auto *table_index_entry = segment_index_entry_->table_index_entry();
-        SharedPtr<String> index_name = table_index_entry->GetIndexName();
-        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-        SharedPtr<String> table_name = table_entry->GetTableName();
-        SharedPtr<String> db_name = table_entry->GetDBName();
-
-        return MemIndexTracerInfo(index_name, table_name, db_name, mem, input_row_count_);
+        return MemIndexTracerInfo(MakeShared<String>(index_name_),
+                                  MakeShared<String>(table_name_),
+                                  MakeShared<String>(db_name_),
+                                  mem,
+                                  input_row_count_);
     }
 
-    IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 embedding_dimension, SegmentIndexEntry *segment_index_entry)
-        : IVFIndexInMem(begin_row_id, ivf_option, column_logical_type, embedding_data_type, embedding_dimension, segment_index_entry) {
+    IVFIndexInMemT(const RowID begin_row_id, const IndexIVFOption &ivf_option, const u32 embedding_dimension)
+        : IVFIndexInMem(begin_row_id, ivf_option, column_logical_type, embedding_data_type, embedding_dimension) {
         const auto mid = this->ivf_option().centroid_option_.centroids_num_ratio_ * this->ivf_option().centroid_option_.min_points_per_centroid_;
         build_index_bar_embedding_num_ = std::ceil(mid * mid + 3);
     }
@@ -146,15 +132,6 @@ public:
     RowID GetBeginRowID() const override { return begin_row_id_; }
 
     u32 GetRowCount() const override { return input_row_count_; }
-
-    void InsertBlockData(const SegmentOffset block_offset,
-                         BlockColumnEntry *block_column_entry,
-                         BufferManager *buffer_manager,
-                         const u32 row_offset,
-                         const u32 row_count) override {
-        const auto column_vector = block_column_entry->GetConstColumnVector(buffer_manager, row_offset);
-        InsertBlockData(block_offset, column_vector, row_offset, row_count);
-    }
 
     void
     InsertBlockData(const SegmentOffset block_offset, const ColumnVector &column_vector, BlockOffset row_offset, BlockOffset row_count) override {
@@ -240,26 +217,6 @@ public:
         }
         // fin
         have_ivf_index_.test_and_set(std::memory_order_release);
-    }
-
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *p_dump_size) override {
-        std::unique_lock lock(rw_mutex_);
-        SizeT dump_size = MemoryUsed();
-        if (!have_ivf_index_.test(std::memory_order_acquire)) {
-            BuildIndex();
-        }
-        auto new_chunk_index_entry = segment_index_entry->CreateIVFIndexChunkIndexEntry(begin_row_id_, input_row_count_, buffer_mgr);
-        if (p_dump_size != nullptr) {
-            *p_dump_size = dump_size;
-        }
-        BufferHandle handle = new_chunk_index_entry->GetIndex();
-        auto *data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
-        data_ptr->GetMemData(std::move(*ivf_index_storage_));
-        delete ivf_index_storage_;
-        ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
-        own_ivf_index_storage_ = false;
-        dump_handle_ = std::move(handle);
-        return new_chunk_index_entry;
     }
 
     void Dump(BufferObj *buffer_obj, SizeT *p_dump_size) override {
@@ -356,16 +313,10 @@ public:
 };
 
 template <LogicalType column_logical_type>
-SharedPtr<IVFIndexInMem> GetNewIVFIndexInMem(const DataType *column_data_type,
-                                             const RowID begin_row_id,
-                                             const IndexIVFOption &index_ivf_option,
-                                             SegmentIndexEntry *segment_index_entry) {
+SharedPtr<IVFIndexInMem> GetNewIVFIndexInMem(const DataType *column_data_type, const RowID begin_row_id, const IndexIVFOption &index_ivf_option) {
     const auto *embedding_info_ptr = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get());
     auto GetResult = [&]<EmbeddingDataType embedding_data_type> {
-        return MakeShared<IVFIndexInMemT<column_logical_type, embedding_data_type>>(begin_row_id,
-                                                                                    index_ivf_option,
-                                                                                    embedding_info_ptr->Dimension(),
-                                                                                    segment_index_entry);
+        return MakeShared<IVFIndexInMemT<column_logical_type, embedding_data_type>>(begin_row_id, index_ivf_option, embedding_info_ptr->Dimension());
     };
     switch (embedding_info_ptr->Type()) {
         case EmbeddingDataType::kElemInt8: {
@@ -397,17 +348,14 @@ SharedPtr<IVFIndexInMem> GetNewIVFIndexInMem(const DataType *column_data_type,
     }
 }
 
-SharedPtr<IVFIndexInMem> IVFIndexInMem::NewIVFIndexInMem(const ColumnDef *column_def,
-                                                         const IndexBase *index_base,
-                                                         const RowID begin_row_id,
-                                                         SegmentIndexEntry *segment_index_entry) {
+SharedPtr<IVFIndexInMem> IVFIndexInMem::NewIVFIndexInMem(const ColumnDef *column_def, const IndexBase *index_base, const RowID begin_row_id) {
     auto *index_ivf_ptr = static_cast<const IndexIVF *>(index_base);
     const auto &index_ivf_option = index_ivf_ptr->ivf_option_;
     const auto *column_data_type = column_def->type().get();
     if (const auto column_logical_type = column_data_type->type(); column_logical_type == LogicalType::kEmbedding) {
-        return GetNewIVFIndexInMem<LogicalType::kEmbedding>(column_data_type, begin_row_id, index_ivf_option, segment_index_entry);
+        return GetNewIVFIndexInMem<LogicalType::kEmbedding>(column_data_type, begin_row_id, index_ivf_option);
     } else if (column_logical_type == LogicalType::kMultiVector) {
-        return GetNewIVFIndexInMem<LogicalType::kMultiVector>(column_data_type, begin_row_id, index_ivf_option, segment_index_entry);
+        return GetNewIVFIndexInMem<LogicalType::kMultiVector>(column_data_type, begin_row_id, index_ivf_option);
     }
     UnrecoverableError("IVFIndex can only apply to Embedding and multi-vector column");
     return {};

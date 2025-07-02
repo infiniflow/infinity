@@ -41,7 +41,6 @@ import status;
 import infinity_exception;
 import variables;
 import logger;
-import cleanup_scanner;
 import infinity_context;
 import periodic_trigger;
 import bg_task;
@@ -113,7 +112,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
                         }
                         case GlobalVariable::kJeProf: {
-#ifdef ENABLE_JEMALLOC_PROF
+#if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
                             // http://jemalloc.net/jemalloc.3.html
                             malloc_stats_print(nullptr, nullptr, "admp");
                             int ret = mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
@@ -277,14 +276,14 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             config->SetCleanupInterval(interval);
                             break;
                         }
-                        case GlobalOptionIndex::kFullCheckpointInterval: {
+                        case GlobalOptionIndex::kCheckpointInterval: {
                             if (set_command->value_type() != SetVarType::kInteger) {
                                 Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
                             if (interval < 0) {
-                                Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set checkpoint interval: {}", interval));
                                 RecoverableError(status);
                             }
                             query_context->storage()->periodic_trigger_thread()->checkpoint_trigger_->UpdateInternal(interval);
@@ -434,8 +433,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             if (test_command->command_content() == "stuck dump by line bg_task for 3 second") {
                 auto *compact_processor = query_context->storage()->compaction_processor();
                 compact_processor->AddTestCommand(BGTaskType::kTestCommand, "stuck for 3 seconds");
-            } else if (test_command->command_content() == "delta checkpoint") {
-                LOG_INFO(fmt::format("test command: delta checkpoint"));
             } else {
                 LOG_INFO(fmt::format("test command: other"));
             }

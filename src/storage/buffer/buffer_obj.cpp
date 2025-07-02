@@ -233,6 +233,9 @@ void BufferObj::PickForCleanup() {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
         case BufferStatus::kNew: {
+            if (file_worker_->GetData() != nullptr) {
+                file_worker_->FreeInMemory();
+            }
             buffer_mgr_->AddToCleanList(this, false /*do_free*/);
             break;
         }
@@ -256,7 +259,7 @@ void BufferObj::PickForCleanup() {
     }
 }
 
-Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
+Status BufferObj::CleanupFile() const {
     if (status_ != BufferStatus::kClean) {
         String error_message = "Invalid status";
         UnrecoverableError(error_message);
@@ -265,7 +268,7 @@ Status BufferObj::CleanupFile(KVInstance *kv_instance) const {
         String error_message = "Buffer is not freed.";
         UnrecoverableError(error_message);
     }
-    return file_worker_->CleanupFile(kv_instance);
+    return file_worker_->CleanupFile();
 }
 
 void BufferObj::CleanupTempFile() const {

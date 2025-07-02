@@ -47,7 +47,6 @@ import internal_types;
 import knn_result_handler;
 import merge_knn;
 import match_sparse_scan_function_data;
-import fix_heap;
 import global_block_id;
 import roaring_bitmap;
 import bmp_index_file_worker;
@@ -123,14 +122,8 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes()
 SizeT PhysicalMatchSparseScan::TaskletCount() {
     SizeT ret = base_table_ref_->block_index_->BlockCount();
     if (base_table_ref_->index_index_.get() != nullptr) {
-        if (!base_table_ref_->index_index_->index_snapshots_vec_.empty()) {
-            const auto &index_snapshots = base_table_ref_->index_index_->index_snapshots_vec_;
-            if (index_snapshots.size() != 1) {
-                UnrecoverableError("Multiple index snapshots are not supported.");
-            }
-            ret = index_snapshots[0]->segment_index_entries_.size();
-        } else if (!base_table_ref_->index_index_->new_index_snapshots_vec_.empty()) {
-            const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
+        const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
+        if (!index_snapshots.empty()) {
             if (index_snapshots.size() != 1) {
                 UnrecoverableError("Multiple index snapshots are not supported.");
             }
@@ -142,6 +135,7 @@ SizeT PhysicalMatchSparseScan::TaskletCount() {
 
 void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     SizeT search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
+    auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
     Status status;
     TableMeeta *table_meta = table_meta = base_table_ref_->block_index_->table_meta_.get();
@@ -163,12 +157,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            SizeT column_id = 0;
-            std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (column_id != search_column_id) {
+            if (index_base->column_name() != search_column_name) {
                 continue;
             }
             if (index_base->index_type_ != IndexType::kBMP) {
@@ -185,7 +174,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
     } else {
         auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), match_sparse_expr_->index_name_);
         if (iter == index_names_ptr->end()) {
-            Status status = Status::IndexNotExist(match_sparse_expr_->index_name_);
+            status = Status::IndexNotExist(match_sparse_expr_->index_name_);
             RecoverableError(std::move(status));
         }
         const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
@@ -197,12 +186,7 @@ void PhysicalMatchSparseScan::PlanWithIndex(QueryContext *query_context) {
         if (!status.ok()) {
             RecoverableError(status);
         }
-        SizeT column_id = 0;
-        std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
-        if (!status.ok()) {
-            RecoverableError(status);
-        }
-        if (column_id != search_column_id) {
+        if (index_base->column_name() != search_column_name) {
             // knn_column_id isn't in this table index
             LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
             Status error_status = Status::ColumnNotExist(index_base->column_name());
@@ -471,7 +455,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
             break;
         }
-        Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
+        status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, commit_ts, bitmask);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

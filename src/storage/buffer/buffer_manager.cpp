@@ -22,7 +22,6 @@ import stl;
 import file_worker;
 import third_party;
 import logger;
-import specific_concurrent_queue;
 import infinity_exception;
 import buffer_obj;
 import file_worker_type;
@@ -188,7 +187,7 @@ Status BufferManager::RemoveClean(KVInstance *kv_instance) {
         clean_list.swap(clean_list_);
     }
     for (auto *buffer_obj : clean_list) {
-        status = buffer_obj->CleanupFile(kv_instance);
+        status = buffer_obj->CleanupFile();
         if (!status.ok()) {
             return status;
         }

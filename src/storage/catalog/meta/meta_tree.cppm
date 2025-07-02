@@ -14,6 +14,8 @@
 
 module;
 
+#include <tuple>
+
 export module meta_tree;
 
 import stl;
@@ -116,7 +118,7 @@ export struct MetaChunkIndexObject final : public MetaObject {
 };
 
 export struct MetaPmObject final : public MetaObject {
-    MetaPmObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kPmObject, meta_key) {}
+    MetaPmObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kPmStat, meta_key) {}
     nlohmann::json ToJson() const final;
 
     SharedPtr<MetaKey> object_{};
@@ -126,12 +128,40 @@ export struct MetaPmObject final : public MetaObject {
 export struct MetaTree {
     static SharedPtr<MetaTree> MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys);
 
+    struct MyHash {
+        template <typename T, typename... Ts>
+        static SizeT GetHash(T &&t, Ts &&...args) {
+            return std::hash<std::decay_t<T>>{}(t) ^ (... ^ (std::hash<std::decay_t<Ts>>{}(args) << 1));
+        }
+
+        template <typename T> // is_tuple_like
+        SizeT operator()(const T &tuple) const noexcept {
+            return std::apply([](auto &&...elems) { return MyHash::GetHash(std::forward<decltype(elems)>(elems)...); }, tuple);
+        }
+    };
+
+    bool SegmentExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id) const;
+
+    bool BlockExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) const;
+
+    bool ColumnExistInMetas(const String &db_id_str, const String &table_id_str, ColumnID column_id) const;
+    bool IndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str) const;
+
+    bool SegmentIndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) const;
+
+    bool ChunkIndexExistInMetas(const String &db_id_str,
+                                const String &table_id_str,
+                                const String &index_id_str,
+                                SegmentID segment_id,
+                                ChunkID chunk_id) const;
+
 public:
+    void Prepare();
     static bool PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str);
-    HashSet<String> GetMetaPathSet();
+    bool CheckData(const String &path);
     static HashSet<String> GetDataVfsPathSet();
     static HashSet<String> GetDataVfsOffPathSet();
-    Pair<Vector<String>, Vector<String>> CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str);
+    Vector<String> CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str);
 
     Vector<MetaTableObject *> ListTables() const;
     SharedPtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
@@ -141,6 +171,15 @@ public:
     Map<String, String> system_tag_map_{};
     Map<String, SharedPtr<MetaDBObject>> db_map_{};
     Map<String, SharedPtr<MetaPmObject>> pm_object_map_{};
+    Vector<SharedPtr<MetaKey>> metas_;
+
+    // HashMap<MetaType, Tuple<String, String, SegmentID>> table_dic_;
+    HashSet<Tuple<String, String, SegmentID>, MyHash> segment_dic_;
+    HashSet<Tuple<String, String, SegmentID, BlockID>, MyHash> block_dic_;
+    HashSet<Tuple<String, String, ColumnID>, MyHash> column_dic_;
+    HashSet<Tuple<String, String, String>, MyHash> index_dic_;
+    HashSet<Tuple<String, String, String, SegmentID>, MyHash> segment_index_dic_;
+    HashSet<Tuple<String, String, String, SegmentID, ChunkID>, MyHash> chunk_index_dic_;
 };
 
 } // namespace infinity

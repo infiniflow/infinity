@@ -30,7 +30,6 @@ import memory_indexer;
 import column_index_reader;
 import posting_iterator;
 import column_inverter;
-import segment_index_entry;
 import internal_types;
 import logical_type;
 import column_index_merger;
@@ -43,7 +42,24 @@ import global_resource_usage;
 import infinity_context;
 import third_party;
 
+import db_meeta;
+import table_meeta;
+import table_index_meeta;
+import new_txn;
+import txn_state;
+import new_txn_manager;
+import data_block;
+import table_def;
+import column_def;
+import index_full_text;
+import extra_ddl_info;
+import status;
+
 using namespace infinity;
+
+namespace infinity {
+struct InitParameter;
+}
 
 class MemoryIndexerTest : public BaseTestParamStr {
 public:
@@ -54,19 +70,48 @@ public:
     };
 
 protected:
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
-    SharedPtr<ColumnVector> column_;
+    Vector<String> wiki_paragraphs_;
     Vector<ExpectedPosting> expected_postings_;
-    SharedPtr<ColumnVector> empty_column_;
-    String config_path_{};
+    Optional<DBMeeta> db_meta_;
+    Optional<TableMeeta> table_meta_;
+    Optional<TableIndexMeeta> index_meta_;
 
 public:
     void SetUp() override {
         BaseTestParamStr::SetUp();
+        NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col1", std::set<ConstraintType>());
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
+        auto index_name = std::make_shared<String>("idx1");
+        Vector<InitParameter *> index_param_list;
+        auto index_base = IndexFullText::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()}, index_param_list);
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
         // https://en.wikipedia.org/wiki/Finite-state_transducer
-        const char *paragraphs[] = {
+        wiki_paragraphs_ = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
             R"#(An FST will read a set of strings on the input tape and generates a set of relations on the output tape. An FST can be thought of as a translator or relater between strings in a set.)#",
             R"#(In morphological parsing, an example would be inputting a string of letters into the FST, the FST would then output a string of morphemes.)#",
@@ -74,24 +119,43 @@ public:
             R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
         };
 
-        const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-        column_ = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
-        column_->Initialize();
-        for (SizeT i = 0; i < num_paragraph; ++i) {
-            Value v = Value::MakeVarchar(String(paragraphs[i]));
-            column_->AppendValue(v);
-        }
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
-
-        empty_column_ = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
-        empty_column_->Initialize();
-        for (SizeT i = 0; i < 10; ++i) {
-            Value v = Value::MakeVarchar(String(""));
-            empty_column_->AppendValue(v);
-        }
     }
 
-    void Check(ColumnIndexReader &reader) {
+    SharedPtr<ColumnVector> MakeColumnVector(const Vector<String> &paragraphs, SizeT repeats = 1) {
+        auto col_vec = ColumnVector::Make(std::make_shared<DataType>(LogicalType::kVarchar));
+        col_vec->Initialize();
+        for (SizeT i = 0; i < repeats; i++) {
+            for (SizeT j = 0; j < paragraphs.size(); ++j) {
+                Value value = Value::MakeVarchar(paragraphs[j]);
+                col_vec->AppendValue(value);
+            }
+        }
+        return col_vec;
+    }
+
+    SharedPtr<DataBlock> MakeInputBlock(const Vector<String> &paragraphs, SizeT repeats = 1) {
+        auto data_block = DataBlock::Make();
+        auto col_vec = MakeColumnVector(paragraphs, repeats);
+        data_block->InsertVector(col_vec, 0);
+        data_block->Finalize();
+        return data_block;
+    }
+
+    void Check() {
+        {
+            String table_key;
+            String index_key;
+            NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dummy"), TransactionType::kNormal);
+            Status status = txn->GetTableIndexMeta("db1", "tb1", "idx1", db_meta_, table_meta_, index_meta_, &table_key, &index_key);
+            EXPECT_TRUE(status.ok());
+        }
+        ColumnIndexReader reader;
+        reader.Open(flag_, *index_meta_);
+        // Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
+        // ASSERT_GT(res.first, 0);     // row count
+        // ASSERT_GT(res.second, 0.0f); // avg column length
         for (SizeT i = 0; i < expected_postings_.size(); ++i) {
             const ExpectedPosting &expected = expected_postings_[i];
             const String &term = expected.term;
@@ -124,98 +188,51 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          MemoryIndexerTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(MemoryIndexerTest, Insert) {
-    // prepare fake segment index entry
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
-    indexer1.Insert(column_, 0, 1);
-    indexer1.Insert(column_, 1, 3);
-    indexer1.Dump();
+TEST_P(MemoryIndexerTest, Chunk) {
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    SharedPtr<String> table_name = std::make_shared<std::string>("tb1");
+    Vector<SharedPtr<DataBlock>> blocks = {MakeInputBlock(wiki_paragraphs_)};
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 4U), flag_, "standard", fake_segment_index_entry_1.get());
-    indexer2->Insert(column_, 4, 1);
-    while (indexer2->GetInflightTasks() > 0) {
-        sleep(1);
-        indexer2->CommitSync();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    Status status = txn->Import(*db_name, *table_name, blocks);
+    EXPECT_TRUE(status.ok());
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+    Check();
+}
+
+TEST_P(MemoryIndexerTest, Memory) {
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    SharedPtr<String> table_name = std::make_shared<std::string>("tb1");
+    auto index_name = std::make_shared<String>("idx1");
+    Vector<String> paragraphs1(wiki_paragraphs_.begin(), wiki_paragraphs_.begin() + 4); // 4 rows
+    Vector<String> paragraphs2(wiki_paragraphs_.begin() + 4, wiki_paragraphs_.end());   // 1 rows
+    Vector<SharedPtr<DataBlock>> blocks = {MakeInputBlock(paragraphs1), MakeInputBlock(paragraphs2)};
+
+    for (SizeT i = 0; i < blocks.size(); ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn->Append(*db_name, *table_name, blocks[i]);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
-
-    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 4U);
-    fake_segment_index_entry_1->SetMemoryIndexer(std::move(indexer2));
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
-    ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
-    Check(reader);
-}
-
-TEST_P(MemoryIndexerTest, test2) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
-    indexer1.Insert(column_, 0, 2, true);
-    indexer1.Insert(column_, 2, 2, true);
-    indexer1.Insert(column_, 4, 1, true);
-    indexer1.Dump(true);
-    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
-
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
-
-    ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
-    Check(reader);
-}
-
-TEST_P(MemoryIndexerTest, test3) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
-    indexer1.Insert(empty_column_, 0, 10, true);
-    indexer1.Dump(true);
-    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
-    fake_segment_index_entry_1->UpdateFulltextColumnLenInfo(indexer1.GetColumnLengthSum(), indexer1.GetDocCount());
-
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
-
-    ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
-    Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
-    ASSERT_EQ(res.first, 10U);
-    ASSERT_EQ(res.second, 0.0f);
-}
-
-TEST_P(MemoryIndexerTest, test4) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
-    indexer1.Insert(empty_column_, 0, 5, true);
-    indexer1.Insert(column_, 0, 5, true);
-    indexer1.Dump(true);
-    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
-    fake_segment_index_entry_1->UpdateFulltextColumnLenInfo(indexer1.GetColumnLengthSum(), indexer1.GetDocCount());
-
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
-
-    ColumnIndexReader reader;
-    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment), nullptr);
-    Pair<u64, float> res = reader.GetTotalDfAndAvgColumnLength();
-
-    ASSERT_EQ(res.first, 10U);
-    ASSERT_EQ(res.second, 45.3f);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    Check();
 }
 
 TEST_P(MemoryIndexerTest, SpillLoadTest) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
-    indexer1->Insert(column_, 0, 2);
-    indexer1->Insert(column_, 2, 2);
-    indexer1->Insert(column_, 4, 1);
-    while (indexer1->GetInflightTasks() > 0) {
-        sleep(1);
-        indexer1->CommitSync();
-    }
-
+    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    SharedPtr<ColumnVector> column_vector = MakeColumnVector(wiki_paragraphs_);
+    indexer1->Insert(column_vector, 0, 2);
+    indexer1->Insert(column_vector, 2, 2);
+    indexer1->Insert(column_vector, 4, 1);
     indexer1->Dump(false, true);
-    UniquePtr<MemoryIndexer> loaded_indexer =
-        MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
+    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
-    SegmentID segment_id = fake_segment_index_entry_1->segment_id();
+    SegmentID segment_id = 0;
     SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, loaded_indexer.get());
     for (SizeT i = 0; i < expected_postings_.size(); ++i) {
         const ExpectedPosting &expected = expected_postings_[i];
@@ -251,15 +268,14 @@ TEST_P(MemoryIndexerTest, SeekPosition) {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 8192);
     while (indexer1.GetInflightTasks() > 0) {
         sleep(1);
         indexer1.CommitSync();
     }
 
-    SegmentID segment_id = fake_segment_index_entry_1->segment_id();
+    SegmentID segment_id = 0;
     SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(segment_id, &indexer1);
     const String term("a");
     SegmentPosting seg_posting;

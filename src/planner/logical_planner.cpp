@@ -38,7 +38,6 @@ import cast_expression;
 import cast_function;
 import bound_cast_func;
 import base_expression;
-import table_entry_type;
 import third_party;
 import table_def;
 import logical_alter;
@@ -297,10 +296,6 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     table_info->db_name_ = MakeShared<String>(schema_name);
     table_info->table_name_ = MakeShared<String>(table_name);
     table_info->table_key_ = table_key;
-
-    if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
-        RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
-    }
 
     // check
     const auto row_count = statement->insert_rows_.size();
@@ -1263,7 +1258,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                 ColumnID column_id = 0;
                 std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_def->name());
                 if (!status.ok()) {
-                    if (status.code() != ErrorCode::kNotFound) {
+                    if (status.code() != ErrorCode::kColumnNotExist) {
                         RecoverableError(status);
                     }
                     found = false;
@@ -1838,8 +1833,8 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
 
 Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     switch (statement->type()) {
-        case FlushType::kDelta: {
-            return BuildFlushDelta(statement, bind_context_ptr);
+        case FlushType::kCatalog: {
+            return BuildFlushCatalog(statement, bind_context_ptr);
         }
         case FlushType::kData: {
             return BuildFlushData(statement, bind_context_ptr);
@@ -1854,8 +1849,8 @@ Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<Bin
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildFlushDelta(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kDelta);
+Status LogicalPlanner::BuildFlushCatalog(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kCatalog);
     this->logical_plan_ = logical_flush;
     return Status::OK();
 }

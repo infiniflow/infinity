@@ -6,6 +6,8 @@ import virtual_store;
 import third_party;
 import persist_result_handler;
 import local_file_handle;
+import kv_store;
+import status;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -16,16 +18,27 @@ public:
         BaseTest::RemoveDbDirs();
         workspace_ = String(GetFullTmpDir()) + "/persistence";
         file_dir_ = String(GetFullTmpDir()) + "/persistence_src";
+        catalog_dir_ = String(GetFullTmpDir()) + "/catalog";
+
         system(("mkdir -p " + workspace_).c_str());
         system(("mkdir -p " + file_dir_).c_str());
+        system(("mkdir -p " + catalog_dir_).c_str());
+
+        kv_store_ = MakeUnique<KVStore>();
+        Status status = kv_store_->Init(catalog_dir_);
+        EXPECT_TRUE(status.ok());
         pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
+        pm_->SetKvStore(kv_store_.get());
         handler_ = MakeUnique<PersistResultHandler>(pm_.get());
     }
+
     void CheckObjData(const String &obj_addr, const String &data);
 
 protected:
     String workspace_{};
     String file_dir_{};
+    String catalog_dir_{};
+    UniquePtr<KVStore> kv_store_{};
     UniquePtr<PersistenceManager> pm_{};
     static constexpr int ObjSizeLimit = 128;
     UniquePtr<PersistResultHandler> handler_;

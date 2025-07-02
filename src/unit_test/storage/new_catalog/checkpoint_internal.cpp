@@ -44,7 +44,6 @@ import meta_info;
 import data_block;
 import column_vector;
 import value;
-import data_access_state;
 import kv_code;
 import kv_store;
 import new_txn;
@@ -297,7 +296,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_create_ts;
+        status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         EXPECT_TRUE(status.ok());
     };
 
@@ -361,7 +361,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_create_ts;
+        status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(!status.ok());
         status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
@@ -391,7 +392,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_create_ts;
+        status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
         status = txn->GetTableMeta(*db_name, "renametable", db_meta, table_meta);
         Optional<TableIndexMeeta> table_index_meta;
         String table_key;
@@ -408,7 +410,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Optional<DBMeeta> db_meta1;
         Optional<TableMeeta> table_meta1;
-        status = txn->GetDBMeta(*db_name, db_meta1);
+        TxnTimeStamp db_create_ts1;
+        status = txn->GetDBMeta(*db_name, db_meta1, db_create_ts1);
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
@@ -758,7 +761,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
             Status status;
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            status = txn->GetDBMeta(*db_name, db_meta);
+            TxnTimeStamp db_create_ts;
+            status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
             status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             auto [segment_ids, status1] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status1.ok());
@@ -773,4 +777,49 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
     checkpoint();
     RestartTxnMgr();
     checkpoint();
+}
+
+TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+
+        Status status = txn1->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->Checkpoint(wal_manager_->LastCheckpointTS());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("clean"), TransactionType::kNormal);
+        Status status = txn->Cleanup();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+        Optional<DBMeeta> db_meta;
+        TxnTimeStamp db_creat_ts;
+        Status status = txn->GetDBMeta(*db_name, db_meta, db_creat_ts);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 }

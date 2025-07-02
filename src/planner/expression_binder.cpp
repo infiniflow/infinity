@@ -97,10 +97,8 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
 
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
-        if (result.get() == nullptr) {
-            Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));
-            RecoverableError(status);
-        }
+        Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));
+        RecoverableError(status);
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
     }
@@ -489,6 +487,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
             for (SizeT idx = 0; idx < arguments.size(); ++idx) {
+                if (arguments[idx]->Type().type() == LogicalType::kEmbedding) {
+                    return nullptr;
+                }
                 // check if the argument types are matched to the scalar function parameter types
                 // if not match, add the cast function to the input parameter.
                 if (arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {

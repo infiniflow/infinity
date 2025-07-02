@@ -404,5 +404,4 @@ TEST_F(ModuloFunctionsTest, mod_func) {
             }
         }
     }
-    kv_store_ptr->Uninit();
 }

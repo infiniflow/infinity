@@ -54,6 +54,7 @@ struct WalChunkIndexInfo;
 struct WalSegmentInfo;
 struct WalCmdCheckpointV2;
 struct WalCmdOptimizeV2;
+struct WalCmdCleanup;
 struct WalCmdRestoreTableSnapshot;
 
 class BufferObj;
@@ -283,7 +284,23 @@ public:
     Status Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks);
 
 private:
-    Status ReplayImport(WalCmdImportV2 *import_cmd);
+    Status ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDumpIndex(WalCmdDumpIndexV2 *dump_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayAppend(WalCmdAppendV2 *append_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayOptimize(WalCmdOptimizeV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
 public:
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
@@ -314,6 +331,8 @@ public:
 
 private:
     Status ReplayCompact(WalCmdCompactV2 *compact_cmd);
+
+    Status CleanupInner(const Vector<UniquePtr<MetaKey>> &metas);
 
 public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts);
@@ -389,7 +408,7 @@ private:
     void CheckTxn(const String &db_name);
 
 public:
-    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, String *db_key = nullptr);
+    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, String *db_key = nullptr);
 
     Status GetTableMeta(const String &db_name,
                         const String &table_name,
@@ -415,9 +434,6 @@ private:
     friend struct NewTxnCompactState;
 
     // DML
-
-    Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
-
     Status AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset);
 
     Status AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset);
@@ -503,23 +519,23 @@ public:
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
 private:
-    Status CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
-    Status CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
-    Status CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
-    Status CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd);
-    Status CommitRenameTable(const WalCmdRenameTableV2 *create_table_cmd);
-    Status CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd);
-    Status CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd);
-    Status CommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
-    Status CommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
-    Status CommitImport(WalCmdImportV2 *import_cmd);
+    Status PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
+    Status PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd);
+    Status PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd);
+    Status PrepareCommitDropTable(const WalCmdDropTableV2 *drop_table_cmd);
+    Status PrepareCommitRenameTable(const WalCmdRenameTableV2 *create_table_cmd);
+    Status PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd);
+    Status PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd);
+    Status PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd);
+    Status PrepareCommitDropIndex(const WalCmdDropIndexV2 *drop_index_cmd);
+    Status PrepareCommitImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
     Status CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd);
-    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd, KVInstance *kv_instance);
-    Status RollbackDelete(const DeleteTxnStore *delete_txn_store, KVInstance *kv_instance);
-    Status CommitCompact(WalCmdCompactV2 *compact_cmd);
-    Status PostCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
-    Status CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
+    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);
+    Status RollbackDelete(const DeleteTxnStore *delete_txn_store);
+    Status PrepareCommitCompact(WalCmdCompactV2 *compact_cmd);
+    Status PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, KVInstance *kv_instance);
+    Status PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
@@ -567,12 +583,9 @@ private:
     bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
-    static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
-    static Status CleanupImpl(TxnTimeStamp ts, KVInstance *kv_instance, const Vector<UniquePtr<MetaKey>> &metas);
-
     bool IsReplay() const;
 
-    Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
+    Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
     Status GetDBFilePaths(const String &db_name, Vector<String> &file_paths);
     Status GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths);
@@ -617,7 +630,6 @@ public:
     void AddSemaphore(UniquePtr<std::binary_semaphore> sema);
     const Vector<UniquePtr<std::binary_semaphore>> &semas() const;
     void AddMetaKeyForBufferObject(UniquePtr<MetaKey> object_meta_key);
-    const Vector<UniquePtr<MetaKey>> &GetMetaKeyForBufferObject() const;
 
 private:
     // Reference to external class
@@ -662,7 +674,6 @@ private:
     SizeT wal_size_{};
 
     // Use for commit and rollback
-    Vector<UniquePtr<MetaKey>> object_meta_keys_{};
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
 
 private:

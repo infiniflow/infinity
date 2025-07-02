@@ -128,8 +128,9 @@ public:
                                         ChunkID chunk_id,
                                         const String &tag_name);
 
-    static String TableColumnKey(const String &db_id, const String &table_id, const String &column_name);
+    static String TableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts);
     static String TableColumnPrefix(const String &db_id, const String &table_id);
+    static String TableColumnPrefix(const String &db_id, const String &table_id, const String &column_name);
 
     static String TableColumnTagKey(const String &db_id, const String &table_id, const String &column_id, const String &tag_name);
 
@@ -208,13 +209,19 @@ public:
 
     static String PMObjectStatKey(const String &key);
 
-    static String DropDBKey(const String &db_id_str, const String &db_name);
+    static String DropDBKey(const String &db_name, const TxnTimeStamp &commit_ts, const String &db_id_str);
 
-    static String DropTableKey(const String &db_id_str, const String &table_id_str, const String &table_name);
+    static String DropTableKey(const String &db_id_str, const String &table_name, const String &table_id_str, TxnTimeStamp create_ts);
+
+    static String RenameTableKey(const String &db_id_str, const String &table_name, const String &table_id_str, TxnTimeStamp create_ts);
+
+    static String DropTableKeyPrefix(const String &db_id_str, const String &table_name);
 
     static String DropSegmentKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id);
 
     static String DropBlockKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id);
+
+    static String DropTableColumnKey(const String &db_id_str, const String &table_id_str, const String &column_name, TxnTimeStamp create_ts);
 
     static String DropBlockColumnKey(const String &db_id_str,
                                      const String &table_id_str,
@@ -222,7 +229,11 @@ public:
                                      BlockID block_id,
                                      const SharedPtr<ColumnDef> &column_def);
 
-    static String DropTableIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, const String &index_name);
+    static String DropTableIndexKey(const String &db_id_str,
+                                    const String &table_id_str,
+                                    const String &index_name,
+                                    const TxnTimeStamp &commit_ts,
+                                    const String &index_id_str);
 
     static String DropSegmentIndexKey(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id);
 

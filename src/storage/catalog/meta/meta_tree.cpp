@@ -14,8 +14,11 @@
 
 module;
 
+#include <re2/re2.h>
+
 #include <filesystem>
 #include <ranges>
+#include <regex>
 
 module meta_tree;
 
@@ -40,16 +43,19 @@ import check_statement;
 import kv_utility;
 import kv_store;
 import new_txn_manager;
+import utility;
 
 namespace infinity {
 
 SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &meta_keys) {
     SharedPtr<MetaTree> meta_tree = MakeShared<MetaTree>();
-    SizeT meta_count = meta_keys.size();
+    meta_tree->metas_ = std::move(meta_keys);
+    auto &meta_keys_ref = meta_tree->metas_;
+    SizeT meta_count = meta_keys_ref.size();
     // Get all dbs
     HashSet<String> db_names, db_ids;
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kDB: {
                 auto db_key = static_cast<DBMetaKey *>(meta_key.get());
@@ -84,7 +90,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all tables and attach to the db
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kTable: {
                 auto table_key = static_cast<TableMetaKey *>(meta_key.get());
@@ -132,7 +138,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all table segments / table tag / table index / table column and attach them to the table
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kSegment: {
                 auto segment_key = static_cast<SegmentMetaKey *>(meta_key.get());
@@ -243,7 +249,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all blocks and attach to segment
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kBlock: {
                 auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
@@ -319,7 +325,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all block column / block tag and attach to blocks
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kBlockColumn: {
                 auto block_key = static_cast<BlockMetaKey *>(meta_key.get());
@@ -403,7 +409,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all segment indexes and attach to table index
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kSegmentIndex: {
                 auto segment_index_key = static_cast<SegmentIndexMetaKey *>(meta_key.get());
@@ -480,7 +486,7 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all chunk indexes and attach to segment index
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
             case MetaType::kChunkIndex: {
                 auto chunk_index_key = static_cast<ChunkIndexMetaKey *>(meta_key.get());
@@ -532,13 +538,13 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get all pm object stat
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
-            case MetaType::kPmObject: {
-                auto pm_obj_key = static_cast<PmObjectMetaKey *>(meta_key.get());
+            case MetaType::kPmStat: {
+                auto pm_obj_key = static_cast<PmStatMetaKey *>(meta_key.get());
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(pm_obj_key->object_key_);
                 if (pm_obj_iter != meta_tree->pm_object_map_.end()) {
-                    String error_message = fmt::format("Duplicate pm object key: {}, idx: {}", pm_obj_key->ToString(), idx);
+                    String error_message = fmt::format("Duplicate pm stat key: {}, idx: {}", pm_obj_key->ToString(), idx);
                     UnrecoverableError(error_message);
                 }
 
@@ -553,10 +559,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
 
     // Get pm object
     for (SizeT idx = 0; idx < meta_count; ++idx) {
-        const SharedPtr<MetaKey> &meta_key = meta_keys[idx];
+        const SharedPtr<MetaKey> &meta_key = meta_keys_ref[idx];
         switch (meta_key->type_) {
-            case MetaType::kPmPath: {
-                auto pm_path_key = static_cast<PmPathMetaKey *>(meta_key.get());
+            case MetaType::kPmObject: {
+                auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
                 nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
                 String object_key = pm_path_json["obj_key"];
                 if (object_key == "KEY_EMPTY") {
@@ -564,8 +570,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
                 }
                 auto pm_obj_iter = meta_tree->pm_object_map_.find(object_key);
                 if (pm_obj_iter == meta_tree->pm_object_map_.end()) {
-                    String error_message = fmt::format("PM object not found: {}, idx: {}", pm_path_key->ToString(), idx);
-                    UnrecoverableError(error_message);
+                    LOG_WARN(fmt::format("PM object not found: {}, idx: {}", pm_path_key->ToString(), idx));
+                    continue;
                 }
 
                 pm_obj_iter->second->path_map_.emplace(pm_path_key->path_key_, meta_key);
@@ -950,16 +956,150 @@ bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<Str
     return true;
 }
 
-HashSet<String> MetaTree::GetMetaPathSet() {
-    HashSet<String> meta_path_set;
-    for (auto &pm_obj : pm_object_map_ | std::views::values) {
-        for (auto &path : pm_obj->path_map_ | std::views::keys) {
-            // We don't need to check for duplicate paths since meta_tree has already done that.
-            meta_path_set.emplace(path);
+void MetaTree::Prepare() {
+    for (const auto &meta : metas_) {
+        switch (meta->type_) {
+            // case MetaType::kTable: {
+            //
+            // }
+            case MetaType::kSegment: {
+                auto *segment_meta = static_cast<const SegmentMetaKey *>(meta.get());
+                segment_dic_.emplace(segment_meta->db_id_str_, segment_meta->table_id_str_, segment_meta->segment_id_);
+                break;
+            }
+            case MetaType::kBlock: {
+                auto *block_meta = static_cast<BlockMetaKey *>(meta.get());
+                block_dic_.emplace(block_meta->db_id_str_, block_meta->table_id_str_, block_meta->segment_id_, block_meta->block_id_);
+                break;
+            }
+            case MetaType::kTableColumn: {
+                auto *column_meta = static_cast<TableColumnMetaKey *>(meta.get());
+                auto json = column_meta->ToJson();
+                auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
+                column_dic_.emplace(column_meta->db_id_str_, column_meta->table_id_str_, meta_column_id);
+                break;
+            }
+            case MetaType::kTableIndex: {
+                auto *index_meta = static_cast<TableIndexMetaKey *>(meta.get());
+                index_dic_.emplace(index_meta->db_id_str_, index_meta->table_id_str_, index_meta->index_id_str_);
+                break;
+            }
+            case MetaType::kSegmentIndex: {
+                auto *segment_index_meta = static_cast<SegmentIndexMetaKey *>(meta.get());
+                segment_index_dic_.emplace(segment_index_meta->db_id_str_,
+                                           segment_index_meta->table_id_str_,
+                                           segment_index_meta->index_id_str_,
+                                           segment_index_meta->segment_id_);
+                break;
+            }
+            case MetaType::kChunkIndex: {
+                auto *chunk_index_meta = static_cast<ChunkIndexMetaKey *>(meta.get());
+                chunk_index_dic_.emplace(chunk_index_meta->db_id_str_,
+                                         chunk_index_meta->table_id_str_,
+                                         chunk_index_meta->index_id_str_,
+                                         chunk_index_meta->segment_id_,
+                                         chunk_index_meta->chunk_id_);
+                break;
+            }
+            default:;
         }
     }
+}
 
-    return meta_path_set;
+bool MetaTree::SegmentExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id) const {
+    return segment_dic_.contains({db_id_str, table_id_str, segment_id});
+}
+
+bool MetaTree::BlockExistInMetas(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id) const {
+    return block_dic_.contains({db_id_str, table_id_str, segment_id, block_id});
+}
+
+bool MetaTree::ColumnExistInMetas(const String &db_id_str, const String &table_id_str, ColumnID column_id) const {
+    return column_dic_.contains({db_id_str, table_id_str, column_id});
+}
+
+bool MetaTree::IndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str) const {
+    return index_dic_.contains({db_id_str, table_id_str, index_id_str});
+}
+
+bool MetaTree::SegmentIndexExistInMetas(const String &db_id_str, const String &table_id_str, const String &index_id_str, SegmentID segment_id) const {
+    return segment_index_dic_.contains({db_id_str, table_id_str, index_id_str, segment_id});
+}
+
+bool MetaTree::ChunkIndexExistInMetas(const String &db_id_str,
+                                      const String &table_id_str,
+                                      const String &index_id_str,
+                                      SegmentID segment_id,
+                                      ChunkID chunk_id) const {
+    return chunk_index_dic_.contains({db_id_str, table_id_str, index_id_str, segment_id, chunk_id});
+}
+
+bool MetaTree::CheckData(const String &path) {
+    Prepare();
+    static const RE2 regex_column(R"(^(?:db_(\d+)/tbl_(\d+)/seg_(\d+)/blk_(\d+)/(?:version|(\d+)\.col|col_(\d+)_out))$)");
+
+    static const RE2 regex_index(R"(^(?:db_(\d+)/tbl_(\d+)/idx_(\d+)/seg_(\d+)/(?:chunk_(\d+)\.idx|ft_(\d+)\.(\w+)))$)");
+
+    re2::StringPiece sp1, sp2, sp3, sp4, sp5, sp6, sp7;
+    String db_id_str, table_id_str, index_id_str, suffix_id, suffix;
+    SegmentID segment_id = INVALID_SEGMENT_ID;
+    BlockID block_id = INVALID_BLOCK_ID;
+
+    if (RE2::FullMatch(path, regex_column, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6)) {
+        // db_{1}, tbl_{2}, seg_{3}, blk_{4}, {5}.col, col_{6}_out
+        db_id_str = sp1.as_string();
+        table_id_str = sp2.as_string();
+        segment_id = static_cast<SegmentID>(std::stoull(sp3.as_string()));
+        block_id = static_cast<BlockID>(std::stoull(sp4.as_string()));
+
+        if (!sp5.empty()) {
+            suffix_id = sp5.as_string();
+            suffix = "col";
+        } else if (!sp6.empty()) {
+            suffix_id = sp6.as_string();
+            suffix = "out";
+        } else {
+            suffix = "version";
+        }
+    } else if (RE2::FullMatch(path, regex_index, &sp1, &sp2, &sp3, &sp4, &sp5, &sp6, &sp7)) {
+        // db_{1}, tbl_{2}, idx_{3}, seg_{4},
+        // chunk_{5}.idx,
+        // ft_{6}.{7}   sp[7] == len | pos | dic
+        db_id_str = sp1.as_string();
+        table_id_str = sp2.as_string();
+        index_id_str = sp3.as_string();
+        segment_id = static_cast<SegmentID>(std::stoull(sp4.as_string()));
+
+        if (!sp5.empty()) {
+            suffix_id = sp5.as_string();
+            suffix = "idx";
+        } else {
+            suffix_id = sp6.as_string();
+            suffix = sp7.as_string(); // len | pos | dic
+        }
+    } else {
+        return true;
+    }
+
+    if (suffix == "dic" || suffix == "pos" || suffix == "len") {
+        // TODO...
+        return false;
+    }
+    if (suffix == "version") {
+        return !SegmentExistInMetas(db_id_str, table_id_str, segment_id) || !BlockExistInMetas(db_id_str, table_id_str, segment_id, block_id);
+    }
+    if (suffix == "col" || suffix == "out") {
+        auto column_id = static_cast<ColumnID>(std::stoull(suffix_id));
+        return !SegmentExistInMetas(db_id_str, table_id_str, segment_id) || !BlockExistInMetas(db_id_str, table_id_str, segment_id, block_id) ||
+               !ColumnExistInMetas(db_id_str, table_id_str, column_id);
+    }
+    if (suffix == "idx") {
+        auto chunk_id = static_cast<ChunkID>(std::stoull(suffix_id));
+        return !SegmentIndexExistInMetas(db_id_str, table_id_str, index_id_str, segment_id) ||
+               !ChunkIndexExistInMetas(db_id_str, table_id_str, index_id_str, segment_id, chunk_id) ||
+               !IndexExistInMetas(db_id_str, table_id_str, index_id_str);
+    }
+    return true;
 }
 
 HashSet<String> MetaTree::GetDataVfsPathSet() {
@@ -973,37 +1113,30 @@ HashSet<String> MetaTree::GetDataVfsPathSet() {
 
 HashSet<String> MetaTree::GetDataVfsOffPathSet() {
     HashSet<String> data_path_set;
-    auto data_dir = InfinityContext::instance().config()->DataDir();
+    Path data_dir = InfinityContext::instance().config()->DataDir();
+
     for (const auto &entry : std::filesystem::recursive_directory_iterator{data_dir}) {
-        if (std::filesystem::is_regular_file(entry)) {
-            data_path_set.emplace(entry.path().string());
+        if (entry.is_regular_file()) {
+            auto relative_path = std::filesystem::relative(entry.path(), data_dir);
+            data_path_set.emplace(relative_path.string());
         }
     }
     return data_path_set;
 }
 
-Pair<Vector<String>, Vector<String>> MetaTree::CheckMetaDataMapping(bool is_vfs, CheckStmtType tag, Optional<String> db_table_str) {
-    auto meta_path_set = this->GetMetaPathSet();
-    auto data_path_set = is_vfs ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
+Vector<String> MetaTree::CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str) {
+    const auto *pm = InfinityContext::instance().storage()->buffer_manager()->persistence_manager();
+    auto data_path_set = pm != nullptr ? this->GetDataVfsPathSet() : this->GetDataVfsOffPathSet();
 
-    meta_path_set.merge(data_path_set);
-
-    Pair<Vector<String>, Vector<String>> mismatch_entries_pair;
-    auto &[meta_mismatch_entry, data_mismatch_entry] = mismatch_entries_pair;
-
-    for (auto &path : meta_path_set) {
-        if (PathFilter(path, tag, db_table_str) && !data_path_set.contains(path)) {
-            meta_mismatch_entry.emplace_back(path);
-        }
-    }
+    Vector<String> data_mismatch_entry;
 
     for (auto &path : data_path_set) {
-        if (PathFilter(path, tag, db_table_str) && !meta_path_set.contains(path)) {
+        if (CheckData(path) && PathFilter(path, tag, db_table_str)) {
             data_mismatch_entry.emplace_back(path);
         }
     }
 
-    return mismatch_entries_pair;
+    return data_mismatch_entry;
 }
 
 } // namespace infinity

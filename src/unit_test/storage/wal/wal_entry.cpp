@@ -36,6 +36,8 @@ import statement_common;
 import data_type;
 import persistence_manager;
 import embedding_info;
+import kv_store;
+import status;
 
 using namespace infinity;
 
@@ -178,7 +180,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "2", "tbl1", "1", "table_key"));
+        entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "2", "tbl1", "1", 1, "table_key"));
         entry->commit_ts_ = 4;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -242,7 +244,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "catalog", String("META_123.full.json")));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), "catalog", String("META_123.full.json")));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
@@ -305,9 +307,9 @@ TEST_F(WalEntryTest, ReadWriteV2) {
     infinity::InfinityContext::instance().InitPhase2();
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds_.push_back(MakeShared<WalCmdCreateDatabaseV2>("db1", "1", "default2_comment"));
-    entry->cmds_.push_back(MakeShared<WalCmdDropDatabaseV2>("db1", "1"));
+    entry->cmds_.push_back(MakeShared<WalCmdDropDatabaseV2>("db1", "1", 1));
     entry->cmds_.push_back(MakeShared<WalCmdCreateTableV2>("db1", "1", "2", MockTableDesc2()));
-    entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "1", "tbl1", "2", "table_key"));
+    entry->cmds_.push_back(MakeShared<WalCmdDropTableV2>("db1", "1", "tbl1", "2", 1, "table_key"));
     {
         WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
         entry->cmds_.push_back(MakeShared<WalCmdImportV2>("db1", "1", "tbl1", "2", std::move(segment_info)));
@@ -321,7 +323,7 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         }
         entry->cmds_.push_back(MakeShared<WalCmdCreateIndexV2>("db1", "1", "tbl1", "2", "3", index_base, "table_key"));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", "index_key"));
+    entry->cmds_.push_back(MakeShared<WalCmdDropIndexV2>("db1", "1", "tbl1", "2", "idx1", "3", 1, "index_key"));
     {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -378,8 +380,17 @@ TEST_F(WalEntryTest, ReadWriteV2) {
         Vector<String> column_names;
         column_names.push_back("boolean_col");
         column_names.push_back("embedding_col");
-        entry->cmds_.push_back(
-            MakeShared<WalCmdDropColumnsV2>("db1", "1", "tbl1", "2", std::move(column_names), Vector<ColumnID>{3, 4}, "table_key"));
+        Vector<String> column_keys;
+        column_keys.push_back("column_key1");
+        column_keys.push_back("column_key2");
+        entry->cmds_.push_back(MakeShared<WalCmdDropColumnsV2>("db1",
+                                                               "1",
+                                                               "tbl1",
+                                                               "2",
+                                                               std::move(column_names),
+                                                               Vector<ColumnID>{3, 4},
+                                                               "table_key",
+                                                               std::move(column_keys)));
     }
 
     i32 exp_size = entry->GetSizeInBytes();
@@ -405,7 +416,12 @@ TEST_F(WalEntryTest, ReadWriteVFS) {
     String workspace = GetFullPersistDir();
     String data_dir = GetFullDataDir();
     SizeT object_size_limit = 100;
+    auto kv_store = MakeUnique<KVStore>();
+    Status status = kv_store->Init(GetCatalogDir());
+    EXPECT_TRUE(status.ok());
     PersistenceManager pm(workspace, data_dir, object_size_limit);
+    pm.SetKvStore(kv_store.get());
+
     ObjAddr obj_addr0{.obj_key_ = "key1", .part_offset_ = 0, .part_size_ = 10};
     ObjAddr obj_addr1{.obj_key_ = "key1", .part_offset_ = 10, .part_size_ = 20};
     pm.SaveLocalPath(paths[0], obj_addr0);

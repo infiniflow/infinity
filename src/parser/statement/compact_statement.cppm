@@ -22,5 +22,4 @@ namespace infinity {
 export using infinity::CompactStatementType;
 export using infinity::CompactStatement;
 export using infinity::ManualCompactStatement;
-export using infinity::AutoCompactStatement;
 }; // namespace infinity

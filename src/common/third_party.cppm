@@ -25,12 +25,14 @@ module;
 
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
+#include "spdlog/fmt/ranges.h"
 #include "spdlog/logger.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
 #include "json.hpp"
+#include "simdjson.h"
 
 #include "toml.hpp"
 
@@ -71,15 +73,15 @@ module;
 #include <miniocpp/client.h>
 
 #include "rocksdb/db.h"
+#include "rocksdb/env.h"
+#include "rocksdb/io_status.h"
+#include "rocksdb/merge_operator.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
-#include "rocksdb/io_status.h"
-#include "rocksdb/utilities/transaction.h"
-#include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/utilities/backup_engine.h"
 #include "rocksdb/utilities/merge_operators.h"
-#include "rocksdb/merge_operator.h"
-#include "rocksdb/env.h"
+#include "rocksdb/utilities/transaction.h"
+#include "rocksdb/utilities/transaction_db.h"
 
 #pragma clang diagnostic pop
 
@@ -168,14 +170,20 @@ namespace nlohmann {
 export using nlohmann::json;
 }
 
+namespace simdjson {
+export using simdjson::padded_string;
+export using simdjson::simdjson_result;
+export using simdjson::deserialize_tag;
+export using simdjson::error_code;
+export using ondemand::parser;
+export using ondemand::document;
+export using ondemand::object;
+export using ondemand::value;
+}
+
 namespace magic_enum {
 export using magic_enum::underlying_type_t;
 }
-
-namespace moodycamel {
-export using moodycamel::ConcurrentQueue;
-export using moodycamel::BlockingConcurrentQueue;
-} // namespace moodycamel
 
 namespace arrow {
 export using Status = arrow::Status;

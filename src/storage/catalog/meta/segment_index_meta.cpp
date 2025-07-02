@@ -221,15 +221,6 @@ Status SegmentIndexMeta::InitSet() {
             return status;
         }
     }
-    {
-        String mem_index_key = GetSegmentIndexTag("mem_index");
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-        bool setted = new_catalog->GetOrSetMemIndex(mem_index_key, mem_index);
-        if (!setted) {
-            return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
-        }
-    }
     return Status::OK();
 }
 
@@ -238,13 +229,6 @@ Status SegmentIndexMeta::InitSet1() {
         Status status = SetNextChunkID(0);
         if (!status.ok()) {
             return status;
-        }
-    }
-    {
-        SharedPtr<MemIndex> mem_index = MakeShared<MemIndex>();
-        bool setted = GetOrSetMemIndex(mem_index);
-        if (!setted) {
-            return Status(ErrorCode::kDuplicateEntry, "Mem index already exists");
         }
     }
     return Status::OK();
@@ -360,14 +344,18 @@ Status SegmentIndexMeta::UninitSet1(UsageFlag usage_flag) {
         next_chunk_id_.reset();
     }
     if (usage_flag == UsageFlag::kOther) {
-        {
-            // Remove mem index
-            String mem_index_key = GetSegmentIndexTag("mem_index");
-            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-            Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
-            if (!status.ok()) {
-                return status;
-            }
+        // Clear mem index
+        SharedPtr<MemIndex> mem_index = GetMemIndex();
+        if (mem_index != nullptr) {
+            mem_index->ClearMemIndex();
+        }
+
+        // Remove mem index
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+        if (!status.ok()) {
+            return status;
         }
     }
     {
@@ -396,12 +384,10 @@ SharedPtr<MemIndex> SegmentIndexMeta::GetMemIndex() {
     return new_catalog->GetMemIndex(mem_index_key);
 }
 
-bool SegmentIndexMeta::GetOrSetMemIndex(SharedPtr<MemIndex> &mem_index) {
-    // This function is used by populate index and append index (used by append or recover mem index)
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+SharedPtr<MemIndex> SegmentIndexMeta::PopMemIndex() {
     String mem_index_key = GetSegmentIndexTag("mem_index");
-    bool setted = new_catalog->GetOrSetMemIndex(mem_index_key, mem_index);
-    return setted;
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    return new_catalog->PopMemIndex(mem_index_key);
 }
 
 Status SegmentIndexMeta::LoadChunkIDs() {

@@ -37,9 +37,12 @@ class ColumnDef;
 export struct DBMetaKey final : public MetaKey {
     DBMetaKey(String db_id_str, String db_name) : MetaKey(MetaType::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)) {}
 
+    DBMetaKey(String db_id_str, String db_name, TxnTimeStamp commit_ts)
+        : MetaKey(MetaType::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)), commit_ts_(commit_ts) {}
+
     String db_id_str_{};
     String db_name_{};
-    TxnTimeStamp commit_ts_{};
+    TxnTimeStamp commit_ts_{}; // Commit timestamp of "create database"
 
     String ToString() const final;
     nlohmann::json ToJson() const final;
@@ -69,6 +72,19 @@ export struct TableMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
+export struct TableNameMetaKey final : public MetaKey {
+    TableNameMetaKey(String db_id_str, String table_id_str, const String &table_name)
+        : MetaKey(MetaType::kTableName), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), table_name_(std::move(table_name)) {}
+
+    String db_id_str_{};
+    String table_id_str_{};
+    String table_name_{};
+    TxnTimeStamp commit_ts_{};
+
+    String ToString() const final;
+    nlohmann::json ToJson() const final;
+};
+
 export struct TableColumnMetaKey final : public MetaKey {
     TableColumnMetaKey(String db_id_str, String table_id_str, String column_name)
         : MetaKey(MetaType::kTableColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)),
@@ -77,6 +93,7 @@ export struct TableColumnMetaKey final : public MetaKey {
     String db_id_str_{};
     String table_id_str_{};
     String column_name_{};
+    TxnTimeStamp commit_ts_{};
     String value_{};
 
     String ToString() const final;
@@ -264,8 +281,8 @@ export struct ChunkIndexTagMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmPathMetaKey final : public MetaKey {
-    PmPathMetaKey(String path_key) : MetaKey(MetaType::kPmPath), path_key_(std::move(path_key)) {}
+export struct PmObjectMetaKey final : public MetaKey {
+    PmObjectMetaKey(String path_key) : MetaKey(MetaType::kPmObject), path_key_(std::move(path_key)) {}
 
     String path_key_{};
     String value_{};
@@ -274,8 +291,8 @@ export struct PmPathMetaKey final : public MetaKey {
     nlohmann::json ToJson() const final;
 };
 
-export struct PmObjectMetaKey final : public MetaKey {
-    PmObjectMetaKey(String object_key) : MetaKey(MetaType::kPmObject), object_key_(std::move(object_key)) {}
+export struct PmStatMetaKey final : public MetaKey {
+    PmStatMetaKey(String object_key) : MetaKey(MetaType::kPmStat), object_key_(std::move(object_key)) {}
 
     String object_key_{};
     String value_{};

@@ -42,8 +42,13 @@ String DBTagMetaKey::ToString() const { return fmt::format("db_tag: {}:{}", KeyE
 String TableMetaKey::ToString() const {
     return fmt::format("table: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
 }
+
+String TableNameMetaKey::ToString() const {
+    return fmt::format("table name: {}:{}", KeyEncode::CatalogTableKey(db_id_str_, table_name_, commit_ts_), table_id_str_);
+}
+
 String TableColumnMetaKey::ToString() const {
-    return fmt::format("table_column: {}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_), value_);
+    return fmt::format("table_column: {}:{}", KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name_, commit_ts_), value_);
 }
 String TableTagMetaKey::ToString() const {
     return fmt::format("table_tag: {}:{}", KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag_name_), value_);
@@ -65,6 +70,9 @@ String BlockMetaKey::ToString() const {
 }
 
 String BlockTagMetaKey::ToString() const {
+    if (tag_name_ == "fast_rough_filter") {
+        return fmt::format("block_tag: {}", KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str_, table_id_str_, segment_id_, block_id_, tag_name_));
+    }
     return fmt::format("block_tag: {}:{}",
                        KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str_, table_id_str_, segment_id_, block_id_, tag_name_),
                        value_);
@@ -81,32 +89,32 @@ String TableIndexTagMetaKey::ToString() const {
 }
 
 String SegmentIndexMetaKey::ToString() const {
-    return fmt::format("table_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
+    return fmt::format("segment_index: {}:{}", KeyEncode::CatalogIdxSegmentKey(db_id_str_, table_id_str_, index_id_str_, segment_id_), commit_ts_);
 }
 
 String SegmentIndexTagMetaKey::ToString() const {
-    return fmt::format("table_index_tag: {}:{}",
+    return fmt::format("segment_index_tag: {}:{}",
                        KeyEncode::CatalogIdxSegmentTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, tag_name_),
                        value_);
 }
 
 String ChunkIndexMetaKey::ToString() const {
-    return fmt::format("table_index: {}:{}",
+    return fmt::format("chunk_index: {}:{}",
                        KeyEncode::CatalogIdxChunkKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_),
                        commit_ts_);
 }
 
 String ChunkIndexTagMetaKey::ToString() const {
-    return fmt::format("table_index: {}:{}",
+    return fmt::format("chunk_index_tag: {}:{}",
                        KeyEncode::CatalogIdxChunkTagKey(db_id_str_, table_id_str_, index_id_str_, segment_id_, chunk_id_, tag_name_),
                        value_);
 }
 
 String SystemTagMetaKey::ToString() const { return fmt::format("system_tag: {}:{}", tag_name_, value_); }
 
-String PmPathMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
+String PmObjectMetaKey::ToString() const { return fmt::format("pm_path: {}:{}", KeyEncode::PMObjectKey(path_key_), value_); }
 
-String PmObjectMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
+String PmStatMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", KeyEncode::PMObjectStatKey(object_key_), value_); }
 
 String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
 
@@ -128,6 +136,16 @@ nlohmann::json DBTagMetaKey::ToJson() const {
 }
 
 nlohmann::json TableMetaKey::ToJson() const {
+    nlohmann::json json_res;
+    json_res["table_id"] = std::stoull(table_id_str_);
+    json_res["table_name"] = table_name_;
+    if (commit_ts_ != UNCOMMIT_TS) {
+        json_res["commit_ts"] = commit_ts_;
+    }
+    return json_res;
+}
+
+nlohmann::json TableNameMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["table_id"] = std::stoull(table_id_str_);
     json_res["table_name"] = table_name_;
@@ -239,14 +257,14 @@ nlohmann::json SystemTagMetaKey::ToJson() const {
     return json_res;
 }
 
-nlohmann::json PmPathMetaKey::ToJson() const {
+nlohmann::json PmObjectMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["path"] = path_key_;
     json_res["description"] = nlohmann::json::parse(value_);
     return json_res;
 }
 
-nlohmann::json PmObjectMetaKey::ToJson() const {
+nlohmann::json PmStatMetaKey::ToJson() const {
     nlohmann::json json_res;
     json_res["object"] = object_key_;
     json_res["stat"] = nlohmann::json::parse(value_);
@@ -284,6 +302,17 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
         SharedPtr<TableMetaKey> table_meta_key = MakeShared<TableMetaKey>(db_id_str, table_id_str, table_name_str);
         table_meta_key->commit_ts_ = std::stoull(commit_ts_str);
         return table_meta_key;
+    }
+
+    if (fields[0] == "catalog" && fields[1] == "tbl_name") {
+        const String &db_id_str = fields[2];
+        const String &table_name_str = fields[3];
+        const String &commit_ts_str = fields[4];
+        const String &table_id_str = value;
+
+        SharedPtr<TableNameMetaKey> table_name_meta_key = MakeShared<TableNameMetaKey>(db_id_str, table_id_str, table_name_str);
+        table_name_meta_key->commit_ts_ = std::stoull(commit_ts_str);
+        return table_name_meta_key;
     }
 
     if (fields[0] == "catalog" && fields[1] == "seg") {
@@ -349,7 +378,9 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
             const String &db_id_str = fields[2];
             const String &table_id_str = fields[3];
             const String &column_name_str = fields[4];
+            const String &commit_ts_str = fields[5];
             SharedPtr<TableColumnMetaKey> table_column_meta_key = MakeShared<TableColumnMetaKey>(db_id_str, table_id_str, column_name_str);
+            table_column_meta_key->commit_ts_ = std::stoull(commit_ts_str);
             table_column_meta_key->value_ = value;
             return table_column_meta_key;
         }
@@ -421,13 +452,13 @@ SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {
     if (fields[0] == "pm") {
         if (fields[1] == "object") {
             const String &path_key = fields[2];
-            SharedPtr<PmPathMetaKey> pm_path_meta_key = MakeShared<PmPathMetaKey>(path_key);
+            SharedPtr<PmObjectMetaKey> pm_path_meta_key = MakeShared<PmObjectMetaKey>(path_key);
             pm_path_meta_key->value_ = value; //
             return pm_path_meta_key;
         }
         if (fields[1] == "object_stat") {
             const String &object_key = fields[2];
-            SharedPtr<PmObjectMetaKey> pm_object_meta_key = MakeShared<PmObjectMetaKey>(object_key);
+            SharedPtr<PmStatMetaKey> pm_object_meta_key = MakeShared<PmStatMetaKey>(object_key);
             pm_object_meta_key->value_ = value;
             return pm_object_meta_key;
         }

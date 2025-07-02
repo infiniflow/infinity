@@ -38,22 +38,28 @@ import infinity_exception;
 
 namespace infinity {
 
-Vector<SegmentID> GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts) {
+Vector<SegmentID>
+GetTableSegments(KVInstance *kv_instance, const String &db_id_str, const String &table_id_str, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     Vector<SegmentID> segment_ids;
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str, table_id_str);
     auto iter = kv_instance->GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
-        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
-            LOG_DEBUG(fmt::format("SKIP SEGMENT: {} {} {}", iter->Key().ToString(), commit_ts, begin_ts));
+        TxnTimeStamp segment_commit_ts = std::stoull(iter->Value().ToString());
+        if (segment_commit_ts > begin_ts and segment_commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            LOG_DEBUG(fmt::format("SKIP SEGMENT: {} {} {}", iter->Key().ToString(), segment_commit_ts, begin_ts));
             iter->Next();
             continue;
         }
         // the key is committed before the txn or the key isn't committed
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
-        segment_ids.push_back(segment_id);
+        String drop_segment_ts{};
+        kv_instance->Get(KeyEncode::DropSegmentKey(db_id_str, table_id_str, segment_id), drop_segment_ts);
+
+        if (drop_segment_ts.empty() || (std::stoull(drop_segment_ts) > begin_ts && std::stoull(drop_segment_ts) != commit_ts)) {
+            segment_ids.push_back(segment_id);
+        }
         iter->Next();
     }
     std::sort(segment_ids.begin(), segment_ids.end());
@@ -153,8 +159,7 @@ GetTableIndexDef(KVInstance *kv_instance, const String &db_id_str, const String 
         LOG_ERROR(fmt::format("Fail to get index definition from kv store, key: {}, cause: {}", index_def_key, status.message()));
         return nullptr;
     }
-    nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);
-    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_json);
+    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_str);
     return index_base;
 }
 
@@ -213,6 +218,22 @@ SizeT GetSegmentRowCount(KVInstance *kv_instance,
         segment_row_count += block_row_cnt;
     }
     return segment_row_count;
+}
+
+String GetLastPartOfKey(const String &key, char delimiter) {
+    size_t last_pos = key.rfind(delimiter);
+
+    if (last_pos != std::string::npos) {
+        return key.substr(last_pos + 1);
+    } else {
+        UnrecoverableError(fmt::format("No '{}' found", delimiter));
+    }
+    return key;
+}
+
+u64 GetTimestampFromKey(const String &key) {
+    String ts_str = GetLastPartOfKey(key, '|');
+    return std::stoull(ts_str);
 }
 
 } // namespace infinity

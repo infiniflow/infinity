@@ -63,7 +63,7 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
         String index_path = GetFilePath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kRead);
         if (status.ok()) {
-            // When replay by full checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
+            // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
             index_size = file_handle->FileSize();
         }
     }
@@ -74,6 +74,10 @@ HnswFileWorker::~HnswFileWorker() {
     if (data_ != nullptr) {
         FreeInMemory();
         data_ = nullptr;
+    }
+    if (mmap_data_ != nullptr) {
+        FreeFromMmapImpl();
+        mmap_data_ = nullptr;
     }
 }
 

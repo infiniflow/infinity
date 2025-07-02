@@ -28,7 +28,6 @@ import infinity_exception;
 import default_values;
 import roaring_bitmap;
 import vector_buffer;
-import fix_heap;
 import serialize;
 import third_party;
 import logger;

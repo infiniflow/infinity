@@ -119,14 +119,8 @@ SizeT VarBuffer::TotalSize() const {
 SizeT VarBufferManager::Append(UniquePtr<char[]> data, SizeT size, bool *free_success) {
     auto *buffer = GetInnerMut();
     SizeT offset = buffer->Append(std::move(data), size, free_success);
-    if (type_ == BufferType::kBufferObj) {
-        block_column_entry_->SetLastChunkOff(buffer->TotalSize());
-    }
     return offset;
 }
-
-VarBufferManager::VarBufferManager(BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr)
-    : type_(BufferType::kBufferObj), buffer_handle_(None), block_column_entry_(block_column_entry), buffer_mgr_(buffer_mgr) {}
 
 VarBufferManager::VarBufferManager(BufferObj *outline_buffer_obj)
     : type_(BufferType::kNewCatalog), buffer_handle_(None), outline_buffer_obj_(outline_buffer_obj) {}
@@ -159,24 +153,6 @@ void VarBufferManager::InitBuffer() {
             }
             break;
         }
-        case BufferType::kBufferObj: {
-            if (!buffer_handle_.has_value()) {
-                if (auto *block_obj = block_column_entry_->GetOutlineBuffer(0); block_obj == nullptr) {
-                    auto file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                 block_column_entry_->block_entry()->block_dir(),
-                                                                 block_column_entry_->OutlineFilename(0),
-                                                                 0, /*buffer_size*/
-                                                                 buffer_mgr_->persistence_manager());
-                    auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
-                    block_column_entry_->AppendOutlineBuffer(buffer_obj);
-                    buffer_handle_ = buffer_obj->Load();
-                } else {
-                    buffer_handle_ = block_obj->Load();
-                }
-            }
-            break;
-        }
         case BufferType::kNewCatalog: {
             if (!buffer_handle_.has_value()) {
                 buffer_handle_ = outline_buffer_obj_->Load();
@@ -191,7 +167,6 @@ VarBuffer *VarBufferManager::GetInnerMut() {
     switch (type_) {
         case BufferType::kBuffer:
             return mem_buffer_.get();
-        case BufferType::kBufferObj:
         case BufferType::kNewCatalog:
             return static_cast<VarBuffer *>(buffer_handle_->GetDataMut());
     }
@@ -203,7 +178,6 @@ const VarBuffer *VarBufferManager::GetInner() {
     switch (type_) {
         case BufferType::kBuffer:
             return mem_buffer_.get();
-        case BufferType::kBufferObj:
         case BufferType::kNewCatalog:
             return static_cast<const VarBuffer *>(buffer_handle_->GetData());
     }

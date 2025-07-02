@@ -21,7 +21,6 @@ module column_length_io;
 
 import stl;
 import column_index_reader;
-import chunk_index_entry;
 import memory_indexer;
 import buffer_obj;
 import buffer_handle;
@@ -40,7 +39,7 @@ FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader
 FullTextColumnLengthReader::~FullTextColumnLengthReader() = default;
 
 u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
-    // determine the ChunkIndexEntry which contains row_id
+    // determine the chunk index which contains row_id
     current_chunk_buffer_handle_.~BufferHandle();
     SizeT left = 0;
     SizeT right = chunk_index_meta_infos_.size();
@@ -60,7 +59,7 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
         return 0;
     }
 
-    // Load the column-length file of the ChunkIndexEntry
+    // Load the column-length file of the chunk index
     current_chunk_buffer_handle_ = chunk_index_meta_infos_[current_chunk].index_buffer_->Load();
     column_lengths_ = (const u32 *)current_chunk_buffer_handle_.GetData();
     current_chunk_base_rowid_ = chunk_index_meta_infos_[current_chunk].base_rowid_;

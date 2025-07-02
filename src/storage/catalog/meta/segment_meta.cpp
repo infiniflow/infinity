@@ -28,7 +28,6 @@ import infinity_exception;
 
 import block_meta;
 import meta_info;
-import segment_entry;
 import new_catalog;
 import fast_rough_filter;
 import column_def;
@@ -38,7 +37,7 @@ import snapshot_info;
 namespace infinity {
 
 SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
-    : begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(table_meta.kv_instance()), table_meta_(table_meta),
+    : begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta),
       segment_id_(segment_id) {}
 
 // Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {

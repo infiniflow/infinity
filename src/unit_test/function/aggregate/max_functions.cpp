@@ -306,6 +306,4 @@ TEST_F(MaxFunctionTest, max_func) {
 
         EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
     }
-
-    kv_store_ptr->Uninit();
 }

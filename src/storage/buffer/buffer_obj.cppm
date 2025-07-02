@@ -106,7 +106,7 @@ public:
 
     void PickForCleanup();
 
-    Status CleanupFile(KVInstance *kv_instance) const;
+    Status CleanupFile() const;
 
     void CleanupTempFile() const;
 

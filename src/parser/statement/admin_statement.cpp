@@ -36,14 +36,6 @@ std::string AdminStatement::ToString() const {
             ss << "Admin list log index";
             break;
         }
-        case AdminStmtType::kListCatalogs: {
-            ss << "Admin list catalog files";
-            break;
-        }
-        case AdminStmtType::kShowCatalog: {
-            ss << "Admin show catalog file: ";
-            break;
-        }
         case AdminStmtType::kListDatabases: {
             ss << "Admin list databases: ";
             break;

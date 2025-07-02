@@ -14,10 +14,6 @@
 
 module;
 
-namespace infinity {
-struct SegmentEntry;
-}
-
 export module abstract_bmp;
 
 import stl;
@@ -32,15 +28,11 @@ import internal_types;
 import buffer_handle;
 import base_memindex;
 import memindex_tracer;
-import table_index_entry;
 import chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
-struct ChunkIndexEntry;
-struct SegmentIndexEntry;
-struct BlockColumnEntry;
 class ColumnVector;
 class BufferObj;
 
@@ -76,7 +68,7 @@ export struct BMPIndexInMem final : public BaseMemIndex {
 public:
     BMPIndexInMem() : bmp_(nullptr) {}
 
-    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry);
+    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def);
 
     MemIndexTracerInfo GetInfo() const override;
 
@@ -154,17 +146,11 @@ public:
 
     SizeT GetSizeInBytes() const;
 
-    void AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count);
-
     void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
-
-    void AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts);
 
     const AbstractBMP &get() const { return bmp_; }
 
     AbstractBMP &get_ref() { return bmp_; }
-
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
     void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
 
@@ -175,7 +161,6 @@ private:
     AbstractBMP bmp_ = nullptr;
     mutable bool own_memory_ = true;
     mutable BufferHandle chunk_handle_{};
-    SegmentIndexEntry *segment_index_entry_;
 };
 
 } // namespace infinity
