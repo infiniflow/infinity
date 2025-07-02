@@ -45,7 +45,7 @@ export struct BlockColumnSnapshotInfo {
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 
     nlohmann::json Serialize();
-    static SharedPtr<BlockColumnSnapshotInfo> Deserialize(const nlohmann::json &column_block_json);
+    static SharedPtr<BlockColumnSnapshotInfo> Deserialize(std::string_view column_block_str);
 };
 
 export struct BlockSnapshotInfo {
@@ -58,7 +58,7 @@ export struct BlockSnapshotInfo {
     String fast_rough_filter_;
 
     nlohmann::json Serialize();
-    static SharedPtr<BlockSnapshotInfo> Deserialize(const nlohmann::json &block_json);
+    static SharedPtr<BlockSnapshotInfo> Deserialize(std::string_view block_str);
 };
 
 export struct SegmentSnapshotInfo {
@@ -73,7 +73,7 @@ export struct SegmentSnapshotInfo {
     Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
 
     nlohmann::json Serialize();
-    static SharedPtr<SegmentSnapshotInfo> Deserialize(const nlohmann::json &segment_json);
+    static SharedPtr<SegmentSnapshotInfo> Deserialize(std::string_view segment_str);
 };
 
 export struct ChunkIndexSnapshotInfo {
@@ -82,14 +82,14 @@ export struct ChunkIndexSnapshotInfo {
     Vector<String> full_text_files_; // full text files of the chunk
     SharedPtr<ChunkIndexMetaInfo> chunk_info_;
     nlohmann::json Serialize();
-    static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(const nlohmann::json &chunk_index_json);
+    static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(std::string_view chunk_index_str);
 };
 
 export struct SegmentIndexSnapshotInfo {
     SegmentID segment_id_;
     Vector<SharedPtr<ChunkIndexSnapshotInfo>> chunk_index_snapshots_{};
     nlohmann::json Serialize();
-    static SharedPtr<SegmentIndexSnapshotInfo> Deserialize(const nlohmann::json &segment_index_json);
+    static SharedPtr<SegmentIndexSnapshotInfo> Deserialize(std::string_view segment_index_str);
 };
 
 export struct TableIndexSnapshotInfo {
@@ -98,7 +98,7 @@ export struct TableIndexSnapshotInfo {
     SharedPtr<String> index_id_str_;
     Vector<SharedPtr<SegmentIndexSnapshotInfo>> segment_index_snapshots_{};
     nlohmann::json Serialize();
-    static SharedPtr<TableIndexSnapshotInfo> Deserialize(const nlohmann::json &table_index_json);
+    static SharedPtr<TableIndexSnapshotInfo> Deserialize(std::string_view table_index_str);
 };
 
 export struct TableSnapshotInfo : public SnapshotInfo {

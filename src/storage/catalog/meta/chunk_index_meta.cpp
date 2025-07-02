@@ -609,7 +609,7 @@ Status ChunkIndexMeta::LoadChunkInfo() {
         return s;
     }
     chunk_info_ = ChunkIndexMetaInfo();
-    chunk_info_->FromJson(nlohmann::json::parse(chunk_info_str));
+    chunk_info_->FromJson(chunk_info_str);
     return Status::OK();
 }
 

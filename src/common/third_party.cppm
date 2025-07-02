@@ -178,7 +178,11 @@ export using simdjson::error_code;
 export using ondemand::parser;
 export using ondemand::document;
 export using ondemand::object;
+export using ondemand::array;
 export using ondemand::value;
+export using ondemand::number;
+export using ondemand::json_type;
+export using ondemand::number_type;
 }
 
 namespace magic_enum {

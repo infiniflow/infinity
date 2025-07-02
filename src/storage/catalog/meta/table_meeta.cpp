@@ -651,7 +651,7 @@ Status TableMeeta::LoadColumnDefs() {
             kv_instance_->Get(KeyEncode::DropTableColumnKey(db_id_str_, table_id_str_, column_name, max_commit_ts), drop_column_ts);
 
             if (drop_column_ts.empty() || std::stoull(drop_column_ts) > begin_ts_) {
-                auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
+                auto column_def = ColumnDef::FromJson(column_value);
                 column_defs.push_back(column_def);
             }
         }

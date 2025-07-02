@@ -120,7 +120,7 @@ nlohmann::json IndexFullText::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
+SharedPtr<IndexFullText> IndexFullText::Deserialize(std::string_view index_def_str) {
     Status status = Status::NotSupport("Not implemented");
     RecoverableError(status);
     return nullptr;
