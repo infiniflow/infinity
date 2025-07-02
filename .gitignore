@@ -25,6 +25,10 @@ CMakeFiles/
 cmake-build-*/
 build/
 
+# Ignore temporary files and third party dependencies
+tmp/
+third_party/
+
 
 
 
