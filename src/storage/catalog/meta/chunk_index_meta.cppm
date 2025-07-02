@@ -39,7 +39,8 @@ export struct ChunkIndexMetaInfo {
 
     void ToJson(nlohmann::json &json) const;
 
-    void FromJson(const nlohmann::json &json);
+    void FromJson(std::string_view json_str);
+
     static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 };
 

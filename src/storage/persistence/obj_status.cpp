@@ -39,25 +39,6 @@ nlohmann::json ObjStat::Serialize() const {
     return obj;
 }
 
-void ObjStat::Deserialize(const nlohmann::json &obj) {
-    ref_count_ = 0;
-    obj_size_ = obj["obj_size"];
-    parts_ = obj["parts"];
-    if (obj.contains("deleted_ranges")) {
-        SizeT start = 0;
-        SizeT end = 0;
-        for (auto &range_obj : obj["deleted_ranges"]) {
-            if (range_obj.contains("start")) {
-                start = range_obj["start"];
-            }
-            if (range_obj.contains("end")) {
-                end = range_obj["end"];
-            }
-            deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
-        }
-    }
-}
-
 String ObjStat::ToString() const {
     nlohmann::json obj;
     obj["obj_size"] = obj_size_;
@@ -72,9 +53,26 @@ String ObjStat::ToString() const {
     return obj.dump();
 }
 
-void ObjStat::Deserialize(const String &str) {
-    nlohmann::json obj = nlohmann::json::parse(str);
-    Deserialize(obj);
+void ObjStat::Deserialize(std::string_view str) {
+    simdjson::padded_string obj_json(str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(obj_json);
+    ref_count_ = 0;
+    obj_size_ = doc["obj_size"];
+    parts_ = doc["parts"];
+    if (simdjson::array array; doc["deleted_ranges"].get(array) == simdjson::SUCCESS) {
+        SizeT start = 0;
+        SizeT end = 0;
+        for (auto range_obj : array) {
+            if (auto item = range_obj["start"]; item.error() == simdjson::SUCCESS) {
+                start = item.get<SizeT>();
+            }
+            if (auto item = range_obj["end"]; item.error() == simdjson::SUCCESS) {
+                end = item.get<SizeT>();
+            }
+            deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
+        }
+    }
 }
 
 SizeT ObjStat::GetSizeInBytes() const {

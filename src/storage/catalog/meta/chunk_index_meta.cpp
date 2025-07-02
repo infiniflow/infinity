@@ -59,11 +59,14 @@ void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
     json["index_size"] = index_size_;
 }
 
-void ChunkIndexMetaInfo::FromJson(const nlohmann::json &json) {
-    base_name_ = json["base_name"].get<String>();
-    base_row_id_ = RowID::FromUint64(json["base_row_id"].get<u64>());
-    row_cnt_ = json["row_count"].get<u64>();
-    index_size_ = json["index_size"].get<u64>();
+void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
+    simdjson::padded_string json(json_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json);
+    base_name_ = doc["base_name"].get<String>();
+    base_row_id_ = RowID::FromUint64(doc["base_row_id"].get<u64>());
+    row_cnt_ = doc["row_count"].get<u64>();
+    index_size_ = doc["index_size"].get<u64>();
 }
 
 ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta)
@@ -553,7 +556,7 @@ Status ChunkIndexMeta::LoadChunkInfo() {
         return s;
     }
     chunk_info_ = ChunkIndexMetaInfo();
-    chunk_info_->FromJson(nlohmann::json::parse(chunk_info_str));
+    chunk_info_->FromJson(chunk_info_str);
     return Status::OK();
 }
 
