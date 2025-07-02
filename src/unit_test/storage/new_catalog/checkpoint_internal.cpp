@@ -816,7 +816,8 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
     {
         auto txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         Optional<DBMeeta> db_meta;
-        Status status = txn->GetDBMeta(*db_name, db_meta);
+        TxnTimeStamp db_creat_ts;
+        Status status = txn->GetDBMeta(*db_name, db_meta, db_creat_ts);
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
