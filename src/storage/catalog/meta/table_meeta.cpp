@@ -470,7 +470,7 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     return Status::OK();
 }
 
-Status TableMeeta::GetTableDetail(TableDetail &table_detail, const String &db_name, const String &table_name) {
+Status TableMeeta::GetTableDetail(TableDetail &table_detail) {
     TableInfo table_info;
     Status status = GetTableInfo(table_info);
     if (!status.ok()) {
@@ -480,8 +480,8 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail, const String &db_na
     if (!status.ok()) {
         return status;
     }
-    table_detail.db_name_ = MakeShared<String>(db_name);
-    table_detail.table_name_ = MakeShared<String>(table_name);
+    table_detail.db_name_ = MakeShared<String>(db_name_);
+    table_detail.table_name_ = MakeShared<String>(table_name_);
     table_detail.table_comment_ = table_info.table_comment_;
     table_detail.column_count_ = table_info.column_count_;
     table_detail.row_count_ = table_info.row_count_;

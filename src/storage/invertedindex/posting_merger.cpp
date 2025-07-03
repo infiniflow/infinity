@@ -180,7 +180,7 @@ void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_posti
     // segment_term_postings is already sorted by base_row_id
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];
-        RowID base_row_id = term_posting->GetBaseRowId();
+        RowID base_row_id = term_posting->GetBeginRowID();
         u32 base_doc_id = base_row_id - merge_base_rowid;
         PostingDecoder *decoder = term_posting->GetPostingDecoder();
         SortedPosting sorted_posting(posting_format_.GetOption(), base_doc_id, decoder);

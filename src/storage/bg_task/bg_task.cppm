@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module bg_task;
 
 import stl;
@@ -139,19 +141,20 @@ public:
     bool new_optimize_ = false;
 };
 
-export class DumpIndexTask final : public BGTask {
+export class DumpMemIndexTask final : public BGTask {
 public:
-    DumpIndexTask(BaseMemIndex *mem_index, SharedPtr<NewTxn> &new_txn_shared);
-    DumpIndexTask(EMVBIndexInMem *emvb_mem_index, SharedPtr<NewTxn> &new_txn_shared);
+    DumpMemIndexTask(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, RowID begin_row_id = RowID());
 
-    ~DumpIndexTask() override = default;
+    ~DumpMemIndexTask() override = default;
 
-    String ToString() const override { return "DumpIndexTask"; }
+    String ToString() const override { return "DumpMemIndexTask"; }
 
 public:
-    BaseMemIndex *mem_index_{};
-    EMVBIndexInMem *emvb_mem_index_{};
-    SharedPtr<NewTxn> new_txn_shared_{};
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    SegmentID segment_id_{};
+    RowID begin_row_id_{};
 };
 
 export class AppendMemIndexTask final : public BGTask {

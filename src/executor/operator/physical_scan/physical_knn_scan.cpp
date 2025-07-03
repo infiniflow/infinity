@@ -649,8 +649,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         const auto *ivf_chunk = static_cast<const IVFIndexInChunk *>(index_handle.GetData());
                         ivf_result_handler->Search(ivf_chunk);
                     }
-                    if (mem_index && mem_index->memory_ivf_index_) {
-                        ivf_result_handler->Search(mem_index->memory_ivf_index_.get());
+                    if (mem_index) {
+                        SharedPtr<IVFIndexInMem> memory_ivf_index = mem_index->GetIVFIndex();
+                        if (memory_ivf_index != nullptr) {
+                            ivf_result_handler->Search(memory_ivf_index.get());
+                        }
                     }
                     auto [result_n, d_ptr, offset_ptr] = ivf_result_handler->EndWithoutSort();
                     auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
@@ -872,14 +875,17 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                             abstract_hnsw_search(*abstract_hnsw, false);
 #endif
                         }
-                        if (mem_index && mem_index->memory_hnsw_index_) {
+                        if (mem_index) {
+                            SharedPtr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();
+                            if (memory_hnsw_index) {
 #ifdef INDEX_HANDLER
-                            const HnswHandlerPtr hnsw_handler = mem_index->memory_hnsw_index_->get();
-                            hnsw_search(hnsw_handler, true);
+                                const HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
+                                hnsw_search(hnsw_handler, true);
 #else
-                            const AbstractHnsw &abstract_hnsw = mem_index->memory_hnsw_index_->get();
-                            abstract_hnsw_search(abstract_hnsw, true);
+                                const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
+                                abstract_hnsw_search(abstract_hnsw, true);
 #endif
+                            }
                         }
                     }
                     break;

@@ -140,7 +140,7 @@ public:
 
     ~BMPIndexInMem();
 
-    RowID GetBeginRowID() const { return begin_row_id_; }
+    RowID GetBeginRowID() const override { return begin_row_id_; }
 
     SizeT GetRowCount() const;
 

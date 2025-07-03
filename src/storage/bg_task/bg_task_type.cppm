@@ -31,7 +31,7 @@ export enum class BGTaskType {
     kNotifyOptimize,
     kNewCleanup,
     kUpdateSegmentBloomFilterData, // Not used
-    kDumpIndex,
+    kDumpMemIndex,
     kAppendMemIndex,
     kTestCommand,
     kInvalid

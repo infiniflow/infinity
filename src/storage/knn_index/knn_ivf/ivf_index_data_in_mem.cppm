@@ -58,7 +58,7 @@ public:
     virtual ~IVFIndexInMem();
     u32 GetInputRowCount() const;
 
-    virtual RowID GetBeginRowID() const = 0;
+    virtual RowID GetBeginRowID() const override = 0;
 
     virtual u32 GetRowCount() const = 0;
 

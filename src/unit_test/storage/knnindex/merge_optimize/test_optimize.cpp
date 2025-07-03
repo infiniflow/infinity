@@ -204,7 +204,7 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
 
         SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
         ASSERT_NE(mem_index, nullptr);
-        EXPECT_EQ(mem_index->memory_hnsw_index_, nullptr);
+        EXPECT_EQ(mem_index->GetHnswIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
             auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();
@@ -323,7 +323,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
 
         SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
         ASSERT_NE(mem_index, nullptr);
-        EXPECT_EQ(mem_index->memory_secondary_index_, nullptr);
+        EXPECT_EQ(mem_index->GetSecondaryIndex(), nullptr);
         txn_mgr->PrintAllKeyValue();
         {
             auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();

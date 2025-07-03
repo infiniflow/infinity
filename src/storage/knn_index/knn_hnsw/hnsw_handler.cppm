@@ -290,7 +290,7 @@ public:
 
     void Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr = nullptr);
 
-    RowID GetBeginRowID() const { return begin_row_id_; }
+    RowID GetBeginRowID() const override { return begin_row_id_; }
     const HnswHandlerPtr &get() const { return hnsw_handler_; }
     HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
     void SetLSGParam(float alpha, UniquePtr<float[]> avg);

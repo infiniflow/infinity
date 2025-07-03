@@ -45,7 +45,7 @@ public:
     // for in memory segment posting
     void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
-    RowID GetBaseRowId() const { return base_row_id_; }
+    RowID GetBeginRowID() const { return base_row_id_; }
     void SetBaseRowId(RowID base_row_id) { base_row_id_ = base_row_id; }
 
     u32 GetDocCount() const { return doc_count_; }

@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module memindex_tracer;
 
 import stl;
@@ -27,8 +29,9 @@ class BaseMemIndex;
 class NewTxn;
 struct NewCatalog;
 class NewTxnManager;
-class DumpIndexTask;
+class DumpMemIndexTask;
 class EMVBIndexInMem;
+class MemIndex;
 
 export struct MemIndexTracerInfo {
 public:
@@ -40,6 +43,18 @@ public:
     SharedPtr<String> db_name_;
     SizeT mem_used_;
     SizeT row_count_;
+};
+
+export struct MemIndexDetail {
+    SharedPtr<MemIndex> mem_index_;
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    SegmentID segment_id_{};
+    RowID begin_row_id_{};
+    SizeT mem_used_{};
+    SizeT row_count_{};
+    bool is_emvb_index_{};
 };
 
 export class MemIndexTracer {
@@ -56,39 +71,32 @@ private:
     bool TryTriggerDump();
 
 public:
-    void DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index);
-
-    void DumpFail(BaseMemIndex *mem_index);
+    void DumpDone(SharedPtr<MemIndex> mem_index);
 
     Vector<MemIndexTracerInfo> GetMemIndexTracerInfo(NewTxn *txn);
 
-    Vector<BaseMemIndex *> GetUndumpedMemIndexes(NewTxn *new_txn);
-
-    virtual void TriggerDump(UniquePtr<DumpIndexTask> task) = 0;
+    virtual void TriggerDump(SharedPtr<DumpMemIndexTask> task) = 0;
 
     SizeT cur_index_memory() const { return cur_index_memory_.load(); }
 
 protected:
     virtual NewTxn *GetTxn() = 0;
 
-    virtual Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) = 0;
-
-    virtual Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) = 0;
+    virtual Vector<SharedPtr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) = 0;
 
     using MemIndexMapIter = HashSet<BaseMemIndex *>::iterator;
 
-    UniquePtr<DumpIndexTask> MakeDumpTask();
+    Vector<SharedPtr<DumpMemIndexTask>> MakeDumpTask();
 
     static SizeT ChooseDump(const Vector<BaseMemIndex *> &mem_indexes);
 
 protected:
-    std::mutex mtx_;
-
     const SizeT index_memory_limit_;
     Atomic<SizeT> cur_index_memory_ = 0;
 
-    HashMap<BaseMemIndex *, SizeT> proposed_dump_{};
-    Atomic<SizeT> acc_proposed_dump_ = 0;
+    std::mutex mtx_; // protect proposed_dump_ and proposed_dump_size_
+    HashMap<SharedPtr<MemIndex>, SizeT> proposed_dump_{};
+    SizeT proposed_dump_size_ = 0;
 };
 
 inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
@@ -96,12 +104,20 @@ inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
     if (add == 0 || index_memory_limit_ == 0) {
         return;
     }
-    SizeT old_index_memory = cur_index_memory_.fetch_add(add);
-    if (SizeT new_index_memory = old_index_memory + add; new_index_memory > index_memory_limit_) {
-        if (new_index_memory > index_memory_limit_ + acc_proposed_dump_.load()) {
-            LOG_TRACE(fmt::format("acc_proposed_dump_ = {}", acc_proposed_dump_.load()));
-            TryTriggerDump();
+    bool need_trigger_dump = false;
+    {
+        std::lock_guard lck(mtx_);
+        SizeT old_index_memory = cur_index_memory_.fetch_add(add);
+        if (old_index_memory + add > index_memory_limit_ + proposed_dump_size_) {
+            need_trigger_dump = true;
+            LOG_TRACE(fmt::format("mem index limit: {}, cur_index_memory_: {}, proposed_dump_size_: {}",
+                                  index_memory_limit_,
+                                  old_index_memory + add,
+                                  proposed_dump_size_));
         }
+    }
+    if (need_trigger_dump) {
+        TryTriggerDump();
     }
 }
 
@@ -111,14 +127,12 @@ public:
 
     ~BGMemIndexTracer();
 
-    void TriggerDump(UniquePtr<DumpIndexTask> task) override;
+    void TriggerDump(SharedPtr<DumpMemIndexTask> task) override;
 
 protected:
     NewTxn *GetTxn() override;
 
-    Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override;
-
-    Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) override;
+    Vector<SharedPtr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override;
 
 private:
     NewTxnManager *txn_mgr_;

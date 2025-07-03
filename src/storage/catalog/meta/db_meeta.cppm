@@ -49,13 +49,17 @@ public:
 
     Status SetNextTableID(const String &table_id_str);
 
+    String GetDBName() const { return db_name_; }
+    void SetDBName(const String &db_name) { db_name_ = db_name; }
+
 private:
     Status GetComment(String *&comment);
     Status LoadTableIDs();
     String GetDBTag(const String &tag) const;
 
 private:
-    String db_id_str_;
+    String db_id_str_{};
+    String db_name_{};
     NewTxn *txn_{};
     TxnTimeStamp txn_begin_ts_{};
     KVInstance *kv_instance_{};
