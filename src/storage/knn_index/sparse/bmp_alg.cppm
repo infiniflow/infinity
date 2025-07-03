@@ -58,6 +58,10 @@ public:
             return {{}, {}};
         }
 
+        if (u32(topk) > doc_ids_.size()) {
+            topk = doc_ids_.size();
+        }
+
         SizeT block_size = block_fwd_.block_size();
         SparseVecEle<DataType, IdxType> keeped_query;
         if (options.beta_ < 1.0) {
@@ -477,8 +481,8 @@ public:
             UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
         }
         return MakeUnique<BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>>(std::move(bm_ivt),
-                                                                          std::move(block_fwd),
-                                                                          VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
+                                                                                      std::move(block_fwd),
+                                                                                      VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
     }
 
 private:
