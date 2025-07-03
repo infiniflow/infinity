@@ -17,7 +17,6 @@
 #include <sstream>
 #include <utility>
 
-#include "query_node.h"
 #include "search_driver.h"
 #include "search_parser.h"
 #define SearchScannerSuffix InfinitySyntax
