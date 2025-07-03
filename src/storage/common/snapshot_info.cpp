@@ -757,110 +757,105 @@ nlohmann::json DatabaseSnapshotInfo::CreateSnapshotMetadataJSON() const {
 }
 
 Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
-    // Config *config = InfinityContext::instance().config();
-    
-    // // Read metadata JSON file
-    // String metadata_path = fmt::format("{}/{}/{}.json", config->DataDir(), snapshot_dir, snapshot_name);
-    
-    // auto [file_handle, open_status] = VirtualStore::Open(metadata_path, FileAccessMode::kRead);
-    // if (!open_status.ok()) {
-    //     return {nullptr, open_status};
+    // LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+
+    // String meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
+
+    // if (!VirtualStore::Exists(meta_path)) {
+    //     return {nullptr, Status::FileNotFound(meta_path)};
     // }
-    
-    // // Get file size
-    // auto [file_size, size_status] = file_handle->GetFileSize();
-    // if (!size_status.ok()) {
-    //     return {nullptr, size_status};
+    // auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
+    // if (!status.ok()) {
+    //     return {nullptr, status};
     // }
-    
-    // // Read JSON content
-    // auto buffer = std::make_unique<char[]>(file_size);
-    // auto [nread, read_status] = file_handle->Read(buffer.get(), file_size);
-    // if (!read_status.ok()) {
-    //     return {nullptr, read_status};
+
+    // i64 file_size = meta_file_handle->FileSize();
+    // String json_str(file_size, 0);
+    // auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
+    // if (!status.ok()) {
+    //     RecoverableError(status_read);
     // }
-    
-    // // Parse JSON
-    // nlohmann::json json_data;
-    // try {
-    //     json_data = nlohmann::json::parse(buffer.get(), buffer.get() + file_size);
-    // } catch (const std::exception &e) {
-    //     return {nullptr, Status::InvalidSnapshotMetadata(fmt::format("Failed to parse JSON: {}", e.what()))};
+    // if ((SizeT)file_size != n_bytes) {
+    //     Status status = Status::FileCorrupted(meta_path);
+    //     RecoverableError(status);
     // }
-    
+
+    // nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+
+    // //    LOG_INFO(snapshot_meta_json.dump());
     // // Validate snapshot scope
-    // if (!json_data.contains("snapshot_scope") || json_data["snapshot_scope"] != SnapshotScope::kDatabase) {
+    // if (!snapshot_meta_json.contains("snapshot_scope") || snapshot_meta_json["snapshot_scope"] != SnapshotScope::kDatabase) {
     //     return {nullptr, Status::InvalidSnapshotMetadata("Invalid snapshot scope, expected database snapshot")};
     // }
     
-    // Create DatabaseSnapshotInfo object
-    auto database_snapshot = MakeShared<DatabaseSnapshotInfo>();
+//     // Create DatabaseSnapshotInfo object
+//     auto database_snapshot = MakeShared<DatabaseSnapshotInfo>();
     
-    // // Deserialize basic fields
-    // database_snapshot->version_ = json_data["version"];
-    // database_snapshot->snapshot_name_ = json_data["snapshot_name"];
-    // database_snapshot->scope_ = static_cast<SnapshotScope>(json_data["snapshot_scope"]);
-    // database_snapshot->db_name_ = json_data["database_name"];
-    // database_snapshot->db_id_str_ = json_data["db_id_str"];
-    // database_snapshot->db_comment_ = json_data["db_comment"];
-    // database_snapshot->db_next_table_id_str_ = json_data["db_next_table_id_str"];
+//     // Deserialize basic fields
+//     database_snapshot->version_ = json_data["version"];
+//     database_snapshot->snapshot_name_ = json_data["snapshot_name"];
+//     database_snapshot->scope_ = static_cast<SnapshotScope>(json_data["snapshot_scope"]);
+//     database_snapshot->db_name_ = json_data["database_name"];
+//     database_snapshot->db_id_str_ = json_data["db_id_str"];
+//     database_snapshot->db_comment_ = json_data["db_comment"];
+//     database_snapshot->db_next_table_id_str_ = json_data["db_next_table_id_str"];
     
-    // // Deserialize table snapshots
-    // if (json_data.contains("table_snapshots")) {
-    //     for (const auto &table_snapshot_json : json_data["table_snapshots"]) {
-    //         auto [table_snapshot, table_status] = TableSnapshotInfo::Deserialize(snapshot_dir, table_snapshot_json["snapshot_name"]);
-    //         if (!table_status.ok()) {
-    //             return {nullptr, table_status};
-    //         }
-    //         database_snapshot->table_snapshots_.emplace_back(table_snapshot);
-    //     }
-    // }
+//     // Deserialize table snapshots
+//     if (json_data.contains("table_snapshots")) {
+//         for (const auto &table_snapshot_json : json_data["table_snapshots"]) {
+//             auto [table_snapshot, table_status] = TableSnapshotInfo::Deserialize(snapshot_dir, table_snapshot_json["snapshot_name"]);
+//             if (!table_status.ok()) {
+//                 return {nullptr, table_status};
+//             }
+//             database_snapshot->table_snapshots_.emplace_back(table_snapshot);
+//         }
+//     }
     
-    return {database_snapshot, Status::OK()};
+    return {nullptr, Status::OK()};
 }
 
 Status DatabaseSnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir, 
                            const String& snapshot_name,
                            const Vector<String>& files_to_restore,
                            const String& new_database_id_str) {
-    Config* config = InfinityContext::instance().config();
+//     Config* config = InfinityContext::instance().config();
     
-    for (const auto& file : files_to_restore) {
-        String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+//     for (const auto& file : files_to_restore) {
+//         String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
         
-        // Replace the old database_id_str with the new one in the file path
-        String modified_file = file;
+//         // Replace the old database_id_str with the new one in the file path
+//         String modified_file = file;
         
-        // Find and replace the db_* pattern in the file path
-        // Look for pattern: /db_* where * can be any number of digits
-        size_t db_pos = modified_file.find("db_");
-        if (db_pos != String::npos) {
-            // Find the end of the database ID (next '/' or end of string)
-            size_t db_end = modified_file.find('/', db_pos + 3);
-            if (db_end == String::npos) {
-                db_end = modified_file.length();
-            }
+//         // Find and replace the db_* pattern in the file path
+//         // Look for pattern: /db_* where * can be any number of digits
+//         size_t db_pos = modified_file.find("db_");
+//         if (db_pos != String::npos) {
+//             // Find the end of the database ID (next '/' or end of string)
+//             size_t db_end = modified_file.find('/', db_pos + 3);
+//             if (db_end == String::npos) {
+//                 db_end = modified_file.length();
+//             }
             
-            // Extract the old database ID from the path
-            String old_db_id_in_path = modified_file.substr(db_pos + 3, db_end - (db_pos + 3));
+//             // Extract the old database ID from the path
+//             String old_db_id_in_path = modified_file.substr(db_pos + 3, db_end - (db_pos + 3));
             
-            // Replace the old database ID with the new one
-            modified_file.replace(db_pos + 3, old_db_id_in_path.length(), new_database_id_str);
-        }
+//             // Replace the old database ID with the new one
+//             modified_file.replace(db_pos + 3, old_db_id_in_path.length(), new_database_id_str);
+//         }
         
-        String dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
+//         String dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
         
-        // Create destination directory
-        String dst_dir = VirtualStore::GetParentPath(dst_file_path);
-        if (!VirtualStore::Exists(dst_dir)) {
-            VirtualStore::MakeDirectory(dst_dir);
-        }
+//         // Create destination directory
+//         String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+//         if (!VirtualStore::Exists(dst_dir)) {
+//             VirtualStore::MakeDirectory(dst_dir);
+//         }
         
-        Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
-        if (!copy_status.ok()) {
-            return copy_status;
-        }
-    }
+//         Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+//         if (!copy_status.ok()) {
+//             return copy_status;
+//         }
+//     }
     
     return Status::OK();
 }

@@ -1,0 +1,54 @@
+# name: test/sql/ddl/index/test_ivf.sql
+# description: Test create ivf index
+# group: [ddl, test_ivf]
+
+statement ok
+DROP TABLE IF EXISTS test_ivf;
+
+# Expecting IDENTIFIER or PRIMARY or UNIQUE
+statement ok
+CREATE TABLE test_ivf (col1 embedding(float,128));
+
+# import data from fvecs file
+statement ok
+COPY test_ivf FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+
+statement ok
+CREATE INDEX idx1 ON test_ivf (col1) USING IVF WITH (metric = l2);
+
+statement ok
+CREATE SNAPSHOT test_ivf_backup ON TABLE test_ivf;
+
+statement ok
+DROP TABLE test_ivf;
+
+statement ok
+RESTORE TABLE SNAPSHOT test_ivf_backup;
+
+statement ok
+SELECT * FROM test_ivf LIMIT 1;
+
+statement ok
+SHOW TABLE test_ivf INDEX idx1;
+
+#drop and restore again
+statement ok
+DROP TABLE test_ivf;
+
+statement ok
+RESTORE TABLE SNAPSHOT test_ivf_backup;
+
+statement ok
+SELECT * FROM test_ivf LIMIT 1;
+
+statement ok
+SHOW TABLE test_ivf INDEX idx1;
+
+statement ok
+DROP TABLE test_ivf;
+
+statement ok
+DROP SNAPSHOT test_ivf_backup;
+
+statement error
+DROP SNAPSHOT test_ivf_backup;

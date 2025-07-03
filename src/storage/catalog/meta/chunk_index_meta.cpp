@@ -60,7 +60,7 @@ nlohmann::json ChunkIndexMetaInfo::Serialize() {
 
 SharedPtr<ChunkIndexMetaInfo> ChunkIndexMetaInfo::Deserialize(const nlohmann::json &chunk_index_json) {
     auto chunk_index_meta_info = MakeShared<ChunkIndexMetaInfo>();
-    chunk_index_meta_info->FromJson(chunk_index_json);
+    chunk_index_meta_info->FromJson(chunk_index_json.dump());
     return chunk_index_meta_info;
 }
 
@@ -71,19 +71,14 @@ void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
     json["index_size"] = index_size_;
 }
 
-void ChunkIndexMetaInfo::FromJson(const nlohmann::json &json) {
-    base_name_ = json["base_name"].get<String>();
-    base_row_id_ = RowID::FromUint64(json["base_row_id"].get<u64>());
-    row_cnt_ = json["row_count"].get<u64>();
-    
-    if (json.contains("index_size")) {
-        LOG_INFO(fmt::format("Raw index_size JSON value: {}", json["index_size"].dump()));
-        index_size_ = json["index_size"].get<u64>();
-        LOG_INFO(fmt::format("Parsed index_size: {}", index_size_));
-    } else {
-        LOG_WARN(fmt::format("index_size key missing in JSON"));
-        index_size_ = 0;
-    }
+void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
+    simdjson::padded_string json(json_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json);
+    base_name_ = doc["base_name"].get<String>();
+    base_row_id_ = RowID::FromUint64(doc["base_row_id"].get<u64>());
+    row_cnt_ = doc["row_count"].get<u64>();
+    index_size_ = doc["index_size"].get<u64>();
 }
 
 ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta)

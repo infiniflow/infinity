@@ -41,7 +41,7 @@ export struct ChunkIndexMetaInfo {
 
     void ToJson(nlohmann::json &json) const;
 
-    void FromJson(const nlohmann::json &json);
+    void FromJson(std::string_view json_str);
 
     nlohmann::json Serialize();
 
