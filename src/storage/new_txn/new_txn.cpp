@@ -1552,12 +1552,8 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
 
     Optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
-    ConflictType conflict_type;
     Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
-        if (conflict_type == ConflictType::kIgnore) {
-            return Status::OK();
-        }
         return Status::DuplicateDatabase(db_name);
     }
     if (status.code() != ErrorCode::kDBNotExist) {
