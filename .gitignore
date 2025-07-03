@@ -1,32 +1,146 @@
-# Ignore everything by default
-*
+# .gitignore uses glob patterns instead of regex
 
-# Allow directories (so we can add files selectively)
+# file names without extension
+*
+!*.*
 !*/
 
-# C++ source files we want to track
-!*.cppm
-!*.cpp
-!*.hpp
+# names with special characters
+*#*
+*~*
 
-!*.cxx
-!*.hxx
-!*.cc
-!*.hh
-!*.c
-!*.inl
+# names with given extension
+*.a
+*.app
+*.autobak
+*.class
+*.d
+*.dll
+*.dylib
+*.exe
+*.gch
+*.gz
+*.l.cc
+*.la
+*.lai
+*.lib
+*.lo
+*.log
+*.log.*
+*.mod
+*.o
+*.obj
+*.orig
+*.out
+*.output
+*.pb.h
+*.pb.cc
+*.pch
+*.pyc
+*.slo
+*.smod
+*.so
+*.tab.c
+*.tab.h
+*.tab.cc
+*.tab.hh
+*.tar
+*.tgz
+*.zip
+*.tar.bz2
+*.xz
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
+.DS_Store
 
-# CMake files (optional - include if you want to track these)
-!CMakeLists.txt
+# build directory of Gradle, CMake etc
+build*/
+cmake-build-*
+.idea
+
+# ignore compilation configure file
+src/bin/compilation_config.h
+src/bin/compilation_config.cppm
+
+# bison output file
+parser.output
+
+# ignore parser auto generated files
+#lexer.cpp
+#lexer.h
+#parser.cpp
+#parser.h
+#location.h
+#location.hh
+#query_lexer.h
+#query_lexer.cpp
+#query_parser.h
+#query_parser.cpp
+
+test/sql/**/*gen*.slt
+test/sql/**/*big*.slt
+test/sql/**/*fvecs*.slt
+test/sql/**/*csr*.slt
+test/data/**/*gen*
+test/data/csv/**/*big*.csv
+test/data/csv/*9_commas.csv
+test/data/fvecs/*big*.fvecs
+test/data/fvecs/test.fvecs
+test/data/csr/test.csr
+test/data/fvecs/pysdk_test.fvecs
+test/data/csv/pysdk_test_import_with_different_size.csv
+test/data/bvecs/
+test/sql/dml/import/test_bvecs.slt
+
+invalid/*
+
+benchmark/toml/toml_config.h
+benchmark/csv/csv_config.h
+
+# py thrift rpc
+#python/infinity/remote_thrift/infinity_thrift_rpc/constants.py
+#python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService.py
+#python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService-remote
+#python/infinity/remote_thrift/infinity_thrift_rpc/ttypes.py
 
 
-# Documentation files (optional)
-!*.md
-!*.txt
+# cpp rpc
+#src/network/infinity_thrift/*
 
-# Git related files (needed for git to work)
-!.gitignore
-!.gitattributes
+#python sdk
+python/build
+python/dist
+python/.idea
+python/infinity_sdk.egg-info
 
-# License file (optional)
-!LICENSE*
+
+sift_1m
+
+# ignore all fvecs benchmark file
+test/data/benchmark/*
+
+# ignore valgrind output file
+callgrind.out.*
+
+# ignore vscode config file
+.vscode/
+
+# ignore vscode clangd cache file
+.cache/
+
+# ignore all benchmark datasets
+python/benchmark/datasets/
+
+.venv*/
+tmp*/
+
+dist/
+python/infinity_sdk/infinity_sdk.egg-info/
+minio/
+
+# not ignore Dockerfile
+!Dockerfile*
+
+my_env/
