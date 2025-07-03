@@ -182,7 +182,8 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     }
 
     Optional<DBMeeta> db_meta;
-    status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -207,6 +208,58 @@ Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type,
     return Status::OK();
 }
 
+Status NewTxn::ReplayCreateDb(WalCmdCreateDatabaseV2 *create_db_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // Check if the database already exists in kv store
+    String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts);
+    String db_id;
+    Status status = kv_instance_->Get(db_key, db_id);
+    if (status.ok()) {
+        if (db_id == create_db_cmd->db_id_) {
+            LOG_WARN(fmt::format("Skipping replay create db: Database {} with id {} already exists, commit ts: {}, txn: {}.",
+                                 create_db_cmd->db_name_,
+                                 create_db_cmd->db_id_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay create db: Database {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+                                  create_db_cmd->db_name_,
+                                  create_db_cmd->db_id_,
+                                  db_id,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Database ID mismatch during replay of database creation.");
+        }
+    }
+
+    // If the database does not exist, create it
+    status = PrepareCommitCreateDB(create_db_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Update next db id if necessary
+    String current_next_db_id_str;
+    status = kv_instance_->Get(NEXT_DATABASE_ID.data(), current_next_db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    u64 current_next_db_id = std::stoull(current_next_db_id_str);
+    u64 this_db_id = std::stoull(create_db_cmd->db_id_);
+    if (this_db_id + 1 > current_next_db_id) {
+        // Update the next db id
+        String next_db_id_str = std::to_string(this_db_id + 1);
+        status = kv_instance_->Put(NEXT_DATABASE_ID.data(), next_db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        LOG_TRACE(fmt::format("Update next db id to {}.", next_db_id_str));
+    }
+    LOG_TRACE(fmt::format("Replay create db: {} with id {}.", create_db_cmd->db_name_, create_db_cmd->db_id_));
+    return Status::OK();
+}
+
 Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     this->SetTxnType(TransactionType::kDropDB);
 
@@ -220,7 +273,8 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     this->CheckTxnStatus();
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kDBNotExist) {
             return status;
@@ -242,6 +296,45 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     String db_id_str = db_meta->db_id_str();
     txn_store->db_id_str_ = db_id_str;
     txn_store->db_id_ = std::stoull(db_id_str);
+    txn_store->create_ts_ = db_create_ts;
+    return Status::OK();
+}
+
+Status NewTxn::ReplayDropDb(WalCmdDropDatabaseV2 *drop_db_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // Check if the database is already dropped in kv store
+    String drop_db_key = KeyEncode::DropDBKey(drop_db_cmd->db_name_, drop_db_cmd->create_ts_, drop_db_cmd->db_id_);
+    String drop_db_commit_ts_str;
+    Status status = kv_instance_->Get(drop_db_key, drop_db_commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp db_commit_ts = std::stoull(drop_db_commit_ts_str);
+        if (db_commit_ts == commit_ts) {
+            LOG_WARN(fmt::format("Skipping replay drop db: Database {} created at {} with id {} and ts: {} already dropped, commit ts: {}, txn: {}.",
+                                 drop_db_cmd->db_name_,
+                                 drop_db_cmd->create_ts_,
+                                 drop_db_cmd->db_id_,
+                                 drop_db_cmd->create_ts_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay drop db: Database {} created at {} with id {} and ts: {} already dropped with different commit ts {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  drop_db_cmd->db_name_,
+                                  drop_db_cmd->create_ts_,
+                                  drop_db_cmd->db_id_,
+                                  drop_db_cmd->create_ts_,
+                                  db_commit_ts,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Database commit timestamp mismatch during replay of database drop.");
+        }
+    }
+
+    status = PrepareCommitDropDB(drop_db_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+    LOG_TRACE(fmt::format("Replay drop db: {} with id {}.", drop_db_cmd->db_name_, drop_db_cmd->db_id_));
     return Status::OK();
 }
 
@@ -249,7 +342,8 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     this->CheckTxnStatus();
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -315,13 +409,15 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     this->CheckTxn(db_name);
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
     String table_id_str;
     String table_key;
-    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str);
+    TxnTimeStamp create_table_ts;
+    status = db_meta->GetTableID(*table_def->table_name(), table_key, table_id_str, create_table_ts);
 
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
@@ -353,6 +449,260 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     txn_store->table_id_ = std::stoull(table_id_str);
     txn_store->table_def_ = table_def;
     LOG_TRACE("NewTxn::CreateTable created table entry is inserted.");
+    return Status::OK();
+}
+
+Status NewTxn::ReplayCreateTable(WalCmdCreateTableV2 *create_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // Check if the table already exists in kv store
+    String table_key = KeyEncode::CatalogTableKey(create_table_cmd->db_id_, *create_table_cmd->table_def_->table_name(), commit_ts);
+    String table_id;
+    Status status = kv_instance_->Get(table_key, table_id);
+    if (status.ok()) {
+        if (table_id == create_table_cmd->table_id_) {
+            LOG_WARN(fmt::format("Skipping replay create table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
+                                 *create_table_cmd->table_def_->table_name(),
+                                 create_table_cmd->table_id_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay create table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+                                  *create_table_cmd->table_def_->table_name(),
+                                  create_table_cmd->table_id_,
+                                  table_id,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Table ID mismatch during replay of table creation.");
+        }
+    }
+
+    // If the table does not exist, create it
+    status = PrepareCommitCreateTable(create_table_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Get db meta to set next table id
+    Optional<DBMeeta> db_meta;
+    TxnTimeStamp db_create_ts;
+    status = GetDBMeta(create_table_cmd->db_name_, db_meta, db_create_ts);
+
+    // Get next table id of the db
+    String next_table_id_key = KeyEncode::CatalogDbTagKey(create_table_cmd->db_id_, NEXT_TABLE_ID.data());
+    String next_table_id_str;
+    status = kv_instance_->Get(next_table_id_key, next_table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    u64 next_table_id = std::stoull(next_table_id_str);
+    u64 this_table_id = std::stoull(create_table_cmd->table_id_);
+    if (this_table_id + 1 > next_table_id) {
+        // Update the next table id
+        String new_next_table_id_str = std::to_string(this_table_id + 1);
+        status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, create_table_cmd->db_name_));
+    }
+
+    LOG_TRACE(fmt::format("Replay create table: {} with id {} in database {}.",
+                          *create_table_cmd->table_def_->table_name(),
+                          create_table_cmd->table_id_,
+                          create_table_cmd->db_name_));
+    return Status::OK();
+}
+
+Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
+    this->SetTxnType(TransactionType::kDropTable);
+
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    this->CheckTxnStatus();
+
+    Optional<DBMeeta> db_meta;
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    String table_key;
+    String table_id_str;
+    TxnTimeStamp table_create_ts;
+    status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
+    if (!status.ok()) {
+        if (status.code() != ErrorCode::kTableNotExist) {
+            return status;
+        }
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
+        return status;
+    }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<DropTableTxnStore>();
+    DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->db_id_ = std::stoull(db_meta->db_id_str());
+    txn_store->table_name_ = table_name;
+    txn_store->table_id_str_ = table_id_str;
+    txn_store->table_id_ = std::stoull(table_id_str);
+    txn_store->create_ts_ = table_create_ts;
+    txn_store->table_key_ = table_key;
+    LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
+    return Status::OK();
+}
+
+Status NewTxn::ReplayDropTable(WalCmdDropTableV2 *drop_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // Check if the table is already dropped in kv store
+    String drop_table_key =
+        KeyEncode::DropTableKey(drop_table_cmd->db_id_, drop_table_cmd->table_name_, drop_table_cmd->table_id_, drop_table_cmd->create_ts_);
+    String drop_table_commit_ts_str;
+    Status status = kv_instance_->Get(drop_table_key, drop_table_commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp table_commit_ts = std::stoull(drop_table_commit_ts_str);
+        if (table_commit_ts == commit_ts) {
+            LOG_WARN(fmt::format("Skipping replay drop table: Table {} created at {} with id {} and ts {} already dropped, commit ts: {}, txn: {}.",
+                                 drop_table_cmd->table_name_,
+                                 drop_table_cmd->create_ts_,
+                                 drop_table_cmd->table_id_,
+                                 drop_table_cmd->create_ts_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format(
+                "Replay drop table: Table {} created at {} with id {} and ts {} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+                drop_table_cmd->table_name_,
+                drop_table_cmd->create_ts_,
+                drop_table_cmd->table_id_,
+                drop_table_cmd->create_ts_,
+                table_commit_ts,
+                commit_ts,
+                txn_id));
+            return Status::UnexpectedError("Table commit timestamp mismatch during replay of table drop.");
+        }
+    }
+
+    status = PrepareCommitDropTable(drop_table_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+    LOG_TRACE(fmt::format("Replay drop table: {} with id {} in database {}.",
+                          drop_table_cmd->table_name_,
+                          drop_table_cmd->table_id_,
+                          drop_table_cmd->db_name_));
+
+    return Status::OK();
+}
+
+Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name) {
+    this->SetTxnType(TransactionType::kRenameTable);
+
+    this->CheckTxnStatus();
+    this->CheckTxn(db_name);
+
+    Optional<DBMeeta> db_meta;
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    {
+        String table_id;
+        String table_key;
+        TxnTimeStamp create_table_ts;
+        status = db_meta->GetTableID(new_table_name, table_key, table_id, create_table_ts);
+
+        if (status.ok()) {
+            return Status::DuplicateTable(new_table_name);
+        } else if (status.code() != ErrorCode::kTableNotExist) {
+            return status;
+        }
+    }
+
+    String table_id_str;
+    String table_key;
+    TxnTimeStamp create_table_ts;
+    status = db_meta->GetTableID(old_table_name, table_key, table_id_str, create_table_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Put the data into local txn store
+    if (base_txn_store_ != nullptr) {
+        return Status::UnexpectedError("txn store is not null");
+    }
+
+    base_txn_store_ = MakeShared<RenameTableTxnStore>();
+    RenameTableTxnStore *txn_store = static_cast<RenameTableTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = db_meta->db_id_str();
+    txn_store->old_table_name_ = old_table_name;
+    txn_store->table_id_str_ = table_id_str;
+    txn_store->new_table_name_ = new_table_name;
+    txn_store->old_table_key_ = table_key;
+    LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
+    return Status::OK();
+}
+
+Status NewTxn::ReplayRenameTable(WalCmdRenameTableV2 *rename_table_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+
+    const String &db_id = rename_table_cmd->db_id_;
+    const String &old_table_name = rename_table_cmd->table_name_;
+    const String &old_table_key = rename_table_cmd->old_table_key_;
+    const String &table_id = rename_table_cmd->table_id_;
+    const TxnTimeStamp create_ts = infinity::GetTimestampFromKey(old_table_key);
+
+    String rename_table_key = KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts);
+    String rename_table_commit_ts_str;
+    // TODO: Check if the table is already renamed in kv store
+    Status status = kv_instance_->Get(rename_table_key, rename_table_commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp rename_table_commit_ts = std::stoull(rename_table_commit_ts_str);
+        if (rename_table_commit_ts == commit_ts) {
+            LOG_WARN(fmt::format("Skipping replay rename table: Table {} with id {} already renamed to {}, commit ts: {}, txn: {}.",
+                                 old_table_name,
+                                 table_id,
+                                 rename_table_cmd->new_table_name_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay rename table: Table {} with id {} already renamed to {} with different commit ts {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  old_table_name,
+                                  table_id,
+                                  rename_table_cmd->new_table_name_,
+                                  rename_table_commit_ts,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Table commit timestamp mismatch during replay of table rename.");
+        }
+    }
+
+    String ts_str = std::to_string(commit_ts);
+    kv_instance_->Put(KeyEncode::RenameTableKey(db_id, old_table_name, table_id, create_ts), ts_str);
+
+    // create new table key
+    String new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
+    status = kv_instance_->Put(new_table_key, table_id);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -404,6 +754,55 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     txn_store->column_defs_ = column_defs;
     txn_store->table_key_ = table_key;
 
+    return Status::OK();
+}
+
+Status NewTxn::ReplayAddColumns(WalCmdAddColumnsV2 *add_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // This implementation might have error, since not check the column id and create timestamp
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    String table_key;
+    Status status = GetTableMeta(add_columns_cmd->db_name_, add_columns_cmd->table_name_, db_meta, table_meta, &table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Construct added columns name map
+    Set<SizeT> column_idx_set;
+    Set<String> column_name_set;
+    for (const auto &column_def : add_columns_cmd->column_defs_) {
+        column_idx_set.insert(column_def->id());
+        column_name_set.insert(column_def->name());
+    }
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> old_column_defs;
+    std::tie(old_column_defs, status) = table_meta->GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+
+    // TODO: TS also needed, check the column name / id / ts, Skip if they are same.
+    for (auto &column_def : *old_column_defs) {
+        if (column_name_set.contains(column_def->name())) {
+            LOG_WARN(fmt::format("Skipping replay add columns: Duplicate column name: {} in table: {}.{}.",
+                                 column_def->name(),
+                                 add_columns_cmd->db_name_,
+                                 add_columns_cmd->table_name_));
+            return Status::OK();
+        }
+        if (column_idx_set.contains(column_def->id())) {
+            return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", column_def->id()));
+        }
+    }
+
+    // If columns don't exist, create them
+    status = PrepareCommitAddColumns(add_columns_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
+    LOG_TRACE(fmt::format("Replay add columns to table: {}.{}.", add_columns_cmd->db_name_, add_columns_cmd->table_name_));
     return Status::OK();
 }
 
@@ -501,105 +900,71 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     return Status::OK();
 }
 
-Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
-    this->SetTxnType(TransactionType::kDropTable);
+Status NewTxn::ReplayDropColumns(WalCmdDropColumnsV2 *drop_columns_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
 
-    if (conflict_type == ConflictType::kReplace) {
-        return Status::NotSupport("ConflictType::kReplace");
-    }
-    if (conflict_type == ConflictType::kInvalid) {
-        return Status::UnexpectedError("Unknown ConflictType");
-    }
-
-    this->CheckTxnStatus();
+    const String &db_name = drop_columns_cmd->db_name_;
+    const String &table_name = drop_columns_cmd->table_name_;
 
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
-    if (!status.ok()) {
-        return status;
-    }
-    String table_key;
-    String table_id_str;
-    status = db_meta->GetTableID(table_name, table_key, table_id_str);
-    if (!status.ok()) {
-        if (status.code() != ErrorCode::kTableNotExist) {
-            return status;
-        }
-        if (conflict_type == ConflictType::kIgnore) {
-            return Status::OK();
-        }
-        return status;
-    }
-
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
-    }
-
-    base_txn_store_ = MakeShared<DropTableTxnStore>();
-    DropTableTxnStore *txn_store = static_cast<DropTableTxnStore *>(base_txn_store_.get());
-    txn_store->db_name_ = db_name;
-    txn_store->db_id_str_ = db_meta->db_id_str();
-    txn_store->db_id_ = std::stoull(db_meta->db_id_str());
-    txn_store->table_name_ = table_name;
-    txn_store->table_id_str_ = table_id_str;
-    txn_store->table_id_ = std::stoull(table_id_str);
-    txn_store->table_key_ = table_key;
-    LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
-    return Status::OK();
-}
-
-Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name) {
-    this->SetTxnType(TransactionType::kRenameTable);
-
-    this->CheckTxnStatus();
-    this->CheckTxn(db_name);
-
-    Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
     }
 
-    {
-        String table_id;
-        String table_key;
-        status = db_meta->GetTableID(new_table_name, table_key, table_id);
-
+    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const String &column_key = drop_columns_cmd->column_keys_[i];
+        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
+        String drop_column_key =
+            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts);
+        String drop_column_commit_ts_str;
+        status = kv_instance_->Get(drop_column_key, drop_column_commit_ts_str);
         if (status.ok()) {
-            return Status::DuplicateTable(new_table_name);
-        } else if (status.code() != ErrorCode::kTableNotExist) {
-            return status;
+            TxnTimeStamp drop_column_commit_ts = std::stoull(drop_column_commit_ts_str);
+            if (drop_column_commit_ts == commit_ts) {
+                LOG_WARN(fmt::format("Skipping replay drop column: Column {} created at {} in table {}.{} already dropped, commit ts: {}, txn: {}.",
+                                     drop_columns_cmd->column_names_[i],
+                                     create_ts,
+                                     db_name,
+                                     table_name,
+                                     commit_ts,
+                                     txn_id));
+                continue;
+            } else {
+                LOG_ERROR(fmt::format(
+                    "Replay drop column: Column {} created at {} in table {}.{} already dropped with different commit ts {}, commit ts: {}, txn: {}.",
+                    drop_columns_cmd->column_names_[i],
+                    create_ts,
+                    db_name,
+                    table_name,
+                    drop_column_commit_ts,
+                    commit_ts,
+                    txn_id));
+                return Status::UnexpectedError("Column commit timestamp mismatch during replay of column drop.");
+            }
         }
     }
 
-    String table_id_str;
-    String table_key;
-    status = db_meta->GetTableID(old_table_name, table_key, table_id_str);
+    status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
     if (!status.ok()) {
         return status;
     }
 
-    // Put the data into local txn store
-    if (base_txn_store_ != nullptr) {
-        return Status::UnexpectedError("txn store is not null");
+    auto ts_str = std::to_string(commit_ts);
+    for (SizeT i = 0; i < drop_columns_cmd->column_names_.size(); ++i) {
+        const String &column_key = drop_columns_cmd->column_keys_[i];
+        TxnTimeStamp create_ts = infinity::GetTimestampFromKey(column_key);
+        kv_instance_->Put(
+            KeyEncode::DropTableColumnKey(drop_columns_cmd->db_id_, drop_columns_cmd->table_id_, drop_columns_cmd->column_names_[i], create_ts),
+            ts_str);
     }
-
-    base_txn_store_ = MakeShared<RenameTableTxnStore>();
-    RenameTableTxnStore *txn_store = static_cast<RenameTableTxnStore *>(base_txn_store_.get());
-    txn_store->db_name_ = db_name;
-    txn_store->db_id_str_ = db_meta->db_id_str();
-    txn_store->old_table_name_ = old_table_name;
-    txn_store->table_id_str_ = table_id_str;
-    txn_store->new_table_name_ = new_table_name;
-    txn_store->old_table_key_ = table_key;
-    LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
 }
 
 Status NewTxn::ListTable(const String &db_name, Vector<String> &table_names) {
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -636,7 +1001,8 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     String index_key;
     String index_id;
-    status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
+    TxnTimeStamp create_index_ts;
+    status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id, create_index_ts);
     if (status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -680,6 +1046,65 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     return Status::OK();
 }
 
+Status NewTxn::ReplayCreateIndex(WalCmdCreateIndexV2 *create_index_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    // Check if the index already exists in kv store
+    String index_key =
+        KeyEncode::CatalogIndexKey(create_index_cmd->db_id_, create_index_cmd->table_id_, *create_index_cmd->index_base_->index_name_, commit_ts);
+    String index_id;
+    Status status = kv_instance_->Get(index_key, index_id);
+    if (status.ok()) {
+        if (index_id == create_index_cmd->index_id_) {
+            LOG_WARN(fmt::format("Skipping replay create index: Index {} already exists in table {} of database {}, commit ts: {}, txn: {}.",
+                                 *create_index_cmd->index_base_->index_name_,
+                                 create_index_cmd->table_name_,
+                                 create_index_cmd->db_name_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(
+                fmt::format("Replay create index: Index {} already exists in table {} of database {} with different id {}, commit ts: {}, txn: {}.",
+                            *create_index_cmd->index_base_->index_name_,
+                            create_index_cmd->table_name_,
+                            create_index_cmd->db_name_,
+                            index_id,
+                            commit_ts,
+                            txn_id));
+            return Status::UnexpectedError("Index ID mismatch during replay of index creation.");
+        }
+    }
+
+    status = PrepareCommitCreateIndex(create_index_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String next_index_id_key = KeyEncode::CatalogTableTagKey(create_index_cmd->db_id_, create_index_cmd->table_id_, NEXT_INDEX_ID.data());
+    String next_index_id_str;
+    status = kv_instance_->Get(next_index_id_key, next_index_id_str);
+
+    u64 next_index_id = std::stoull(next_index_id_str);
+    u64 this_index_id = std::stoull(create_index_cmd->index_id_);
+    if (this_index_id + 1 > next_index_id) {
+        // Update the next index id
+        String new_next_index_id_str = std::to_string(this_index_id + 1);
+        status = kv_instance_->Put(next_index_id_key, new_next_index_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        LOG_TRACE(fmt::format("Update next index id to {} for table {} of database {}.",
+                              new_next_index_id_str,
+                              create_index_cmd->table_name_,
+                              create_index_cmd->db_name_));
+    }
+    LOG_TRACE(fmt::format("Replay create index: {} with id {} in table {} of database {}.",
+                          *create_index_cmd->index_base_->index_name_,
+                          create_index_cmd->index_id_,
+                          create_index_cmd->table_name_,
+                          create_index_cmd->db_name_));
+    return Status::OK();
+}
+
 Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -700,7 +1125,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     String index_key;
     String index_id;
-    status = table_meta->GetIndexID(index_name, index_key, index_id);
+    TxnTimeStamp create_index_ts;
+    status = table_meta->GetIndexID(index_name, index_key, index_id, create_index_ts);
     if (!status.ok()) {
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
@@ -750,9 +1176,58 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     txn_store->index_name_ = index_name;
     txn_store->index_id_str_ = index_id;
     txn_store->index_id_ = std::stoull(txn_store->index_id_str_);
+    txn_store->create_ts_ = create_index_ts;
     txn_store->index_key_ = index_key;
 
     LOG_TRACE(fmt::format("NewTxn::DropIndexByName dropped index: {}.{}.{}", db_name, table_name, index_name));
+    return Status::OK();
+}
+
+Status NewTxn::ReplayDropIndex(WalCmdDropIndexV2 *drop_index_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+
+    // Check if the index is already dropped in kv store
+    String drop_index_key = KeyEncode::DropTableIndexKey(drop_index_cmd->db_id_,
+                                                         drop_index_cmd->table_id_,
+                                                         drop_index_cmd->index_name_,
+                                                         drop_index_cmd->create_ts_,
+                                                         drop_index_cmd->index_id_);
+    String drop_index_commit_ts_str;
+    Status status = kv_instance_->Get(drop_index_key, drop_index_commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp index_commit_ts = std::stoull(drop_index_commit_ts_str);
+        if (index_commit_ts == commit_ts) {
+            LOG_WARN(
+                fmt::format("Skipping replay drop index: Index {} created at {} already dropped in table {} of database {}, commit ts: {}, txn: {}.",
+                            drop_index_cmd->index_name_,
+                            drop_index_cmd->create_ts_,
+                            drop_index_cmd->table_name_,
+                            drop_index_cmd->db_name_,
+                            commit_ts,
+                            txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay drop index: Index {} created at {} already dropped in table {} of database {} with different commit ts {}, "
+                                  "commit ts: {}, txn: {}.",
+                                  drop_index_cmd->index_name_,
+                                  drop_index_cmd->create_ts_,
+                                  drop_index_cmd->table_name_,
+                                  drop_index_cmd->db_name_,
+                                  index_commit_ts,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Index commit timestamp mismatch during replay of index drop.");
+        }
+    }
+
+    status = PrepareCommitDropIndex(drop_index_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+    LOG_TRACE(fmt::format("Replay drop index: {} in table {} of database {}.",
+                          drop_index_cmd->index_name_,
+                          drop_index_cmd->table_name_,
+                          drop_index_cmd->db_name_));
+
     return Status::OK();
 }
 
@@ -1016,6 +1491,8 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
 
     return Status::OK();
 }
+
+Status NewTxn::ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, CheckpointTxnStore *ckp_txn_store) {
     Vector<String> *table_id_strs_ptr;
@@ -1310,72 +1787,108 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::CREATE_DATABASE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of CREATE_DATABASE_V2 command.
+                    break;
+                }
                 auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
-                Status status = CommitCreateDB(create_db_cmd);
+                Status status = PrepareCommitCreateDB(create_db_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::DROP_DATABASE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_DATABASE_V2 command.
+                    break;
+                }
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
-                Status status = CommitDropDB(drop_db_cmd);
+                Status status = PrepareCommitDropDB(drop_db_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::CREATE_TABLE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_TABLE_V2 command.
+                    break;
+                }
                 auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
-                Status status = CommitCreateTable(create_table_cmd);
+                Status status = PrepareCommitCreateTable(create_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::DROP_TABLE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_TABLE_V2 command.
+                    break;
+                }
                 auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
-                Status status = CommitDropTable(drop_table_cmd);
+                Status status = PrepareCommitDropTable(drop_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::RENAME_TABLE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of CREATE_DATABASE_V2 command.
+                    break;
+                }
                 auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
-                Status status = CommitRenameTable(rename_table_cmd);
+                Status status = PrepareCommitRenameTable(rename_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::ADD_COLUMNS_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of ADD_COLUMNS_V2 command.
+                    break;
+                }
                 auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
-                Status status = CommitAddColumns(add_column_cmd);
+                Status status = PrepareCommitAddColumns(add_column_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::DROP_COLUMNS_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_COLUMNS_V2 command.
+                    break;
+                }
                 auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
-                Status status = CommitDropColumns(drop_column_cmd);
+                Status status = PrepareCommitDropColumns(drop_column_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::CREATE_INDEX_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_TABLE_V2 command.
+                    break;
+                }
                 auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
-                Status status = CommitCreateIndex(create_index_cmd);
+                Status status = PrepareCommitCreateIndex(create_index_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::DROP_INDEX_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_INDEX_V2 command.
+                    break;
+                }
                 auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
-                Status status = CommitDropIndex(drop_index_cmd);
+                Status status = PrepareCommitDropIndex(drop_index_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1386,7 +1899,7 @@ Status NewTxn::PrepareCommit() {
                 // Process dump mem index operation caused by other commands (import, compact, optimizeIndex) here.
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
                 if (dump_index_cmd->dump_cause_ != DumpIndexCause::kDumpMemIndex) {
-                    Status status = PostCommitDumpIndex(dump_index_cmd);
+                    Status status = PrepareCommitDumpIndex(dump_index_cmd, kv_instance_.get());
                     if (!status.ok()) {
                         return status;
                     }
@@ -1397,6 +1910,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DELETE_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of DROP_INDEX_V2 command.
+                    break;
+                }
                 auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
 
                 Status status = PrepareCommitDelete(delete_cmd);
@@ -1406,24 +1923,36 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::IMPORT_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of IMPORT_V2 command.
+                    break;
+                }
                 auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
-                Status status = CommitImport(import_cmd);
+                Status status = PrepareCommitImport(import_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::COMPACT_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of COMPACT_V2 command.
+                    break;
+                }
                 auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
-                Status status = CommitCompact(compact_cmd);
+                Status status = PrepareCommitCompact(compact_cmd);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case WalCommandType::CHECKPOINT_V2: {
+                if (this->IsReplay()) {
+                    // Skip replay of CHECKPOINT_V2 command.
+                    break;
+                }
                 auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-                Status status = CommitCheckpoint(checkpoint_cmd);
+                Status status = PrepareCommitCheckpoint(checkpoint_cmd);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to checkpoint");
                 }
@@ -1445,11 +1974,11 @@ Status NewTxn::PrepareCommit() {
     return Status::OK();
 }
 
-Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, String *db_key_ptr) {
+Status NewTxn::GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, String *db_key_ptr) {
     CatalogMeta catalog_meta(this);
     String db_key;
     String db_id_str;
-    Status status = catalog_meta.GetDBID(db_name, db_key, db_id_str);
+    Status status = catalog_meta.GetDBID(db_name, db_key, db_id_str, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1466,7 +1995,8 @@ Status NewTxn::GetTableMeta(const String &db_name,
                             Optional<TableMeeta> &table_meta,
                             String *table_key_ptr) {
     Status status;
-    status = this->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1480,7 +2010,8 @@ Status NewTxn::GetTableMeta(const String &db_name,
 Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key_ptr) {
     String table_key;
     String table_id_str;
-    Status status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    TxnTimeStamp create_table_ts;
+    Status status = db_meta.GetTableID(table_name, table_key, table_id_str, create_table_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1500,7 +2031,8 @@ Status NewTxn::GetTableIndexMeta(const String &db_name,
                                  String *table_key_ptr,
                                  String *index_key_ptr) {
     Status status;
-    status = this->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    status = this->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1519,7 +2051,8 @@ Status
 NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Optional<TableIndexMeeta> &table_index_meta, String *index_key_ptr) {
     String index_key;
     String index_id_str;
-    Status status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+    TxnTimeStamp create_index_ts;
+    Status status = table_meta.GetIndexID(index_name, index_key, index_id_str, create_index_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1530,7 +2063,7 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
     return Status::OK();
 }
 //
-// Status NewTxn::CommitCreateDB() {
+// Status NewTxn::PrepareCommitCreateDB() {
 //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 //
 //    CreateDBTxnStore *txn_store = static_cast<CreateDBTxnStore *>(base_txn_store_.get());
@@ -1547,7 +2080,7 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
 //    return Status::OK();
 //}
 
-Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
+Status NewTxn::PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     Optional<DBMeeta> db_meta;
@@ -1559,11 +2092,12 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd) {
 
     return Status::OK();
 }
-Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
+Status NewTxn::PrepareCommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
 
     String db_key;
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, &db_key);
+    TxnTimeStamp create_db_ts;
+    Status status = GetDBMeta(drop_db_cmd->db_name_, db_meta, create_db_ts, &db_key);
     if (!status.ok()) {
         return status;
     }
@@ -1578,7 +2112,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabaseV2 *drop_db_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
+Status NewTxn::PrepareCommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1586,7 +2120,8 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
 
     // Get database ID
     Optional<DBMeeta> db_meta;
-    Status status = GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1600,7 +2135,7 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTableV2 *create_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
+Status NewTxn::PrepareCommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_id_str = drop_table_cmd->db_id_;
@@ -1614,7 +2149,7 @@ Status NewTxn::CommitDropTable(const WalCmdDropTableV2 *drop_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
+Status NewTxn::PrepareCommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id = rename_table_cmd->db_id_;
     const String &old_table_name = rename_table_cmd->table_name_;
@@ -1635,7 +2170,7 @@ Status NewTxn::CommitRenameTable(const WalCmdRenameTableV2 *rename_table_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
+Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
     const String &db_name = add_columns_cmd->db_name_;
     const String &table_name = add_columns_cmd->table_name_;
 
@@ -1670,7 +2205,7 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
+Status NewTxn::PrepareCommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
     const String &db_name = drop_columns_cmd->db_name_;
     const String &table_name = drop_columns_cmd->table_name_;
 
@@ -1698,7 +2233,7 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumnsV2 *drop_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
+Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd) {
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(this);
     Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
@@ -3956,6 +4491,8 @@ Status NewTxn::Cleanup() {
     return Status::OK();
 }
 
+Status NewTxn::ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
+
 Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
     KVInstance *kv_instance = kv_instance_.get();
     TxnTimeStamp begin_ts = BeginTS();
@@ -4114,32 +4651,67 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
 
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
 
-Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
+Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command, TxnTimeStamp commit_ts, i64 txn_id) {
     WalCommandType command_type = command->GetType();
     switch (command_type) {
+        case WalCommandType::DUMMY: {
+            return Status::UnexpectedError("Dummy WAL command");
+        }
         case WalCommandType::CREATE_DATABASE_V2: {
             auto *create_db_cmd = static_cast<WalCmdCreateDatabaseV2 *>(command.get());
-
-            // IncreaseLatestDBID
-            SizeT id_num = std::stoull(create_db_cmd->db_id_);
-            Status status = kv_instance_->Put(NEXT_DATABASE_ID.data(), fmt::format("{}", id_num));
+            Status status = ReplayCreateDb(create_db_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DROP_DATABASE_V2: {
+            auto *drop_db_cmd = static_cast<WalCmdDropDatabaseV2 *>(command.get());
+            Status status = ReplayDropDb(drop_db_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         case WalCommandType::CREATE_TABLE_V2: {
             auto *create_table_cmd = static_cast<WalCmdCreateTableV2 *>(command.get());
 
-            Optional<DBMeeta> db_meta;
-            String table_key;
-            Status status = GetDBMeta(create_table_cmd->db_name_, db_meta);
+            Status status = ReplayCreateTable(create_table_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
+            break;
+        }
+        case WalCommandType::DROP_TABLE_V2: {
+            auto *drop_table_cmd = static_cast<WalCmdDropTableV2 *>(command.get());
 
-            u64 next_table_id = std::stoull(create_table_cmd->table_id_);
-            ++next_table_id;
-            String next_table_id_str = std::to_string(next_table_id);
-
-            status = db_meta->SetNextTableID(next_table_id_str);
+            Status status = ReplayDropTable(drop_table_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::RENAME_TABLE_V2: {
+            auto *rename_table_cmd = static_cast<WalCmdRenameTableV2 *>(command.get());
+            Status status = ReplayRenameTable(rename_table_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::ADD_COLUMNS_V2: {
+            auto *add_column_cmd = static_cast<WalCmdAddColumnsV2 *>(command.get());
+            Status status = PrepareCommitAddColumns(add_column_cmd);
+            // Status status = ReplayAddColumns(add_column_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DROP_COLUMNS_V2: {
+            auto *drop_column_cmd = static_cast<WalCmdDropColumnsV2 *>(command.get());
+            Status status = PrepareCommitDropColumns(drop_column_cmd);
+            // Status status = ReplayDropColumns(drop_column_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4147,20 +4719,15 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         }
         case WalCommandType::CREATE_INDEX_V2: {
             auto *create_index_cmd = static_cast<WalCmdCreateIndexV2 *>(command.get());
-
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            String table_key;
-            Status status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta, &table_key);
+            Status status = ReplayCreateIndex(create_index_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
-
-            u64 next_index_id = std::stoull(create_index_cmd->index_id_);
-            ++next_index_id;
-            String next_index_id_str = std::to_string(next_index_id);
-
-            status = table_meta->SetNextIndexID(next_index_id_str);
+            break;
+        }
+        case WalCommandType::DROP_INDEX_V2: {
+            auto *drop_index_cmd = static_cast<WalCmdDropIndexV2 *>(command.get());
+            Status status = ReplayDropIndex(drop_index_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4188,25 +4755,16 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         case WalCommandType::DELETE_V2: {
             auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
 
-            Optional<DBMeeta> db_meta;
-            Optional<TableMeeta> table_meta;
-            Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+            Status status = ReplayDelete(delete_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
-            }
-            if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
-                return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
-                                                        delete_cmd->db_id_,
-                                                        delete_cmd->table_id_,
-                                                        db_meta->db_id_str(),
-                                                        table_meta->table_id_str()));
             }
             break;
         }
         case WalCommandType::IMPORT_V2: {
             auto *import_cmd = static_cast<WalCmdImportV2 *>(command.get());
 
-            Status status = ReplayImport(import_cmd);
+            Status status = ReplayImport(import_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4224,7 +4782,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         case WalCommandType::COMPACT_V2: {
             auto *compact_cmd = static_cast<WalCmdCompactV2 *>(command.get());
 
-            Status status = ReplayCompact(compact_cmd);
+            Status status = ReplayCompact(compact_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -4234,6 +4792,14 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             auto *optimize_cmd = static_cast<WalCmdOptimizeV2 *>(command.get());
 
             Status status = ReplayOptimizeIndeByParams(optimize_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::CHECKPOINT_V2: {
+            auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
+            Status status = PrepareCommitCheckpoint(checkpoint_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -4249,7 +4815,8 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
 
 Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths) {
     Optional<DBMeeta> db_meta;
-    Status status = this->GetDBMeta(db_name, db_meta);
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }

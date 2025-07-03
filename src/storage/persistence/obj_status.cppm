@@ -18,10 +18,11 @@ export module obj_status;
 
 import stl;
 import third_party;
+import status;
 
 namespace infinity {
 
-class Status;
+// class Status;
 
 export struct Range {
     SizeT start_{}; // inclusive
@@ -83,11 +84,9 @@ export struct ObjStat {
 
     nlohmann::json Serialize() const;
 
-    void Deserialize(const nlohmann::json &obj);
-
     String ToString() const;
 
-    void Deserialize(const String &str);
+    void Deserialize(std::string_view str);
 
     SizeT GetSizeInBytes() const;
 

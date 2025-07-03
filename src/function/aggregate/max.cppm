@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module max;
+
+import stl;
 
 namespace infinity {
 

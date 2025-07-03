@@ -90,9 +90,7 @@ public:
 
     [[nodiscard]] nlohmann::json Serialize() const override;
 
-    static std::unique_ptr<SparseInfo> Deserialize(const nlohmann::json &json);
-
-    static std::unique_ptr<SparseInfo> Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &json);
+    static std::unique_ptr<SparseInfo> Deserialize(std::string_view json_str);
 
     inline EmbeddingDataType DataType() const noexcept { return data_type_; }
 

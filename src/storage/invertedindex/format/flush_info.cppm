@@ -1,8 +1,8 @@
 module;
 
-import stl;
-
 export module flush_info;
+
+import stl;
 
 namespace infinity {
 

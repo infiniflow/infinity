@@ -14,6 +14,8 @@
 
 module;
 
+export module bound_delete_statement;
+
 import bound_statement;
 import table_ref;
 import base_expression;
@@ -21,8 +23,6 @@ import bind_context;
 import logical_node;
 import query_context;
 import stl;
-
-export module bound_delete_statement;
 
 namespace infinity {
 

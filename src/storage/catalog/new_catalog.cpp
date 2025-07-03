@@ -305,7 +305,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
                                                          std::move(meta_infos[1]),
                                                          std::stoull(meta_infos[2]),
                                                          std::stoull(meta_infos[3]),
-                                                         ColumnDef::FromJson(nlohmann::json::parse(std::move(meta_infos[4])))));
+                                                         ColumnDef::FromJson(meta_infos[4])));
         } else if (type_str == "idx") {
             UniquePtr<TableIndexMetaKey> table_index_meta_key =
                 MakeUnique<TableIndexMetaKey>(std::move(meta_infos[0]), std::move(meta_infos[1]), std::move(meta_infos[4]), std::move(meta_infos[2]));
@@ -352,24 +352,6 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
         return static_cast<SizeT>(lhs->type_) > static_cast<SizeT>(rhs->type_);
     });
     return Status::OK();
-}
-
-Status NewCatalog::IncrLatestID(String &id_str, std::string_view id_name) {
-    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
-    Status s = kv_instance->Get(id_name.data(), id_str);
-    if (!s.ok()) {
-        kv_instance->Rollback();
-        return s;
-    }
-    SizeT id_num = std::stoull(id_str);
-    ++id_num;
-    s = kv_instance->Put(id_name.data(), fmt::format("{}", id_num));
-    if (!s.ok()) {
-        kv_instance->Rollback();
-        return s;
-    }
-    s = kv_instance->Commit();
-    return s;
 }
 
 void NewCatalog::SetLastCleanupTS(TxnTimeStamp cleanup_ts) { last_cleanup_ts_ = cleanup_ts; }
@@ -420,8 +402,10 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     auto new_end = std::remove_if(meta_keys.begin(), meta_keys.end(), [&](const auto &meta_key) {
         if (meta_key->type_ == MetaType::kPmObject) {
             auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
-            nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
-            String object_key = pm_path_json["obj_key"];
+            simdjson::padded_string json(pm_path_key->value_);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json);
+            String object_key = doc["obj_key"].get<String>();
             if (object_key == "KEY_EMPTY") {
                 kv_instance_ptr->Delete(KeyEncode::PMObjectKey(pm_path_key->path_key_));
                 return true;

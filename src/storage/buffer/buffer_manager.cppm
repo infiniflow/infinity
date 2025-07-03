@@ -14,12 +14,12 @@
 
 module;
 
+export module buffer_manager;
+
 import stl;
 import file_worker;
 // import specific_concurrent_queue;
 import default_values;
-
-export module buffer_manager;
 
 namespace infinity {
 

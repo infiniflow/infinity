@@ -345,7 +345,7 @@ Status Storage::AdminToWriter() {
 
     status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS());
     if (!status.ok()) {
-        UnrecoverableError("Failed to checkpoint");
+        UnrecoverableError(fmt::format("Failed to checkpoint: {}", status.message()));
     }
     status = new_txn_mgr_->CommitTxn(new_txn);
     if (!status.ok()) {

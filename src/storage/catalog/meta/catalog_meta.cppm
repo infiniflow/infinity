@@ -29,7 +29,7 @@ public:
     CatalogMeta(NewTxn *txn);
     CatalogMeta(KVInstance *kv_instance);
 
-    Status GetDBID(const String &db_name, String &db_key, String &db_id);
+    Status GetDBID(const String &db_name, String &db_key, String &db_id, TxnTimeStamp &create_ts);
 
     Status GetDBIDs(Vector<String> *&db_id_strs, Vector<String> **db_names = nullptr);
 

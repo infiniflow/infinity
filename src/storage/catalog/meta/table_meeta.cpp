@@ -79,7 +79,7 @@ Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **
     return Status::OK();
 }
 
-Status TableMeeta::GetIndexID(const String &index_name, String &index_key, String &index_id_str) {
+Status TableMeeta::GetIndexID(const String &index_name, String &index_key, String &index_id_str, TxnTimeStamp &create_index_ts) {
     String index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id_str_, table_id_str_, index_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(index_key_prefix);
@@ -118,6 +118,7 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
         return Status::IndexNotExist(index_name);
     }
 
+    create_index_ts = max_commit_ts;
     return Status::OK();
 }
 
@@ -649,7 +650,7 @@ Status TableMeeta::LoadColumnDefs() {
             kv_instance_->Get(KeyEncode::DropTableColumnKey(db_id_str_, table_id_str_, column_name, max_commit_ts), drop_column_ts);
 
             if (drop_column_ts.empty() || std::stoull(drop_column_ts) > begin_ts_) {
-                auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
+                auto column_def = ColumnDef::FromJson(column_value);
                 column_defs.push_back(column_def);
             }
         }

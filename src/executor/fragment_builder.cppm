@@ -14,13 +14,13 @@
 
 module;
 
+export module fragment_builder;
+
 import stl;
 import query_context;
 import plan_fragment;
 import physical_operator;
 import global_resource_usage;
-
-export module fragment_builder;
 
 namespace infinity {
 

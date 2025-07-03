@@ -14,6 +14,8 @@
 
 module;
 
+export module value_expression;
+
 import base_expression;
 import bound_select_statement;
 
@@ -23,8 +25,6 @@ import value;
 import stl;
 import internal_types;
 import data_type;
-
-export module value_expression;
 
 namespace infinity {
 

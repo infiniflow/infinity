@@ -293,4 +293,37 @@ Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     return Status::OK();
 }
 
+Status TableIndexMeeta::SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality) {
+    String cardinality_key = GetTableIndexTag("cardinality");
+    u8 cardinality_value = static_cast<u8>(cardinality);
+    Status status = kv_instance_.Put(cardinality_key, String(reinterpret_cast<const char *>(&cardinality_value), sizeof(cardinality_value)));
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Tuple<SecondaryIndexCardinality, Status> TableIndexMeeta::GetSecondaryIndexCardinality() {
+    String cardinality_key = GetTableIndexTag("cardinality");
+    String cardinality_value_str;
+    Status status = kv_instance_.Get(cardinality_key, cardinality_value_str);
+    if (!status.ok()) {
+        // Default to HighCardinality if not set
+        return {SecondaryIndexCardinality::kHighCardinality, Status::OK()};
+    }
+
+    if (cardinality_value_str.size() != sizeof(u8)) {
+        return {SecondaryIndexCardinality::kInvalid, Status::InvalidIndexParam("Invalid cardinality data")};
+    }
+
+    u8 cardinality_value = *reinterpret_cast<const u8 *>(cardinality_value_str.data());
+    SecondaryIndexCardinality cardinality = static_cast<SecondaryIndexCardinality>(cardinality_value);
+
+    if (cardinality != SecondaryIndexCardinality::kHighCardinality && cardinality != SecondaryIndexCardinality::kLowCardinality) {
+        return {SecondaryIndexCardinality::kInvalid, Status::InvalidIndexParam("Invalid cardinality value")};
+    }
+
+    return {cardinality, Status::OK()};
+}
+
 } // namespace infinity

@@ -221,7 +221,7 @@ public:
 
     static String DropBlockKey(const String &db_id_str, const String &table_id_str, SegmentID segment_id, BlockID block_id);
 
-    static String DropTableColumnKey(const String &db_id_str, const String &table_id_str, const String &column_name, TxnTimeStamp commit_ts);
+    static String DropTableColumnKey(const String &db_id_str, const String &table_id_str, const String &column_name, TxnTimeStamp create_ts);
 
     static String DropBlockColumnKey(const String &db_id_str,
                                      const String &table_id_str,

@@ -38,7 +38,7 @@ CatalogMeta::CatalogMeta(NewTxn *txn) : txn_(txn) {
 
 CatalogMeta::CatalogMeta(KVInstance *kv_instance) : read_ts_{MAX_TIMESTAMP}, kv_instance_{kv_instance} {}
 
-Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id) {
+Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id, TxnTimeStamp& create_ts) {
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
@@ -77,7 +77,7 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
     if (!drop_db_ts.empty() && std::stoull(drop_db_ts) <= read_ts_) {
         return Status::DBNotExist(db_name);
     }
-
+    create_ts = max_commit_ts;
     return Status::OK();
 }
 

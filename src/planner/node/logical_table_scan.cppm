@@ -14,6 +14,8 @@
 
 module;
 
+export module logical_table_scan;
+
 import stl;
 import logical_node_type;
 import column_binding;
@@ -24,8 +26,6 @@ import meta_info;
 import internal_types;
 import data_type;
 import fast_rough_filter;
-
-export module logical_table_scan;
 
 namespace infinity {
 

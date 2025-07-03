@@ -1158,7 +1158,7 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
                 return nullptr;
             }
             try {
-                tensor_expr = BuildConstantExprFromJson(field_json_obj.value());
+                tensor_expr = BuildConstantExprFromJson(field_json_obj.value().dump());
             } catch (std::exception &e) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = fmt::format("Invalid query_tensor, error info: {}", e.what());

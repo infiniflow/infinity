@@ -14,12 +14,12 @@
 
 module;
 
+export module buffer_obj;
+
 import stl;
 import file_worker;
 import buffer_handle;
 import file_worker_type;
-
-export module buffer_obj;
 
 namespace infinity {
 

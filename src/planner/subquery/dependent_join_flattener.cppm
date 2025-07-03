@@ -14,13 +14,13 @@
 
 module;
 
+export module dependent_join_flattener;
+
 import stl;
 import bind_context;
 import query_context;
 import logical_node;
 import column_binding;
-
-export module dependent_join_flattener;
 
 namespace infinity {
 

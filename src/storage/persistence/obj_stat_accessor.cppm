@@ -97,7 +97,7 @@ public:
 
     virtual nlohmann::json Serialize() = 0;
 
-    virtual void Deserialize(const nlohmann::json &obj) = 0;
+    virtual void Deserialize(std::string_view obj_str) = 0;
 
     virtual void Deserialize(KVInstance *kv_instance) = 0;
 
@@ -129,7 +129,7 @@ public:
 
     nlohmann::json Serialize() override;
 
-    void Deserialize(const nlohmann::json &obj) override;
+    void Deserialize(std::string_view obj_str) override;
 
     void Deserialize(KVInstance *kv_instance) override;
 
@@ -163,7 +163,7 @@ public:
 
     nlohmann::json Serialize() override;
 
-    void Deserialize(const nlohmann::json &obj) override;
+    void Deserialize(std::string_view obj_str) override;
 
     void Deserialize(KVInstance *kv_instance) override;
 

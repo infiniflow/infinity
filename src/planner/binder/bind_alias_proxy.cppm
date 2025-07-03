@@ -14,14 +14,14 @@
 
 module;
 
+export module bind_alias_proxy;
+
 import stl;
 import base_expression;
 
 import bind_context;
 import expression_binder;
 import parsed_expr;
-
-export module bind_alias_proxy;
 
 namespace infinity {
 

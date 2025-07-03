@@ -63,7 +63,7 @@ public:
 
     virtual nlohmann::json Serialize() const override;
 
-    static SharedPtr<IndexFullText> Deserialize(const nlohmann::json &index_def_json);
+    static SharedPtr<IndexFullText> Deserialize(std::string_view index_def_str);
 
     bool IsRealtime() const { return FlagIsRealtime(flag_); }
 

@@ -62,12 +62,14 @@ void ReadJsonl(std::ifstream &input_file, SizeT lines_to_read, Vector<Tuple<char
         else if (line.length() == 0)
             continue;
         else {
-            std::string_view json_sv(line);
-            nlohmann::json json = nlohmann::json::parse(json_sv);
+            simdjson::padded_string json_str(line);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_str);
             char *elems[3];
             for (SizeT i = 0; i < 3; i++) {
-                assert(json.contains(columns[i]));
-                String val_str = json[columns[i]];
+                String val_str;
+                [[maybe_unused]] auto error = doc[columns[i]].get<String>(val_str);
+                assert(error == simdjson::SUCCESS);
                 char *val_buf = (char *)malloc(val_str.length() + 1);
                 memcpy(val_buf, val_str.data(), val_str.length());
                 val_buf[val_str.length()] = '\0';

@@ -65,9 +65,7 @@ public:
 
     nlohmann::json Serialize() const;
 
-    static std::shared_ptr<ParsedExpr> Deserialize(const nlohmann::json &constant_expr);
-
-    static std::shared_ptr<ParsedExpr> Deserialize(simdjson::simdjson_result<simdjson::ondemand::value> &constant_expr);
+    static std::shared_ptr<ParsedExpr> Deserialize(std::string_view constant_expr_str);
 
     void TrySortSparseVec(const ColumnDef *col_def);
 
