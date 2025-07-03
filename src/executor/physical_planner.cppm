@@ -14,13 +14,14 @@
 
 module;
 
+export module physical_planner;
+
 import stl;
 import physical_operator;
 import logical_node;
 import query_context;
 import global_resource_usage;
 
-export module physical_planner;
 namespace infinity {
 
 export class PhysicalPlanner {

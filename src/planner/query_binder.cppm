@@ -14,6 +14,8 @@
 
 module;
 
+export module query_binder;
+
 import logical_node;
 import stl;
 
@@ -38,8 +40,6 @@ import base_table_reference;
 import subquery_reference;
 import join_reference;
 import cross_product_reference;
-
-export module query_binder;
 
 namespace infinity {
 

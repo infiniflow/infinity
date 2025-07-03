@@ -14,6 +14,8 @@
 
 module;
 
+export module bitmap_cast;
+
 import stl;
 
 import column_vector_cast;
@@ -23,7 +25,6 @@ import bound_cast_func;
 import column_vector;
 import third_party;
 
-export module bitmap_cast;
 #if 0
 namespace infinity {
 

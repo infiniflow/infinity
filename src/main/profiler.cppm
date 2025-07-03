@@ -43,9 +43,7 @@ public:
     static String ElapsedToString(NanoSeconds duration, i64 scale = 1);
 
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
-    [[nodiscard]] inline i64 Elapsed() const {
-        return ElapsedInternal().count();
-    }
+    [[nodiscard]] inline i64 Elapsed() const { return ElapsedInternal().count(); }
 
     [[nodiscard]] inline i64 GetBegin() const { return begin_ts_.time_since_epoch().count(); }
 

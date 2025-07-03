@@ -14,6 +14,8 @@
 
 module;
 
+export module column_pruner;
+
 import stl;
 import logical_node_visitor;
 import reference_expression;
@@ -26,8 +28,6 @@ import optimizer_rule;
 import logical_node;
 import query_context;
 import logical_node_type;
-
-export module column_pruner;
 
 namespace infinity {
 

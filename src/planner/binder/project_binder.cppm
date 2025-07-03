@@ -14,6 +14,8 @@
 
 module;
 
+export module project_binder;
+
 import stl;
 
 import base_expression;
@@ -24,8 +26,6 @@ import parsed_expr;
 import function_expr;
 import column_expr;
 import bound_select_statement;
-
-export module project_binder;
 
 namespace infinity {
 

@@ -14,11 +14,11 @@
 
 module;
 
+export module expression_transformer;
+
 import stl;
 import base_expression;
 import conjunction_expression;
-
-export module expression_transformer;
 
 namespace infinity {
 

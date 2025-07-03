@@ -14,6 +14,8 @@
 
 module;
 
+export module query_context;
+
 import logical_node_type;
 import stl;
 import config;
@@ -30,8 +32,6 @@ import status;
 import query_result;
 import base_statement;
 import admin_statement;
-
-export module query_context;
 
 namespace infinity {
 

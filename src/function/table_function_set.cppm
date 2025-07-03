@@ -14,12 +14,12 @@
 
 module;
 
+export module table_function_set;
+
 import function_set;
 import stl;
 import table_function;
 import function;
-
-export module table_function_set;
 
 namespace infinity {
 

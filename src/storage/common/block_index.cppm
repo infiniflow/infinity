@@ -14,10 +14,10 @@
 
 module;
 
+export module block_index;
+
 import stl;
 import global_block_id;
-
-export module block_index;
 
 namespace infinity {
 
@@ -32,8 +32,9 @@ class SegmentIndexMeta;
 export struct NewSegmentSnapshot {
 public:
     SegmentOffset segment_offset() const;
-    const Vector<UniquePtr<BlockMeta>>& block_map() const;
+    const Vector<UniquePtr<BlockMeta>> &block_map() const;
     UniquePtr<SegmentMeta> segment_meta_;
+
 private:
     mutable Vector<UniquePtr<BlockMeta>> block_map_;
 };

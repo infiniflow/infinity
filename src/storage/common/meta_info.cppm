@@ -14,6 +14,8 @@
 
 module;
 
+export module meta_info;
+
 import stl;
 import column_def;
 import default_values;
@@ -21,8 +23,6 @@ import data_type;
 import create_index_info;
 import internal_types;
 import third_party;
-
-export module meta_info;
 
 namespace infinity {
 

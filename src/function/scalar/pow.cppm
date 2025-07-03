@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module pow;
+
+import stl;
 
 namespace infinity {
 

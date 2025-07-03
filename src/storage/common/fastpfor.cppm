@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module fastpfor;
+
+import stl;
 
 namespace infinity {
 

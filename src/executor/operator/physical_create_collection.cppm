@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_create_collection;
+
 import stl;
 
 import query_context;
@@ -26,8 +28,6 @@ import internal_types;
 import extra_ddl_info;
 import data_type;
 import logger;
-
-export module physical_create_collection;
 
 namespace infinity {
 
