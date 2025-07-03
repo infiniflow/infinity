@@ -625,19 +625,55 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
     const SecondaryIndexDataBase<CardinalityTag> *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
+    // For LowCardinality: store the range for processing
+    Pair<KeyType, KeyType> current_range_;
+
     TrunkReaderT(const u32 segment_row_count, BufferObj *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<CardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
 
+    // Method to set range for LowCardinality processing
+    void SetRange(const Pair<KeyType, KeyType> &range) { current_range_ = range; }
+
     void OutPut(Bitmask &selected_rows) override {
-        const u32 begin_pos = begin_pos_;
-        const u32 end_pos = end_pos_;
-        const auto index_handle = index_buffer_->Load();
-        const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_handle.GetData());
-        const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
-        // output result
-        for (u32 i = begin_pos; i < end_pos; ++i) {
-            selected_rows.SetTrue(offset_ptr[i]);
+        if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
+            // High cardinality: use traditional approach
+            const u32 begin_pos = begin_pos_;
+            const u32 end_pos = end_pos_;
+            const auto index_handle = index_buffer_->Load();
+            const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_handle.GetData());
+            const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
+            // output result
+            for (u32 i = begin_pos; i < end_pos; ++i) {
+                selected_rows.SetTrue(offset_ptr[i]);
+            }
+        } else {
+            // Low cardinality: use RoaringBitmap approach
+            const auto [begin_val, end_val] = current_range_;
+            const auto index_handle = index_buffer_->Load();
+            const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_handle.GetData());
+
+            // Get unique keys count and pointer through base class interface
+            u32 unique_key_count = index->GetUniqueKeyCount();
+            if (unique_key_count == 0)
+                return;
+
+            const KeyType *unique_keys = static_cast<const KeyType *>(index->GetUniqueKeysPtr());
+
+            // Find keys in range [begin_val, end_val]
+            auto begin_it = std::lower_bound(unique_keys, unique_keys + unique_key_count, begin_val);
+            auto end_it = std::upper_bound(unique_keys, unique_keys + unique_key_count, end_val);
+
+            // For each key in range, add its offsets to the result
+            for (auto it = begin_it; it != end_it; ++it) {
+                const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(it));
+                if (bitmap) {
+                    bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
+                        selected_rows.SetTrue(offset);
+                        return true; // continue iteration
+                    });
+                }
+            }
         }
     }
 };
@@ -851,6 +887,9 @@ Bitmask ExecuteSingleRangeLowCardinalityT(const Pair<ConvertToOrderedType<Column
     Bitmask part_result(segment_row_count);
     part_result.SetAllFalse();
     for (auto &trunk_reader : trunk_readers) {
+        // Set the range for LowCardinality processing
+        auto *typed_reader = static_cast<TrunkReaderT<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get());
+        typed_reader->SetRange(interval_range);
         // directly output without GetResultCnt optimization
         trunk_reader->OutPut(part_result);
     }
