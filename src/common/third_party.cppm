@@ -393,6 +393,7 @@ export namespace rapidjson {
 using Document = ::RAPIDJSON_NAMESPACE::Document;
 using Value = ::RAPIDJSON_NAMESPACE::Value;
 using StringBuffer = ::RAPIDJSON_NAMESPACE::StringBuffer;
+using Type = ::RAPIDJSON_NAMESPACE::Type;
 
 template <typename CharType = char>
 using UTF8 = ::RAPIDJSON_NAMESPACE::UTF8<CharType>;
