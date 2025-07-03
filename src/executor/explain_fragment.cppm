@@ -14,10 +14,10 @@
 
 module;
 
+export module explain_fragment;
+
 import plan_fragment;
 import stl;
-
-export module explain_fragment;
 
 namespace infinity {
 

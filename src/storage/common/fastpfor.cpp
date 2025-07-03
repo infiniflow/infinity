@@ -29,9 +29,9 @@ module;
 
 #pragma GCC diagnostic pop
 
-import stl;
-
 module fastpfor;
+
+import stl;
 
 namespace infinity {
 

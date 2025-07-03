@@ -1,8 +1,8 @@
 module;
 
-import stl;
-
 export module regex;
+
+import stl;
 
 namespace infinity {
 

@@ -14,12 +14,12 @@
 
 module;
 
+export module column_identifer;
+
 import stl;
 
 import query_context;
 import column_expr;
-
-export module column_identifer;
 
 namespace infinity {
 

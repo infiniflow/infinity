@@ -14,6 +14,8 @@
 
 module;
 
+export module group_binder;
+
 import stl;
 
 import base_expression;
@@ -29,8 +31,6 @@ import constant_expr;
 import function_expr;
 import knn_expr;
 import subquery_expr;
-
-export module group_binder;
 
 namespace infinity {
 

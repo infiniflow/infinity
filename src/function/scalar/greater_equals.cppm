@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module greater_equals;
+
+import stl;
 
 namespace infinity {
 

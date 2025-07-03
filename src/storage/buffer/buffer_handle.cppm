@@ -14,10 +14,10 @@
 
 module;
 
+export module buffer_handle;
+
 import stl;
 import third_party;
-
-export module buffer_handle;
 
 namespace infinity {
 

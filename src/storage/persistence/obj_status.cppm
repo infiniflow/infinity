@@ -18,10 +18,11 @@ export module obj_status;
 
 import stl;
 import third_party;
+import status;
 
 namespace infinity {
 
-class Status;
+// class Status;
 
 export struct Range {
     SizeT start_{}; // inclusive

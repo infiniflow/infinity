@@ -14,6 +14,8 @@
 
 module;
 
+export module join_binder;
+
 import stl;
 
 import base_expression;
@@ -22,8 +24,6 @@ import expression_binder;
 import query_context;
 import parsed_expr;
 import knn_expr;
-
-export module join_binder;
 
 namespace infinity {
 

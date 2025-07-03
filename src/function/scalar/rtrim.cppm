@@ -1,8 +1,8 @@
 module;
 
-import stl;
-
 export module rtrim;
+
+import stl;
 
 namespace infinity {
 

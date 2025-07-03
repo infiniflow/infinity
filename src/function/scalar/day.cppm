@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module day;
+
+import stl;
 
 namespace infinity {
 

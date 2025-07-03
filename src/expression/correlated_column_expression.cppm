@@ -14,12 +14,12 @@
 
 module;
 
+export module correlated_column_expression;
+
 import stl;
 import base_expression;
 import internal_types;
 import data_type;
-
-export module correlated_column_expression;
 
 namespace infinity {
 

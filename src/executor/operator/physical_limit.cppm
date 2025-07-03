@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_limit;
+
 import stl;
 
 import query_context;
@@ -27,8 +29,6 @@ import load_meta;
 import infinity_exception;
 import internal_types;
 import data_type;
-
-export module physical_limit;
 
 namespace infinity {
 

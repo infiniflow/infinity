@@ -14,14 +14,13 @@
 
 module;
 
-import stl;
-
 export module avg;
+
+import stl;
 
 namespace infinity {
 
 class NewCatalog;
-
 
 export void RegisterAvgFunction(NewCatalog *catalog_ptr);
 

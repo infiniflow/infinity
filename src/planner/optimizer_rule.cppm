@@ -14,10 +14,10 @@
 
 module;
 
+export module optimizer_rule;
+
 import logical_node;
 import stl;
-
-export module optimizer_rule;
 
 namespace infinity {
 

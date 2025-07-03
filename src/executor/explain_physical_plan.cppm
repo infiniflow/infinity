@@ -14,6 +14,8 @@
 
 module;
 
+export module explain_physical_plan;
+
 import stl;
 import physical_operator;
 import physical_union_all;
@@ -72,8 +74,6 @@ import physical_read_cache;
 import physical_unnest;
 import physical_unnest_aggregate;
 import physical_check;
-
-export module explain_physical_plan;
 
 namespace infinity {
 

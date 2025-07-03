@@ -2,6 +2,8 @@ module;
 
 #include <cassert>
 
+export module posting_byte_slice_reader;
+
 import stl;
 import byte_slice;
 import byte_slice_reader;
@@ -9,7 +11,6 @@ import posting_byte_slice;
 import flush_info;
 import posting_field;
 import posting_buffer;
-export module posting_byte_slice_reader;
 
 namespace infinity {
 
