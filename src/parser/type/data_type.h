@@ -173,7 +173,7 @@ public:
         plain_type_ = false;
     }
 
-    nlohmann::json Serialize() const;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const;
 
     static std::shared_ptr<DataType> Deserialize(std::string_view data_type_str);
     static std::shared_ptr<DataType> StringDeserialize(const std::string &data_type_string);

@@ -42,7 +42,11 @@ TEST_F(DecimalInfoTest, decimal_info_A) {
     EXPECT_EQ(decimal_info->precision(), 38);
     EXPECT_EQ(decimal_info->Size(), 16u);
 
-    nlohmann::json json;
-    json["type_info"] = decimal_info->Serialize();
-    EXPECT_EQ(json.dump(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+    writer.StartObject();
+    writer.Key("type_info");
+    decimal_info->Serialize(writer);
+    writer.EndObject();
+    EXPECT_EQ(sb.GetString(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
 }

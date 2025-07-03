@@ -51,7 +51,12 @@ Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
 
 Status TableIndexMeeta::SetIndexBase(const SharedPtr<IndexBase> &index_base) {
     String index_def_key = GetTableIndexTag("index_base");
-    Status status = kv_instance_.Put(index_def_key, index_base->Serialize().dump());
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+    writer.StartObject();
+    index_base->Serialize(writer);
+    writer.EndObject();
+    Status status = kv_instance_.Put(index_def_key, sb.GetString());
     if (!status.ok()) {
         return status;
     }

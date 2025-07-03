@@ -60,53 +60,51 @@ TEST_F(JsonTest, rapidjson_test) {
     // test writer
     String text;
     {
-        class ArrayList {
-        public:
-            void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) {
-                writer.StartArray();
-                for (unsigned i = 0; i < 3; i++) {
-                    writer.Uint(i);
-                }
-                writer.EndArray();
-            }
-        };
-
         class KVList {
         public:
             void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) {
-                writer.StartObject();
                 for (unsigned i = 0; i < 3; i++) {
                     String key = "k" + std::to_string(i);
                     String val = "v" + std::to_string(i);
                     writer.Key(val.c_str());
                     writer.String(val.c_str());
                 }
-                writer.EndObject();
             }
+        };
+
+        auto fun = [&](rapidjson::Writer<rapidjson::StringBuffer>& writer) -> void {
+            writer.Key("hello");
+            writer.String("world");
+            writer.Key("t");
+            writer.Bool(true);
+            writer.Key("f");
+            writer.Bool(false);
+            writer.Key("n");
+            writer.Null();
+            writer.Key("i");
+            writer.Uint(123);
+            writer.Key("pi");
+            writer.Double(3.1416);
+
+            writer.Key("a");
+            writer.StartArray();
+            for (unsigned i = 0; i < 3; i++) {
+                writer.Uint(i);
+            }
+            writer.EndArray();
+
+            writer.Key("o");
+            writer.StartObject();
+            KVList kvl;
+            kvl.Serialize(writer);
+            writer.EndObject();
         };
 
         rapidjson::StringBuffer sb;
         rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
 
         writer.StartObject();
-        writer.Key("hello");
-        writer.String("world");
-        writer.Key("t");
-        writer.Bool(true);
-        writer.Key("f");
-        writer.Bool(false);
-        writer.Key("n");
-        writer.Null();
-        writer.Key("i");
-        writer.Uint(123);
-        writer.Key("pi");
-        writer.Double(3.1416);
-        writer.Key("a");
-        ArrayList arrls;
-        arrls.Serialize(writer);
-        writer.Key("o");
-        KVList kvl;
-        kvl.Serialize(writer);
+        fun(writer);
         writer.EndObject();
 
         text = sb.GetString();
