@@ -54,22 +54,14 @@ Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const Strin
 
 Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name) {
     auto *txn_ptr = query_context->GetNewTxn();
-    const String &db_name = query_context->schema_name();
+    String snapshot_dir = query_context->global_config()->SnapshotDir();
 
-    Optional<DBMeeta> db_meta;
-    TxnTimeStamp db_create_ts;
-    Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
+    SharedPtr<DatabaseSnapshotInfo> database_snapshot;
+    Status status;
+    std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
     if (!status.ok()) {
         return status;
     }
-
-    if (!db_meta.has_value()) {
-        return Status::NotFound("DB not found");
-    }
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
-
-    SharedPtr<TableSnapshotInfo> table_snapshot;
-    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
 
     // check txn_type
     LOG_INFO(fmt::format("txn type: {}", TransactionType2Str(txn_ptr->GetTxnType())));
@@ -77,7 +69,7 @@ Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const Stri
     //     return Status::InvalidArgument("Txn type is not RestoreTable");
     // }
 
-    status = txn_ptr->RestoreTableSnapshot(db_name, table_snapshot);
+    status = txn_ptr->RestoreDatabaseSnapshot(database_snapshot);
     if (!status.ok()) {
         return status;
     }

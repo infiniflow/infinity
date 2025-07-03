@@ -1335,7 +1335,7 @@ bool WalCmdRestoreTableSnapshot::operator==(const WalCmd &other) const {
 
 bool WalCmdRestoreDatabaseSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRestoreDatabaseSnapshot *>(&other);
-    if (other_cmd == nullptr || db_name_ != other_cmd->db_name_ || restore_table_wal_cmds_.size() != other_cmd->restore_table_wal_cmds_.size()) {
+    if (other_cmd == nullptr || db_name_ != other_cmd->db_name_ || db_id_str_ != other_cmd->db_id_str_ || db_comment_ != other_cmd->db_comment_ || restore_table_wal_cmds_.size() != other_cmd->restore_table_wal_cmds_.size()) {
         return false;
     }
     for (SizeT i = 0; i < restore_table_wal_cmds_.size(); i++) {
@@ -1621,7 +1621,7 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
 }
 
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
-    i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size();
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_str_.size() + sizeof(i32) + db_comment_.size();
     size += sizeof(i32);
     for (const auto& restore_table_wal_cmd : restore_table_wal_cmds_) {
         size += restore_table_wal_cmd.GetSizeInBytes();
@@ -1775,6 +1775,7 @@ void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::RESTORE_DATABASE_SNAPSHOT);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_id_str_);
+    WriteBufAdv(buf, this->db_comment_);
     WriteBufAdv(buf, static_cast<i32>(restore_table_wal_cmds_.size()));
     for (const auto &restore_table_wal_cmd : restore_table_wal_cmds_) {
         restore_table_wal_cmd.WriteAdv(buf);
@@ -2880,6 +2881,8 @@ String WalCmdRestoreTableSnapshot::ToString() const {
 String WalCmdRestoreDatabaseSnapshot::ToString() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << std::endl;
+    ss << "db_id_str: " << db_id_str_ << std::endl;
+    ss << "db_comment: " << db_comment_ << std::endl;
     ss << "restore_table_wal_cmds count: " << restore_table_wal_cmds_.size() << std::endl;
     for (SizeT i = 0; i < restore_table_wal_cmds_.size(); ++i) {
         ss << "  restore_table_wal_cmd " << i << ": " << restore_table_wal_cmds_[i].ToString();
@@ -2890,6 +2893,8 @@ String WalCmdRestoreDatabaseSnapshot::ToString() const {
 String WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << std::endl;
+    ss << "db_id_str: " << db_id_str_ << std::endl;
+    ss << "db_comment: " << db_comment_ << std::endl;
     ss << "restore_table_wal_cmds count: " << restore_table_wal_cmds_.size() << std::endl;
     for (SizeT i = 0; i < restore_table_wal_cmds_.size(); ++i) {
         ss << "  restore_table_wal_cmd " << i << ": " << restore_table_wal_cmds_[i].CompactInfo();

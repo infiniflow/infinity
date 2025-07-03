@@ -1088,8 +1088,8 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
 };
 
 export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
-    WalCmdRestoreDatabaseSnapshot(const String &db_name, const String &db_id_str, const Vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
-        : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), restore_table_wal_cmds_(restore_table_wal_cmds) {}
+    WalCmdRestoreDatabaseSnapshot(const String &db_name, const String &db_id_str, const String &db_comment, const Vector<WalCmdRestoreTableSnapshot> &restore_table_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_DATABASE_SNAPSHOT), db_name_(db_name), db_id_str_(db_id_str), db_comment_(db_comment), restore_table_wal_cmds_(restore_table_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1099,6 +1099,7 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
 
     String db_name_{};
     String db_id_str_{};
+    String db_comment_{};
     
     Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };

@@ -5,16 +5,6 @@
 !*.*
 !*/
 
-# explicitly allow common license and author files
-!LICENSE*
-!COPYING*
-!AUTHORS*
-!CONTRIBUTORS*
-!README*
-!CHANGELOG*
-!NOTICE*
-!PATENTS*
-
 # names with special characters
 *#*
 *~*

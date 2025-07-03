@@ -56,6 +56,7 @@ struct WalCmdCheckpointV2;
 struct WalCmdOptimizeV2;
 struct WalCmdCleanup;
 struct WalCmdRestoreTableSnapshot;
+struct WalCmdRestoreDatabaseSnapshot;
 
 class BufferObj;
 
@@ -541,6 +542,7 @@ private:
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
+    Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
