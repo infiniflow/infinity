@@ -89,7 +89,7 @@ void TestCatalog::AppendMemIndex(const String &index_name, SizeT row_cnt, SizeT 
             mem_index = iter->second;
         } else {
             mem_index = MakeShared<MemIndex>();
-            mem_index->memory_dummy_index_ = MakeShared<DummyIndexInMem>("db1", "tbl1", index_name, 0, tracer_);
+            mem_index->SetDummyIndex(MakeShared<DummyIndexInMem>("db1", "tbl1", index_name, 0, tracer_));
             memindexes_.emplace(index_name, mem_index);
         }
     }

@@ -75,7 +75,6 @@ void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {
 
 void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<NewTxn> new_txn_shared = nullptr;
     String db_name = dump_task->db_name_;
     String table_name = dump_task->table_name_;
     String index_name = dump_task->index_name_;
@@ -87,10 +86,7 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
     i64 retry_count = 0;
     do {
         SharedPtr<BGTaskInfo> bg_task_info = MakeShared<BGTaskInfo>(BGTaskType::kDumpMemIndex);
-
-        if (!commit_status.ok()) {
-            new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
-        }
+        SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
 
         Status status = new_txn_shared->DumpMemIndex(db_name, table_name, index_name, segment_id, begin_row_id);
         if (status.ok()) {

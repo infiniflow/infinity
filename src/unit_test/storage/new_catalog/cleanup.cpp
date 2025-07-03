@@ -1155,7 +1155,7 @@ TEST_P(TestTxnCleanup, cleanup_and_dump_index) {
 
             SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             ASSERT_NE(mem_index, nullptr);
-            ASSERT_EQ(mem_index->memory_secondary_index_, nullptr);
+            ASSERT_EQ(mem_index->GetSecondaryIndex(), nullptr);
 
             {
                 auto [chunk_ids, status] = segment_index_meta.GetChunkIDs1();

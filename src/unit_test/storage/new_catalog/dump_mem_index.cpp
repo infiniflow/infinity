@@ -305,13 +305,14 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            auto secondary_index = mem_index->GetSecondaryIndex();
+            RowID begin_id = secondary_index->GetBeginRowID();
+            u32 row_cnt = secondary_index->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -346,13 +347,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -387,13 +388,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -823,13 +824,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -866,13 +867,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -909,13 +910,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -1423,13 +1424,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -1478,13 +1479,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block_after_add_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -1522,7 +1523,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -1558,7 +1559,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -1596,7 +1597,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -1666,7 +1667,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -1702,7 +1703,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -1736,7 +1737,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -2040,13 +2041,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2091,13 +2092,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2133,13 +2134,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2174,13 +2175,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2217,13 +2218,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block_after_drop_column();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2292,7 +2293,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -2326,7 +2327,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -2358,7 +2359,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -2620,13 +2621,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2662,13 +2663,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -2704,13 +2705,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -3162,13 +3163,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
         status = new_txn_mgr->RollBackTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -3432,13 +3433,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -3474,13 +3475,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -3516,13 +3517,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4075,13 +4076,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4092,11 +4093,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4124,13 +4125,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4140,11 +4141,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4175,24 +4176,24 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4225,22 +4226,22 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr);
+        //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr);
         //        });
 
         append_a_block();
 
         //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        //            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+        //            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
         //            return std::make_pair(begin_id, row_cnt);
         //        });
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4277,11 +4278,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4318,11 +4319,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4358,11 +4359,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4399,11 +4400,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4438,11 +4439,12 @@ TEST_P(TestTxnDumpMemIndex, dump_and_import) {
 
         append_a_block();
 
-        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            auto secondary_index = mem_index->GetSecondaryIndex();
+            RowID begin_id = secondary_index->GetBeginRowID();
+            u32 row_cnt = secondary_index->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4764,11 +4766,11 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() != nullptr); });
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4802,8 +4804,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4837,8 +4839,8 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -4870,7 +4872,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -4902,7 +4904,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -4934,7 +4936,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -4964,7 +4966,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -4995,7 +4997,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -5024,7 +5026,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         drop_db(*db_name);
     }
@@ -5294,7 +5296,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5333,7 +5335,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5372,7 +5374,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5410,7 +5412,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5450,7 +5452,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5488,7 +5490,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5527,7 +5529,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5567,7 +5569,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5604,7 +5606,7 @@ TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         // Check data
         check_data();
@@ -5882,13 +5884,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -5921,13 +5923,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -5960,13 +5962,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         status = new_txn_mgr->RollBackTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -5998,13 +6000,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -6038,13 +6040,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
@@ -6078,13 +6080,13 @@ TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->GetSecondaryIndex() == nullptr); });
 
         append_a_block();
 
         check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+            u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
             return std::make_pair(begin_id, row_cnt);
         });
 
