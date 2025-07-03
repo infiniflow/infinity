@@ -145,7 +145,7 @@ jobs:
       - name: Run sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug
-        run: sudo docker exec compassionate_ritchie bash -c "LD_PRELOAD=/usr/lib/llvm-18/lib/clang/18/lib/linux/libclang_rt.asan-x86_64.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py" && sleep 1s
 
       - name: Stop sqllogictest debug
         if: ${{ !cancelled() }}
