@@ -46,7 +46,6 @@ export struct ChunkIndexMetaInfo {
     nlohmann::json Serialize();
 
     static SharedPtr<ChunkIndexMetaInfo> Deserialize(const nlohmann::json &chunk_index_json);
-    void FromJson(std::string_view json_str);
 
     static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 };

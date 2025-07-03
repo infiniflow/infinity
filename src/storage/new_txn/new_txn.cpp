@@ -1547,27 +1547,27 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
 }
 
 Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info) {
-    // this->SetTxnType(TransactionType::kRestoreDatabase);
-    // const String &db_name = database_snapshot_info->db_name_;
-    // String db_id_str;
-    // Status status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
-    // if (!status.ok()) {
-    //     return status;
-    // }
+    this->SetTxnType(TransactionType::kRestoreDatabase);
+    const String &db_name = database_snapshot_info->db_name_;
+    String db_id_str;
+    Status status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+    if (!status.ok()) {
+        return status;
+    }
 
-    // base_txn_store_ = MakeShared<RestoreDatabaseTxnStore>();
-    // RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
-    // txn_store->db_name_ = db_name;
-    // txn_store->db_id_str_ = db_id_str;
+    base_txn_store_ = MakeShared<RestoreDatabaseTxnStore>();
+    RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
+    txn_store->db_name_ = db_name;
+    txn_store->db_id_str_ = db_id_str;
     
-    // // Copy database snapshot files
-    // String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    // String snapshot_name = database_snapshot_info->snapshot_name_;
-    // Vector<String> files_to_restore = database_snapshot_info->GetFiles();
-    // status = database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str);
-    // if (!status.ok()) {
-    //     return status;
-    // }
+    // Copy database snapshot files
+    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    String snapshot_name = database_snapshot_info->snapshot_name_;
+    Vector<String> files_to_restore = database_snapshot_info->GetFiles();
+    status = database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
     
     // // Process each table snapshot within the database
     // for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
@@ -1588,19 +1588,18 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     //         return status;
     //     }
         
-    //     // Create transaction store for this table
-    //     tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
-    //     RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(tmp_txn_store_.get());
+        // Create transaction store for this table
+        // tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
+        // RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(tmp_txn_store_.get());
         
-    //     // Use the helper function to process snapshot restoration data
-    //     status = ProcessSnapshotRestorationData(db_name, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, txn_store);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    //     txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
-    // }
+        // Use the helper function to process snapshot restoration data
+        //`status = ProcessSnapshotRestorationData(db_name, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, txn_store);
+        // if (!status.ok()) {
+        //     return status;
+        // }
+        // txn_store->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
     
-    // LOG_TRACE("NewTxn::RestoreDatabaseSnapshot created database entry is inserted.");
+    //LOG_TRACE("NewTxn::RestoreDatabaseSnapshot created database entry is inserted.");
     return Status::OK();
 }
 
