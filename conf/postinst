@@ -1,0 +1,7 @@
+#!/usr/bin/bash
+
+if ! id -u infinity > /dev/null 2>&1 ; then
+    useradd --create-home --home-dir /var/infinity --skel /dev/null infinity
+fi
+
+mkdir -p /var/infinity && chown -R infinity /var/infinity

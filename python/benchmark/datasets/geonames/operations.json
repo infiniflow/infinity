@@ -1,0 +1,42 @@
+[
+  {
+    "name": "term",
+    "body": {
+      "query": {
+        "match": {
+          "country_code": "AT"
+        }
+      }
+    }
+  },
+  {
+    "name": "phrase",
+    "body": {
+      "query": {
+        "match": {
+          "name": "Sankt Georgen"
+        }
+      }
+    }
+  },
+  {
+    "name": "significant_text_selective",
+    "body": {
+      "query": {
+        "match": {
+          "alternatenames": "street"
+        }
+      }
+    }
+  },
+  {
+    "name": "significant_text_sampled_unselective",
+    "body": {
+      "query": {
+        "match": {
+          "timezone": "America"
+        }
+      }
+    }
+  }
+]
