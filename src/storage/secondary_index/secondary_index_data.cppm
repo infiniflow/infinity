@@ -175,6 +175,11 @@ public:
     virtual void InsertData(const void *ptr) = 0;
 
     virtual void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) = 0;
+
+    // Virtual methods for low cardinality access (default implementations for high cardinality)
+    virtual u32 GetUniqueKeyCount() const { return 0; }
+    virtual const void *GetUniqueKeysPtr() const { return nullptr; }
+    virtual const void *GetOffsetsForKeyPtr(const void *key_ptr) const { return nullptr; }
 };
 
 // Type aliases for backward compatibility
