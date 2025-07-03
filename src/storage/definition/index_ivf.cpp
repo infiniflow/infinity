@@ -353,8 +353,6 @@ nlohmann::json IndexIVF::Serialize() const {
     return res;
 }
 
-IndexIVFOption IndexIVF::DeserializeIndexIVFOption(const nlohmann::json &ivf_option_json) { return ivf_option_json; }
-
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroidOption &ivf_centroid_option) {
     simdjson::object obj = val.get_object();
@@ -382,8 +380,11 @@ auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFOption &
     return simdjson::SUCCESS;
 }
 
-IndexIVFOption IndexIVF::DeserializeIndexIVFOption(simdjson::simdjson_result<simdjson::value> &ivf_option_json) {
-    return ivf_option_json.get<IndexIVFOption>();
+IndexIVFOption IndexIVF::DeserializeIndexIVFOption(std::string_view ivf_option_str) {
+    simdjson::padded_string ivf_option_json(ivf_option_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(ivf_option_json);
+    return doc.get<IndexIVFOption>();
 }
 
 String BuildIndexIVFStorageOptionStr();

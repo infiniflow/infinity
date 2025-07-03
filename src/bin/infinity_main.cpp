@@ -107,7 +107,7 @@ void StopThriftServer() {
     threaded_thrift_server.Shutdown();
     threaded_thrift_thread.join();
 #endif
-    LOG_INFO("Thrift server is shutdown.");
+    LOG_INFO("Thrift server is shut down.");
 }
 
 void StartPeerServer() {
@@ -123,7 +123,7 @@ void StopPeerServer() {
     using namespace infinity;
     pool_peer_thrift_server.Shutdown();
     pool_peer_thrift_thread.join();
-    LOG_INFO("Peer server is shutdown.");
+    LOG_INFO("Peer server is shut down.");
 }
 
 void ShutdownServer() {
@@ -135,11 +135,11 @@ void ShutdownServer() {
 
     http_server.Shutdown();
 
-    infinity::LOG_INFO("HTTP server is shutdown.");
+    infinity::LOG_INFO("HTTP server is shut down.");
 
     pg_server.Shutdown();
 
-    infinity::LOG_INFO("PG server is shutdown.");
+    infinity::LOG_INFO("PG server is shut down.");
 
     infinity::InfinityContext::instance().UnInit();
 
@@ -287,6 +287,6 @@ auto main(int argc, char **argv) -> int {
 
     pg_thread.join();
 
-    fmt::print("Server is shutdown\n");
+    fmt::print("Server is shut down\n");
     return 0;
 }

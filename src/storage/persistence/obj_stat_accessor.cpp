@@ -290,17 +290,19 @@ nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
     return json_obj;
 }
 
-void ObjectStatAccessor_LocalStorage::Deserialize(const nlohmann::json &obj) {
+void ObjectStatAccessor_LocalStorage::Deserialize(std::string_view obj_str) {
+    simdjson::padded_string obj_json(obj_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(obj_json);
     std::unique_lock<std::shared_mutex> lock(mutex_);
-    SizeT len = 0;
-    if (obj.contains("obj_stat_size")) {
-        len = obj["obj_stat_size"];
-    }
-    for (SizeT i = 0; i < len; ++i) {
-        auto &json_pair = obj["obj_stat_array"][i];
-        String obj_key = json_pair["obj_key"];
+    // SizeT len = 0;
+    // if (SizeT len_json; doc["obj_stat_size"].get<SizeT>(len_json) == simdjson::SUCCESS) {
+    //     len = len_json;
+    // }
+    for (simdjson::array array = doc["obj_stat_array"]; auto item: array) {
+        String obj_key = item["obj_key"].get<String>();
         ObjStat obj_stat;
-        obj_stat.Deserialize(json_pair["obj_stat"]);
+        obj_stat.Deserialize(item["obj_stat"].raw_json());
         obj_stat.cached_ = ObjCached::kCached;
         obj_map_.emplace(obj_key, std::move(obj_stat));
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
@@ -316,8 +318,9 @@ void ObjectStatAccessor_LocalStorage::Deserialize(KVInstance *kv_instance) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
         String obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
+        String obj_value = iter->Value().ToString();
         ObjStat obj_stat;
-        obj_stat.Deserialize(iter->Value().ToString());
+        obj_stat.Deserialize(obj_value);
         obj_stat.cached_ = ObjCached::kCached;
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
         obj_map_.emplace(std::move(obj_key), std::move(obj_stat));
@@ -417,17 +420,19 @@ nlohmann::json ObjectStatAccessor_ObjectStorage::Serialize() {
     return json_obj;
 }
 
-void ObjectStatAccessor_ObjectStorage::Deserialize(const nlohmann::json &obj) {
-    SizeT len = 0;
-    if (obj.contains("obj_stat_size")) {
-        len = obj["obj_stat_size"];
-    }
+void ObjectStatAccessor_ObjectStorage::Deserialize(std::string_view obj_str) {
+    simdjson::padded_string obj_json(obj_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(obj_json);
+    // SizeT len = 0;
+    // if (auto item = doc["obj_stat_size"]; item.error() == simdjson::SUCCESS) {
+    //     len = item.get<SizeT>();
+    // }
     std::unique_lock<std::shared_mutex> lock(mutex_);
-    for (SizeT i = 0; i < len; ++i) {
-        auto &json_pair = obj["obj_stat_array"][i];
-        String obj_key = json_pair["obj_key"];
+    for (simdjson::array array = doc["obj_stat_array"]; auto item: array) {
+        String obj_key = item["obj_key"].get<String>();
         ObjStat obj_stat;
-        obj_stat.Deserialize(json_pair["obj_stat"]);
+        obj_stat.Deserialize(item["obj_stat"].raw_json());
         obj_stat.cached_ = ObjCached::kNotCached;
         obj_map_.PutNew(obj_key, std::move(obj_stat));
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
@@ -443,8 +448,9 @@ void ObjectStatAccessor_ObjectStorage::Deserialize(KVInstance *kv_instance) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
         String obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
+        String obj_value = iter->Value().ToString();
         ObjStat obj_stat;
-        obj_stat.Deserialize(iter->Value().ToString());
+        obj_stat.Deserialize(obj_value);
         obj_stat.cached_ = ObjCached::kNotCached;
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
         obj_map_.PutNew(std::move(obj_key), std::move(obj_stat));

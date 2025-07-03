@@ -94,7 +94,7 @@ private:
 
     static void NewCSVRowHandler(void *);
 
-    void JSONLRowHandler(const nlohmann::json &line_json, Vector<SharedPtr<ColumnVector>> &column_vectors);
+    void JSONLRowHandler(std::string_view line_json, Vector<SharedPtr<ColumnVector>> &column_vectors);
 
     void ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
 
@@ -109,7 +109,7 @@ private:
     char delimiter_{','};
 };
 
-export SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object);
-export SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &json_object, const SparseInfo *sparse_info);
+export SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_object);
+export SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view json_object, const SparseInfo *sparse_info);
 
 } // namespace infinity

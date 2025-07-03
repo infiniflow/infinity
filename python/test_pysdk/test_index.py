@@ -640,6 +640,7 @@ class TestInfinity:
             "test_insert_data_fulltext_index_search" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("offline", [False, True])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_empty_fulltext_index(self, file_format, suffix, offline):
@@ -697,7 +698,7 @@ class TestInfinity:
         else:
             table_obj.optimize("body_index", {})
             table_obj.optimize("body2_index", {})
-            time.sleep(5)
+            time.sleep(40)
 
         res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()

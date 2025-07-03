@@ -361,7 +361,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
     for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
         SizeT input_block_start_idx = segment_idx * DEFAULT_BLOCK_PER_SEGMENT;
-        SizeT input_block_end_idx = std::min(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT, input_blocks.size());
+        SizeT input_block_end_idx = std::min(std::size_t(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT), input_blocks.size());
         import_txn_store->input_blocks_in_imports_.emplace(
             segment_ids[segment_idx], Vector<SharedPtr<DataBlock>>(input_blocks.begin() + input_block_start_idx,
                                                                    input_blocks.begin() + input_block_end_idx));
@@ -393,13 +393,12 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     return Status::OK();
 }
 
-Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
-    Status status;
+Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+    Status status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
@@ -412,7 +411,7 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd) {
         return status;
     }
 
-    return Status::OK();
+    return PrepareCommitImport(import_cmd);
 }
 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
@@ -447,6 +446,8 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
 Status NewTxn::Append(const TableInfo &table_info, const SharedPtr<DataBlock> &input_block) {
     return Append(*table_info.db_name_, *table_info.table_name_, input_block);
 }
+
+Status NewTxn::ReplayAppend(WalCmdAppendV2 *append_cmd, TxnTimeStamp commit_ts, i64 txn_id) { return Status::OK(); }
 
 Status NewTxn::AppendInner(const String &db_name,
                            const String &table_name,
@@ -514,6 +515,24 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     }
 
     return DeleteInner(db_name, table_name, *table_meta_opt, row_ids);
+}
+
+Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    if (delete_cmd->db_id_ != db_meta->db_id_str() || delete_cmd->table_id_ != table_meta->table_id_str()) {
+        return Status::CatalogError(fmt::format("WalCmdDeleteV2 db_id or table_id ({}, {}) mismatch with the expected value ({}, {})",
+                                                delete_cmd->db_id_,
+                                                delete_cmd->table_id_,
+                                                db_meta->db_id_str(),
+                                                table_meta->table_id_str()));
+    }
+
+    return PrepareCommitDelete(delete_cmd);
 }
 
 Status NewTxn::DeleteInner(const String &db_name, const String &table_name, TableMeeta &table_meta, const Vector<RowID> &row_ids) {
@@ -765,6 +784,39 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
     }
 
     return Status::OK();
+}
+
+Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    Status status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta &table_meta = *table_meta_opt;
+
+    for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+        status = NewCatalog::LoadFlushedSegment2(table_meta, segment_info, fake_commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    {
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        status = table_meta.RemoveSegmentIDs1(compact_cmd->deprecated_segment_ids_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return PrepareCommitCompact(compact_cmd);
 }
 
 Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset) {
@@ -1246,7 +1298,7 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
     return Status::OK();
 }
 
-Status NewTxn::CommitImport(WalCmdImportV2 *import_cmd) {
+Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
     Status status;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const String &db_id_str = import_cmd->db_id_;
@@ -1503,7 +1555,7 @@ Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCompact(WalCmdCompactV2 *compact_cmd) {
+Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     Status status;
     const String &db_id_str = compact_cmd->db_id_;
     const String &table_id_str = compact_cmd->table_id_;

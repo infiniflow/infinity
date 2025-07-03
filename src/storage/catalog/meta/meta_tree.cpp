@@ -563,8 +563,10 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
         switch (meta_key->type_) {
             case MetaType::kPmObject: {
                 auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
-                nlohmann::json pm_path_json = nlohmann::json::parse(pm_path_key->value_);
-                String object_key = pm_path_json["obj_key"];
+                simdjson::padded_string json(pm_path_key->value_);
+                simdjson::parser parser;
+                simdjson::document doc = parser.iterate(json);
+                String object_key = doc["obj_key"].get<String>();
                 if (object_key == "KEY_EMPTY") {
                     continue;
                 }
