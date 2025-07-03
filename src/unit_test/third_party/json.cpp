@@ -184,12 +184,12 @@ TEST_F(JsonTest, rapidjson_test) {
         }
 
         // Count
-        std::cout << "size(doc): " << doc.Size() << std::endl;
+        std::cout << "size(doc): " << doc.MemberCount() << std::endl;
         std::cout << "size(doc::array): " << doc["a"].Size() << std::endl;
 
         // Random Access
-        const auto &item = doc[0];
-        std::cout << "idx0: " << item.GetString() << std::endl;
+        const auto &item = doc["a"][0];
+        std::cout << "array[0]: " << item.GetInt() << std::endl;
 
         // Print document
         PrintDocument(doc);
