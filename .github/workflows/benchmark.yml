@@ -1,0 +1,86 @@
+name: benchmarks
+
+on:
+  # Schedule the workflow to run once per day at 16:00 UTC
+  schedule:
+    - cron: '0 16 * * *'
+  pull_request:
+    types: [ labeled ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+
+jobs:
+  benchmarks:
+    name: run benchmarks
+    # run the workflow only at scheduled time, or when a pull request is labeled with 'benchmark'
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark')) }}
+    # run the workflow only on infiniflow self-hosted runners as gist requires more disk space than github-hosted runners allow
+    runs-on: ["self-hosted"]
+    steps:
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v4
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          CPUS=${CPUS:-$(nproc)}
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "CPUS=${CPUS}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot -v /var/run/docker.sock:/var/run/docker.sock --cpus ${CPUS} infiniflow/infinity_builder:centos7_clang18
+
+      - name: Build release version
+        if: ${{ !cancelled() && !failure() }}
+        run: | 
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && rm -rf cmake-build-release"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && mkdir -p cmake-build-release "
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-release"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity && cmake --build /infinity/cmake-build-release --target infinity knn_import_benchmark knn_query_benchmark"
+          
+      - name: Prepare benchmark datasets
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && wget ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && wget ftp://ftp.irisa.fr/local/texmex/corpus/gist.tar.gz"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && tar -zxvf sift.tar.gz && rm -rf sift.tar.gz"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && sudo mkdir -p test/data/benchmark/sift_1m"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mv sift/* test/data/benchmark/sift_1m/"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && tar -zxvf gist.tar.gz && rm -rf gist.tar.gz"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && sudo mkdir -p test/data/benchmark/gist_1m"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mv gist/* test/data/benchmark/gist_1m/"
+
+      # reset infinity state and linux caches before running the sift import/query benchmarks
+      - name: Latest benchmark sift
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "echo 3 | sudo tee /proc/sys/vm/drop_caches"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=/infinity/test/data"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "echo '1 50' | /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false /infinity/test/data | tee benchmark_sift_1_thread.log"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "echo '8 50' | /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false /infinity/test/data | tee benchmark_sift_8_thread.log"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf test/data/benchmark/sift_1m"
+
+      # reset infinity state and linux caches before running the gist import/query benchmarks
+      - name: Latest benchmark gist
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "echo 3 | sudo tee /proc/sys/vm/drop_caches"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/cmake-build-release/benchmark/local_infinity/knn_import_benchmark --dataset=gist --dataset_dir=/infinity/test/data"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "echo '1 50' | /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 200 false /infinity/test/data | tee benchmark_gist_1_thread.log"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "echo '8 50' | /infinity/cmake-build-release/benchmark/local_infinity/knn_query_benchmark gist 200 false /infinity/test/data | tee benchmark_gist_8_thread.log"
+            sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf test/data/benchmark/gist_1m"
+           
+      - name: Destroy builder container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+            if [ -n "${BUILDER_CONTAINER}" ]; then
+              sudo docker rm -f -v ${BUILDER_CONTAINER}
+            fi
