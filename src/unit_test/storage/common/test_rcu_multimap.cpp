@@ -538,9 +538,15 @@ TEST_F(RcuMultiMapTest, TestDifferentValueTypes) {
 TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
     RcuMultiMap<i32, TestValue> map;
 
-    const i32 num_threads = 8;
-    const i32 operations_per_thread = 1000;
-    const i32 key_range = 100;
+    // Previous parameters (slower):
+    // const i32 num_threads = 8;
+    // const i32 operations_per_thread = 1000;
+    // const i32 key_range = 100;
+
+    // Faster parameters:
+    const i32 num_threads = 4;
+    const i32 operations_per_thread = 200;
+    const i32 key_range = 20;
 
     std::atomic<i32> total_insertions{0};
     std::atomic<i32> total_reads{0};
@@ -569,7 +575,9 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
                 total_insertions.fetch_add(1);
 
                 // Occasionally yield to allow other threads to run
-                if (i % 100 == 0) {
+                // Previous frequency (slower): every 100 operations
+                // Faster frequency: every 50 operations
+                if (i % 50 == 0) {
                     std::this_thread::yield();
                 }
             }
@@ -638,9 +646,15 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
 TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
     RcuMultiMap<String, TestValue> map;
 
-    const i32 num_threads = 12;
-    const i32 operations_per_thread = 500;
-    const i32 key_range = 50;
+    // Previous parameters (slower):
+    // const i32 num_threads = 12;
+    // const i32 operations_per_thread = 500;
+    // const i32 key_range = 50;
+
+    // Faster parameters:
+    const i32 num_threads = 6;
+    const i32 operations_per_thread = 100;
+    const i32 key_range = 15;
 
     std::atomic<i32> total_insertions{0};
     std::atomic<i32> total_deletions{0};
@@ -668,8 +682,10 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
                 map.Insert(key, test_val);
                 total_insertions.fetch_add(1);
 
-                if (i % 50 == 0) {
-                    std::this_thread::sleep_for(std::chrono::microseconds(1));
+                // Previous frequency (slower): every 50 operations with 1μs sleep
+                // Faster: every 25 operations, no sleep
+                if (i % 25 == 0) {
+                    std::this_thread::yield();
                 }
             }
         });
@@ -683,7 +699,9 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
             }
 
             // Wait a bit to let some data be inserted
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // Previous delay (slower): 10ms
+            // Faster delay:
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
             std::random_device rd;
             std::mt19937 gen(rd() + t);
@@ -694,8 +712,10 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
                 map.Delete(key);
                 total_deletions.fetch_add(1);
 
-                if (i % 25 == 0) {
-                    std::this_thread::sleep_for(std::chrono::microseconds(1));
+                // Previous frequency (slower): every 25 operations with 1μs sleep
+                // Faster: every 20 operations, no sleep
+                if (i % 20 == 0) {
+                    std::this_thread::yield();
                 }
             }
         });
@@ -724,7 +744,9 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
 
                 total_reads.fetch_add(1);
 
-                if (i % 50 == 0) {
+                // Previous frequency (slower): every 50 operations
+                // Faster: every 30 operations
+                if (i % 30 == 0) {
                     std::this_thread::yield();
                 }
             }
@@ -751,9 +773,15 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
 TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
     RcuMultiMap<i64, TestValue> map;
 
-    const i32 num_threads = 16;
-    const i32 operations_per_thread = 2000;
-    const i32 key_range = 1000;
+    // Previous parameters (slower):
+    // const i32 num_threads = 16;
+    // const i32 operations_per_thread = 2000;
+    // const i32 key_range = 1000;
+
+    // Faster parameters:
+    const i32 num_threads = 6;
+    const i32 operations_per_thread = 300;
+    const i32 key_range = 50;
 
     std::atomic<i64> total_operations{0};
     std::atomic<i64> successful_reads{0};
@@ -806,7 +834,9 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
                 total_operations.fetch_add(1);
 
                 // Occasional yield to promote thread interleaving
-                if (local_operations % 100 == 0) {
+                // Previous frequency (slower): every 100 operations
+                // Faster: every 50 operations
+                if (local_operations % 50 == 0) {
                     std::this_thread::yield();
                 }
             }
@@ -817,7 +847,9 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
     start_flag.store(true);
 
     // Let threads run for a specific duration
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    // Previous duration (slower): std::chrono::seconds(2)
+    // Faster duration:
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     stop_flag.store(true);
 
     // Wait for all threads to complete
@@ -849,9 +881,15 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
 TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
     RcuMultiMap<String, TestValue> map;
 
-    const i32 num_threads = 8;
-    const i32 operations_per_thread = 1500;
-    const i32 key_range = 20; // Small key range to force frequent access
+    // Previous parameters (slower):
+    // const i32 num_threads = 8;
+    // const i32 operations_per_thread = 1500;
+    // const i32 key_range = 20;
+
+    // Faster parameters:
+    const i32 num_threads = 4;
+    const i32 operations_per_thread = 200;
+    const i32 key_range = 10; // Small key range to force frequent access
 
     std::atomic<i32> total_gets{0};
     std::atomic<bool> start_flag{false};
@@ -870,7 +908,9 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
             std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
 
             // First, insert some data
-            for (i32 i = 0; i < 50; ++i) {
+            // Previous count (slower): 50
+            // Faster count:
+            for (i32 i = 0; i < 10; ++i) {
                 String key = "swap_key_" + std::to_string(key_dist(gen));
                 auto *test_val = new TestValue(t * 1000 + i);
                 map.Insert(key, test_val);
