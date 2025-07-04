@@ -24,35 +24,7 @@ import rcu_multimap;
 
 using namespace infinity;
 
-// Test value class with reference counting
-class TestValue {
-public:
-    explicit TestValue(i32 val) : value_(val), ref_count_(1) {}
-    
-    void IncrementRef() { ++ref_count_; }
-    void DecrementRef() { 
-        if (--ref_count_ == 0) {
-            delete this;
-        }
-    }
-    
-    i32 GetValue() const { return value_; }
-    i32 GetRefCount() const { return ref_count_; }
-
-private:
-    i32 value_;
-    std::atomic<i32> ref_count_;
-};
-
-// Test value class without reference counting (for testing different deallocators)
-class SimpleTestValue {
-public:
-    explicit SimpleTestValue(i32 val) : value_(val) {}
-    i32 GetValue() const { return value_; }
-
-private:
-    i32 value_;
-};
+// RcuMultiMap now works with POD types directly, so we'll use simple integers for testing
 
 class RcuMultiMapTest : public BaseTest {
 public:
@@ -68,22 +40,10 @@ public:
     }
 
 protected:
-    // Helper function to create test values
-    TestValue* CreateTestValue(i32 val) {
-        return new TestValue(val);
-    }
-    
-    SimpleTestValue* CreateSimpleTestValue(i32 val) {
-        return new SimpleTestValue(val);
-    }
-    
     // Helper function to verify values in vector
-    void VerifyValues(const Vector<TestValue*>& values, const Vector<i32>& expected) {
+    void VerifyValues(const Vector<i32> &values, const Vector<i32> &expected) {
         EXPECT_EQ(values.size(), expected.size());
-        Vector<i32> actual_values;
-        for (const auto* val : values) {
-            actual_values.push_back(val->GetValue());
-        }
+        Vector<i32> actual_values = values;
         std::sort(actual_values.begin(), actual_values.end());
         Vector<i32> sorted_expected = expected;
         std::sort(sorted_expected.begin(), sorted_expected.end());
@@ -92,44 +52,37 @@ protected:
 };
 
 TEST_F(RcuMultiMapTest, TestBasicInsertAndGet) {
-    RcuMultiMap<String, TestValue> map;
-    
+    RcuMultiMap<String, i32> map;
+
     // Insert some values
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-    auto* val3 = CreateTestValue(30);
-    
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
-    map.Insert("key1", val3); // Multiple values for same key
-    
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+    map.Insert("key1", 30); // Multiple values for same key
+
     // Test Get
     auto values1 = map.Get("key1");
     EXPECT_EQ(values1.size(), 2);
     VerifyValues(values1, {10, 30});
-    
+
     auto values2 = map.Get("key2");
     EXPECT_EQ(values2.size(), 1);
     VerifyValues(values2, {20});
-    
+
     // Test non-existent key
     auto values3 = map.Get("key3");
     EXPECT_EQ(values3.size(), 0);
-    
+
     // Test size
     EXPECT_GT(map.size(), 0);
 }
 
 TEST_F(RcuMultiMapTest, TestLowercaseAliases) {
-    RcuMultiMap<String, TestValue> map;
-    
-    auto* val1 = CreateTestValue(100);
-    auto* val2 = CreateTestValue(200);
-    
+    RcuMultiMap<String, i32> map;
+
     // Test lowercase insert alias
-    map.insert("test_key", val1);
-    map.insert("test_key", val2);
-    
+    map.insert("test_key", 100);
+    map.insert("test_key", 200);
+
     // Test lowercase get alias
     auto values = map.get("test_key");
     EXPECT_EQ(values.size(), 2);
@@ -137,18 +90,14 @@ TEST_F(RcuMultiMapTest, TestLowercaseAliases) {
 }
 
 TEST_F(RcuMultiMapTest, TestDelete) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-    auto* val3 = CreateTestValue(30);
-
-    map.Insert("key1", val1);
-    map.Insert("key1", val2);
-    map.Insert("key2", val3);
+    map.Insert("key1", 10);
+    map.Insert("key1", 20);
+    map.Insert("key2", 30);
 
     // Delete specific value (this should work since data is in dirty_map)
-    map.Delete("key1", val1);
+    map.Delete("key1", 10);
     auto values1 = map.Get("key1");
     EXPECT_EQ(values1.size(), 1);
     VerifyValues(values1, {20});
@@ -165,27 +114,23 @@ TEST_F(RcuMultiMapTest, TestDelete) {
 }
 
 TEST_F(RcuMultiMapTest, TestEmplace) {
-    RcuMultiMap<String, TestValue> map;
-    
+    RcuMultiMap<String, i32> map;
+
     // Test emplace functionality
     map.emplace("key1", 42);
     map.emplace("key1", 84);
-    
+
     auto values = map.Get("key1");
     EXPECT_EQ(values.size(), 2);
     VerifyValues(values, {42, 84});
 }
 
 TEST_F(RcuMultiMapTest, TestBounds) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-    auto* val3 = CreateTestValue(30);
-
-    map.Insert("apple", val1);
-    map.Insert("banana", val2);
-    map.Insert("cherry", val3);
+    map.Insert("apple", 10);
+    map.Insert("banana", 20);
+    map.Insert("cherry", 30);
 
     // Force data to be moved from dirty_map to read_map by triggering cache misses
     // The RCU mechanism moves data to read_map when miss_time >= dirty_map size
@@ -206,70 +151,34 @@ TEST_F(RcuMultiMapTest, TestBounds) {
 }
 
 TEST_F(RcuMultiMapTest, TestGetAllValuesWithRef) {
-    RcuMultiMap<String, TestValue> map;
-    
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-    auto* val3 = CreateTestValue(30);
-    
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
-    map.Insert("key3", val3);
-    
-    Vector<TestValue*> all_values;
+    RcuMultiMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+    map.Insert("key3", 30);
+
+    Vector<i32> all_values;
     map.GetAllValuesWithRef(all_values);
-    
+
     EXPECT_EQ(all_values.size(), 3);
     VerifyValues(all_values, {10, 20, 30});
-    
-    // Clean up references
-    for (auto* val : all_values) {
-        val->DecrementRef();
-    }
-}
-
-TEST_F(RcuMultiMapTest, TestCustomDeallocator) {
-    // Test with ValueDelete deallocator for SimpleTestValue
-    RcuMultiMap<String, SimpleTestValue> map(ValueNoOp<SimpleTestValue>, ValueDelete<SimpleTestValue>);
-    
-    auto* val1 = CreateSimpleTestValue(100);
-    auto* val2 = CreateSimpleTestValue(200);
-    
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
-    
-    auto values1 = map.Get("key1");
-    EXPECT_EQ(values1.size(), 1);
-    EXPECT_EQ(values1[0]->GetValue(), 100);
-    
-    auto values2 = map.Get("key2");
-    EXPECT_EQ(values2.size(), 1);
-    EXPECT_EQ(values2[0]->GetValue(), 200);
-    
-    // Delete will call ValueDelete automatically
-    map.Delete("key1");
-    map.Delete("key2");
 }
 
 TEST_F(RcuMultiMapTest, TestGarbageCollection) {
-    RcuMultiMap<String, TestValue> map;
-    
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-    
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
-    
+    RcuMultiMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+
     // Delete some entries
     map.Delete("key1");
-    
+
     // Test garbage collection (should not crash)
-    uint64_t current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    
+    u64 current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
     // Test checkGc alias
     map.checkGc(current_time - 1000); // GC entries older than 1 second
-    
+
     // Verify remaining data is still accessible
     auto values = map.Get("key2");
     EXPECT_EQ(values.size(), 1);
@@ -277,39 +186,32 @@ TEST_F(RcuMultiMapTest, TestGarbageCollection) {
 }
 
 TEST_F(RcuMultiMapTest, TestExpiredEntries) {
-    RcuMultiMap<String, TestValue> map;
-    
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-    
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
-    
+    RcuMultiMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+
     // Access key1 to update its access time
     map.Get("key1", true);
-    
+
     // Sleep briefly to create time difference
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    
-    uint64_t current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    
+
+    u64 current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
     Vector<String> expired_keys;
     map.CheckExpired(current_time + 1000, expired_keys); // Check for entries not accessed in last second
-    
+
     // Should find some expired keys (exact behavior depends on implementation)
     // This test mainly ensures the method doesn't crash
     EXPECT_GE(expired_keys.size(), 0);
 }
 
 TEST_F(RcuMultiMapTest, TestGetWithRcuTime) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
-    auto* val1 = CreateTestValue(10);
-    auto* val2 = CreateTestValue(20);
-
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
 
     // Test GetWithRcuTime (should behave similarly to Get but with RCU semantics)
     auto values1 = map.GetWithRcuTime("key1");
@@ -326,12 +228,11 @@ TEST_F(RcuMultiMapTest, TestGetWithRcuTime) {
 }
 
 TEST_F(RcuMultiMapTest, TestMultipleValuesPerKey) {
-    RcuMultiMap<i32, TestValue> map;
+    RcuMultiMap<i32, i32> map;
 
     // Insert multiple values for the same key
     for (i32 i = 0; i < 10; ++i) {
-        auto* val = CreateTestValue(i * 10);
-        map.Insert(42, val);
+        map.Insert(42, i * 10);
     }
 
     auto values = map.Get(42);
@@ -345,15 +246,11 @@ TEST_F(RcuMultiMapTest, TestMultipleValuesPerKey) {
 }
 
 TEST_F(RcuMultiMapTest, TestIntegerKeys) {
-    RcuMultiMap<i32, TestValue> map;
+    RcuMultiMap<i32, i32> map;
 
-    auto* val1 = CreateTestValue(100);
-    auto* val2 = CreateTestValue(200);
-    auto* val3 = CreateTestValue(300);
-
-    map.Insert(1, val1);
-    map.Insert(2, val2);
-    map.Insert(3, val3);
+    map.Insert(1, 100);
+    map.Insert(2, 200);
+    map.Insert(3, 300);
 
     // Test retrieval
     auto values1 = map.Get(1);
@@ -377,13 +274,13 @@ TEST_F(RcuMultiMapTest, TestIntegerKeys) {
 }
 
 TEST_F(RcuMultiMapTest, TestEmptyMap) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
     // Test operations on empty map
     auto values = map.Get("nonexistent");
     EXPECT_EQ(values.size(), 0);
 
-    Vector<TestValue*> all_values;
+    Vector<i32> all_values;
     map.GetAllValuesWithRef(all_values);
     EXPECT_EQ(all_values.size(), 0);
 
@@ -398,44 +295,16 @@ TEST_F(RcuMultiMapTest, TestEmptyMap) {
     EXPECT_EQ(upper_results.size(), 0);
 }
 
-TEST_F(RcuMultiMapTest, TestReferenceCountingBehavior) {
-    RcuMultiMap<String, TestValue> map;
-
-    auto* val = CreateTestValue(42);
-    i32 initial_ref_count = val->GetRefCount();
-
-    // Insert should increment reference count
-    map.Insert("key1", val);
-
-    // Get should increment reference count for returned values
-    auto values = map.Get("key1");
-    EXPECT_EQ(values.size(), 1);
-    EXPECT_GT(values[0]->GetRefCount(), initial_ref_count);
-
-    // Clean up the reference from Get
-    for (auto* v : values) {
-        v->DecrementRef();
-    }
-
-    // Delete should decrement reference count
-    map.Delete("key1");
-
-    // Original reference should still be valid
-    EXPECT_EQ(val->GetRefCount(), initial_ref_count);
-    val->DecrementRef(); // Clean up original reference
-}
+// TestReferenceCountingBehavior removed - no longer relevant for POD types
 
 TEST_F(RcuMultiMapTest, TestStressInsertAndRetrieve) {
-    RcuMultiMap<i32, TestValue> map;
+    RcuMultiMap<i32, i32> map;
 
     const i32 num_operations = 20; // Smaller number for more predictable behavior
-    Vector<TestValue*> created_values;
 
     // Insert values only for keys 0-4 (so we can test deletion more reliably)
     for (i32 i = 0; i < num_operations; ++i) {
-        auto* val = CreateTestValue(i);
-        created_values.push_back(val);
-        map.Insert(i % 5, val); // Use only 5 keys (0-4)
+        map.Insert(i % 5, i); // Use only 5 keys (0-4)
     }
 
     // Verify all values are accessible
@@ -460,40 +329,24 @@ TEST_F(RcuMultiMapTest, TestStressInsertAndRetrieve) {
 }
 
 TEST_F(RcuMultiMapTest, TestDeleteFunctionality) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
     // Test that delete operations don't crash and maintain map integrity
-    auto *val1 = CreateTestValue(42);
-    auto *val2 = CreateTestValue(84);
-
-    map.Insert("test_key", val1);
-    map.Insert("test_key", val2);
-    map.Insert("other_key", CreateTestValue(100));
+    map.Insert("test_key", 42);
+    map.Insert("test_key", 84);
+    map.Insert("other_key", 100);
 
     // Verify initial state
     auto initial_values = map.Get("test_key");
     EXPECT_GE(initial_values.size(), 1);
 
-    // Clean up references
-    for (auto *v : initial_values) {
-        v->DecrementRef();
-    }
-
     // Test delete operations (may or may not be immediately visible due to RCU)
-    map.Delete("test_key", val1);  // Delete specific value
+    map.Delete("test_key", 42);    // Delete specific value
     map.Delete("nonexistent_key"); // Delete non-existent key (should not crash)
 
     // Verify map is still functional after delete operations
     auto final_values = map.Get("test_key");
     auto other_values = map.Get("other_key");
-
-    // Clean up references
-    for (auto *v : final_values) {
-        v->DecrementRef();
-    }
-    for (auto *v : other_values) {
-        v->DecrementRef();
-    }
 
     // The key tests are:
     // 1. Operations don't crash
@@ -503,15 +356,9 @@ TEST_F(RcuMultiMapTest, TestDeleteFunctionality) {
     EXPECT_GE(map.size(), 0);          // Map should still be functional
 
     // Test that we can still insert after delete
-    auto *new_val = CreateTestValue(200);
-    map.Insert("new_key", new_val);
+    map.Insert("new_key", 200);
     auto new_key_values = map.Get("new_key");
     EXPECT_GE(new_key_values.size(), 1);
-
-    // Clean up
-    for (auto *v : new_key_values) {
-        v->DecrementRef();
-    }
 }
 
 // Test with different value types
@@ -522,21 +369,21 @@ TEST_F(RcuMultiMapTest, TestDifferentValueTypes) {
     i32 value1 = 42;
     i32 value2 = 84;
 
-    int_map.Insert("key1", &value1);
-    int_map.Insert("key2", &value2);
+    int_map.Insert("key1", value1);
+    int_map.Insert("key2", value2);
 
     auto values1 = int_map.Get("key1");
     EXPECT_EQ(values1.size(), 1);
-    EXPECT_EQ(*values1[0], 42);
+    EXPECT_EQ(values1[0], 42);
 
     auto values2 = int_map.Get("key2");
     EXPECT_EQ(values2.size(), 1);
-    EXPECT_EQ(*values2[0], 84);
+    EXPECT_EQ(values2[0], 84);
 }
 
 // Multi-threading test cases
 TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
-    RcuMultiMap<i32, TestValue> map;
+    RcuMultiMap<i32, i32> map;
 
     // Previous parameters (slower):
     // const i32 num_threads = 8;
@@ -569,9 +416,8 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
             for (i32 i = 0; i < operations_per_thread; ++i) {
                 i32 key = key_dist(gen);
                 i32 value = t * operations_per_thread + i;
-                auto *test_val = new TestValue(value);
 
-                map.Insert(key, test_val);
+                map.Insert(key, value);
                 total_insertions.fetch_add(1);
 
                 // Occasionally yield to allow other threads to run
@@ -600,10 +446,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
                 i32 key = key_dist(gen);
                 auto values = map.Get(key);
 
-                // Clean up references
-                for (auto *val : values) {
-                    val->DecrementRef();
-                }
+                // No cleanup needed for POD types
 
                 total_reads.fetch_add(1);
 
@@ -633,10 +476,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
         auto values = map.Get(key);
         final_total_values += values.size();
 
-        // Clean up references
-        for (auto *val : values) {
-            val->DecrementRef();
-        }
+        // No cleanup needed for POD types
     }
 
     EXPECT_GT(final_total_values, 0);
@@ -644,7 +484,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertAndRead) {
 }
 
 TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
     // Previous parameters (slower):
     // const i32 num_threads = 12;
@@ -677,9 +517,8 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
             for (i32 i = 0; i < operations_per_thread; ++i) {
                 String key = "key_" + std::to_string(key_dist(gen));
                 i32 value = t * operations_per_thread + i;
-                auto *test_val = new TestValue(value);
 
-                map.Insert(key, test_val);
+                map.Insert(key, value);
                 total_insertions.fetch_add(1);
 
                 // Previous frequency (slower): every 50 operations with 1μs sleep
@@ -736,11 +575,8 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
                 String key = "key_" + std::to_string(key_dist(gen));
                 auto values = map.Get(key);
 
-                // Verify reference counting
-                for (auto *val : values) {
-                    EXPECT_GT(val->GetRefCount(), 0);
-                    val->DecrementRef();
-                }
+                // No verification needed for POD types
+                // Values are now stored directly, no reference counting
 
                 total_reads.fetch_add(1);
 
@@ -771,7 +607,7 @@ TEST_F(RcuMultiMapTest, TestConcurrentInsertDeleteRead) {
 }
 
 TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
-    RcuMultiMap<i64, TestValue> map;
+    RcuMultiMap<i64, i64> map;
 
     // Previous parameters (slower):
     // const i32 num_threads = 16;
@@ -814,20 +650,15 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
                         successful_reads.fetch_add(1);
 
                         // Verify data integrity
-                        for (auto *val : values) {
-                            EXPECT_GT(val->GetRefCount(), 0);
-                            EXPECT_GE(val->GetValue(), 0);
+                        for (auto val : values) {
+                            EXPECT_GE(val, 0);
                         }
                     }
 
-                    // Clean up references
-                    for (auto *val : values) {
-                        val->DecrementRef();
-                    }
+                    // No cleanup needed for POD types
                 } else { // 30% inserts
                     i64 value = t * operations_per_thread + local_operations;
-                    auto *test_val = new TestValue(static_cast<i32>(value));
-                    map.Insert(key, test_val);
+                    map.Insert(key, value);
                 }
 
                 local_operations++;
@@ -868,10 +699,8 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
         final_total_values += values.size();
 
         // Verify data integrity
-        for (auto *val : values) {
-            EXPECT_GT(val->GetRefCount(), 0);
-            EXPECT_GE(val->GetValue(), 0);
-            val->DecrementRef();
+        for (auto val : values) {
+            EXPECT_GE(val, 0);
         }
     }
 
@@ -879,7 +708,7 @@ TEST_F(RcuMultiMapTest, TestHighVolumeMultiThreading) {
 }
 
 TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
-    RcuMultiMap<String, TestValue> map;
+    RcuMultiMap<String, i32> map;
 
     // Previous parameters (slower):
     // const i32 num_threads = 8;
@@ -912,8 +741,8 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
             // Faster count:
             for (i32 i = 0; i < 10; ++i) {
                 String key = "swap_key_" + std::to_string(key_dist(gen));
-                auto *test_val = new TestValue(t * 1000 + i);
-                map.Insert(key, test_val);
+                i32 value = t * 1000 + i;
+                map.Insert(key, value);
             }
 
             // Then perform many reads to trigger cache misses and swaps
@@ -924,10 +753,8 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
                 total_gets.fetch_add(1);
 
                 // Verify data integrity during RCU operations
-                for (auto *val : values) {
-                    EXPECT_GT(val->GetRefCount(), 0);
-                    EXPECT_GE(val->GetValue(), 0);
-                    val->DecrementRef();
+                for (auto val : values) {
+                    EXPECT_GE(val, 0);
                 }
 
                 // Force frequent access to trigger CheckSwapInLock
@@ -937,9 +764,7 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
                         String rapid_key = "swap_key_" + std::to_string(j % key_range);
                         auto rapid_values = map.Get(rapid_key, true);
                         total_gets.fetch_add(1); // Count these additional gets
-                        for (auto *val : rapid_values) {
-                            val->DecrementRef();
-                        }
+                        // No cleanup needed for POD types
                     }
                 }
             }
@@ -971,10 +796,8 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
             final_total_values += values.size();
 
             // Verify data integrity after all RCU operations
-            for (auto *val : values) {
-                EXPECT_GT(val->GetRefCount(), 0);
-                EXPECT_GE(val->GetValue(), 0);
-                val->DecrementRef();
+            for (auto val : values) {
+                EXPECT_GE(val, 0);
             }
         }
     }
@@ -985,14 +808,11 @@ TEST_F(RcuMultiMapTest, TestRcuSwapUnderLoad) {
 }
 
 TEST_F(RcuMultiMapTest, TestRcuBehavior) {
-    RcuMultiMap<String, TestValue> map;
-
-    auto* val1 = CreateTestValue(100);
-    auto* val2 = CreateTestValue(200);
+    RcuMultiMap<String, i32> map;
 
     // Insert data (goes to dirty_map)
-    map.Insert("key1", val1);
-    map.Insert("key2", val2);
+    map.Insert("key1", 100);
+    map.Insert("key2", 200);
 
     // Data should be accessible via Get (searches both dirty and read maps)
     auto values1 = map.Get("key1");
@@ -1006,10 +826,7 @@ TEST_F(RcuMultiMapTest, TestRcuBehavior) {
     // Force multiple cache misses to trigger CheckSwapInLock
     for (int i = 0; i < 10; ++i) {
         auto temp_values = map.Get("key1");
-        // Clean up references
-        for (auto* val : temp_values) {
-            val->DecrementRef();
-        }
+        // No cleanup needed for POD types
     }
 
     // After enough misses, data should be moved to read_map

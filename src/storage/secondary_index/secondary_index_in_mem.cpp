@@ -41,31 +41,22 @@ namespace infinity {
 
 constexpr u32 map_memory_bloat_factor = 3;
 
-// Simple wrapper for u32 values to work with RcuMultiMap
-class U32Value {
-public:
-    explicit U32Value(u32 value) : value_(value) {}
-    u32 GetValue() const { return value_; }
-
-private:
-    u32 value_;
-};
+// No wrapper needed anymore - RcuMultiMap now works with POD types directly
 
 template <typename RawValueType>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
     // Replaced MultiMap + mutex with RcuMultiMap for better concurrent performance
-    RcuMultiMap<KeyType, U32Value> in_mem_secondary_index_;
+    RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
-    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(U32Value)); }
+    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32)); }
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
-    explicit SecondaryIndexInMemT(const RowID begin_row_id)
-        : begin_row_id_(begin_row_id), in_mem_secondary_index_(ValueNoOp<U32Value>, ValueDelete<U32Value>) {
+    explicit SecondaryIndexInMemT(const RowID begin_row_id) : begin_row_id_(begin_row_id), in_mem_secondary_index_(ValueNoOp<u32>, ValueNoOp<u32>) {
         IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
@@ -90,13 +81,12 @@ public:
         MultiMap<KeyType, u32> temp_map;
 
         // Get all key-value pairs from RcuMultiMap
-        Vector<Pair<KeyType, U32Value *>> all_pairs;
+        Vector<Pair<KeyType, u32>> all_pairs;
         in_mem_secondary_index_.GetAllKeyValuePairs(all_pairs);
 
         // Convert to the format expected by InsertData
-        for (const auto &[key, value_ptr] : all_pairs) {
-            temp_map.emplace(key, value_ptr->GetValue());
-            // No reference cleanup needed since we use ValueNoOp
+        for (const auto &[key, value] : all_pairs) {
+            temp_map.emplace(key, value);
         }
 
         data_ptr->InsertData(&temp_map);
@@ -120,14 +110,12 @@ private:
                 auto column_vector = iter.column_vector();
                 Span<const char> data = column_vector->GetVarcharInner(*v_ptr);
                 const KeyType key = ConvertToOrderedKeyValue(std::string_view{data.data(), data.size()});
-                // Create U32Value wrapper and insert
-                auto *value_wrapper = new U32Value(offset);
-                in_mem_secondary_index_.Insert(key, value_wrapper);
+                // Insert u32 offset directly
+                in_mem_secondary_index_.Insert(key, offset);
             } else {
                 const KeyType key = ConvertToOrderedKeyValue(*v_ptr);
-                // Create U32Value wrapper and insert
-                auto *value_wrapper = new U32Value(offset);
-                in_mem_secondary_index_.Insert(key, value_wrapper);
+                // Insert u32 offset directly
+                in_mem_secondary_index_.Insert(key, offset);
             }
             ++inserted_count;
         }
@@ -138,20 +126,18 @@ private:
         // No lock needed - RcuMultiMap handles concurrency internally
 
         // Get all key-value pairs and filter for the range [b, e]
-        Vector<Pair<KeyType, U32Value *>> all_pairs;
+        Vector<Pair<KeyType, u32>> all_pairs;
         in_mem_secondary_index_.GetAllKeyValuePairs(all_pairs);
 
         // Collect all values in the range
         Set<u32> unique_offsets;
 
-        for (const auto &[key, value_ptr] : all_pairs) {
+        for (const auto &[key, offset] : all_pairs) {
             if (key >= b && key <= e) {
-                const u32 offset = value_ptr->GetValue();
                 if (offset < segment_row_count) {
                     unique_offsets.insert(offset);
                 }
             }
-            // No reference cleanup needed since we use ValueNoOp
         }
 
         // Create result
