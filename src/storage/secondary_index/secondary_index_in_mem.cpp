@@ -127,7 +127,9 @@ private:
         result_var.second.SetAllFalse();
 
         for (const u32 offset : result) {
-            result_var.second.SetTrue(offset);
+            if (offset < segment_row_count) {
+                result_var.second.SetTrue(offset);
+            }
         }
 
         result_var.second.RunOptimize();
