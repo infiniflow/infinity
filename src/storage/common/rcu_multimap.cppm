@@ -83,6 +83,8 @@ public:
 
     Vector<Pair<Key, Value>> upper_bound(const Key &key);
 
+    u32 range(const Key &key_min, const Key &key_max, Vector<Value> &result) const;
+
 private:
     void CheckSwapInLock();
     MapValue CreateMapValue(const Value &value);
@@ -364,6 +366,22 @@ Vector<Pair<Key, Value>> RcuMultiMap<Key, Value>::upper_bound(const Key &key) {
     }
 
     return result;
+}
+
+template <typename Key, typename Value>
+u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Value> &result) const {
+
+    InnerMultiMap *current_read = read_map_;
+    auto it_begin = current_read->lower_bound(key_min);
+    auto it_end = current_read->upper_bound(key_max);
+
+    u32 size = std::distance(it_begin, it_end);
+    result.reserve(size);
+    for (auto it = it_begin; it != it_end; ++it) {
+        result.emplace_back(it->second.value_);
+    }
+
+    return size;
 }
 
 } // namespace infinity

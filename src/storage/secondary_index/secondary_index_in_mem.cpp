@@ -121,29 +121,12 @@ private:
     }
 
     Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) const {
-        // No lock needed - RcuMultiMap handles concurrency internally
-
-        // Get all key-value pairs and filter for the range [b, e]
-        Vector<Pair<KeyType, u32>> all_pairs;
-        in_mem_secondary_index_.GetAllKeyValuePairs(all_pairs);
-
-        // Collect all values in the range
-        Set<u32> unique_offsets;
-
-        for (const auto &[key, offset] : all_pairs) {
-            if (key >= b && key <= e) {
-                if (offset < segment_row_count) {
-                    unique_offsets.insert(offset);
-                }
-            }
-        }
-
-        // Create result
-        const u32 result_size = unique_offsets.size();
+        Vector<u32> result;
+        const u32 result_size = in_mem_secondary_index_.range(b, e, result);
         Pair<u32, Bitmask> result_var(result_size, Bitmask(segment_row_count));
         result_var.second.SetAllFalse();
 
-        for (const u32 offset : unique_offsets) {
+        for (const u32 offset : result) {
             result_var.second.SetTrue(offset);
         }
 
