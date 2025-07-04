@@ -92,6 +92,8 @@ public:
 
     void GetAllValuesWithRef(Vector<Value *> &values);
 
+    void GetAllKeyValuePairs(Vector<Pair<Key, Value *>> &pairs) const;
+
     size_t size() const;
 
     template <typename... Args>
@@ -369,6 +371,29 @@ void RcuMultiMap<Key, Value>::GetAllValuesWithRef(Vector<Value *> &values) {
         if (it->second->value_ != nullptr) {
             allocator_(it->second->value_);
             values.push_back(it->second->value_);
+        }
+    }
+}
+
+template <typename Key, typename Value>
+void RcuMultiMap<Key, Value>::GetAllKeyValuePairs(Vector<Pair<Key, Value *>> &pairs) const {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    // Get pairs from dirty_map
+    for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
+        if (it->second->value_ != nullptr) {
+            allocator_(it->second->value_);
+            pairs.emplace_back(it->first, it->second->value_);
+        }
+    }
+
+    // Also get pairs from read_map if it exists and is different from dirty_map
+    if (read_map_ != nullptr && read_map_ != dirty_map_) {
+        for (auto it = read_map_->begin(); it != read_map_->end(); ++it) {
+            if (it->second->value_ != nullptr) {
+                allocator_(it->second->value_);
+                pairs.emplace_back(it->first, it->second->value_);
+            }
         }
     }
 }

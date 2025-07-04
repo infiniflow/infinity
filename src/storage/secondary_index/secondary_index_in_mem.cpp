@@ -35,29 +35,43 @@ import base_memindex;
 import memindex_tracer;
 import column_vector;
 import buffer_obj;
+import rcu_multimap;
 
 namespace infinity {
 
 constexpr u32 map_memory_bloat_factor = 3;
 
+// Simple wrapper for u32 values to work with RcuMultiMap
+class U32Value {
+public:
+    explicit U32Value(u32 value) : value_(value) {}
+    u32 GetValue() const { return value_; }
+
+private:
+    u32 value_;
+};
+
 template <typename RawValueType>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
-    mutable std::shared_mutex map_mutex_;
-    MultiMap<KeyType, u32> in_mem_secondary_index_;
+    // Replaced MultiMap + mutex with RcuMultiMap for better concurrent performance
+    RcuMultiMap<KeyType, U32Value> in_mem_secondary_index_;
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
-    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32)); }
+    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(U32Value)); }
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
-    explicit SecondaryIndexInMemT(const RowID begin_row_id) : begin_row_id_(begin_row_id) { IncreaseMemoryUsageBase(MemoryCostOfThis()); }
+    explicit SecondaryIndexInMemT(const RowID begin_row_id)
+        : begin_row_id_(begin_row_id), in_mem_secondary_index_(ValueNoOp<U32Value>, ValueDelete<U32Value>) {
+        IncreaseMemoryUsageBase(MemoryCostOfThis());
+    }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
-        std::shared_lock lock(map_mutex_);
+        // RcuMultiMap is thread-safe, no lock needed
         return in_mem_secondary_index_.size();
     }
 
@@ -71,7 +85,21 @@ public:
     void Dump(BufferObj *buffer_obj) const override {
         BufferHandle handle = buffer_obj->Load();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-        data_ptr->InsertData(&in_mem_secondary_index_);
+
+        // Convert RcuMultiMap data to MultiMap for compatibility with InsertData
+        MultiMap<KeyType, u32> temp_map;
+
+        // Get all key-value pairs from RcuMultiMap
+        Vector<Pair<KeyType, U32Value *>> all_pairs;
+        in_mem_secondary_index_.GetAllKeyValuePairs(all_pairs);
+
+        // Convert to the format expected by InsertData
+        for (const auto &[key, value_ptr] : all_pairs) {
+            temp_map.emplace(key, value_ptr->GetValue());
+            // No reference cleanup needed since we use ValueNoOp
+        }
+
+        data_ptr->InsertData(&temp_map);
     }
     Pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
@@ -81,7 +109,7 @@ public:
 private:
     u32 InsertInner(auto &iter) {
         u32 inserted_count = 0;
-        std::unique_lock lock(map_mutex_);
+        // No lock needed - RcuMultiMap handles concurrency internally
         while (true) {
             auto opt = iter.Next();
             if (!opt.has_value()) {
@@ -92,10 +120,14 @@ private:
                 auto column_vector = iter.column_vector();
                 Span<const char> data = column_vector->GetVarcharInner(*v_ptr);
                 const KeyType key = ConvertToOrderedKeyValue(std::string_view{data.data(), data.size()});
-                in_mem_secondary_index_.emplace(key, offset);
+                // Create U32Value wrapper and insert
+                auto *value_wrapper = new U32Value(offset);
+                in_mem_secondary_index_.Insert(key, value_wrapper);
             } else {
                 const KeyType key = ConvertToOrderedKeyValue(*v_ptr);
-                in_mem_secondary_index_.emplace(key, offset);
+                // Create U32Value wrapper and insert
+                auto *value_wrapper = new U32Value(offset);
+                in_mem_secondary_index_.Insert(key, value_wrapper);
             }
             ++inserted_count;
         }
@@ -103,17 +135,34 @@ private:
     }
 
     Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) const {
-        std::shared_lock lock(map_mutex_);
-        const auto begin = in_mem_secondary_index_.lower_bound(b);
-        const auto end = in_mem_secondary_index_.upper_bound(e);
-        const u32 result_size = std::distance(begin, end);
+        // No lock needed - RcuMultiMap handles concurrency internally
+
+        // Get all key-value pairs and filter for the range [b, e]
+        Vector<Pair<KeyType, U32Value *>> all_pairs;
+        in_mem_secondary_index_.GetAllKeyValuePairs(all_pairs);
+
+        // Collect all values in the range
+        Set<u32> unique_offsets;
+
+        for (const auto &[key, value_ptr] : all_pairs) {
+            if (key >= b && key <= e) {
+                const u32 offset = value_ptr->GetValue();
+                if (offset < segment_row_count) {
+                    unique_offsets.insert(offset);
+                }
+            }
+            // No reference cleanup needed since we use ValueNoOp
+        }
+
+        // Create result
+        const u32 result_size = unique_offsets.size();
         Pair<u32, Bitmask> result_var(result_size, Bitmask(segment_row_count));
         result_var.second.SetAllFalse();
-        for (auto it = begin; it != end; ++it) {
-            if (const auto offset = it->second; offset < segment_row_count) {
-                result_var.second.SetTrue(offset);
-            }
+
+        for (const u32 offset : unique_offsets) {
+            result_var.second.SetTrue(offset);
         }
+
         result_var.second.RunOptimize();
         return result_var;
     }
