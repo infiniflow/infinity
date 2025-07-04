@@ -46,7 +46,7 @@ class RcuMultiMap {
 private:
     struct MapValue {
         Value *value_;
-        volatile uint64_t used_time_;
+        volatile u64 used_time_;
     };
 
     typedef MultiMap<Key, MapValue *> InnerMultiMap;
@@ -56,7 +56,7 @@ private:
     struct DeletedMap {
         InnerMultiMap *map_;
         Set<Pair<Key, MapValue *>> *deleted_entries_;
-        uint64_t delete_time_;
+        u64 delete_time_;
     };
 
 public:
@@ -83,12 +83,12 @@ public:
 
     void Delete(const Key &key, Value *value);
 
-    void CheckGc(uint64_t min_delete_time);
+    void CheckGc(u64 min_delete_time);
 
     // Add lowercase alias for compatibility
-    void checkGc(uint64_t min_delete_time) { CheckGc(min_delete_time); }
+    void checkGc(u64 min_delete_time) { CheckGc(min_delete_time); }
 
-    void CheckExpired(uint64_t min_access_time, Vector<Key> &keys_need_expired);
+    void CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired);
 
     void GetAllValuesWithRef(Vector<Value *> &values);
 
@@ -108,7 +108,7 @@ private:
     MapValue *CreateMapValue(Value *value);
 
     // Helper function to get current time in milliseconds
-    uint64_t GetCurrentTimeMs() const {
+    u64 GetCurrentTimeMs() const {
         return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     }
 
@@ -307,7 +307,7 @@ void RcuMultiMap<Key, Value>::Delete(const Key& key, Value* value) {
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::CheckGc(uint64_t min_delete_time) {
+void RcuMultiMap<Key, Value>::CheckGc(u64 min_delete_time) {
     Vector<Value *> values_need_delete;
     {
         std::lock_guard<std::mutex> lock(dirty_lock_);
@@ -351,7 +351,7 @@ void RcuMultiMap<Key, Value>::CheckGc(uint64_t min_delete_time) {
 }
 
 template <typename Key, typename Value>
-void RcuMultiMap<Key, Value>::CheckExpired(uint64_t min_access_time, Vector<Key> &keys_need_expired) {
+void RcuMultiMap<Key, Value>::CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired) {
     std::lock_guard<std::mutex> lock(dirty_lock_);
     Set<Key> expired_keys;
 
