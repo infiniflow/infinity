@@ -56,9 +56,7 @@ protected:
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
-    explicit SecondaryIndexInMemT(const RowID begin_row_id) : begin_row_id_(begin_row_id), in_mem_secondary_index_(ValueNoOp<u32>, ValueNoOp<u32>) {
-        IncreaseMemoryUsageBase(MemoryCostOfThis());
-    }
+    explicit SecondaryIndexInMemT(const RowID begin_row_id) : begin_row_id_(begin_row_id) { IncreaseMemoryUsageBase(MemoryCostOfThis()); }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {

@@ -364,7 +364,7 @@ TEST_F(RcuMultiMapTest, TestDeleteFunctionality) {
 // Test with different value types
 TEST_F(RcuMultiMapTest, TestDifferentValueTypes) {
     // Test with pointer to int
-    RcuMultiMap<String, i32> int_map(ValueNoOp<i32>, ValueNoOp<i32>);
+    RcuMultiMap<String, i32> int_map;
 
     i32 value1 = 42;
     i32 value2 = 84;
