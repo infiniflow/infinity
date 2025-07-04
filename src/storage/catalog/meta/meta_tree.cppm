@@ -164,7 +164,7 @@ public:
     Vector<String> CheckMetaDataMapping(CheckStmtType tag, Optional<String> db_table_str);
 
     Vector<MetaTableObject *> ListTables() const;
-    SharedPtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
+    UniquePtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
 
     nlohmann::json ToJson() const;
 

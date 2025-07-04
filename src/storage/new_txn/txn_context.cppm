@@ -18,6 +18,7 @@ export module txn_context;
 
 import stl;
 import txn_state;
+import default_values;
 
 namespace infinity {
 

@@ -138,9 +138,11 @@ public:
 
     void RemoveFromAllocation(TxnTimeStamp commit_ts);
 
-    void SetSystemCache();
+    void SetSystemCache(UniquePtr<SystemCache> system_cache);
 
     void RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr);
+
+    SystemCache *GetSystemCachePtr() const;
 
 private:
     mutable std::mutex locker_{};

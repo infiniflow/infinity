@@ -167,7 +167,7 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                         LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    LOG_INFO(fmt::format("Thread: {}, txn_id: {}", thread_i, txn_id));
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
                 }
                 {
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
@@ -185,7 +185,7 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                         LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    LOG_INFO(fmt::format("Thread: {}, txn_id: {}", thread_i, txn_id));
+                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
                 }
             }
         }));

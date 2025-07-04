@@ -419,7 +419,7 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     return meta_keys;
 }
 
-Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
+UniquePtr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
 
     auto meta_tree = this->MakeMetaTree();
@@ -427,7 +427,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     // String meta_tree_str = meta_tree->ToJson().dump(4);
     // LOG_INFO(meta_tree_str);
 
-    system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
+    UniquePtr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {
     //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
@@ -440,12 +440,8 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     //                          current_segment_row_count));
     // }
 
-    return Status::OK();
+    return system_cache;
 }
-
-SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_; }
-
-SystemCache *NewCatalog::GetSystemCachePtr() const { return system_cache_.get(); }
 
 KVStore *NewCatalog::kv_store() const { return kv_store_; }
 

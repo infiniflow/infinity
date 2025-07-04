@@ -31,7 +31,7 @@ public:
     explicit TxnAllocator(Storage *storage);
     virtual ~TxnAllocator();
 
-    void SetSystemCache(const SharedPtr<SystemCache> &system_cache);
+    void SetSystemCache(SystemCache *system_cache);
 
     void Start();
     void Stop();
@@ -51,7 +51,7 @@ private:
 
     mutable std::mutex task_mutex_;
 
-    SharedPtr<SystemCache> system_cache_;
+    SystemCache* system_cache_{};
 };
 
 } // namespace infinity

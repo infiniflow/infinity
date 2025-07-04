@@ -202,7 +202,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
-    SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
+    SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();
     Vector<SegmentID> segment_ids;
 
     SizeT input_block_count = input_blocks.size();
@@ -619,7 +619,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     // Fake commit timestamp, in prepare commit phase, it will be replaced by real commit timestamp
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
+    SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
     Vector<SegmentID> new_segment_ids;
