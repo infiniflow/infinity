@@ -124,9 +124,9 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         flush_request.flush_type = "data"
         self._client.flush(flush_request)
 
-    def flush_delta(self):
+    def flush_catalog(self):
         flush_request = ttypes.FlushRequest()
-        flush_request.flush_type = "delta"
+        flush_request.flush_type = "catalog"
         self._client.flush(flush_request)
 
     def disconnect(self):
