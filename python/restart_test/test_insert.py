@@ -25,13 +25,14 @@ class TestInsert:
         uri = common_values.TEST_LOCAL_HOST
 
         cur_insert_n = 0
+        last_insert_n = 0
         shutdown = False
         error = False
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
 
         def insert_func(table_obj):
-            nonlocal cur_insert_n, shutdown, error
+            nonlocal cur_insert_n, last_insert_n, shutdown, error
             batch_size = 10
 
             while cur_insert_n < insert_n:
@@ -48,6 +49,7 @@ class TestInsert:
                         except StopIteration:
                             break
                     if len(insert_data) > 0:
+                        last_insert_n = len(insert_data)
                         table_obj.insert(insert_data)
                     else:
                         cur_insert_n = insert_n
@@ -80,12 +82,16 @@ class TestInsert:
 
         @decorator
         def part1(infinity_obj):
+            nonlocal cur_insert_n, last_insert_n
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert")
 
             data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
-            assert count_star == cur_insert_n
+
+            # insert while shutdown might fail or success
+            assert count_star in {cur_insert_n, cur_insert_n + last_insert_n}
+            cur_insert_n = count_star
             print(f"cur_insert_n: {cur_insert_n}")
 
             t1 = threading.Thread(target=shutdown_func)
