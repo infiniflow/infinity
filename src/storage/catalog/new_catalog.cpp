@@ -171,27 +171,27 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
     {
         std::unique_lock lock(mem_index_mtx_);
         for (const auto &mem_index_pair : mem_index_map_) {
-            if (mem_index_pair.second->memory_hnsw_index_ != nullptr) {
+            if (mem_index_pair.second->GetHnswIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "hnsw"});
                 continue;
             }
-            if (mem_index_pair.second->memory_ivf_index_ != nullptr) {
+            if (mem_index_pair.second->GetIVFIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "ivf"});
                 continue;
             }
-            if (mem_index_pair.second->memory_indexer_ != nullptr) {
+            if (mem_index_pair.second->GetFulltextIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "full-text"});
                 continue;
             }
-            if (mem_index_pair.second->memory_secondary_index_ != nullptr) {
+            if (mem_index_pair.second->GetSecondaryIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "secondary"});
                 continue;
             }
-            if (mem_index_pair.second->memory_emvb_index_ != nullptr) {
+            if (mem_index_pair.second->GetEMVBIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "emvb"});
                 continue;
             }
-            if (mem_index_pair.second->memory_bmp_index_ != nullptr) {
+            if (mem_index_pair.second->GetBMPIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "bmp"});
                 continue;
             }

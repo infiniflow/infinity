@@ -387,13 +387,13 @@ TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
         EXPECT_TRUE(status.ok());
     };
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        RowID begin_id = mem_index->GetSecondaryIndex()->GetBeginRowID();
+        u32 row_cnt = mem_index->GetSecondaryIndex()->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        RowID begin_id = mem_index->GetFulltextIndex()->GetBeginRowID();
+        u32 row_cnt = mem_index->GetFulltextIndex()->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
 }

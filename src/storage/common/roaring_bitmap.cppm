@@ -360,6 +360,6 @@ private:
 };
 
 export using Bitmask = RoaringBitmap<true>;
-// export using Bitmap = RoaringBitmap<false>;
+export using Bitmap = RoaringBitmap<false>;
 
 } // namespace infinity

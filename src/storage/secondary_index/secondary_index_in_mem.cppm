@@ -47,7 +47,7 @@ public:
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
-    virtual RowID GetBeginRowID() const = 0;
+    virtual RowID GetBeginRowID() const override = 0;
 
     virtual u32 GetRowCount() const = 0;
 

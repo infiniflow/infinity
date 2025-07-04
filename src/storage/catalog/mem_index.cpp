@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 module mem_index;
 
 import stl;
@@ -33,6 +35,44 @@ import abstract_bmp;
 namespace infinity {
 
 MemIndex::~MemIndex() = default;
+
+SizeT MemIndex::GetMemUsed() const {
+    const BaseMemIndex *base_mem_index = GetBaseMemIndex();
+    if (base_mem_index == nullptr) {
+        return 0;
+    }
+    return base_mem_index->GetMemUsed();
+}
+
+RowID MemIndex::GetBeginRowID() {
+    const BaseMemIndex *base_mem_index = GetBaseMemIndex();
+    if (base_mem_index != nullptr) {
+        return base_mem_index->GetBeginRowID();
+    }
+    SharedPtr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
+    if (emvb_index != nullptr) {
+        return emvb_index->GetBeginRowID();
+    }
+    return RowID();
+}
+
+SizeT MemIndex::GetRowCount() {
+    const BaseMemIndex *base_mem_index = GetBaseMemIndex();
+    if (base_mem_index != nullptr) {
+        return base_mem_index->GetRowCount();
+    }
+    SharedPtr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
+    if (emvb_index != nullptr) {
+        return emvb_index->GetRowCount();
+    }
+    return 0;
+}
+
+bool MemIndex::IsNull() const {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_hnsw_index_ == nullptr && memory_ivf_index_ == nullptr && memory_indexer_ == nullptr && memory_secondary_index_ == nullptr &&
+           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_dummy_index_ == nullptr;
+}
 
 void MemIndex::ClearMemIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
@@ -57,6 +97,8 @@ BaseMemIndex *MemIndex::GetBaseMemIndex(const MemIndexID &mem_index_id) {
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_dummy_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
         return nullptr;
     }
@@ -80,6 +122,8 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_dummy_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
         return nullptr;
     }
@@ -99,6 +143,8 @@ void MemIndex::SetBaseMemIndexInfo(const String &db_name, const String &table_na
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_dummy_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
         return;
     }
@@ -127,6 +173,76 @@ EMVBIndexInMem *MemIndex::GetEMVBMemIndex(const MemIndexID &mem_index_id) {
         res->segment_id_ = mem_index_id.segment_id_;
     }
     return res;
+}
+
+SharedPtr<HnswIndexInMem> MemIndex::GetHnswIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_hnsw_index_;
+}
+
+void MemIndex::SetHnswIndex(SharedPtr<HnswIndexInMem> hnsw_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_hnsw_index_ = hnsw_index;
+}
+
+SharedPtr<IVFIndexInMem> MemIndex::GetIVFIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_ivf_index_;
+}
+
+void MemIndex::SetIVFIndex(SharedPtr<IVFIndexInMem> ivf_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_ivf_index_ = ivf_index;
+}
+
+SharedPtr<MemoryIndexer> MemIndex::GetFulltextIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_indexer_;
+}
+
+void MemIndex::SetFulltextIndex(SharedPtr<MemoryIndexer> indexer) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_indexer_ = indexer;
+}
+
+SharedPtr<SecondaryIndexInMem> MemIndex::GetSecondaryIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_secondary_index_;
+}
+
+void MemIndex::SetSecondaryIndex(SharedPtr<SecondaryIndexInMem> secondary_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_secondary_index_ = secondary_index;
+}
+
+SharedPtr<EMVBIndexInMem> MemIndex::GetEMVBIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_emvb_index_;
+}
+
+void MemIndex::SetEMVBIndex(SharedPtr<EMVBIndexInMem> emvb_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_emvb_index_ = emvb_index;
+}
+
+SharedPtr<BMPIndexInMem> MemIndex::GetBMPIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_bmp_index_;
+}
+
+void MemIndex::SetBMPIndex(SharedPtr<BMPIndexInMem> bmp_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_bmp_index_ = bmp_index;
+}
+
+SharedPtr<DummyIndexInMem> MemIndex::GetDummyIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_dummy_index_;
+}
+
+void MemIndex::SetDummyIndex(SharedPtr<DummyIndexInMem> dummy_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_dummy_index_ = dummy_index;
 }
 
 } // namespace infinity

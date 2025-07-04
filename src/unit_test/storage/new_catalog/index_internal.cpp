@@ -212,8 +212,9 @@ TEST_P(TestTxnIndexInternal, test_index0) {
         EXPECT_TRUE(status.ok());
     };
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        auto secondary_index = mem_index->GetSecondaryIndex();
+        RowID begin_id = secondary_index->GetBeginRowID();
+        u32 row_cnt = secondary_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
 
@@ -276,8 +277,9 @@ TEST_P(TestTxnIndexInternal, test_index0) {
     merge_index(*index_name1);
 
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        auto secondary_index = mem_index->GetSecondaryIndex();
+        RowID begin_id = secondary_index->GetBeginRowID();
+        u32 row_cnt = secondary_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
 }
@@ -490,7 +492,7 @@ TEST_P(TestTxnIndexInternal, test_index) {
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
         // {
-        //     SharedPtr<SecondaryIndexInMem> memory_secondary_index = mem_index->memory_secondary_index_;
+        //     SharedPtr<SecondaryIndexInMem> memory_secondary_index = mem_index->GetSecondaryIndex();
         //     u32 segment_row_count = 2;
         //     Tuple<u32, int32_t, int32_t> arg_tuple = {segment_row_count, begin_val, end_val};
         //     [[maybe_unused]] Pair<u32, Bitmask> result = memory_secondary_index->RangeQuery(&arg_tuple);
@@ -527,33 +529,39 @@ TEST_P(TestTxnIndexInternal, test_index) {
         EXPECT_TRUE(status.ok());
     };
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        auto secondary_index = mem_index->GetSecondaryIndex();
+        RowID begin_id = secondary_index->GetBeginRowID();
+        u32 row_cnt = secondary_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        auto fulltext_index = mem_index->GetFulltextIndex();
+        RowID begin_id = fulltext_index->GetBeginRowID();
+        u32 row_cnt = fulltext_index->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        auto ivf_index = mem_index->GetIVFIndex();
+        RowID begin_id = ivf_index->GetBeginRowID();
+        u32 row_cnt = ivf_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        auto hnsw_index = mem_index->GetHnswIndex();
+        RowID begin_id = hnsw_index->GetBeginRowID();
+        u32 row_cnt = hnsw_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
+        auto bmp_index = mem_index->GetBMPIndex();
+        RowID begin_id = bmp_index->GetBeginRowID();
+        u32 row_cnt = bmp_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+        auto emvb_index = mem_index->GetEMVBIndex();
+        RowID begin_id = emvb_index->GetBeginRowID();
+        u32 row_cnt = emvb_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
 
@@ -637,33 +645,39 @@ TEST_P(TestTxnIndexInternal, test_index) {
     merge_index(*index_name6);
 
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        auto secondary_index = mem_index->GetSecondaryIndex();
+        RowID begin_id = secondary_index->GetBeginRowID();
+        u32 row_cnt = secondary_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        auto fulltext_index = mem_index->GetFulltextIndex();
+        RowID begin_id = fulltext_index->GetBeginRowID();
+        u32 row_cnt = fulltext_index->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        auto ivf_index = mem_index->GetIVFIndex();
+        RowID begin_id = ivf_index->GetBeginRowID();
+        u32 row_cnt = ivf_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        auto hnsw_index = mem_index->GetHnswIndex();
+        RowID begin_id = hnsw_index->GetBeginRowID();
+        u32 row_cnt = hnsw_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
+        auto bmp_index = mem_index->GetBMPIndex();
+        RowID begin_id = bmp_index->GetBeginRowID();
+        u32 row_cnt = bmp_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+        auto emvb_index = mem_index->GetEMVBIndex();
+        RowID begin_id = emvb_index->GetBeginRowID();
+        u32 row_cnt = emvb_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
 }
@@ -788,13 +802,15 @@ TEST_P(TestTxnIndexInternal, test_populate_index0) {
         EXPECT_TRUE(status.ok());
     };
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        auto secondary_index = mem_index->GetSecondaryIndex();
+        RowID begin_id = secondary_index->GetBeginRowID();
+        u32 row_cnt = secondary_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        auto fulltext_index = mem_index->GetFulltextIndex();
+        RowID begin_id = fulltext_index->GetBeginRowID();
+        u32 row_cnt = fulltext_index->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
 }
@@ -1017,33 +1033,39 @@ TEST_P(TestTxnIndexInternal, test_populate_index) {
         EXPECT_TRUE(status.ok());
     };
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        auto secondary_index = mem_index->GetSecondaryIndex();
+        RowID begin_id = secondary_index->GetBeginRowID();
+        u32 row_cnt = secondary_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        auto fulltext_index = mem_index->GetFulltextIndex();
+        RowID begin_id = fulltext_index->GetBeginRowID();
+        u32 row_cnt = fulltext_index->GetDocCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        auto ivf_index = mem_index->GetIVFIndex();
+        RowID begin_id = ivf_index->GetBeginRowID();
+        u32 row_cnt = ivf_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        auto hnsw_index = mem_index->GetHnswIndex();
+        RowID begin_id = hnsw_index->GetBeginRowID();
+        u32 row_cnt = hnsw_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
+        auto bmp_index = mem_index->GetBMPIndex();
+        RowID begin_id = bmp_index->GetBeginRowID();
+        u32 row_cnt = bmp_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+        auto emvb_index = mem_index->GetEMVBIndex();
+        RowID begin_id = emvb_index->GetBeginRowID();
+        u32 row_cnt = emvb_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
 }

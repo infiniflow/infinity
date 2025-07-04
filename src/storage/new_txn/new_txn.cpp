@@ -387,7 +387,8 @@ Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &
             return status;
         }
         output_table_array.push_back(MakeShared<TableDetail>());
-        status = table_meta->GetTableDetail(*output_table_array.back(), db_name, table_name);
+        table_meta->SetDBTableName(db_name, table_name);
+        status = table_meta->GetTableDetail(*output_table_array.back());
         if (!status.ok()) {
             return status;
         }

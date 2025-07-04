@@ -47,4 +47,8 @@ void BaseMemIndex::DecreaseMemoryUsageBase(SizeT mem) {
     memindex_tracer->DecreaseMemUsed(mem);
 }
 
+SizeT BaseMemIndex::GetMemUsed() const { return GetInfo().mem_used_; }
+
+SizeT BaseMemIndex::GetRowCount() const { return GetInfo().row_count_; }
+
 } // namespace infinity

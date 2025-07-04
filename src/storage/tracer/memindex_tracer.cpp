@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <vector>
 
 module memindex_tracer;
@@ -48,117 +49,59 @@ void MemIndexTracer::DecreaseMemUsed(SizeT mem_used) {
 }
 
 bool MemIndexTracer::TryTriggerDump() {
-    auto dump_task = MakeDumpTask();
-    if (!dump_task) {
+    Vector<SharedPtr<DumpMemIndexTask>> dump_tasks = MakeDumpTask();
+    if (dump_tasks.empty()) {
         return false;
     }
     LOG_TRACE(fmt::format("Dump triggered!"));
-    TriggerDump(std::move(dump_task));
+    for (auto &dump_task : dump_tasks) {
+        TriggerDump(std::move(dump_task));
+    }
+    dump_tasks.clear();
     return true;
 }
 
-void MemIndexTracer::DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index) {
+void MemIndexTracer::DumpDone(SharedPtr<MemIndex> mem_index) {
     std::lock_guard lck(mtx_);
     auto iter = proposed_dump_.find(mem_index);
     if (iter == proposed_dump_.end()) {
-        UnrecoverableException(fmt::format("Dump task {} is not found", (u64)(mem_index)));
+        return;
     }
-    SizeT old_index_memory = cur_index_memory_.fetch_sub(actual_dump_size);
-    if (old_index_memory < actual_dump_size) {
-        UnrecoverableException(fmt::format("Dump size {} is larger than current index memory {}", actual_dump_size, old_index_memory));
-    }
-    SizeT proposed_dump_size = iter->second;
-    if (proposed_dump_size > actual_dump_size) {
-        UnrecoverableException(fmt::format("Dump size {} is larger than proposed dump size {}", actual_dump_size, proposed_dump_size));
-    }
-    acc_proposed_dump_.fetch_sub(proposed_dump_size);
+    SizeT dump_size = iter->second;
+    proposed_dump_size_ -= dump_size;
     proposed_dump_.erase(iter);
 }
 
-void MemIndexTracer::DumpFail(BaseMemIndex *mem_index) {
-    std::lock_guard lck(mtx_);
-    auto iter = proposed_dump_.find(mem_index);
-    if (iter == proposed_dump_.end()) {
-        UnrecoverableException(fmt::format("Dump task {} is not found", (u64)(mem_index)));
-    }
-    SizeT proposed_dump_size = iter->second;
-    acc_proposed_dump_.fetch_sub(proposed_dump_size);
-
-    proposed_dump_.erase(iter);
-}
-
-Vector<MemIndexTracerInfo> MemIndexTracer::GetMemIndexTracerInfo(NewTxn *txn) {
-    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(txn);
-    Vector<MemIndexTracerInfo> info_vec;
-    for (auto *mem_index : mem_indexes) {
-        info_vec.push_back(mem_index->GetInfo());
-    }
-    return info_vec;
-}
-
-Vector<BaseMemIndex *> MemIndexTracer::GetUndumpedMemIndexes(NewTxn *new_txn) {
-    Vector<BaseMemIndex *> results;
-    Vector<BaseMemIndex *> mem_indexes = GetAllMemIndexes(new_txn);
-    for (auto *mem_index : mem_indexes) {
-        if (auto iter = proposed_dump_.find(mem_index); iter == proposed_dump_.end()) {
-            auto info = mem_index->GetInfo();
-            proposed_dump_.emplace(mem_index, info.mem_used_);
-            results.push_back(mem_index);
-        }
-    }
-    return results;
-}
-
-UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
-    std::lock_guard lck(mtx_);
-
+Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
 
-    bool make_task = false;
-    DeferFn defer_op([&] {
-        if (new_txn_shared.get() && !make_task) {
-            auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-            Status status = new_txn_mgr->RollBackTxn(new_txn_shared.get());
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
+    Vector<SharedPtr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
+    // Generate dump task for all EMVB index and at most one non-EMVB index
+    Vector<SharedPtr<DumpMemIndexTask>> dump_tasks;
+    for (auto &mem_index_detail : mem_index_details) {
+        {
+            std::lock_guard lck(mtx_);
+            // Skip index that is already in proposed dump
+            if (proposed_dump_.find(mem_index_detail->mem_index_) != proposed_dump_.end()) {
+                continue;
             }
+            // Record index in proposed dump
+            proposed_dump_[mem_index_detail->mem_index_] = mem_index_detail->mem_used_;
+            proposed_dump_size_ += mem_index_detail->mem_used_;
         }
-    });
 
-    UniquePtr<DumpIndexTask> dump_task{};
-    Vector<BaseMemIndex *> mem_indexes = GetUndumpedMemIndexes(new_txn_shared.get());
-    Vector<EMVBIndexInMem *> emvb_indexes = GetEMVBMemIndexes(new_txn_shared.get());
-    if (!mem_indexes.empty()) {
-        SizeT dump_idx = ChooseDump(mem_indexes);
-        BaseMemIndex *mem_index = mem_indexes[dump_idx];
-        MemIndexTracerInfo info = mem_index->GetInfo();
-        dump_task = MakeUnique<DumpIndexTask>(mem_index, new_txn_shared);
-
-        acc_proposed_dump_.fetch_add(info.mem_used_);
-        proposed_dump_[mem_index] = info.mem_used_;
-    } else if (!emvb_indexes.empty()) {
-        // FIXME: We do not calculate the memory used for each EMVB index,
-        // so we choose the first EMVB index to dump.
-        EMVBIndexInMem *emvb_index = emvb_indexes[0];
-        dump_task = MakeUnique<DumpIndexTask>(emvb_index, new_txn_shared);
-    } else {
-        LOG_WARN("Cannot find memindex to dump");
-        return nullptr;
+        auto dump_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_,
+                                                      mem_index_detail->table_name_,
+                                                      mem_index_detail->index_name_,
+                                                      mem_index_detail->segment_id_,
+                                                      mem_index_detail->begin_row_id_);
+        dump_tasks.push_back(std::move(dump_task));
+        if (!mem_index_detail->is_emvb_index_) {
+            break;
+        }
     }
-
-    make_task = true;
-    return dump_task;
-}
-
-SizeT MemIndexTracer::ChooseDump(const Vector<BaseMemIndex *> &mem_indexes) {
-    Vector<MemIndexTracerInfo> info_vec;
-    info_vec.reserve(mem_indexes.size());
-    for (auto *mem_index : mem_indexes) {
-        info_vec.push_back(mem_index->GetInfo());
-    }
-    auto max_iter = std::max_element(info_vec.begin(), info_vec.end(), [](const auto &a, const auto &b) { return a.mem_used_ < b.mem_used_; });
-    return std::distance(info_vec.begin(), max_iter);
+    return dump_tasks;
 }
 
 BGMemIndexTracer::BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr) : MemIndexTracer(index_memory_limit), txn_mgr_(txn_mgr) {
@@ -173,9 +116,8 @@ BGMemIndexTracer::~BGMemIndexTracer() {
 #endif
 }
 
-void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
+void BGMemIndexTracer::TriggerDump(SharedPtr<DumpMemIndexTask> dump_task) {
     auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
-
     LOG_INFO(fmt::format("Submit dump task: {}", dump_task->ToString()));
     dump_index_processor->Submit(std::move(dump_task));
 }
@@ -188,7 +130,8 @@ NewTxn *BGMemIndexTracer::GetTxn() {
     return txn;
 }
 
-Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
+Vector<SharedPtr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
+    Vector<SharedPtr<MemIndexDetail>> mem_index_details;
     Vector<SharedPtr<MemIndex>> mem_indexes;
     Vector<MemIndexID> mem_index_ids;
     Status status = NewCatalog::GetAllMemIndexes(new_txn, mem_indexes, mem_index_ids);
@@ -196,54 +139,28 @@ Vector<BaseMemIndex *> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new_txn) {
         UnrecoverableError(status.message());
     }
 
-    Vector<BaseMemIndex *> base_mem_indexes;
-    // for (auto &mem_index : mem_indexes) {
     for (SizeT i = 0; i < mem_indexes.size(); ++i) {
+        SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
         auto &mem_index = mem_indexes[i];
         auto &mem_index_id = mem_index_ids[i];
-        BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex(mem_index_id);
-        EMVBIndexInMem *emvb_index = mem_index->GetEMVBMemIndex(mem_index_id);
-        if (base_mem_index != nullptr) {
-            base_mem_indexes.emplace_back(base_mem_index);
-        } else if (emvb_index != nullptr) {
-        } else {
-            LOG_WARN(fmt::format("Not implement base index of index {}.{}.{}.{}",
-                                 mem_index_id.db_name_,
-                                 mem_index_id.table_name_,
-                                 mem_index_id.index_name_,
-                                 mem_index_id.segment_id_));
+        const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
+        detail->mem_index_ = mem_index;
+        detail->is_emvb_index_ = base_mem_index == nullptr;
+        detail->db_name_ = mem_index_id.db_name_;
+        detail->table_name_ = mem_index_id.table_name_;
+        detail->index_name_ = mem_index_id.index_name_;
+        detail->segment_id_ = mem_index_id.segment_id_;
+        if (!detail->is_emvb_index_) {
+            MemIndexTracerInfo info = base_mem_index->GetInfo();
+            detail->mem_used_ = info.mem_used_;
+            detail->row_count_ = info.row_count_;
         }
+        mem_index_details.push_back(detail);
     }
-    return base_mem_indexes;
-}
-
-Vector<EMVBIndexInMem *> BGMemIndexTracer::GetEMVBMemIndexes(NewTxn *new_txn) {
-    Vector<SharedPtr<MemIndex>> mem_indexes;
-    Vector<MemIndexID> mem_index_ids;
-    Status status = NewCatalog::GetAllMemIndexes(new_txn, mem_indexes, mem_index_ids);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-
-    Vector<EMVBIndexInMem *> emvb_indexes;
-    for (SizeT i = 0; i < mem_indexes.size(); ++i) {
-        auto &mem_index = mem_indexes[i];
-        auto &mem_index_id = mem_index_ids[i];
-        BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex(mem_index_id);
-        EMVBIndexInMem *emvb_index = mem_index->GetEMVBMemIndex(mem_index_id);
-
-        if (emvb_index != nullptr) {
-            emvb_indexes.emplace_back(emvb_index);
-        } else if (base_mem_index != nullptr) {
-        } else {
-            LOG_WARN(fmt::format("Not implement base index of index {}.{}.{}.{}",
-                                 mem_index_id.db_name_,
-                                 mem_index_id.table_name_,
-                                 mem_index_id.index_name_,
-                                 mem_index_id.segment_id_));
-        }
-    }
-    return emvb_indexes;
+    std::sort(mem_index_details.begin(), mem_index_details.end(), [](const SharedPtr<MemIndexDetail> &lhs, const SharedPtr<MemIndexDetail> &rhs) {
+        return lhs->is_emvb_index_ || lhs->mem_used_ > rhs->mem_used_;
+    });
+    return mem_index_details;
 }
 
 } // namespace infinity

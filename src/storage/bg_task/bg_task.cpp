@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <vector>
 
 module bg_task;
@@ -83,11 +84,13 @@ Status NewCleanupTask::Execute(TxnTimeStamp last_cleanup_ts, TxnTimeStamp &cur_c
 NewCompactTask::NewCompactTask(NewTxn *new_txn, String db_name, String table_name)
     : BGTask(BGTaskType::kNewCompact, false), new_txn_(new_txn), db_name_(db_name), table_name_(table_name) {}
 
-DumpIndexTask::DumpIndexTask(BaseMemIndex *mem_index, SharedPtr<NewTxn> &new_txn_shared)
-    : BGTask(BGTaskType::kDumpIndex, true), mem_index_(mem_index), new_txn_shared_(new_txn_shared) {}
-
-DumpIndexTask::DumpIndexTask(EMVBIndexInMem *emvb_mem_index, SharedPtr<NewTxn> &new_txn_shared)
-    : BGTask(BGTaskType::kDumpIndex, true), emvb_mem_index_(emvb_mem_index), new_txn_shared_(new_txn_shared) {}
+DumpMemIndexTask::DumpMemIndexTask(const String &db_name,
+                                   const String &table_name,
+                                   const String &index_name,
+                                   SegmentID segment_id,
+                                   RowID begin_row_id)
+    : BGTask(BGTaskType::kDumpMemIndex, true), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
+      begin_row_id_(begin_row_id) {}
 
 AppendMemIndexTask::AppendMemIndexTask(const SharedPtr<MemIndex> &mem_index,
                                        const SharedPtr<ColumnVector> &input_column,

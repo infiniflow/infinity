@@ -55,8 +55,8 @@ String ToString(BGTaskType type) {
             return "UpdateSegmentBloomFilterData";
             break;
         }
-        case BGTaskType::kDumpIndex: {
-            return "DumpIndex";
+        case BGTaskType::kDumpMemIndex: {
+            return "DumpMemIndex";
             break;
         }
         case BGTaskType::kAppendMemIndex: {
