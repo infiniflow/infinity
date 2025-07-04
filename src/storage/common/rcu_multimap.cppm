@@ -372,16 +372,52 @@ template <typename Key, typename Value>
 u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Value> &result) const {
 
     InnerMultiMap *current_read = read_map_;
-    auto it_begin = current_read->lower_bound(key_min);
-    auto it_end = current_read->upper_bound(key_max);
+    auto read_begin = current_read->lower_bound(key_min);
+    auto read_end = current_read->upper_bound(key_max);
 
-    u32 size = std::distance(it_begin, it_end);
-    result.reserve(size);
-    for (auto it = it_begin; it != it_end; ++it) {
-        result.emplace_back(it->second.value_);
+    InnerMultiMap *dirty_snapshot = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(dirty_lock_);
+        dirty_snapshot = dirty_map_;
     }
 
-    return size;
+    auto dirty_begin = dirty_snapshot->lower_bound(key_min);
+    auto dirty_end = dirty_snapshot->upper_bound(key_max);
+
+    // merge
+    u32 count = 0;
+    auto read_it = read_begin;
+    auto dirty_it = dirty_begin;
+
+    while (read_it != read_end || dirty_it != dirty_end) {
+        bool use_read = false;
+
+        if (read_it != read_end && dirty_it != dirty_end) {
+            if (read_it->first < dirty_it->first) {
+                use_read = true;
+            } else if (dirty_it->first < read_it->first) {
+                use_read = false;
+            } else {
+                // Use dirty_map if key is the same
+                use_read = false;
+            }
+        } else if (read_it != read_end) {
+            use_read = true;
+        } else {
+            use_read = false;
+        }
+
+        if (use_read) {
+            result.push_back(read_it->second.value_);
+            ++read_it;
+            ++count;
+        } else {
+            result.push_back(dirty_it->second.value_);
+            ++dirty_it;
+            ++count;
+        }
+    }
+    return count;
 }
 
 } // namespace infinity
