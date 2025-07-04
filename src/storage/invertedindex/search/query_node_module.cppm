@@ -31,6 +31,9 @@ export using infinity::AndNotQueryNode;
 export using infinity::OrQueryNode;
 export using infinity::NotQueryNode;
 export using infinity::PhraseQueryNode;
+export using infinity::RankFeaturesQueryNode;
+export using infinity::KeywordQueryNode;
+export using infinity::RankFeatureQueryNode;
 
 // unimplemented
 // export using infinity::WandQueryNode;

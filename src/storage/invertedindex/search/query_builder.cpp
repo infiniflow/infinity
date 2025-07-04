@@ -17,8 +17,6 @@ module;
 #include <iostream>
 #include <vector>
 
-#include "query_node.h"
-
 module query_builder;
 
 import stl;
@@ -34,6 +32,7 @@ import term_doc_iterator;
 import logger;
 import third_party;
 import parse_fulltext_options;
+import query_node;
 
 namespace infinity {
 
