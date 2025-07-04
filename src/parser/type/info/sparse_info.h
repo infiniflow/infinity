@@ -88,7 +88,7 @@ public:
                std::to_string(dimension_);
     }
 
-    [[nodiscard]] nlohmann::json Serialize() const override;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const override;
 
     static std::unique_ptr<SparseInfo> Deserialize(std::string_view json_str);
 

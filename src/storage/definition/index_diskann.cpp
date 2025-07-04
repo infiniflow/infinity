@@ -142,15 +142,20 @@ String IndexDiskAnn::BuildOtherParamsString() const {
     return ss.str();
 }
 
-nlohmann::json IndexDiskAnn::Serialize() const {
-    nlohmann::json res = IndexBase::Serialize();
-    res["metric_type"] = MetricTypeToString(metric_type_);
-    res["encode_type"] = DiskAnnEncodeTypeToString(encode_type_);
-    res["R"] = R_;
-    res["L"] = L_;
-    res["num_pq_chunks"] = num_pq_chunks_;
-    res["num_parts"] = num_parts_;
-    return res;
+void IndexDiskAnn::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    IndexBase::Serialize(writer);
+    writer.Key("metric_type");
+    writer.String(MetricTypeToString(metric_type_).c_str());
+    writer.Key("encode_type");
+    writer.String(DiskAnnEncodeTypeToString(encode_type_).c_str());
+    writer.Key("R");
+    writer.Uint64(R_);
+    writer.Key("L");
+    writer.Uint64(L_);
+    writer.Key("num_pq_chunks");
+    writer.Uint64(num_pq_chunks_);
+    writer.Key("num_parts");
+    writer.Uint64(num_parts_);
 }
 
 void IndexDiskAnn::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {

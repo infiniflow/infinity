@@ -316,68 +316,102 @@ String QueryProfiler::ToString() const {
     return ss.str();
 }
 
-nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
-    nlohmann::json json;
-
+void QueryProfiler::Serialize(const QueryProfiler *profiler, rapidjson::Writer<rapidjson::StringBuffer>& writer) {
+    writer.Key("fragments");
+    writer.StartArray();
     i64 start = std::numeric_limits<i64>::max();
     i64 end = 0;
     for (const auto &fragment : profiler->records_) {
-        nlohmann::json json_fragments;
-        json_fragments["fragment_id"] = fragment.first;
+        writer.StartObject();
 
+        writer.Key("fragment_id");
+        writer.Uint64(fragment.first);
+
+        writer.Key("tasks");
+        writer.StartArray();
         i64 fragment_start = std::numeric_limits<i64>::max();
         i64 fragment_end = 0;
         for (const auto &task : fragment.second) {
-            nlohmann::json json_tasks;
+            writer.StartObject();
             SizeT times = 0;
-            json_tasks["task_id"] = task.first;
 
+            writer.Key("task_id");
+            writer.Int64(task.first);
+
+            writer.Key("operators");
+            writer.StartArray();
             i64 task_start = std::numeric_limits<i64>::max();
             i64 task_end = 0;
             for (const auto &operators : task.second) {
+                writer.StartObject();
                 task_start = std::min(task_start, operators.task_profiler_.GetBegin());
                 task_end = std::max(task_end, operators.task_profiler_.GetEnd());
 
-                nlohmann::json json_operators;
-                json_operators["times"] = times;
+                writer.Key("times");
+                writer.Uint64(times);
+
+                writer.Key("infos");
+                writer.StartArray();
                 for (const auto &op : operators.timings_) {
-                    nlohmann::json json_info;
-                    json_info["name"] = op.name_;
-                    json_info["start"] = op.start_;
-                    json_info["end"] = op.end_;
-                    json_info["elapsed"] = op.elapsed_;
-                    json_info["input_rows"] = op.input_rows_;
-                    json_info["output_rows"] = op.output_rows_;
-                    json_info["output_data_size"] = op.output_data_size_;
-                    json_operators["infos"].push_back(json_info);
+                    writer.StartObject();
+
+                    writer.Key("name");
+                    writer.String(op.name_.c_str());
+                    writer.Key("start");
+                    writer.Int64(op.start_);
+                    writer.Key("end");
+                    writer.Int64(op.end_);
+                    writer.Key("elapsed");
+                    writer.Int64(op.elapsed_);
+                    writer.Key("input_rows");
+                    writer.Uint(op.input_rows_);
+                    writer.Key("output_rows");
+                    writer.Uint(op.output_rows_);
+                    writer.Key("output_data_size");
+                    writer.Int(op.output_data_size_);
+
+                    writer.EndObject();
                 }
+                writer.EndArray();
+
                 times++;
-                json_tasks["operators"].push_back(json_operators);
+                writer.EndObject();
             }
-            json_tasks["task_start"] = task_start;
-            json_tasks["task_end"] = task_end;
-            json_tasks["task_total"] = task_end - task_start;
+            writer.EndArray();
+
+            writer.Key("task_start");
+            writer.Int64(task_start);
+            writer.Key("task_end");
+            writer.Int64(task_end);
+            writer.Key("task_total");
+            writer.Int64(task_end - task_start);
 
             fragment_start = std::min(fragment_start, task_start);
             fragment_end = std::max(fragment_end, task_end);
 
-            json_fragments["tasks"].push_back(json_tasks);
+            writer.EndObject();
         }
-        i64 fragment_total = fragment_end - fragment_start;
+        writer.EndArray();
 
-        json_fragments["fragment_start"] = fragment_start;
-        json_fragments["fragment_end"] = fragment_end;
-        json_fragments["fragment_total"] = fragment_total;
+        i64 fragment_total = fragment_end - fragment_start;
+        writer.Key("fragment_start");
+        writer.Int64(fragment_start);
+        writer.Key("fragment_end");
+        writer.Int64(fragment_end);
+        writer.Key("fragment_total");
+        writer.Int64(fragment_total);
 
         start = std::min(start, fragment_start);
         end = std::max(end, fragment_end);
 
-        json["fragments"].push_back(json_fragments);
+        writer.EndObject();
     }
-    json["total"] = end - start;
-    json["time_unit"] = "ns";
+    writer.EndArray();
 
-    return json;
+    writer.Key("total");
+    writer.Int64(end - start);
+    writer.Key("time_unit");
+    writer.String("ns");
 }
 
 Vector<TaskProfiler> &QueryProfiler::GetTaskProfile(u64 fragment_id, i64 task_id) { return records_[fragment_id][task_id]; }

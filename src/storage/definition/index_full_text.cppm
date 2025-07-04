@@ -61,7 +61,7 @@ public:
 
     virtual String BuildOtherParamsString() const override;
 
-    virtual nlohmann::json Serialize() const override;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const override;
 
     static SharedPtr<IndexFullText> Deserialize(std::string_view index_def_str);
 
