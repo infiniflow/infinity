@@ -79,10 +79,6 @@ public:
     template <typename... Args>
     void emplace(const Key &key, Args &&...args);
 
-    Vector<Pair<Key, Value>> lower_bound(const Key &key);
-
-    Vector<Pair<Key, Value>> upper_bound(const Key &key);
-
     u32 range(const Key &key_min, const Key &key_max, Vector<Value> &result) const;
 
 private:
@@ -338,34 +334,6 @@ template <typename... Args>
 void RcuMultiMap<Key, Value>::emplace(const Key& key, Args&&... args) {
     Value value(std::forward<Args>(args)...);
     Insert(key, value);
-}
-
-template <typename Key, typename Value>
-Vector<Pair<Key, Value>> RcuMultiMap<Key, Value>::lower_bound(const Key &key) {
-    Vector<Pair<Key, Value>> result;
-
-    InnerMultiMap *current_read = read_map_;
-    auto it = current_read->lower_bound(key);
-
-    for (; it != current_read->end(); ++it) {
-        result.emplace_back(it->first, it->second.value_);
-    }
-
-    return result;
-}
-
-template <typename Key, typename Value>
-Vector<Pair<Key, Value>> RcuMultiMap<Key, Value>::upper_bound(const Key &key) {
-    Vector<Pair<Key, Value>> result;
-
-    InnerMultiMap *current_read = read_map_;
-    auto it = current_read->upper_bound(key);
-
-    for (; it != current_read->end(); ++it) {
-        result.emplace_back(it->first, it->second.value_);
-    }
-
-    return result;
 }
 
 template <typename Key, typename Value>

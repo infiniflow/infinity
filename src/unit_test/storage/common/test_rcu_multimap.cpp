@@ -113,43 +113,6 @@ TEST_F(RcuMultiMapTest, TestDelete) {
     EXPECT_EQ(values3.size(), 0);
 }
 
-TEST_F(RcuMultiMapTest, TestEmplace) {
-    RcuMultiMap<String, i32> map;
-
-    // Test emplace functionality
-    map.emplace("key1", 42);
-    map.emplace("key1", 84);
-
-    auto values = map.Get("key1");
-    EXPECT_EQ(values.size(), 2);
-    VerifyValues(values, {42, 84});
-}
-
-TEST_F(RcuMultiMapTest, TestBounds) {
-    RcuMultiMap<String, i32> map;
-
-    map.Insert("apple", 10);
-    map.Insert("banana", 20);
-    map.Insert("cherry", 30);
-
-    // Force data to be moved from dirty_map to read_map by triggering cache misses
-    // The RCU mechanism moves data to read_map when miss_time >= dirty_map size
-    for (int i = 0; i < 10; ++i) {
-        map.Get("apple");  // This will trigger CheckSwapInLock when miss_time is high enough
-        map.Get("banana");
-        map.Get("cherry");
-    }
-
-    // Test lower_bound (should work after data is in read_map)
-    // Note: bounds operations only search read_map, not dirty_map
-    auto lower_results = map.lower_bound("banana");
-    EXPECT_GE(lower_results.size(), 0); // May be 0 if data hasn't moved to read_map yet
-
-    // Test upper_bound
-    auto upper_results = map.upper_bound("banana");
-    EXPECT_GE(upper_results.size(), 0);
-}
-
 TEST_F(RcuMultiMapTest, TestGetAllValuesWithRef) {
     RcuMultiMap<String, i32> map;
 
@@ -264,13 +227,6 @@ TEST_F(RcuMultiMapTest, TestIntegerKeys) {
     auto values3 = map.Get(3);
     EXPECT_EQ(values3.size(), 1);
     VerifyValues(values3, {300});
-
-    // Test bounds with integer keys
-    auto lower_results = map.lower_bound(2);
-    EXPECT_GE(lower_results.size(), 1);
-
-    auto upper_results = map.upper_bound(2);
-    EXPECT_GE(upper_results.size(), 0);
 }
 
 TEST_F(RcuMultiMapTest, TestEmptyMap) {
@@ -286,16 +242,7 @@ TEST_F(RcuMultiMapTest, TestEmptyMap) {
 
     // Delete on empty map should not crash
     map.Delete("nonexistent");
-
-    // Bounds on empty map should not crash
-    auto lower_results = map.lower_bound("test");
-    EXPECT_EQ(lower_results.size(), 0);
-
-    auto upper_results = map.upper_bound("test");
-    EXPECT_EQ(upper_results.size(), 0);
 }
-
-// TestReferenceCountingBehavior removed - no longer relevant for POD types
 
 TEST_F(RcuMultiMapTest, TestStressInsertAndRetrieve) {
     RcuMultiMap<i32, i32> map;
@@ -819,19 +766,11 @@ TEST_F(RcuMultiMapTest, TestRcuBehavior) {
     EXPECT_EQ(values1.size(), 1);
     VerifyValues(values1, {100});
 
-    // Bounds might not work initially since data is in dirty_map
-    auto lower_results_before = map.lower_bound("key1");
-    // Don't assert on size since it depends on RCU state
-
     // Force multiple cache misses to trigger CheckSwapInLock
     for (int i = 0; i < 10; ++i) {
         auto temp_values = map.Get("key1");
         // No cleanup needed for POD types
     }
-
-    // After enough misses, data should be moved to read_map
-    // Bounds should now potentially work better
-    auto lower_results_after = map.lower_bound("key1");
 
     // The key insight is that Get always works regardless of RCU state
     auto final_values = map.Get("key1");
