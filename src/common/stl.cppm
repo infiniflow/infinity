@@ -38,6 +38,7 @@ module;
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <random>
 #include <ranges>
@@ -564,8 +565,8 @@ export {
     }
 
     template <typename T, typename U>
-    inline constexpr Pair<T, U> MakePair(T && first, U && second) {
-        return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
+    inline constexpr auto MakePair(T && first, U && second) {
+        return std::make_pair(std::forward<T>(first), std::forward<U>(second));
     }
 
     template <typename T>
