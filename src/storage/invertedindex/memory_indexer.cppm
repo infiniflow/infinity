@@ -28,7 +28,7 @@ import internal_types;
 import ring;
 import skiplist;
 import internal_types;
-import map_with_lock;
+import rcu_multimap;
 import vector_with_lock;
 import buf_writer;
 import posting_list_format;
@@ -54,7 +54,8 @@ public:
 
     using PostingPtr = SharedPtr<PostingWriter>;
     // using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
-    using PostingTableStore = MapWithLock<String, PostingPtr>;
+    // using PostingTableStore = MapWithLock<String, PostingPtr>;
+    using PostingTableStore = RcuMap<String, PostingPtr>;
 
     struct PostingTable {
         PostingTable();

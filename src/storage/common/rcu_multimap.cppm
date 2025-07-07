@@ -2,6 +2,7 @@ module;
 
 #include <cassert>
 #include <cstdio>
+#include <iterator>
 
 export module rcu_multimap;
 
@@ -461,6 +462,70 @@ public:
 
     u32 range(const Key &key_min, const Key &key_max, Vector<Value> &result) const;
 
+    // MapWithLock compatibility methods
+    bool Get(const Key &key, Value &value);
+    bool GetOrAdd(const Key &key, Value &value, const Value &new_value);
+    void Clear();
+    void Range(const Key &key_min, const Key &key_max, Vector<Pair<Key, Value>> &items);
+
+    // Unsafe iterator methods (for single-threaded access)
+    // This iterator provides the same interface as std::map<Key, Value>::iterator
+    class UnsafeIterator {
+    public:
+        UnsafeIterator(typename InnerMap::iterator it) : it_(it) {}
+
+        // Iterator traits
+        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = Pair<const Key, Value>;
+        using difference_type = std::ptrdiff_t;
+        using pointer = value_type *;
+        using reference = value_type &;
+
+        // The key insight: we need to provide a proxy object that has first and second members
+        // that can be accessed with -> operator
+        struct IteratorProxy {
+            Key first;
+            Value second;
+
+            IteratorProxy(const Key &k, const Value &v) : first(k), second(v) {}
+
+            void update(const Key &k, const Value &v) {
+                first = k;
+                second = v;
+            }
+        };
+
+        IteratorProxy *operator->() const {
+            // Create a thread-local static proxy object to return a pointer to
+            static thread_local IteratorProxy proxy(it_->first, it_->second.value_);
+            // Update the proxy with current values
+            proxy.update(it_->first, it_->second.value_);
+            return &proxy;
+        }
+
+        value_type operator*() const { return MakePair(it_->first, it_->second.value_); }
+
+        UnsafeIterator &operator++() {
+            ++it_;
+            return *this;
+        }
+
+        UnsafeIterator operator++(int) {
+            UnsafeIterator tmp = *this;
+            ++it_;
+            return tmp;
+        }
+
+        bool operator==(const UnsafeIterator &other) const { return it_ == other.it_; }
+        bool operator!=(const UnsafeIterator &other) const { return it_ != other.it_; }
+
+    private:
+        typename InnerMap::iterator it_;
+    };
+
+    UnsafeIterator UnsafeBegin();
+    UnsafeIterator UnsafeEnd();
+
 private:
     void CheckSwapInLock();
     MapValue CreateMapValue(const Value &value);
@@ -770,6 +835,99 @@ u32 RcuMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Val
     }
 
     return count;
+}
+
+// MapWithLock compatibility methods implementation
+template <typename Key, typename Value>
+bool RcuMap<Key, Value>::Get(const Key &key, Value &value) {
+    Value *value_ptr = Get(key, true);
+    if (value_ptr != nullptr) {
+        value = *value_ptr;
+        return true;
+    }
+    return false;
+}
+
+template <typename Key, typename Value>
+bool RcuMap<Key, Value>::GetOrAdd(const Key &key, Value &value, const Value &new_value) {
+    // First try to get existing value
+    Value *existing_value_ptr = Get(key, true);
+    if (existing_value_ptr != nullptr) {
+        value = *existing_value_ptr;
+        return true; // found
+    }
+
+    // Not found, add new value
+    Insert(key, new_value);
+    value = new_value;
+    return false; // added
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::Clear() {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    // Clear dirty_map
+    for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
+        MapValue map_value = it->second;
+        map_value.used_time_ = GetCurrentTimeMs();
+        deleted_value_list_.push_back(map_value);
+    }
+    dirty_map_->clear();
+
+    // Mark all entries in read_map for deletion
+    for (auto it = read_map_->begin(); it != read_map_->end(); ++it) {
+        MapValue map_value = it->second;
+        map_value.used_time_ = GetCurrentTimeMs();
+        deleted_entries_.insert(MakePair(it->first, map_value));
+        deleted_value_list_.push_back(map_value);
+    }
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::Range(const Key &key_min, const Key &key_max, Vector<Pair<Key, Value>> &items) {
+    items.clear();
+
+    InnerMap *current_read = read_map_;
+    auto read_begin = current_read->lower_bound(key_min);
+    auto read_end = current_read->upper_bound(key_max);
+
+    InnerMap *dirty_snapshot = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(dirty_lock_);
+        dirty_snapshot = dirty_map_;
+    }
+
+    auto dirty_begin = dirty_snapshot->lower_bound(key_min);
+    auto dirty_end = dirty_snapshot->upper_bound(key_max);
+
+    // Merge results, prioritizing dirty_map values
+    Set<Key> processed_keys;
+
+    // First, add all values from dirty_map
+    for (auto it = dirty_begin; it != dirty_end; ++it) {
+        items.emplace_back(it->first, it->second.value_);
+        processed_keys.insert(it->first);
+    }
+
+    // Then add values from read_map that are not in dirty_map
+    for (auto it = read_begin; it != read_end; ++it) {
+        if (processed_keys.find(it->first) == processed_keys.end()) {
+            items.emplace_back(it->first, it->second.value_);
+        }
+    }
+}
+
+template <typename Key, typename Value>
+typename RcuMap<Key, Value>::UnsafeIterator RcuMap<Key, Value>::UnsafeBegin() {
+    // WARNING: This is unsafe and should only be used when no concurrent access is happening
+    return UnsafeIterator(dirty_map_->begin());
+}
+
+template <typename Key, typename Value>
+typename RcuMap<Key, Value>::UnsafeIterator RcuMap<Key, Value>::UnsafeEnd() {
+    // WARNING: This is unsafe and should only be used when no concurrent access is happening
+    return UnsafeIterator(dirty_map_->end());
 }
 
 } // namespace infinity
