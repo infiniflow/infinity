@@ -653,9 +653,9 @@ void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
     return;
 }
 
-void NewTxnManager::SetSystemCache() {
-    system_cache_ = storage_->new_catalog()->GetSystemCache();
-    txn_allocator_->SetSystemCache(system_cache_);
+void NewTxnManager::SetSystemCache(UniquePtr<SystemCache> system_cache) {
+    system_cache_ = std::move(system_cache);
+    txn_allocator_->SetSystemCache(system_cache_.get());
 }
 
 void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, NewTxn *txn_ptr) {
@@ -689,5 +689,7 @@ Vector<SharedPtr<BGTaskInfo>> NewTxnManager::GetTaskInfoList() const {
     }
     return task_info_list;
 }
+
+SystemCache *NewTxnManager::GetSystemCachePtr() const { return system_cache_.get(); }
 
 } // namespace infinity
