@@ -34,6 +34,7 @@ class TestInsertImport:
         import_rate = insert_batch_size / (import_size + insert_batch_size)
 
         cur_n = 0
+        last_n = 0
         insert_finish = False
         shutdown = False
         error = False
@@ -46,7 +47,7 @@ class TestInsertImport:
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
 
         def insert_import_func(table_obj):
-            nonlocal cur_n, insert_finish, shutdown, error, write_i
+            nonlocal cur_n, last_n, insert_finish, shutdown, error, write_i
 
             while cur_n < total_n:
                 r = random.randint(0, 100)
@@ -54,6 +55,7 @@ class TestInsertImport:
                 if insert_finish:
                     logger.debug("insert finished")
                 try:
+                    last_n = 0
                     if not if_import and not insert_finish:
                         insert_data = []
                         # get `batch_size` data in data_gen one time
@@ -68,6 +70,7 @@ class TestInsertImport:
                                 insert_finish = True
                                 break
                         if len(insert_data) > 0:
+                            last_n = len(insert_data)
                             table_obj.insert(insert_data)
                         else:
                             cur_n = total_n
@@ -76,6 +79,7 @@ class TestInsertImport:
                     else:
                         abs_import_file = os.path.abspath(import_file)
                         table_obj.import_data(abs_import_file, import_options)
+                        last_n = import_size
                         cur_n += import_size
                         logger.debug(f"{write_i}. import {import_size} data, cur_n: {cur_n}")
                     write_i += 1
@@ -108,12 +112,15 @@ class TestInsertImport:
 
         @decorator
         def part1(infinity_obj):
+            nonlocal cur_n, last_n
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert")
 
             data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
-            assert count_star == cur_n
+            # insert and import while shutdown might fail or success
+            assert count_star in {cur_n, cur_n + last_n}
+            cur_n = count_star
             logger.debug(f"cur_n: {cur_n}")
 
             t1 = RtnThread(target=shutdown_func)
