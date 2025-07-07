@@ -612,7 +612,7 @@ Vector<MetaTableObject *> MetaTree::ListTables() const {
     return tables;
 };
 
-SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
+UniquePtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const {
     u64 next_db_id{0};
     auto tag_iter = system_tag_map_.find(NEXT_DATABASE_ID.data());
     if (tag_iter != system_tag_map_.end()) {
@@ -627,7 +627,7 @@ SharedPtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const 
         UnrecoverableError(error_message);
     }
 
-    SharedPtr<SystemCache> system_cache = MakeShared<SystemCache>(next_db_id);
+    UniquePtr<SystemCache> system_cache = MakeUnique<SystemCache>(next_db_id);
     for (const auto &db_pair : db_map_) {
         MetaDBObject *meta_db_object = static_cast<MetaDBObject *>(db_pair.second.get());
         SharedPtr<DbCache> db_cache = meta_db_object->RestoreDbCache(storage_ptr);

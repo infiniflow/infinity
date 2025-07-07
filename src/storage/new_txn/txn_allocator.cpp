@@ -34,7 +34,7 @@ namespace infinity {
 TxnAllocator::TxnAllocator(Storage *storage) : storage_(storage) {}
 TxnAllocator::~TxnAllocator() = default;
 
-void TxnAllocator::SetSystemCache(const SharedPtr<SystemCache> &system_cache) { system_cache_ = system_cache; }
+void TxnAllocator::SetSystemCache(SystemCache* system_cache) { system_cache_ = system_cache; }
 
 void TxnAllocator::Start() {
     processor_thread_ = Thread([this] { Process(); });
@@ -47,7 +47,7 @@ void TxnAllocator::Stop() {
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
-    system_cache_.reset();
+    system_cache_ = nullptr;
     LOG_INFO("Transaction allocator is stopped.");
 }
 
