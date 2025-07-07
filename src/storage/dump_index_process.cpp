@@ -14,7 +14,6 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <thread>
 
 module infinity_core;
@@ -39,6 +38,7 @@ import :mem_index;
 import :memory_indexer;
 import :txn_state;
 import :base_txn_store;
+import row_id;
 
 namespace infinity {
 

@@ -17,8 +17,6 @@ module;
 #include <string>
 #include <vector>
 
-#include "parser/type/complex/embedding_type.h"
-
 module infinity_core;
 
 import :stl;
@@ -27,6 +25,7 @@ import :knn_scan_data;
 import :status;
 import knn_expr;
 import :third_party;
+import embedding_type;
 
 namespace infinity {
 

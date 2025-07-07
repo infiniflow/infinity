@@ -14,8 +14,6 @@
 
 module;
 
-#include "parser/type/complex/embedding_type.h"
-
 module infinity_core;
 
 import :buffer_manager;
@@ -28,6 +26,7 @@ import :buffer_obj;
 import :local_file_handle;
 import :chunk_index_meta;
 import sparse_info;
+import embedding_type;
 
 namespace infinity {
 

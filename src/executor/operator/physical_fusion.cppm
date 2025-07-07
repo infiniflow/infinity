@@ -14,8 +14,6 @@
 
 module;
 
-#include "parser/type/complex/row_id.h"
-
 export module infinity_core:physical_fusion;
 
 import :stl;
@@ -23,6 +21,7 @@ import :physical_operator;
 import :base_table_ref;
 import :fusion_expression;
 import :operator_state;
+import row_id;
 
 namespace infinity {
 // struct FusionOperatorState;

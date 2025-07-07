@@ -14,7 +14,7 @@
 
 module;
 
-#include "type/complex/row_id.h"
+#include <chrono>
 
 module infinity_core;
 
@@ -24,6 +24,7 @@ import :secondary_index_in_mem;
 import :ivf_index_data_in_mem;
 import :emvb_index_in_mem;
 import :memory_indexer;
+import row_id;
 #ifdef INDEX_HANDLER
 import :hnsw_handler;
 import :bmp_handler;

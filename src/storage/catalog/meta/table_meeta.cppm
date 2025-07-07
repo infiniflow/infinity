@@ -14,14 +14,13 @@
 
 module;
 
-#include "type/complex/row_id.h"
-
 export module infinity_core:table_meeta;
 
 import :stl;
 import :status;
 import column_def;
 import :new_catalog;
+import row_id;
 
 namespace infinity {
 

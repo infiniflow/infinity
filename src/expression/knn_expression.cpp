@@ -15,7 +15,6 @@
 module;
 
 #include <sstream>
-// #include "parser/type/complex/embedding_type.h"
 
 module infinity_core;
 

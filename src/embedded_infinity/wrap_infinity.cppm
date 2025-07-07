@@ -1,6 +1,5 @@
 module;
 
-#include "parser/type/complex/embedding_type.h"
 #include <cstring>
 #include <nanobind/nanobind.h>
 #include <string>
@@ -47,6 +46,7 @@ import parsed_expr;
 import search_expr;
 import internal_types;
 import extra_ddl_info;
+import embedding_type;
 
 namespace nb = nanobind;
 

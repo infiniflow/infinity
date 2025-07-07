@@ -14,7 +14,6 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <string>
 
 module infinity_core;
@@ -38,6 +37,7 @@ import :segment_meta;
 import :kv_utility;
 import :column_index_reader;
 import :new_txn;
+import row_id;
 
 namespace infinity {
 

@@ -14,8 +14,6 @@
 
 module;
 
-#include "parser/type/complex/embedding_type.h"
-
 module infinity_core;
 
 import :stl;
@@ -37,6 +35,7 @@ import :data_block;
 import :knn_expression;
 import :value;
 import :column_vector;
+import embedding_type;
 
 namespace infinity {
 

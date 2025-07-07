@@ -17,7 +17,6 @@ module;
 #include <charconv>
 #include <ranges>
 #include <sstream>
-#include "parser/type/complex/embedding_type.h"
 
 module infinity_core;
 
@@ -38,6 +37,7 @@ import internal_types;
 import sparse_info;
 import embedding_info;
 import logical_type;
+import embedding_type;
 
 namespace infinity {
 

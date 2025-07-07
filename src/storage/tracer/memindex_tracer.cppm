@@ -14,13 +14,12 @@
 
 module;
 
-#include "type/complex/row_id.h"
-
 export module infinity_core:memindex_tracer;
 
 import :stl;
 import :third_party;
 import :logger;
+import row_id;
 
 namespace infinity {
 

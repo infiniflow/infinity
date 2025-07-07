@@ -14,13 +14,12 @@
 
 module;
 
-#include "parser/type/complex/embedding_type.h"
-
 module infinity_core;
 
 import :stl;
 import :cast_table;
 import logical_type;
+import embedding_type;
 
 namespace infinity {
 

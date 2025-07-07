@@ -4,8 +4,6 @@
 
 module;
 
-#include "parser/type/complex/embedding_type.h"
-
 module infinity_core;
 
 import :buffer_manager;
@@ -21,6 +19,7 @@ import :column_vector;
 import :local_file_handle;
 import :chunk_index_meta;
 import embedding_info;
+import embedding_type;
 
 namespace infinity {
 
