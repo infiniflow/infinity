@@ -4408,10 +4408,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         return status;
     }
 
-    if (conflicted_txn_ != nullptr) {
-        // Wait for dependent transaction finished
-        conflicted_txn_->WaitForCompletion();
-    }
+    // TODO: due to dead lock, ignore the conflict txn.
+    //    if (conflicted_txn_ != nullptr) {
+    //        // Wait for dependent transaction finished
+    //        conflicted_txn_->WaitForCompletion();
+    //    }
 
     SetCompletion();
 
