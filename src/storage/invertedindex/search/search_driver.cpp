@@ -17,9 +17,7 @@
 #include <sstream>
 #include <utility>
 
-#include "query_node.h"
 #include "search_driver.h"
-#include "search_parser.h"
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
@@ -32,6 +30,7 @@ import logger;
 import third_party;
 import analyzer;
 import analyzer_pool;
+import search_scanner;
 
 namespace infinity {
 

@@ -132,7 +132,7 @@ public:
 
     KVStore *kv_store() const { return kv_store_; }
 
-    Vector<SharedPtr<NewTxn>> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Vector<SharedPtr<NewTxn>> GetCheckCandidateTxns(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
 

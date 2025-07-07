@@ -220,7 +220,7 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &r
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
-    Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
+    Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn->TxnID(), begin_ts, commit_ts);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
@@ -563,23 +563,34 @@ void NewTxnManager::PrintAllKeyValue() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID this_txn_id, TxnTimeStamp this_begin_ts, TxnTimeStamp this_commit_ts) {
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
         res.reserve(check_txn_map_.size());
-        for (const auto &check_txn_pair : check_txn_map_) {
-            const SharedPtr<NewTxn> &check_txn = check_txn_pair.second;
-            TxnTimeStamp check_commit_ts = check_txn->CommitTS();
-            TxnState check_txn_state = check_txn->GetTxnState();
-            bool is_rollback = (check_txn_state == TxnState::kRollbacking) || (check_txn_state == TxnState::kRollbacked);
-            if (check_commit_ts < begin_ts || is_rollback) {
+        for (const auto &other_txn_pair : check_txn_map_) {
+            const SharedPtr<NewTxn> &other_txn = other_txn_pair.second;
+            //            LOG_TRACE(fmt::format("This txn: {}, check txn: {}, begin_ts: {}, commit_ts: {}",
+            //                                 this_txn_id,
+            //                                 other_txn->TxnID(),
+            //                                 other_txn->BeginTS(),
+            //                                 other_txn->CommitTS()));
+            if (this_txn_id == other_txn->TxnID()) {
                 continue;
             }
-            if (check_commit_ts >= commit_ts) {
+            TxnTimeStamp other_commit_ts = other_txn->CommitTS();
+            TxnTimeStamp other_begin_ts = other_txn->BeginTS();
+            TxnState other_txn_state = other_txn->GetTxnState();
+            bool is_rollback = (other_txn_state == TxnState::kRollbacking) || (other_txn_state == TxnState::kRollbacked);
+            if (other_commit_ts < this_begin_ts || is_rollback) {
+                // SKIP, other txn is committed before this txn begin
+                continue;
+            }
+            if (other_begin_ts > this_commit_ts) {
+                // SKIP, other txn is started after this txn commit
                 break;
             }
-            res.push_back(check_txn);
+            res.push_back(other_txn);
         }
     }
     return res;
