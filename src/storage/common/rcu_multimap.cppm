@@ -75,6 +75,13 @@ public:
 
     void GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const;
 
+    // Efficiently merge all data into a MultiMap for dumping purposes
+    // This avoids the intermediate vector allocation in GetAllKeyValuePairs
+    void GetMergedMultiMap(MultiMap<Key, Value> &result_map) const;
+
+    // Alternative method that returns MultiMap by value for move semantics
+    MultiMap<Key, Value> GetMergedMultiMap() const;
+
     size_t size() const;
 
     template <typename... Args>
@@ -322,6 +329,66 @@ void RcuMultiMap<Key, Value>::GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pair
             pairs.emplace_back(it->first, it->second.value_);
         }
     }
+}
+
+template <typename Key, typename Value>
+void RcuMultiMap<Key, Value>::GetMergedMultiMap(MultiMap<Key, Value> &result_map) const {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    // Clear the result map first
+    result_map.clear();
+
+    // Create a transform iterator adapter to extract values from MapValue
+    auto transform_func = [](const typename InnerMultiMap::value_type &pair) { return std::make_pair(pair.first, pair.second.value_); };
+
+    // Use bulk insert with transform iterator for dirty_map
+    if (dirty_map_ && !dirty_map_->empty()) {
+        // Reserve space if possible (std::multimap doesn't have reserve, but this is good practice)
+        auto dirty_begin = dirty_map_->begin();
+        auto dirty_end = dirty_map_->end();
+
+        // Use std::transform to create pairs and insert them in bulk
+        std::transform(dirty_begin, dirty_end, std::inserter(result_map, result_map.end()), transform_func);
+    }
+
+    // Also insert pairs from read_map if it exists and is different from dirty_map
+    if (read_map_ != nullptr && read_map_ != dirty_map_ && !read_map_->empty()) {
+        auto read_begin = read_map_->begin();
+        auto read_end = read_map_->end();
+
+        // Use std::transform to create pairs and insert them in bulk
+        std::transform(read_begin, read_end, std::inserter(result_map, result_map.end()), transform_func);
+    }
+}
+
+template <typename Key, typename Value>
+MultiMap<Key, Value> RcuMultiMap<Key, Value>::GetMergedMultiMap() const {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    MultiMap<Key, Value> result_map;
+
+    // Create a transform iterator adapter to extract values from MapValue
+    auto transform_func = [](const typename InnerMultiMap::value_type &pair) { return std::make_pair(pair.first, pair.second.value_); };
+
+    // Use bulk insert with transform iterator for dirty_map
+    if (dirty_map_ && !dirty_map_->empty()) {
+        auto dirty_begin = dirty_map_->begin();
+        auto dirty_end = dirty_map_->end();
+
+        // Use std::transform to create pairs and insert them in bulk
+        std::transform(dirty_begin, dirty_end, std::inserter(result_map, result_map.end()), transform_func);
+    }
+
+    // Also insert pairs from read_map if it exists and is different from dirty_map
+    if (read_map_ != nullptr && read_map_ != dirty_map_ && !read_map_->empty()) {
+        auto read_begin = read_map_->begin();
+        auto read_end = read_map_->end();
+
+        // Use std::transform to create pairs and insert them in bulk
+        std::transform(read_begin, read_end, std::inserter(result_map, result_map.end()), transform_func);
+    }
+
+    return result_map; // RVO (Return Value Optimization) will optimize this
 }
 
 template <typename Key, typename Value>
