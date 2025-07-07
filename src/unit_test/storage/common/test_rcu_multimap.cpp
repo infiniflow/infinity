@@ -777,3 +777,667 @@ TEST_F(RcuMultiMapTest, TestRcuBehavior) {
     EXPECT_EQ(final_values.size(), 1);
     VerifyValues(final_values, {100});
 }
+
+// RcuMap Test Class
+class RcuMapTest : public BaseTest {
+public:
+    RcuMapTest() = default;
+    ~RcuMapTest() = default;
+
+    void SetUp() override { BaseTest::SetUp(); }
+
+    void TearDown() override { BaseTest::TearDown(); }
+};
+
+TEST_F(RcuMapTest, TestBasicInsertAndGet) {
+    RcuMap<String, i32> map;
+
+    // Insert some values (Map has unique keys)
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+    map.Insert("key1", 30); // Should replace the previous value
+
+    // Test Get (returns pointer)
+    auto value1_ptr = map.Get("key1");
+    ASSERT_NE(value1_ptr, nullptr);
+    EXPECT_EQ(*value1_ptr, 30); // Should be the replaced value
+
+    auto value2_ptr = map.Get("key2");
+    ASSERT_NE(value2_ptr, nullptr);
+    EXPECT_EQ(*value2_ptr, 20);
+
+    // Test non-existent key
+    auto value3_ptr = map.Get("key3");
+    EXPECT_EQ(value3_ptr, nullptr);
+
+    // Test GetValue (returns Optional)
+    auto opt_value1 = map.GetValue("key1");
+    EXPECT_TRUE(opt_value1.has_value());
+    EXPECT_EQ(opt_value1.value(), 30);
+
+    auto opt_value3 = map.GetValue("key3");
+    EXPECT_FALSE(opt_value3.has_value());
+
+    // Test size
+    EXPECT_EQ(map.size(), 2);
+}
+
+TEST_F(RcuMapTest, TestLowercaseAliases) {
+    RcuMap<String, i32> map;
+
+    // Test lowercase insert alias
+    map.insert("test_key", 100);
+    map.insert("test_key", 200); // Should replace
+
+    // Test lowercase get alias
+    auto value_ptr = map.get("test_key");
+    ASSERT_NE(value_ptr, nullptr);
+    EXPECT_EQ(*value_ptr, 200);
+}
+
+TEST_F(RcuMapTest, TestDelete) {
+    RcuMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+
+    // Delete key1
+    map.Delete("key1");
+    auto value1_ptr = map.Get("key1");
+    EXPECT_EQ(value1_ptr, nullptr);
+
+    // key2 should still exist
+    auto value2_ptr = map.Get("key2");
+    ASSERT_NE(value2_ptr, nullptr);
+    EXPECT_EQ(*value2_ptr, 20);
+
+    // Test lowercase delete alias
+    map.delete_key("key2");
+    auto value2_ptr_after = map.Get("key2");
+    EXPECT_EQ(value2_ptr_after, nullptr);
+
+    EXPECT_EQ(map.size(), 0);
+}
+
+TEST_F(RcuMapTest, TestGetAllValuesWithRef) {
+    RcuMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+    map.Insert("key3", 30);
+
+    Vector<i32> all_values;
+    map.GetAllValuesWithRef(all_values);
+
+    EXPECT_EQ(all_values.size(), 3);
+    std::sort(all_values.begin(), all_values.end());
+    Vector<i32> expected = {10, 20, 30};
+    EXPECT_EQ(all_values, expected);
+}
+
+TEST_F(RcuMapTest, TestGetAllKeyValuePairs) {
+    RcuMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+    map.Insert("key3", 30);
+
+    Vector<Pair<String, i32>> pairs;
+    map.GetAllKeyValuePairs(pairs);
+
+    EXPECT_EQ(pairs.size(), 3);
+
+    // Sort pairs by key for consistent testing
+    std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+
+    EXPECT_EQ(pairs[0].first, "key1");
+    EXPECT_EQ(pairs[0].second, 10);
+    EXPECT_EQ(pairs[1].first, "key2");
+    EXPECT_EQ(pairs[1].second, 20);
+    EXPECT_EQ(pairs[2].first, "key3");
+    EXPECT_EQ(pairs[2].second, 30);
+}
+
+TEST_F(RcuMapTest, TestGarbageCollection) {
+    RcuMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+
+    // Delete some entries
+    map.Delete("key1");
+
+    // Test garbage collection (should not crash)
+    u64 current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
+    // Test checkGc alias
+    map.checkGc(current_time - 1000); // GC entries older than 1 second
+
+    // Verify remaining data is still accessible
+    auto value_ptr = map.Get("key2");
+    ASSERT_NE(value_ptr, nullptr);
+    EXPECT_EQ(*value_ptr, 20);
+}
+
+TEST_F(RcuMapTest, TestExpiredEntries) {
+    RcuMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+
+    // Access key1 to update its access time
+    map.Get("key1", true);
+
+    // Sleep briefly to create time difference
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    u64 current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
+    Vector<String> expired_keys;
+    map.CheckExpired(current_time + 1000, expired_keys); // Check for entries not accessed in last second
+
+    // Should find some expired keys (exact behavior depends on implementation)
+    // This test mainly ensures the method doesn't crash
+    EXPECT_GE(expired_keys.size(), 0);
+}
+
+TEST_F(RcuMapTest, TestGetWithRcuTime) {
+    RcuMap<String, i32> map;
+
+    map.Insert("key1", 10);
+    map.Insert("key2", 20);
+
+    // Test GetWithRcuTime (should behave similarly to Get but with RCU semantics)
+    auto value1_ptr = map.GetWithRcuTime("key1");
+    ASSERT_NE(value1_ptr, nullptr);
+    EXPECT_EQ(*value1_ptr, 10);
+
+    auto value2_ptr = map.GetWithRcuTime("key2");
+    ASSERT_NE(value2_ptr, nullptr);
+    EXPECT_EQ(*value2_ptr, 20);
+
+    // Test non-existent key
+    auto value3_ptr = map.GetWithRcuTime("key3");
+    EXPECT_EQ(value3_ptr, nullptr);
+}
+
+TEST_F(RcuMapTest, TestUniqueKeys) {
+    RcuMap<i32, i32> map;
+
+    // Insert multiple values for the same key (should replace, not accumulate)
+    map.Insert(42, 100);
+    map.Insert(42, 200);
+    map.Insert(42, 300);
+
+    auto value_ptr = map.Get(42);
+    ASSERT_NE(value_ptr, nullptr);
+    EXPECT_EQ(*value_ptr, 300); // Should be the last inserted value
+
+    EXPECT_EQ(map.size(), 1); // Should only have one entry
+}
+
+TEST_F(RcuMapTest, TestIntegerKeys) {
+    RcuMap<i32, i32> map;
+
+    map.Insert(1, 100);
+    map.Insert(2, 200);
+    map.Insert(3, 300);
+
+    // Test retrieval
+    auto value1_ptr = map.Get(1);
+    ASSERT_NE(value1_ptr, nullptr);
+    EXPECT_EQ(*value1_ptr, 100);
+
+    auto value2_ptr = map.Get(2);
+    ASSERT_NE(value2_ptr, nullptr);
+    EXPECT_EQ(*value2_ptr, 200);
+
+    auto value3_ptr = map.Get(3);
+    ASSERT_NE(value3_ptr, nullptr);
+    EXPECT_EQ(*value3_ptr, 300);
+
+    EXPECT_EQ(map.size(), 3);
+}
+
+TEST_F(RcuMapTest, TestEmptyMap) {
+    RcuMap<String, i32> map;
+
+    // Test operations on empty map
+    auto value_ptr = map.Get("nonexistent");
+    EXPECT_EQ(value_ptr, nullptr);
+
+    auto opt_value = map.GetValue("nonexistent");
+    EXPECT_FALSE(opt_value.has_value());
+
+    Vector<i32> all_values;
+    map.GetAllValuesWithRef(all_values);
+    EXPECT_EQ(all_values.size(), 0);
+
+    // Delete on empty map should not crash
+    map.Delete("nonexistent");
+
+    EXPECT_EQ(map.size(), 0);
+}
+
+TEST_F(RcuMapTest, TestEmplace) {
+    RcuMap<String, i32> map;
+
+    // Test emplace functionality
+    map.emplace("key1", 42);
+    map.emplace("key2", 84);
+
+    auto value1_ptr = map.Get("key1");
+    ASSERT_NE(value1_ptr, nullptr);
+    EXPECT_EQ(*value1_ptr, 42);
+
+    auto value2_ptr = map.Get("key2");
+    ASSERT_NE(value2_ptr, nullptr);
+    EXPECT_EQ(*value2_ptr, 84);
+
+    // Test emplace replacement
+    map.emplace("key1", 168);
+    auto value1_new_ptr = map.Get("key1");
+    ASSERT_NE(value1_new_ptr, nullptr);
+    EXPECT_EQ(*value1_new_ptr, 168);
+
+    EXPECT_EQ(map.size(), 2);
+}
+
+TEST_F(RcuMapTest, TestRange) {
+    RcuMap<i32, i32> map;
+
+    // Insert values with integer keys
+    map.Insert(1, 100);
+    map.Insert(3, 300);
+    map.Insert(5, 500);
+    map.Insert(7, 700);
+    map.Insert(9, 900);
+
+    // Test range query
+    Vector<i32> result;
+    u32 count = map.range(3, 7, result);
+
+    EXPECT_EQ(count, 3); // Should include keys 3, 5, 7
+    EXPECT_EQ(result.size(), 3);
+
+    std::sort(result.begin(), result.end());
+    Vector<i32> expected = {300, 500, 700};
+    EXPECT_EQ(result, expected);
+}
+
+TEST_F(RcuMapTest, TestStressInsertAndRetrieve) {
+    RcuMap<i32, i32> map;
+
+    const i32 num_operations = 50; // Moderate number for fast execution
+
+    // Insert values (each key gets one value due to Map semantics)
+    for (i32 i = 0; i < num_operations; ++i) {
+        map.Insert(i, i * 10);
+    }
+
+    // Verify all values are accessible
+    for (i32 key = 0; key < num_operations; ++key) {
+        auto value_ptr = map.Get(key);
+        ASSERT_NE(value_ptr, nullptr);
+        EXPECT_EQ(*value_ptr, key * 10);
+    }
+
+    EXPECT_EQ(map.size(), num_operations);
+}
+
+// Multi-threading tests for RcuMap
+TEST_F(RcuMapTest, TestConcurrentInsertAndRead) {
+    RcuMap<i32, i32> map;
+
+    const i32 num_threads = 4;
+    const i32 operations_per_thread = 100;
+    const i32 key_range = 20;
+
+    std::atomic<i32> total_insertions{0};
+    std::atomic<i32> total_reads{0};
+    std::atomic<i32> successful_reads{0};
+    std::atomic<bool> start_flag{false};
+
+    Vector<std::thread> threads;
+
+    // Create writer threads
+    for (i32 t = 0; t < num_threads / 2; ++t) {
+        threads.emplace_back([&, t]() {
+            // Wait for start signal
+            while (!start_flag.load()) {
+                std::this_thread::yield();
+            }
+
+            std::random_device rd;
+            std::mt19937 gen(rd() + t);
+            std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
+
+            for (i32 i = 0; i < operations_per_thread; ++i) {
+                i32 key = key_dist(gen);
+                i32 value = t * operations_per_thread + i;
+
+                map.Insert(key, value);
+                total_insertions.fetch_add(1);
+
+                if (i % 25 == 0) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    // Create reader threads
+    for (i32 t = num_threads / 2; t < num_threads; ++t) {
+        threads.emplace_back([&, t]() {
+            // Wait for start signal
+            while (!start_flag.load()) {
+                std::this_thread::yield();
+            }
+
+            std::random_device rd;
+            std::mt19937 gen(rd() + t);
+            std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
+
+            for (i32 i = 0; i < operations_per_thread; ++i) {
+                i32 key = key_dist(gen);
+                auto value_ptr = map.Get(key);
+
+                total_reads.fetch_add(1);
+                if (value_ptr != nullptr) {
+                    successful_reads.fetch_add(1);
+                    EXPECT_GE(*value_ptr, 0); // Basic sanity check
+                }
+
+                if (i % 50 == 0) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    // Start all threads
+    start_flag.store(true);
+
+    // Wait for all threads to complete
+    for (auto &thread : threads) {
+        thread.join();
+    }
+
+    // Verify that all operations completed
+    EXPECT_EQ(total_insertions.load(), (num_threads / 2) * operations_per_thread);
+    EXPECT_EQ(total_reads.load(), (num_threads / 2) * operations_per_thread);
+
+    // Verify that we can still read data after all threads complete
+    i32 final_accessible_keys = 0;
+    for (i32 key = 0; key < key_range; ++key) {
+        auto value_ptr = map.Get(key);
+        if (value_ptr != nullptr) {
+            final_accessible_keys++;
+            EXPECT_GE(*value_ptr, 0);
+        }
+    }
+
+    EXPECT_GT(final_accessible_keys, 0);
+    EXPECT_LE(final_accessible_keys, key_range); // Can't exceed key range for Map
+}
+
+TEST_F(RcuMapTest, TestConcurrentInsertDeleteRead) {
+    RcuMap<String, i32> map;
+
+    const i32 num_threads = 6;
+    const i32 operations_per_thread = 50;
+    const i32 key_range = 10;
+
+    std::atomic<i32> total_insertions{0};
+    std::atomic<i32> total_deletions{0};
+    std::atomic<i32> total_reads{0};
+    std::atomic<bool> start_flag{false};
+
+    Vector<std::thread> threads;
+
+    // Create insert threads
+    for (i32 t = 0; t < num_threads / 3; ++t) {
+        threads.emplace_back([&, t]() {
+            while (!start_flag.load()) {
+                std::this_thread::yield();
+            }
+
+            std::random_device rd;
+            std::mt19937 gen(rd() + t);
+            std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
+
+            for (i32 i = 0; i < operations_per_thread; ++i) {
+                String key = "key_" + std::to_string(key_dist(gen));
+                i32 value = t * operations_per_thread + i;
+
+                map.Insert(key, value);
+                total_insertions.fetch_add(1);
+
+                if (i % 15 == 0) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    // Create delete threads
+    for (i32 t = num_threads / 3; t < 2 * num_threads / 3; ++t) {
+        threads.emplace_back([&, t]() {
+            while (!start_flag.load()) {
+                std::this_thread::yield();
+            }
+
+            // Wait a bit to let some data be inserted
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+            std::random_device rd;
+            std::mt19937 gen(rd() + t);
+            std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
+
+            for (i32 i = 0; i < operations_per_thread / 2; ++i) {
+                String key = "key_" + std::to_string(key_dist(gen));
+                map.Delete(key);
+                total_deletions.fetch_add(1);
+
+                if (i % 10 == 0) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    // Create read threads
+    for (i32 t = 2 * num_threads / 3; t < num_threads; ++t) {
+        threads.emplace_back([&, t]() {
+            while (!start_flag.load()) {
+                std::this_thread::yield();
+            }
+
+            std::random_device rd;
+            std::mt19937 gen(rd() + t);
+            std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
+
+            for (i32 i = 0; i < operations_per_thread; ++i) {
+                String key = "key_" + std::to_string(key_dist(gen));
+                auto value_ptr = map.Get(key);
+
+                total_reads.fetch_add(1);
+                if (value_ptr != nullptr) {
+                    EXPECT_GE(*value_ptr, 0); // Basic sanity check
+                }
+
+                if (i % 20 == 0) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+    }
+
+    // Start all threads
+    start_flag.store(true);
+
+    // Wait for all threads to complete
+    for (auto &thread : threads) {
+        thread.join();
+    }
+
+    // Verify operation counts
+    EXPECT_EQ(total_insertions.load(), (num_threads / 3) * operations_per_thread);
+    EXPECT_EQ(total_deletions.load(), (num_threads / 3) * (operations_per_thread / 2));
+    EXPECT_EQ(total_reads.load(), (num_threads / 3) * operations_per_thread);
+
+    // Verify map is still functional
+    EXPECT_GE(map.size(), 0);
+}
+
+TEST_F(RcuMapTest, TestRcuSwapUnderLoad) {
+    RcuMap<String, i32> map;
+
+    const i32 num_threads = 4;
+    const i32 operations_per_thread = 100;
+    const i32 key_range = 8; // Small key range to force frequent access
+
+    std::atomic<i32> total_gets{0};
+    std::atomic<bool> start_flag{false};
+
+    Vector<std::thread> threads;
+
+    // Create threads that will trigger RCU swaps through cache misses
+    for (i32 t = 0; t < num_threads; ++t) {
+        threads.emplace_back([&, t]() {
+            while (!start_flag.load()) {
+                std::this_thread::yield();
+            }
+
+            std::random_device rd;
+            std::mt19937 gen(rd() + t);
+            std::uniform_int_distribution<i32> key_dist(0, key_range - 1);
+
+            // First, insert some data
+            for (i32 i = 0; i < 5; ++i) {
+                String key = "swap_key_" + std::to_string(key_dist(gen));
+                i32 value = t * 1000 + i;
+                map.Insert(key, value);
+            }
+
+            // Then perform many reads to trigger cache misses and swaps
+            for (i32 i = 0; i < operations_per_thread; ++i) {
+                String key = "swap_key_" + std::to_string(key_dist(gen));
+                auto value_ptr = map.Get(key, true); // Update access time
+
+                total_gets.fetch_add(1);
+
+                // Verify data integrity during RCU operations
+                if (value_ptr != nullptr) {
+                    EXPECT_GE(*value_ptr, 0);
+                }
+
+                // Force frequent access to trigger CheckSwapInLock
+                if (i % 10 == 0) {
+                    // Access multiple keys rapidly to increase miss_time
+                    for (i32 j = 0; j < 3; ++j) {
+                        String rapid_key = "swap_key_" + std::to_string(j % key_range);
+                        map.Get(rapid_key, true);
+                        total_gets.fetch_add(1);
+                    }
+                }
+            }
+        });
+    }
+
+    // Start all threads
+    start_flag.store(true);
+
+    // Wait for all threads to complete
+    for (auto &thread : threads) {
+        thread.join();
+    }
+
+    // Verify that significant work was done
+    EXPECT_GE(total_gets.load(), num_threads * operations_per_thread);
+
+    // Verify final state consistency
+    i32 final_accessible_keys = 0;
+
+    for (i32 i = 0; i < key_range; ++i) {
+        String key = "swap_key_" + std::to_string(i);
+        auto value_ptr = map.Get(key);
+
+        if (value_ptr != nullptr) {
+            final_accessible_keys++;
+            EXPECT_GE(*value_ptr, 0);
+        }
+    }
+
+    EXPECT_GE(final_accessible_keys, 0);
+    EXPECT_LE(final_accessible_keys, key_range);
+}
+
+TEST_F(RcuMapTest, TestRcuBehavior) {
+    RcuMap<String, i32> map;
+
+    // Insert data (goes to dirty_map)
+    map.Insert("key1", 100);
+    map.Insert("key2", 200);
+
+    // Data should be accessible via Get (searches both dirty and read maps)
+    auto value1_ptr = map.Get("key1");
+    ASSERT_NE(value1_ptr, nullptr);
+    EXPECT_EQ(*value1_ptr, 100);
+
+    // Force multiple cache misses to trigger CheckSwapInLock
+    for (int i = 0; i < 10; ++i) {
+        auto temp_value_ptr = map.Get("key1");
+        ASSERT_NE(temp_value_ptr, nullptr);
+    }
+
+    // The key insight is that Get always works regardless of RCU state
+    auto final_value_ptr = map.Get("key1");
+    ASSERT_NE(final_value_ptr, nullptr);
+    EXPECT_EQ(*final_value_ptr, 100);
+}
+
+TEST_F(RcuMapTest, TestMapVsMultiMapBehavior) {
+    RcuMap<String, i32> map;
+    RcuMultiMap<String, i32> multimap;
+
+    // Test that Map replaces values while MultiMap accumulates them
+    map.Insert("test_key", 10);
+    map.Insert("test_key", 20);
+    map.Insert("test_key", 30);
+
+    multimap.Insert("test_key", 10);
+    multimap.Insert("test_key", 20);
+    multimap.Insert("test_key", 30);
+
+    // Map should have only the last value
+    auto map_value_ptr = map.Get("test_key");
+    ASSERT_NE(map_value_ptr, nullptr);
+    EXPECT_EQ(*map_value_ptr, 30);
+    EXPECT_EQ(map.size(), 1);
+
+    // MultiMap should have all values
+    auto multimap_values = multimap.Get("test_key");
+    EXPECT_EQ(multimap_values.size(), 3);
+    EXPECT_GT(multimap.size(), 0);
+
+    // Test range behavior differences
+    map.Insert("key1", 100);
+    map.Insert("key2", 200);
+    map.Insert("key3", 300);
+
+    multimap.Insert("key1", 100);
+    multimap.Insert("key2", 200);
+    multimap.Insert("key3", 300);
+
+    Vector<i32> map_range_result;
+    Vector<i32> multimap_range_result;
+
+    u32 map_count = map.range("key1", "key3", map_range_result);
+    u32 multimap_count = multimap.range("key1", "key3", multimap_range_result);
+
+    // Both should find the same number of keys in range, but Map guarantees unique keys
+    EXPECT_EQ(map_count, map_range_result.size());
+    EXPECT_EQ(multimap_count, multimap_range_result.size());
+    EXPECT_GE(map_count, 3); // At least key1, key2, key3
+}

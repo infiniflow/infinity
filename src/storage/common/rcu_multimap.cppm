@@ -388,4 +388,388 @@ u32 RcuMultiMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vecto
     return count;
 }
 
+// RcuMap implementation using Map (std::map) as inner map
+export template <typename Key, typename Value>
+class RcuMap {
+private:
+    struct MapValue {
+        Value value_;
+        volatile u64 used_time_;
+
+        // Comparison operators needed for Set storage
+        bool operator<(const MapValue &other) const {
+            if (value_ != other.value_) {
+                return value_ < other.value_;
+            }
+            return used_time_ < other.used_time_;
+        }
+
+        bool operator==(const MapValue &other) const { return value_ == other.value_ && used_time_ == other.used_time_; }
+
+        bool operator!=(const MapValue &other) const { return !(*this == other); }
+    };
+
+    typedef Map<Key, MapValue> InnerMap;
+
+    struct DeletedMap {
+        InnerMap *map_;
+        Set<Pair<Key, MapValue>> *deleted_entries_;
+        u64 delete_time_;
+    };
+
+public:
+    explicit RcuMap();
+
+    ~RcuMap();
+
+    // Get single value for key (returns nullptr if not found)
+    Value *Get(const Key &key, bool update_access_time = true);
+
+    // Get single value for key (returns Optional)
+    Optional<Value> GetValue(const Key &key, bool update_access_time = true);
+
+    // Add lowercase alias for compatibility
+    Value *get(const Key &key, bool update_access_time = true) { return Get(key, update_access_time); }
+
+    Value *GetWithRcuTime(const Key &key);
+
+    void Insert(const Key &key, const Value &value);
+
+    // Add lowercase alias for compatibility
+    void insert(const Key &key, const Value &value) { Insert(key, value); }
+
+    void Delete(const Key &key);
+
+    // Add lowercase alias for compatibility
+    void delete_key(const Key &key) { Delete(key); }
+
+    void CheckGc(u64 min_delete_time);
+
+    // Add lowercase alias for compatibility
+    void checkGc(u64 min_delete_time) { CheckGc(min_delete_time); }
+
+    void CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired);
+
+    void GetAllValuesWithRef(Vector<Value> &values);
+
+    void GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const;
+
+    size_t size() const;
+
+    template <typename... Args>
+    void emplace(const Key &key, Args &&...args);
+
+    u32 range(const Key &key_min, const Key &key_max, Vector<Value> &result) const;
+
+private:
+    void CheckSwapInLock();
+    MapValue CreateMapValue(const Value &value);
+
+    // Helper function to get current time in milliseconds
+    u64 GetCurrentTimeMs() const {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    }
+
+private:
+    InnerMap *volatile read_map_;
+    std::size_t miss_time_;
+
+    mutable std::mutex dirty_lock_;
+    InnerMap *dirty_map_;
+
+    Set<Pair<Key, MapValue>> deleted_entries_;
+
+    List<MapValue> deleted_value_list_;
+    List<DeletedMap> deleted_map_list_;
+};
+
+// RcuMap implementation
+template <typename Key, typename Value>
+RcuMap<Key, Value>::RcuMap() {
+    read_map_ = new InnerMap();
+    miss_time_ = 0;
+    dirty_map_ = new InnerMap();
+}
+
+template <typename Key, typename Value>
+RcuMap<Key, Value>::~RcuMap() {
+    delete dirty_map_;
+    delete read_map_;
+
+    while (!deleted_value_list_.empty()) {
+        deleted_value_list_.pop_front();
+    }
+
+    while (!deleted_map_list_.empty()) {
+        DeletedMap &deleted_map = deleted_map_list_.front();
+        delete deleted_map.deleted_entries_;
+        delete deleted_map.map_;
+        deleted_map_list_.pop_front();
+    }
+}
+
+template <typename Key, typename Value>
+typename RcuMap<Key, Value>::MapValue RcuMap<Key, Value>::CreateMapValue(const Value &value) {
+    MapValue map_value;
+    map_value.value_ = value;
+    map_value.used_time_ = GetCurrentTimeMs();
+    return map_value;
+}
+
+template <typename Key, typename Value>
+Value *RcuMap<Key, Value>::Get(const Key &key, bool update_access_time) {
+    // For RcuMap, check dirty_map first to get the most recent value
+    // since Map replaces values for the same key
+    {
+        std::lock_guard<std::mutex> lock(dirty_lock_);
+        auto dirty_it = dirty_map_->find(key);
+
+        if (dirty_it != dirty_map_->end()) {
+            if (update_access_time) {
+                dirty_it->second.used_time_ = GetCurrentTimeMs();
+            }
+            return &(dirty_it->second.value_);
+        }
+    }
+
+    // If not found in dirty_map, check read_map
+    InnerMap *current_read = read_map_;
+    auto it = current_read->find(key);
+
+    if (it != current_read->end()) {
+        if (update_access_time) {
+            it->second.used_time_ = GetCurrentTimeMs();
+        }
+
+        // Increment miss_time since we had to go to read_map
+        {
+            std::lock_guard<std::mutex> lock(dirty_lock_);
+            if (read_map_ == current_read) {
+                miss_time_++;
+                CheckSwapInLock();
+            }
+        }
+        return &(it->second.value_);
+    }
+
+    return nullptr;
+}
+
+template <typename Key, typename Value>
+Optional<Value> RcuMap<Key, Value>::GetValue(const Key &key, bool update_access_time) {
+    Value *result = Get(key, update_access_time);
+    if (result != nullptr) {
+        return Optional<Value>(*result);
+    }
+    return Optional<Value>();
+}
+
+template <typename Key, typename Value>
+Value *RcuMap<Key, Value>::GetWithRcuTime(const Key &key) {
+    return Get(key, false);
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::CheckSwapInLock() {
+    if (miss_time_ < dirty_map_->size()) {
+        return;
+    }
+
+    InnerMap *new_dirty_map = new InnerMap(*dirty_map_);
+    DeletedMap deleted_map;
+    deleted_map.map_ = read_map_;
+    read_map_ = dirty_map_;
+    deleted_map.delete_time_ = GetCurrentTimeMs();
+    deleted_map.deleted_entries_ = new Set<Pair<Key, MapValue>>();
+    deleted_map.deleted_entries_->swap(deleted_entries_);
+    dirty_map_ = new_dirty_map;
+    deleted_map_list_.push_back(deleted_map);
+    miss_time_ = 0;
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::Insert(const Key &key, const Value &value) {
+    MapValue new_value = CreateMapValue(value);
+
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    // For Map, we replace existing value if key exists
+    auto it = dirty_map_->find(key);
+    if (it != dirty_map_->end()) {
+        // Mark old value for deletion
+        MapValue old_value = it->second;
+        old_value.used_time_ = GetCurrentTimeMs();
+        deleted_value_list_.push_back(old_value);
+
+        // Check if key exists in read_map and mark for deletion
+        auto read_it = read_map_->find(key);
+        if (read_it != read_map_->end()) {
+            deleted_entries_.insert(MakePair(key, old_value));
+        }
+    }
+
+    (*dirty_map_)[key] = new_value;
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::Delete(const Key &key) {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    // First check if key exists in dirty_map
+    auto dirty_it = dirty_map_->find(key);
+    if (dirty_it != dirty_map_->end()) {
+        MapValue map_value = dirty_it->second;
+        dirty_map_->erase(dirty_it);
+
+        map_value.used_time_ = GetCurrentTimeMs();
+        deleted_value_list_.push_back(map_value);
+
+        // Also mark for deletion in read_map if it exists there
+        auto read_it = read_map_->find(key);
+        if (read_it != read_map_->end()) {
+            deleted_entries_.insert(MakePair(key, map_value));
+        }
+    } else {
+        // If not in dirty_map, check if it exists in read_map
+        auto read_it = read_map_->find(key);
+        if (read_it != read_map_->end()) {
+            // Mark the entry from read_map for deletion
+            MapValue map_value = read_it->second;
+            map_value.used_time_ = GetCurrentTimeMs();
+            deleted_entries_.insert(MakePair(key, map_value));
+            deleted_value_list_.push_back(map_value);
+        }
+    }
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::CheckGc(u64 min_delete_time) {
+    Vector<Value> values_need_delete;
+    {
+        std::lock_guard<std::mutex> lock(dirty_lock_);
+        while (!deleted_value_list_.empty()) {
+            MapValue &oldest_value = deleted_value_list_.front();
+            if (oldest_value.used_time_ >= min_delete_time) {
+                break;
+            }
+            values_need_delete.push_back(oldest_value.value_);
+            deleted_value_list_.pop_front();
+        }
+    }
+
+    Vector<DeletedMap> map_need_delete;
+    {
+        std::lock_guard<std::mutex> lock(dirty_lock_);
+        while (!deleted_map_list_.empty()) {
+            DeletedMap &oldest_value = deleted_map_list_.front();
+            if (oldest_value.delete_time_ >= min_delete_time) {
+                break;
+            }
+            map_need_delete.push_back(oldest_value);
+            deleted_map_list_.pop_front();
+        }
+    }
+
+    for (auto &deleted_map : map_need_delete) {
+        delete deleted_map.deleted_entries_;
+        delete deleted_map.map_;
+    }
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::CheckExpired(u64 min_access_time, Vector<Key> &keys_need_expired) {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+    Set<Key> expired_keys;
+
+    for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
+        if (it->second.used_time_ <= min_access_time) {
+            expired_keys.insert(it->first);
+        }
+    }
+
+    keys_need_expired.assign(expired_keys.begin(), expired_keys.end());
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::GetAllValuesWithRef(Vector<Value> &values) {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+    for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
+        values.push_back(it->second.value_);
+    }
+}
+
+template <typename Key, typename Value>
+void RcuMap<Key, Value>::GetAllKeyValuePairs(Vector<Pair<Key, Value>> &pairs) const {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+
+    // Get pairs from dirty_map
+    for (auto it = dirty_map_->begin(); it != dirty_map_->end(); ++it) {
+        pairs.emplace_back(it->first, it->second.value_);
+    }
+
+    // Also get pairs from read_map if it exists and is different from dirty_map
+    if (read_map_ != nullptr && read_map_ != dirty_map_) {
+        for (auto it = read_map_->begin(); it != read_map_->end(); ++it) {
+            // Only add if key doesn't exist in dirty_map (avoid duplicates)
+            if (dirty_map_->find(it->first) == dirty_map_->end()) {
+                pairs.emplace_back(it->first, it->second.value_);
+            }
+        }
+    }
+}
+
+template <typename Key, typename Value>
+size_t RcuMap<Key, Value>::size() const {
+    std::lock_guard<std::mutex> lock(dirty_lock_);
+    return dirty_map_->size();
+}
+
+template <typename Key, typename Value>
+template <typename... Args>
+void RcuMap<Key, Value>::emplace(const Key &key, Args &&...args) {
+    Value value(std::forward<Args>(args)...);
+    Insert(key, value);
+}
+
+template <typename Key, typename Value>
+u32 RcuMap<Key, Value>::range(const Key &key_min, const Key &key_max, Vector<Value> &result) const {
+    InnerMap *current_read = read_map_;
+    auto read_begin = current_read->lower_bound(key_min);
+    auto read_end = current_read->upper_bound(key_max);
+
+    InnerMap *dirty_snapshot = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(dirty_lock_);
+        dirty_snapshot = dirty_map_;
+    }
+
+    auto dirty_begin = dirty_snapshot->lower_bound(key_min);
+    auto dirty_end = dirty_snapshot->upper_bound(key_max);
+
+    // merge - for Map, we prioritize dirty_map values over read_map
+    u32 count = 0;
+    auto read_it = read_begin;
+    auto dirty_it = dirty_begin;
+    Set<Key> processed_keys;
+
+    // First, add all values from dirty_map
+    while (dirty_it != dirty_end) {
+        result.push_back(dirty_it->second.value_);
+        processed_keys.insert(dirty_it->first);
+        ++dirty_it;
+        ++count;
+    }
+
+    // Then add values from read_map that are not in dirty_map
+    while (read_it != read_end) {
+        if (processed_keys.find(read_it->first) == processed_keys.end()) {
+            result.push_back(read_it->second.value_);
+            ++count;
+        }
+        ++read_it;
+    }
+
+    return count;
+}
+
 } // namespace infinity
