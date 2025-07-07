@@ -75,17 +75,8 @@ public:
         BufferHandle handle = buffer_obj->Load();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
 
-        // Convert RcuMultiMap data to MultiMap for compatibility with InsertData
         MultiMap<KeyType, u32> temp_map;
-
-        // Get all key-value pairs from RcuMultiMap
-        Vector<Pair<KeyType, u32>> all_pairs;
-        in_mem_secondary_index_.GetAllKeyValuePairs(all_pairs);
-
-        // Convert to the format expected by InsertData
-        for (const auto &[key, value] : all_pairs) {
-            temp_map.emplace(key, value);
-        }
+        const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
         data_ptr->InsertData(&temp_map);
     }
