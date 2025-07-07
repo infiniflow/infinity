@@ -19,16 +19,16 @@ export module infinity_core:expression_state;
 import :stl;
 
 namespace infinity {
-class BaseExpression;
-class AggregateExpression;
-class CaseExpression;
-class CastExpression;
-class ReferenceExpression;
-class FunctionExpression;
-class ValueExpression;
-class InExpression;
-class FilterFulltextExpression;
-class ColumnVector;
+export class BaseExpression;
+export class AggregateExpression;
+export class CaseExpression;
+export class CastExpression;
+export class ReferenceExpression;
+export class FunctionExpression;
+export class ValueExpression;
+export class InExpression;
+export class FilterFulltextExpression;
+export class ColumnVector;
 
 export enum class AggregateFlag : i8 {
     kUninitialized = 0,

@@ -21,17 +21,17 @@ import :data_block;
 import :column_vector;
 
 namespace infinity {
-class FilterFulltextExpression;
-class InExpression;
-class ReferenceExpression;
-class ValueExpression;
-class FunctionExpression;
-class ColumnExpression;
-class CaseExpression;
-class CastExpression;
-class AggregateExpression;
-class ExpressionState;
-class BaseExpression;
+export class FilterFulltextExpression;
+export class InExpression;
+export class ReferenceExpression;
+export class ValueExpression;
+export class FunctionExpression;
+export class ColumnExpression;
+export class CaseExpression;
+export class CastExpression;
+export class AggregateExpression;
+export class ExpressionState;
+export class BaseExpression;
 
 export class ExpressionEvaluator {
 public:

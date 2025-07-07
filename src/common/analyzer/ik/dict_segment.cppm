@@ -7,7 +7,7 @@ import :hit;
 
 namespace infinity {
 
-class DictSegment {
+export class DictSegment {
 public:
     static HashMap<wchar_t, wchar_t> char_map_;
 
