@@ -5,7 +5,7 @@ module;
 
 export module rcu_multimap;
 
-import stl;
+import :stl;
 
 namespace infinity {
 
