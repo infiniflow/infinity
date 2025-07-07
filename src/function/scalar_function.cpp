@@ -15,18 +15,18 @@ module;
 
 #include <sstream>
 
-module scalar_function;
+module infinity_core;
 
-import stl;
-import function;
+import :stl;
+import :function;
 
-import status;
-import infinity_exception;
-import data_block;
-import base_expression;
-import column_vector;
-import third_party;
-import logger;
+import :status;
+import :infinity_exception;
+import :data_block;
+import :base_expression;
+import :column_vector;
+import :third_party;
+import :logger;
 
 namespace infinity {
 

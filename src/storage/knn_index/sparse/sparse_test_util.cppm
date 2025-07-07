@@ -18,13 +18,13 @@ module;
 #include <cstdlib>
 #include <iostream>
 
-export module sparse_test_util;
+export module infinity_core:sparse_test_util;
 
-import stl;
-import sparse_vector_distance;
-import linscan_alg;
-import sparse_util;
-import infinity_exception;
+import :stl;
+import :sparse_vector_distance;
+import :linscan_alg;
+import :sparse_util;
+import :infinity_exception;
 
 namespace infinity {
 

@@ -4,34 +4,34 @@ module;
 #include <fstream>
 #include <string>
 
-module column_index_merger;
+module infinity_core;
 
-import stl;
-import byte_slice;
-import byte_slice_reader;
-import file_reader;
-import posting_decoder;
-import posting_list_format;
-import index_defines;
-import term_meta;
-import index_full_text;
-import column_index_iterator;
-import segment_term_posting;
-import fst;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :file_reader;
+import :posting_decoder;
+import :posting_list_format;
+import :index_defines;
+import :term_meta;
+import :index_full_text;
+import :column_index_iterator;
+import :segment_term_posting;
+import :fst.fst;
 import internal_types;
-import posting_byte_slice_reader;
-import posting_merger;
-import third_party;
-import virtual_store;
-import local_file_handle;
-import infinity_exception;
-import vector_with_lock;
-import logger;
-import persistence_manager;
-import infinity_context;
-import defer_op;
-import utility;
-import persist_result_handler;
+import :posting_byte_slice_reader;
+import :posting_merger;
+import :third_party;
+import :virtual_store;
+import :local_file_handle;
+import :infinity_exception;
+import :vector_with_lock;
+import :logger;
+import :persistence_manager;
+import :infinity_context;
+import :defer_op;
+import :utility;
+import :persist_result_handler;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}

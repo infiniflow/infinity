@@ -13,13 +13,11 @@
 // limitations under the License.
 module;
 
-export module session_manager;
+export module infinity_core:session_manager;
 
-import stl;
-import session;
-import profiler;
-import status;
-import global_resource_usage;
+import :stl;
+import :profiler;
+import :session;
 
 namespace infinity {
 

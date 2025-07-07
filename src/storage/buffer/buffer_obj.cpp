@@ -16,20 +16,20 @@ module;
 
 #include <cassert>
 
-module buffer_obj;
+module infinity_core;
 
-import stl;
-import file_worker;
-import buffer_handle;
-import buffer_manager;
-import infinity_exception;
-import logger;
-import third_party;
-import file_worker_type;
-import var_file_worker;
+import :stl;
+import :file_worker;
+import :buffer_handle;
+import :buffer_manager;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :file_worker_type;
+import :var_file_worker;
 import global_resource_usage;
-import kv_store;
-import status;
+import :kv_store;
+import :status;
 
 namespace infinity {
 

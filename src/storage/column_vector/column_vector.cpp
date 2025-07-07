@@ -18,36 +18,37 @@ module;
 #include <cstring>
 #include <sstream>
 
-module column_vector;
+module infinity_core;
 
-import stl;
-import selection;
+import :stl;
+import :selection;
 
 import type_info;
-import infinity_exception;
-import default_values;
-import roaring_bitmap;
-import vector_buffer;
+import :infinity_exception;
+import :default_values;
+import :roaring_bitmap;
+import :vector_buffer;
 import serialize;
-import third_party;
-import logger;
-import value;
+import :third_party;
+import :logger;
+import :value;
 import internal_types;
 import logical_type;
-import buffer_manager;
-import status;
+import :buffer_manager;
+import :status;
 import logical_type;
 import embedding_info;
 import array_info;
-import base_expression;
-import value_expression;
-import expression_binder;
-import cast_function;
-import bound_cast_func;
-import cast_expression;
-import expression_evaluator;
-import expression_state;
+import :base_expression;
+import :value_expression;
+import :expression_binder;
+import :cast_function;
+import :bound_cast_func;
+import :cast_expression;
+import :expression_evaluator;
+import :expression_state;
 import sparse_info;
+import constant_expr;
 
 namespace infinity {
 

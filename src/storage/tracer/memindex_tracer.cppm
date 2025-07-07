@@ -16,16 +16,15 @@ module;
 
 #include "type/complex/row_id.h"
 
-export module memindex_tracer;
+export module infinity_core:memindex_tracer;
 
-import stl;
-import third_party;
-import logger;
-import global_resource_usage;
+import :stl;
+import :third_party;
+import :logger;
 
 namespace infinity {
 
-class BaseMemIndex;
+export class BaseMemIndex;
 class NewTxn;
 struct NewCatalog;
 class NewTxnManager;

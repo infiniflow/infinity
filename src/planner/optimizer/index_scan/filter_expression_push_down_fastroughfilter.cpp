@@ -16,19 +16,19 @@ module;
 
 #include <string>
 #include <vector>
-module filter_expression_push_down;
+module infinity_core;
 
-import stl;
-import index_filter_expression_info_tree;
-import value;
-import expression_type;
+import :stl;
+import :index_filter_expression_info_tree;
+import :value;
+import :expression_type;
 import logical_type;
 import internal_types;
-import function_expression;
-import filter_expression_push_down_helper;
-import infinity_exception;
-import third_party;
-import column_expression;
+import :function_expression;
+import :filter_expression_push_down_helper;
+import :infinity_exception;
+import :third_party;
+import :column_expression;
 
 namespace infinity {
 

@@ -14,25 +14,25 @@
 
 module;
 
-module physical_merge_match_tensor;
+module infinity_core;
 
-import stl;
-import query_context;
-import physical_operator_type;
-import operator_state;
-import logger;
-import status;
-import infinity_exception;
-import buffer_manager;
-import third_party;
-import default_values;
-import data_block;
-import value;
-import column_vector;
-import cached_match_scan;
-import result_cache_manager;
-import meta_info;
-import new_txn;
+import :stl;
+import :query_context;
+import :physical_operator_type;
+import :operator_state;
+import :logger;
+import :status;
+import :infinity_exception;
+import :buffer_manager;
+import :third_party;
+import :default_values;
+import :data_block;
+import :value;
+import :column_vector;
+import :cached_match_scan;
+import :result_cache_manager;
+import :meta_info;
+import :new_txn;
 
 namespace infinity {
 

@@ -16,26 +16,26 @@ module;
 
 #include <string>
 
-module segment_index_meta;
+module infinity_core;
 
-import kv_code;
-import kv_store;
-import table_index_meeta;
-import table_meeta;
-import third_party;
-import infinity_context;
-import new_catalog;
-import mem_index;
-import index_base;
+import :kv_code;
+import :kv_store;
+import :table_index_meeta;
+import :table_meeta;
+import :third_party;
+import :infinity_context;
+import :new_catalog;
+import :mem_index;
+import :index_base;
 import create_index_info;
-import meta_info;
-import chunk_index_meta;
-import new_txn;
-import txn_state;
-import infinity_exception;
-import utility;
-import memory_indexer;
-import logger;
+import :meta_info;
+import :chunk_index_meta;
+import :new_txn;
+import :txn_state;
+import :infinity_exception;
+import :utility;
+import :memory_indexer;
+import :logger;
 
 namespace infinity {
 

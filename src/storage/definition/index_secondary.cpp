@@ -18,14 +18,14 @@ module;
 #include <sstream>
 #include <string>
 
-module index_secondary;
+module infinity_core;
 
-import stl;
-import status;
-import base_table_ref;
-import infinity_exception;
-import third_party;
-import logger;
+import :stl;
+import :status;
+import :base_table_ref;
+import :infinity_exception;
+import :third_party;
+import :logger;
 
 namespace infinity {
 

@@ -17,11 +17,11 @@ module;
 #include <cassert>
 #include <vector>
 
-module compact_state_data;
+module infinity_core;
 
-import third_party;
-import logger;
-import block_index;
+import :third_party;
+import :logger;
+import :block_index;
 
 namespace infinity {
 

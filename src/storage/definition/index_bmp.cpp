@@ -17,16 +17,18 @@ module;
 #include <sstream>
 #include <vector>
 
-module index_bmp;
+module infinity_core;
 
-import status;
-import logger;
-import infinity_exception;
-import default_values;
+import :status;
+import :logger;
+import :infinity_exception;
+import :default_values;
 import logical_type;
 import serialize;
 import sparse_info;
 import internal_types;
+import :index_bmp;
+import statement_common;
 
 namespace infinity {
 

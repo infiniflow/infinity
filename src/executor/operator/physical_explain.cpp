@@ -16,26 +16,27 @@ module;
 
 #include <vector>
 
-module physical_explain;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import physical_operator_type;
-import operator_state;
-import column_vector;
-import data_block;
-import default_values;
-import value;
-import status;
-import infinity_exception;
+import :physical_operator_type;
+import :operator_state;
+import :column_vector;
+import :data_block;
+import :default_values;
+import :value;
+import :status;
+import :infinity_exception;
 import logical_type;
-import logger;
-import plan_fragment;
-import fragment_task;
-import third_party;
+import :logger;
+import :plan_fragment;
+import :fragment_task;
+import :third_party;
+import explain_statement;
 
 namespace infinity {
 

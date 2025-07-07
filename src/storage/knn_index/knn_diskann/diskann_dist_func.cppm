@@ -14,14 +14,15 @@
 
 module;
 #include <type_traits>
-import stl;
-import simd_functions;
-import mlas_matrix_multiply;
-import search_top_1;
-import diskann_simd_func;
-import infinity_exception;
 
-export module diskann_dist_func;
+export module infinity_core:diskann_dist_func;
+
+import :stl;
+import :simd_functions;
+import :mlas_matrix_multiply;
+import :search_top_1;
+import :diskann_simd_func;
+import :infinity_exception;
 
 namespace infinity {
 export enum class DiskAnnMetricType { L2, Cosine, IP, Invalid };

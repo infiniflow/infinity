@@ -14,20 +14,20 @@
 
 module;
 
-export module bmp_alg;
+export module infinity_core:bmp_alg;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import bmp_util;
-import hnsw_common;
-import knn_result_handler;
-import bmp_ivt;
-import bmp_fwd;
-import bp_reordering;
+import :stl;
+import :sparse_util;
+import :local_file_handle;
+import :bmp_util;
+import :hnsw_common;
+import :knn_result_handler;
+import :bmp_ivt;
+import :bmp_fwd;
+import :bp_reordering;
 import serialize;
-import third_party;
-import infinity_exception;
+import :third_party;
+import :infinity_exception;
 
 namespace infinity {
 

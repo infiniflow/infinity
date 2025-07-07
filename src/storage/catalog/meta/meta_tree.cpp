@@ -20,30 +20,30 @@ module;
 #include <ranges>
 #include <regex>
 
-module meta_tree;
+module infinity_core;
 
-import stl;
-import third_party;
-import infinity_context;
-import infinity_exception;
+import :stl;
+import :third_party;
+import :infinity_context;
+import :infinity_exception;
 import internal_types;
-import default_values;
-import logger;
-import buffer_obj;
-import storage;
-import config;
-import buffer_manager;
-import block_version;
-import buffer_handle;
-import new_catalog;
-import status;
-import kv_code;
-import catalog_cache;
+import :default_values;
+import :logger;
+import :buffer_obj;
+import :storage;
+import :config;
+import :buffer_manager;
+import :block_version;
+import :buffer_handle;
+import :new_catalog;
+import :status;
+import :kv_code;
+import :catalog_cache;
 import check_statement;
-import kv_utility;
-import kv_store;
-import new_txn_manager;
-import utility;
+import :kv_utility;
+import :kv_store;
+import :new_txn_manager;
+import :utility;
 
 namespace infinity {
 

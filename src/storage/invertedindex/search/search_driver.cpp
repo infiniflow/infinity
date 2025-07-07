@@ -22,15 +22,15 @@
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
 
-import stl;
-import term;
-import infinity_exception;
-import status;
-import logger;
-import third_party;
-import analyzer;
-import analyzer_pool;
-import search_scanner;
+// import :stl;
+// import :term;
+// import :infinity_exception;
+// import :status;
+// import :logger;
+// import :third_party;
+// import :analyzer;
+// import :analyzer_pool;
+import infinity_core;
 
 namespace infinity {
 

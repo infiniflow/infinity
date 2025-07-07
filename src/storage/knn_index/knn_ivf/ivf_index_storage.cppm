@@ -16,15 +16,15 @@ module;
 
 #include <cassert>
 
-export module ivf_index_storage;
+export module infinity_core:ivf_index_storage;
 
-import stl;
-import index_ivf;
+import :stl;
+import :index_ivf;
 import internal_types;
 import logical_type;
 import data_type;
-import ivf_index_util_func;
-import infinity_exception;
+import :ivf_index_util_func;
+import :infinity_exception;
 
 namespace infinity {
 

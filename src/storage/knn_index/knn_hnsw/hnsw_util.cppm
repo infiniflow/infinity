@@ -16,12 +16,12 @@ module;
 
 #include <vector>
 
-export module hnsw_util;
+export module infinity_core:hnsw_util;
 
-import stl;
+import :stl;
 import statement_common;
-import infinity_exception;
-import status;
+import :infinity_exception;
+import :status;
 
 namespace infinity {
 

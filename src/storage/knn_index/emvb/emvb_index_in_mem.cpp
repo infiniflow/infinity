@@ -16,35 +16,35 @@ module;
 
 #include <vector>
 
-module emvb_index_in_mem;
+module infinity_core;
 
-import stl;
+import :stl;
 import logical_type;
 import internal_types;
 import column_def;
-import roaring_bitmap;
-import default_values;
-import buffer_manager;
-import block_column_iter;
-import infinity_exception;
-import emvb_index;
-import index_emvb;
-import buffer_handle;
-import index_base;
-import logger;
+import :roaring_bitmap;
+import :default_values;
+import :buffer_manager;
+import :block_column_iter;
+import :infinity_exception;
+import :emvb_index;
+import :index_emvb;
+import :buffer_handle;
+import :index_base;
+import :logger;
 import logical_type;
 import type_info;
 import embedding_info;
-import emvb_product_quantization;
-import column_vector;
-import block_index;
+import :emvb_product_quantization;
+import :column_vector;
+import :block_index;
 
-import table_meeta;
-import segment_meta;
-import new_txn;
-import buffer_obj;
-import kv_store;
-import chunk_index_meta;
+import :table_meeta;
+import :segment_meta;
+import :new_txn;
+import :buffer_obj;
+import :kv_store;
+import :chunk_index_meta;
 
 namespace infinity {
 

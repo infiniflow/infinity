@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_merge_sort;
+import :query_context;
+import :operator_state;
+import :physical_merge_sort;
 
 namespace infinity {
 
-void PhysicalMergeSort::Init(QueryContext* query_context) {}
+void PhysicalMergeSort::Init(QueryContext *query_context) {}
 
 bool PhysicalMergeSort::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 

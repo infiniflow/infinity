@@ -16,27 +16,27 @@ module;
 
 #include <string>
 
-module project_binder;
+module infinity_core;
 
-import stl;
-import base_expression;
+import :stl;
+import :base_expression;
 
-import bind_context;
-import function;
-import function_set;
-import column_expression;
-import unnest_expression;
-import third_party;
+import :bind_context;
+import :function;
+import :function_set;
+import :column_expression;
+import :unnest_expression;
+import :third_party;
 import function_expr;
 import parsed_expr;
 import column_expr;
-import infinity_exception;
-import logger;
-import status;
+import :infinity_exception;
+import :logger;
+import :status;
 import logical_type;
 import array_info;
 import data_type;
-import new_catalog;
+import :new_catalog;
 
 namespace {
 

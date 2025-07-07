@@ -16,9 +16,9 @@ module;
 
 #include <functional>
 
-export module column_binding;
+export module infinity_core:column_binding;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -18,25 +18,25 @@ module;
 #include <string>
 #include <vector>
 
-module index_base;
+module infinity_core;
 
-import stl;
+import :stl;
 import serialize;
-import index_ivf;
-import index_hnsw;
-import index_diskann;
-import index_full_text;
-import index_secondary;
-import index_emvb;
-import index_bmp;
-import bmp_util;
-import third_party;
-import status;
+import :index_ivf;
+import :index_hnsw;
+import :index_diskann;
+import :index_full_text;
+import :index_secondary;
+import :index_emvb;
+import :index_bmp;
+import :bmp_util;
+import :third_party;
+import :status;
 
-import infinity_exception;
+import :infinity_exception;
 import create_index_info;
-import index_defines;
-import logger;
+import :index_defines;
+import :logger;
 
 namespace infinity {
 

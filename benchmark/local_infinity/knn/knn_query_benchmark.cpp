@@ -24,13 +24,13 @@
 
 import compilation_config;
 
-import infinity;
+import :infinity;
 
-import profiler;
-import virtual_store;
-import third_party;
-import query_options;
-import query_result;
+import :profiler;
+import :virtual_store;
+import :third_party;
+import :query_options;
+import :query_result;
 import knn_expr;
 import column_expr;
 import parsed_expr;

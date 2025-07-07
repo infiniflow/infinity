@@ -19,25 +19,25 @@
 #include <set>
 #include <thread>
 
-import stl;
+import :stl;
 import compilation_config;
 import internal_types;
-import infinity;
+import :infinity;
 import logical_type;
-import infinity_exception;
-import profiler;
-import third_party;
-import logical_node_type;
+import :infinity_exception;
+import :profiler;
+import :third_party;
+import :logical_node_type;
 import embedding_info;
 import create_index_info;
-import query_options;
-import query_result;
+import :query_options;
+import :query_result;
 import extra_ddl_info;
 import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
-import virtual_store;
+import :virtual_store;
 
 using namespace infinity;
 

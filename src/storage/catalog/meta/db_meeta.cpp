@@ -16,18 +16,18 @@ module;
 
 #include <string>
 
-module db_meeta;
+module infinity_core;
 
-import stl;
-import kv_code;
-import kv_store;
-import third_party;
-import infinity_exception;
-import meta_info;
-import default_values;
-import new_txn;
-import utility;
-import kv_utility;
+import :stl;
+import :kv_code;
+import :kv_store;
+import :third_party;
+import :infinity_exception;
+import :meta_info;
+import :default_values;
+import :new_txn;
+import :utility;
+import :kv_utility;
 
 namespace infinity {
 

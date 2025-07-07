@@ -16,21 +16,21 @@ module;
 
 #include <vector>
 
-module buffer_manager;
+module infinity_core;
 
-import stl;
-import file_worker;
-import third_party;
-import logger;
-import infinity_exception;
-import buffer_obj;
-import file_worker_type;
-import var_file_worker;
-import persistence_manager;
-import virtual_store;
+import :stl;
+import :file_worker;
+import :third_party;
+import :logger;
+import :infinity_exception;
+import :buffer_obj;
+import :file_worker_type;
+import :var_file_worker;
+import :persistence_manager;
+import :virtual_store;
 import global_resource_usage;
-import kv_store;
-import status;
+import :kv_store;
+import :status;
 
 namespace infinity {
 

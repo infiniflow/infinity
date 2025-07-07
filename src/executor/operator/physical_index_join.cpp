@@ -15,15 +15,18 @@
 module;
 
 #include <string>
-import stl;
-import query_context;
-import operator_state;
 
-module physical_index_join;
+module infinity_core;
+
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_index_join;
+import data_type;;
 
 namespace infinity {
 
-void PhysicalIndexJoin::Init(QueryContext* query_context) {}
+void PhysicalIndexJoin::Init(QueryContext *query_context) {}
 
 bool PhysicalIndexJoin::Execute(QueryContext *, OperatorState *) { return true; }
 

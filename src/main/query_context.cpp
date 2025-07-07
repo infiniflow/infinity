@@ -19,49 +19,14 @@ module;
 #include <sstream>
 // #include "gperftools/profiler.h"
 
-module query_context;
+module infinity_core;
 
-import stl;
-import session;
-import config;
-import task_scheduler;
-import storage;
-import resource_manager;
-import sql_parser;
-import profiler;
-import infinity_exception;
-import logical_planner;
-import logical_node_type;
-import data_block;
-import optimizer;
-import physical_planner;
-import fragment_builder;
-import fragment_task;
-import fragment_context;
-import bind_context;
-import logical_node;
-import physical_operator;
-import third_party;
-import logger;
-import query_result;
-import status;
-import session_manager;
 import base_statement;
 import parser_result;
-import parser_assert;
-import plan_fragment;
-import bg_query_state;
-import show_statement;
+import sql_parser;
 import admin_statement;
-import admin_executor;
-import persistence_manager;
-import global_resource_usage;
-import infinity_context;
-import txn_state;
-
-import new_txn;
-import new_txn_manager;
-import new_catalog;
+import show_statement;
+import parser_assert;
 
 namespace infinity {
 

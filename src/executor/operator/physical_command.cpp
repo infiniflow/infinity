@@ -17,40 +17,41 @@ module;
 // #include <fstream>
 #include <string>
 
-import compilation_config;
+import compilation_config;;
 
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
 
-module physical_command;
+module infinity_core;
 
-import stl;
-import query_context;
-import operator_state;
+import :stl;
+import :query_context;
+import :operator_state;
 
-import profiler;
-import file_writer;
-import table_def;
-import data_table;
-import options;
-import third_party;
-import defer_op;
-import config;
-import status;
-import infinity_exception;
-import variables;
-import logger;
-import infinity_context;
-import periodic_trigger;
-import bg_task;
-import wal_manager;
-import result_cache_manager;
-import snapshot;
-import periodic_trigger_thread;
-import new_txn;
-import bg_task_type;
-import new_catalog;
+import :profiler;
+import :file_writer;
+import :table_def;
+import :data_table;
+import :options;
+import :third_party;
+import :defer_op;
+import :config;
+import :status;
+import :infinity_exception;
+import :variables;
+import :logger;
+import :infinity_context;
+import :periodic_trigger;
+import :bg_task;
+import :wal_manager;
+import :result_cache_manager;
+import :snapshot;
+import :periodic_trigger_thread;
+import :new_txn;
+import :bg_task_type;
+import :new_catalog;
+import command_statement;
 
 namespace infinity {
 

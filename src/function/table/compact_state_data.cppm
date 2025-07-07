@@ -14,15 +14,15 @@
 
 module;
 
-export module compact_state_data;
+export module infinity_core:compact_state_data;
 
-import stl;
-import infinity_exception;
-import global_block_id;
+import :stl;
+import :infinity_exception;
+import :global_block_id;
 import internal_types;
-import default_values;
-import meta_info;
-import base_table_ref;
+import :default_values;
+import :meta_info;
+import :base_table_ref;
 
 namespace infinity {
 

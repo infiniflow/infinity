@@ -19,11 +19,11 @@ module;
 #include <regex>
 #include <sstream>
 
-module utility;
+module infinity_core;
 
-import stl;
-import third_party;
-import default_values;
+import :stl;
+import :third_party;
+import :default_values;
 
 namespace infinity::Utility {
 

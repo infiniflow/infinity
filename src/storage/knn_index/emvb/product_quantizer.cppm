@@ -14,8 +14,8 @@
 
 module;
 
-export module emvb_product_quantization;
-import stl;
+export module infinity_core:emvb_product_quantization;
+import :stl;
 
 namespace infinity {
 class LocalFileHandle;

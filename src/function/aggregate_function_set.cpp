@@ -15,15 +15,16 @@
 module;
 
 #include <sstream>
-import stl;
-import base_expression;
-import aggregate_function;
-import cast_table;
-import logger;
-import status;
-import infinity_exception;
 
-module aggregate_function_set;
+module infinity_core;
+
+import :stl;
+import :base_expression;
+import :aggregate_function;
+import :cast_table;
+import :logger;
+import :status;
+import :infinity_exception;
 
 namespace infinity {
 

@@ -7,14 +7,14 @@ module;
 #include <stdexcept>
 #include <unordered_set>
 
-module ik_dict;
+module infinity_core;
 
-import ik_dict_segment;
-import hit;
-import stl;
-import status;
-import character_util;
-import third_party;
+import :ik_dict_segment;
+import :hit;
+import :stl;
+import :status;
+import :character_util;
+import :third_party;
 
 namespace fs = std::filesystem;
 
@@ -32,7 +32,7 @@ const String EXT_STOP = "ext_stopwords";
 
 bool IsSpaceOrNewline(char c) { return std::isspace(static_cast<unsigned char>(c)) || c == '\n' || c == '\r'; }
 
-String Trim(const String &str) {
+String Trim1(const String &str) {
     if (str.empty()) {
         return str;
     }
@@ -120,7 +120,7 @@ Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool
     }
     String line;
     while (std::getline(is, line)) {
-        line = Trim(line);
+        line = Trim1(line);
         std::wstring word = CharacterUtil::UTF8ToUTF16(line);
         if (!word.empty() && word[0] == L'\uFEFF') {
             word = word.substr(1);

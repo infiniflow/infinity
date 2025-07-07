@@ -18,21 +18,9 @@ module;
 #include <string>
 #include <unistd.h>
 
-module config;
+module infinity_core;
 
-import third_party;
-import stl;
-import boost;
 import compilation_config;
-import default_values;
-import logger;
-import virtual_store;
-import utility;
-import status;
-import options;
-import command_statement;
-import infinity_exception;
-import global_resource_usage;
 
 namespace infinity {
 using namespace std::chrono;

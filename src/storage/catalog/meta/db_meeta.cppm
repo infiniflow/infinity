@@ -14,11 +14,11 @@
 
 module;
 
-export module db_meeta;
+export module infinity_core:db_meeta;
 
-import stl;
-import status;
-import new_catalog;
+import :stl;
+import :status;
+import :new_catalog;
 
 namespace infinity {
 

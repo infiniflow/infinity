@@ -15,31 +15,32 @@
 module;
 
 #include <vector>
-module physical_operator;
 
-import stl;
-import physical_operator_type;
-import default_values;
-import operator_state;
-import column_vector;
-import query_context;
+module infinity_core;
 
-import base_table_ref;
-import third_party;
-import infinity_exception;
+import :stl;
+import :physical_operator_type;
+import :default_values;
+import :operator_state;
+import :column_vector;
+import :query_context;
+
+import :base_table_ref;
+import :third_party;
+import :infinity_exception;
 import logical_type;
 import internal_types;
-import result_cache_manager;
-import logger;
-import data_block;
-import cached_match;
-import buffer_manager;
-import block_index;
+import :result_cache_manager;
+import :logger;
+import :data_block;
+import :cached_match;
+import :buffer_manager;
+import :block_index;
 
-import block_meta;
-import column_meta;
-import new_catalog;
-import status;
+import :block_meta;
+import :column_meta;
+import :new_catalog;
+import :status;
 
 namespace infinity {
 
@@ -125,7 +126,7 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
                                                 const BlockIndex *block_index,
                                                 const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
     std::sort(output_job_infos.begin(), output_job_infos.end());
-    
+
     Status status;
 
     auto cache_segment_id = std::numeric_limits<SegmentID>::max();

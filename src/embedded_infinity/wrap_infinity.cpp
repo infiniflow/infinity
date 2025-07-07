@@ -1,21 +1,22 @@
 module;
+
 #include <cassert>
 #include <cstring>
 #include <nanobind/nanobind.h>
 #include <string>
 
-module wrap_infinity;
+module infinity_core;
 
-import stl;
-import config;
-import resource_manager;
-import task_scheduler;
-import storage;
-import status;
-import query_result;
-import query_options;
-import infinity_context;
-import session;
+import :stl;
+import :config;
+import :resource_manager;
+import :task_scheduler;
+import :storage;
+import :status;
+import :query_result;
+import :query_options;
+import :infinity_context;
+import :session;
 import parsed_expr;
 import search_expr;
 import column_def;
@@ -23,9 +24,9 @@ import create_index_info;
 import update_statement;
 import explain_statement;
 import command_statement;
-import infinity;
-import data_block;
-import value;
+import :infinity;
+import :data_block;
+import :value;
 import data_type;
 import type_info;
 import array_info;
@@ -37,16 +38,16 @@ import function_expr;
 import between_expr;
 import parsed_expr;
 import search_expr;
-import infinity_exception;
-import column_vector;
+import :infinity_exception;
+import :column_vector;
 import internal_types;
-import table_def;
-import third_party;
-import logger;
-import query_options;
+import :table_def;
+import :third_party;
+import :logger;
+import :query_options;
 import search_options;
-import defer_op;
-import infinity_thrift_service;
+import :defer_op;
+import :infinity_thrift_service;
 
 namespace infinity {
 

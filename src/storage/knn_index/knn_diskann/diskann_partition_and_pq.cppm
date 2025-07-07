@@ -24,19 +24,19 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module diskann_partition_and_pq;
+export module infinity_core:diskann_partition_and_pq;
 
-import stl;
-import third_party;
-import infinity_exception;
-import index_base;
-import vector_distance;
-import logger;
-import simd_functions;
-import diskann_dist_func;
-import default_values;
-import local_file_handle;
-import virtual_store;
+import :stl;
+import :third_party;
+import :infinity_exception;
+import :index_base;
+import :vector_distance;
+import :logger;
+import :simd_functions;
+import :diskann_dist_func;
+import :default_values;
+import :local_file_handle;
+import :virtual_store;
 
 namespace infinity {
 

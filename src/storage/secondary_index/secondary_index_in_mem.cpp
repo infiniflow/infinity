@@ -18,23 +18,23 @@ module;
 #include <cassert>
 #include <vector>
 
-module secondary_index_in_mem;
+module infinity_core;
 
-import stl;
+import :stl;
 import logical_type;
 import internal_types;
 import column_def;
-import default_values;
-import buffer_manager;
-import block_column_iter;
-import infinity_exception;
-import secondary_index_data;
-import buffer_handle;
-import logger;
-import base_memindex;
-import memindex_tracer;
-import column_vector;
-import buffer_obj;
+import :default_values;
+import :buffer_manager;
+import :block_column_iter;
+import :infinity_exception;
+import :secondary_index_data;
+import :buffer_handle;
+import :logger;
+import :base_memindex;
+import :memindex_tracer;
+import :column_vector;
+import :buffer_obj;
 
 namespace infinity {
 

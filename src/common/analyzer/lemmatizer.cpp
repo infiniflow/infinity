@@ -21,10 +21,11 @@ module;
 #include <sstream>
 #include <unordered_map>
 
-module lemmatizer;
+module infinity_core;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
+import :lemmatizer;
 
 namespace fs = std::filesystem;
 

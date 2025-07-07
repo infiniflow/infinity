@@ -2,15 +2,15 @@ module;
 
 #include <string>
 
-module cn_quantifier_segmenter;
+module infinity_core;
 
-import stl;
-import hit;
-import segmenter;
-import analyze_context;
-import lexeme;
-import character_util;
-import ik_dict;
+import :stl;
+import :hit;
+import :segmenter;
+import :analyze_context;
+import :lexeme;
+import :character_util;
+import :ik_dict;
 
 namespace infinity {
 

@@ -18,26 +18,26 @@ module;
 #include <string>
 #include <vector>
 
-module physical_aggregate;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import operator_state;
-import data_block;
-import utility;
-import logger;
-import column_vector;
-import third_party;
-import infinity_exception;
-import default_values;
+import :operator_state;
+import :data_block;
+import :utility;
+import :logger;
+import :column_vector;
+import :third_party;
+import :infinity_exception;
+import :default_values;
 
-import expression_state;
-import expression_evaluator;
-import aggregate_expression;
-import status;
+import :expression_state;
+import :expression_evaluator;
+import :aggregate_expression;
+import :status;
 import logical_type;
 import internal_types;
 import column_def;

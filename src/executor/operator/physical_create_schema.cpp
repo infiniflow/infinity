@@ -14,19 +14,19 @@
 
 module;
 
-module physical_create_schema;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import physical_operator_type;
-import operator_state;
-import wal_manager;
-import infinity_context;
-import status;
-import new_txn;
+import :physical_operator_type;
+import :operator_state;
+import :wal_manager;
+import :infinity_context;
+import :status;
+import :new_txn;
 
 namespace infinity {
 

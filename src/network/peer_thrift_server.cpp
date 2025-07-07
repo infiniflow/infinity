@@ -28,14 +28,14 @@ module;
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
-module peer_thrift_server;
+module infinity_core;
 
-import peer_server_thrift_service;
-import peer_server_thrift_types;
-import logger;
-import third_party;
-import stl;
-import infinity_exception;
+import :peer_server_thrift_service;
+import :peer_server_thrift_types;
+import :logger;
+import :third_party;
+import :stl;
+import :infinity_exception;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

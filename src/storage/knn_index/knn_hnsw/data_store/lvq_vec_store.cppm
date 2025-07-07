@@ -23,13 +23,13 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module lvq_vec_store;
+export module infinity_core:lvq_vec_store;
 
-import stl;
-import local_file_handle;
-import hnsw_common;
+import :stl;
+import :local_file_handle;
+import :hnsw_common;
 import serialize;
-import data_store_util;
+import :data_store_util;
 
 namespace infinity {
 

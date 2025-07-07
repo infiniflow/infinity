@@ -17,13 +17,13 @@ module;
 #include <concepts>
 #include <type_traits>
 
-export module unary_operator;
+export module infinity_core:unary_operator;
 
-import stl;
-import column_vector;
-import logger;
-import infinity_exception;
-import roaring_bitmap;
+import :stl;
+import :column_vector;
+import :logger;
+import :infinity_exception;
+import :roaring_bitmap;
 import internal_types;
 
 namespace infinity {

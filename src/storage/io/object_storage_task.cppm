@@ -14,9 +14,9 @@
 
 module;
 
-export module object_storage_task;
+export module infinity_core:object_storage_task;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

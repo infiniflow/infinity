@@ -14,22 +14,21 @@
 
 module;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+module infinity_core;
 
-import physical_operator_type;
-import operator_state;
-import wal_manager;
-import infinity_context;
-import status;
-
-module physical_create_view;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
+import :physical_operator_type;
+import :operator_state;
+import :wal_manager;
+import :infinity_context;
+import :status;
 
 namespace infinity {
 
-void PhysicalCreateView::Init(QueryContext* query_context) {}
+void PhysicalCreateView::Init(QueryContext *query_context) {}
 
 bool PhysicalCreateView::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

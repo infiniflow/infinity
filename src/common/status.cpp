@@ -16,11 +16,12 @@ module;
 
 #include <cstring>
 
-module status;
+module infinity_core;
 
-import stl;
-import third_party;
-import default_values;
+import :stl;
+import :third_party;
+import :default_values;
+import :status;
 
 namespace infinity {
 

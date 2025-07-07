@@ -19,30 +19,30 @@ module;
 #include <cmath>
 #include <iostream>
 #include <random>
-module emvb_index;
-import stl;
-import mlas_matrix_multiply;
-import vector_distance;
-import emvb_product_quantization;
-import emvb_search;
-import kmeans_partition;
-import index_base;
-import status;
-import logger;
-import third_party;
-import infinity_exception;
+module infinity_core;
+import :stl;
+import :mlas_matrix_multiply;
+import :vector_distance;
+import :emvb_product_quantization;
+import :emvb_search;
+import :kmeans_partition;
+import :index_base;
+import :status;
+import :logger;
+import :third_party;
+import :infinity_exception;
 import internal_types;
-import column_vector;
+import :column_vector;
 import column_def;
-import buffer_manager;
-import default_values;
-import block_index;
+import :buffer_manager;
+import :default_values;
+import :block_index;
 
-import new_catalog;
-import segment_meta;
-import block_meta;
-import column_meta;
-import kv_store;
+import :new_catalog;
+import :segment_meta;
+import :block_meta;
+import :column_meta;
+import :kv_store;
 
 namespace infinity {
 

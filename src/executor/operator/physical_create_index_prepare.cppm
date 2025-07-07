@@ -14,17 +14,17 @@
 
 module;
 
-export module physical_create_index_prepare;
+export module infinity_core:physical_create_index_prepare;
 
-import stl;
+import :stl;
 
-import physical_operator_type;
-import physical_operator;
-import query_context;
-import operator_state;
-import load_meta;
-import base_table_ref;
-import index_base;
+import :physical_operator_type;
+import :physical_operator;
+// import :query_context;
+import :operator_state;
+import :load_meta;
+import :base_table_ref;
+import :index_base;
 import internal_types;
 import extra_ddl_info;
 import data_type;

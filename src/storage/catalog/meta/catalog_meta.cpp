@@ -16,15 +16,15 @@ module;
 
 #include <vector>
 
-module catalog_meta;
+module infinity_core;
 
-import kv_code;
-import kv_store;
-import infinity_exception;
-import third_party;
-import kv_utility;
-import default_values;
-import new_txn;
+import :kv_code;
+import :kv_store;
+import :infinity_exception;
+import :third_party;
+import :kv_utility;
+import :default_values;
+import :new_txn;
 
 namespace infinity {
 

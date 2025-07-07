@@ -17,22 +17,27 @@ module;
 #include <charconv>
 #include <ranges>
 #include <sstream>
+#include "parser/type/complex/embedding_type.h"
 
-module value;
+module infinity_core;
 
-import stl;
+import :stl;
 import global_resource_usage;
-import logger;
+import :logger;
 
-import infinity_exception;
-import third_party;
-import bound_cast_func;
-import cast_function;
-import column_vector;
-import default_values;
-import status;
+import :infinity_exception;
+import :third_party;
+import :bound_cast_func;
+import :cast_function;
+import :column_vector;
+import :default_values;
+import :status;
 import type_info;
 import array_info;
+import internal_types;
+import sparse_info;
+import embedding_info;
+import logical_type;
 
 namespace infinity {
 

@@ -16,31 +16,31 @@ module;
 
 #include <vector>
 
-module bound_delete_statement;
+module infinity_core;
 
-import bound_statement;
-import table_ref;
-import base_expression;
-import bind_context;
-import logical_node;
-import query_context;
-import stl;
-import infinity_exception;
-import status;
-import base_table_ref;
-import subquery_table_ref;
-import expression_transformer;
-import expression_type;
-import subquery_expression;
-import query_context;
-import logical_table_scan;
-import logical_filter;
-import logical_delete;
-import subquery_unnest;
+import :bound_statement;
+import :table_ref;
+import :base_expression;
+import :bind_context;
+import :logical_node;
+import :query_context;
+import :stl;
+import :infinity_exception;
+import :status;
+import :base_table_ref;
+import :subquery_table_ref;
+import :expression_transformer;
+import :expression_type;
+import :subquery_expression;
+import :query_context;
+import :logical_table_scan;
+import :logical_filter;
+import :logical_delete;
+import :subquery_unnest;
 
-import conjunction_expression;
+import :conjunction_expression;
 import table_reference;
-import logger;
+import :logger;
 
 namespace infinity {
 

@@ -16,11 +16,11 @@ module;
 
 #include "type/complex/row_id.h"
 
-export module base_memindex;
+export module infinity_core:base_memindex;
 
-import stl;
-import memindex_tracer;
-import chunk_index_meta;
+import :stl;
+import :memindex_tracer;
+import :chunk_index_meta;
 
 namespace infinity {
 

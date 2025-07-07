@@ -17,7 +17,7 @@ module;
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-export module boost;
+export module infinity_core:boost;
 
 namespace boost {
 namespace system {

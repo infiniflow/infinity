@@ -1,11 +1,11 @@
 module;
 
-import stl;
-import int_encoder;
-import no_compress_encoder;
-import vbyte_compress_encoder;
+module infinity_core;
 
-module posting_field;
+import :stl;
+import :int_encoder;
+import :no_compress_encoder;
+import :vbyte_compress_encoder;
 
 namespace infinity {
 

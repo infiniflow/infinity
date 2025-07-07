@@ -17,18 +17,18 @@ module;
 #include <memory>
 #include <vector>
 
-module logical_index_scan;
+module infinity_core;
 
-import stl;
-import logical_node_type;
-import logical_node;
-import column_binding;
-import base_table_ref;
-import default_values;
-import base_expression;
-import function_expression;
-import cast_expression;
-import column_expression;
+import :stl;
+import :logical_node_type;
+import :logical_node;
+import :column_binding;
+import :base_table_ref;
+import :default_values;
+import :base_expression;
+import :function_expression;
+import :cast_expression;
+import :column_expression;
 import logical_type;
 
 namespace infinity {

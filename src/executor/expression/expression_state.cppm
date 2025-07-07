@@ -14,21 +14,21 @@
 
 module;
 
-export module expression_state;
+export module infinity_core:expression_state;
 
-import stl;
-import base_expression;
-import aggregate_expression;
-import case_expression;
-import cast_expression;
-import reference_expression;
-import function_expression;
-import value_expression;
-import in_expression;
-import filter_fulltext_expression;
-import column_vector;
+import :stl;
 
 namespace infinity {
+class BaseExpression;
+class AggregateExpression;
+class CaseExpression;
+class CastExpression;
+class ReferenceExpression;
+class FunctionExpression;
+class ValueExpression;
+class InExpression;
+class FilterFulltextExpression;
+class ColumnVector;
 
 export enum class AggregateFlag : i8 {
     kUninitialized = 0,

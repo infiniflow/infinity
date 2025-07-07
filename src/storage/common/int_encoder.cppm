@@ -3,14 +3,14 @@ module;
 
 #include "new_pfordelta_compressor.h"
 
-export module int_encoder;
+export module infinity_core:int_encoder;
 
-import byte_slice_reader;
-import byte_slice_writer;
+import :byte_slice_reader;
+import :byte_slice_writer;
 
-import stl;
-import infinity_exception;
-import fastpfor;
+import :stl;
+import :infinity_exception;
+import :fastpfor;
 
 namespace infinity {
 

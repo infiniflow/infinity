@@ -16,34 +16,34 @@ module;
 
 #include <string>
 
-module physical_table_scan;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import physical_operator_type;
-import operator_state;
-import global_block_id;
-import data_block;
-import table_scan_function_data;
-import base_table_ref;
-import block_index;
+import :physical_operator_type;
+import :operator_state;
+import :global_block_id;
+import :data_block;
+import :table_scan_function_data;
+import :base_table_ref;
+import :block_index;
 
-import default_values;
-import infinity_exception;
-import third_party;
-import logger;
-import column_vector;
+import :default_values;
+import :infinity_exception;
+import :third_party;
+import :logger;
+import :column_vector;
 import logical_type;
-import meta_info;
+import :meta_info;
 
-import new_txn;
-import block_meta;
-import new_catalog;
-import column_meta;
-import status;
+import :new_txn;
+import :block_meta;
+import :new_catalog;
+import :column_meta;
+import :status;
 
 namespace infinity {
 

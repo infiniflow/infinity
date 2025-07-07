@@ -15,18 +15,18 @@
 module;
 
 #include <string>
-import stl;
+
+module infinity_core;
+
+import :stl;
 import logical_type;
-import column_vector;
-import status;
-import infinity_exception;
-import third_party;
+import :column_vector;
+import :status;
+import :infinity_exception;
+import :third_party;
 import internal_types;
 
-module hash_table;
-
 namespace infinity {
-
 
 void HashTableBase::Init(Vector<SharedPtr<DataType>> types) {
     types_ = std::move(types);

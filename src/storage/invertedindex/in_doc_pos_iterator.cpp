@@ -2,13 +2,13 @@ module;
 
 #include <cassert>
 
-module in_doc_pos_iterator;
+module infinity_core;
 
-import stl;
-import index_defines;
-import in_doc_pos_state;
-import position_list_format_option;
-import position_list_decoder;
+import :stl;
+import :index_defines;
+import :in_doc_pos_state;
+import :position_list_format_option;
+import :position_list_decoder;
 
 namespace infinity {
 InDocPositionIterator::InDocPositionIterator(const PositionListFormatOption &option)

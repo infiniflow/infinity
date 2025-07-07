@@ -14,13 +14,13 @@
 
 module;
 
-export module new_txn_manager;
+export module infinity_core:new_txn_manager;
 
-import stl;
-import buffer_manager;
-import txn_state;
-import default_values;
-import status;
+import :stl;
+import :buffer_manager;
+import :txn_state;
+import :default_values;
+import :status;
 
 namespace infinity {
 

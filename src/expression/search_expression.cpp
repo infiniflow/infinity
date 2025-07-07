@@ -15,14 +15,14 @@
 module;
 
 #include <sstream>
-module search_expression;
-import stl;
-import expression_type;
-import scalar_function;
-import match_expression;
-import knn_expression;
-import match_tensor_expression;
-import fusion_expression;
+module infinity_core;
+import :stl;
+import :expression_type;
+import :scalar_function;
+import :match_expression;
+import :knn_expression;
+import :match_tensor_expression;
+import :fusion_expression;
 
 namespace infinity {
 

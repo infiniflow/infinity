@@ -16,30 +16,30 @@ module;
 
 #include <set>
 
-module hnsw_file_worker;
+module infinity_core;
 
-import infinity_exception;
-import stl;
-import index_file_worker;
-import hnsw_alg;
-import hnsw_common;
-import index_hnsw;
+import :infinity_exception;
+import :stl;
+import :index_file_worker;
+import :hnsw_alg;
+import :hnsw_common;
+import :index_hnsw;
 
-import index_base;
-import third_party;
-import logger;
+import :index_base;
+import :third_party;
+import :logger;
 import logical_type;
 import embedding_info;
 import create_index_info;
 import internal_types;
 #ifdef INDEX_HANDLER
-import hnsw_handler;
+import :hnsw_handler;
 #else
-import abstract_hnsw;
+import :abstract_hnsw;
 #endif
-import virtual_store;
-import persistence_manager;
-import local_file_handle;
+import :virtual_store;
+import :persistence_manager;
+import :local_file_handle;
 
 namespace infinity {
 

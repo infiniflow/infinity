@@ -16,20 +16,20 @@ module;
 
 #include <sstream>
 
-module logical_match;
+module infinity_core;
 
-import stl;
-import base_table_ref;
-import column_binding;
-import logical_node_type;
-import match_expression;
+import :stl;
+import :base_table_ref;
+import :column_binding;
+import :logical_node_type;
+import :match_expression;
 
-import default_values;
-import third_party;
-import meta_info;
+import :default_values;
+import :third_party;
+import :meta_info;
 import logical_type;
 import internal_types;
-import explain_logical_plan;
+import :explain_logical_plan;
 
 namespace infinity {
 

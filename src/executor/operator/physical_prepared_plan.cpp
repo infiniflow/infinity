@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_prepared_plan;
+import :query_context;
+import :operator_state;
+import :physical_prepared_plan;
 
 namespace infinity {
 
-void PhysicalPreparedPlan::Init(QueryContext* query_context) {}
+void PhysicalPreparedPlan::Init(QueryContext *query_context) {}
 
 bool PhysicalPreparedPlan::Execute(QueryContext *, OperatorState *) { return true; }
 

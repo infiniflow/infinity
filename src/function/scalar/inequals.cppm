@@ -14,9 +14,9 @@
 
 module;
 
-export module inequals;
+export module infinity_core:inequals;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

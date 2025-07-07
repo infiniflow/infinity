@@ -14,10 +14,10 @@
 
 module;
 
-import stl;
-import data_block;
+module infinity_core;
 
-module task_result;
+import :stl;
+import :data_block;
 
 namespace infinity {
 

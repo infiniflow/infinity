@@ -17,27 +17,27 @@ module;
 #include "type/complex/row_id.h"
 #include <string>
 
-module table_meeta;
+module infinity_core;
 
-import status;
-import kv_code;
-import kv_store;
+import :status;
+import :kv_code;
+import :kv_store;
 import column_def;
-import third_party;
-import default_values;
-import logger;
-import table_def;
-import infinity_exception;
-import meta_info;
-import infinity_context;
-import storage;
-import new_catalog;
-import table_index_meeta;
+import :third_party;
+import :default_values;
+import :logger;
+import :table_def;
+import :infinity_exception;
+import :meta_info;
+import :infinity_context;
+import :storage;
+import :new_catalog;
+import :table_index_meeta;
 import create_index_info;
-import segment_meta;
-import kv_utility;
-import column_index_reader;
-import new_txn;
+import :segment_meta;
+import :kv_utility;
+import :column_index_reader;
+import :new_txn;
 
 namespace infinity {
 

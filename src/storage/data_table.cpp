@@ -16,17 +16,18 @@ module;
 
 #include <sstream>
 
-module data_table;
+module infinity_core;
 
-import stl;
+import :stl;
 import logical_type;
-import infinity_exception;
+import :infinity_exception;
 
-import third_party;
-import data_block;
-import table_def;
-import value;
-import logger;
+import :third_party;
+import :data_block;
+import :table_def;
+import :value;
+import :logger;
+import column_def;
 
 namespace infinity {
 

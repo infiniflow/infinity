@@ -17,25 +17,14 @@ module;
 #include <cstdlib>
 #include <string>
 
-module infinity_context;
+module infinity_core;
 
-import stl;
-import third_party;
-import logger;
-import config;
-import resource_manager;
-import task_scheduler;
-import storage;
-import session_manager;
-import variables;
-// import python_instance;
-import status;
-import infinity_exception;
-import wal_manager;
-import global_resource_usage;
-import infinity_thrift_service;
-import defer_op;
-import virtual_store;
+import :wal_manager;
+import :infinity_thrift_service;
+import admin_statement;
+import knn_expr;
+import :resource_manager;
+import :session_manager;
 
 namespace infinity {
 

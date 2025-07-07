@@ -14,22 +14,20 @@
 
 module;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+module infinity_core;
 
-import physical_operator_type;
-import operator_state;
-import status;
-import load_meta;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
+import :physical_operator_type;
+import :operator_state;
+import :status;
+import :load_meta;
 import extra_ddl_info;
-import wal_manager;
-import infinity_context;
-
-import new_txn;
-
-module physical_create_table;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
 
 namespace infinity {
 
@@ -56,7 +54,7 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, std::move(input), nullptr, id, load_metas), schema_name_(std::move(schema_name)),
       table_index_(table_index), conflict_type_(conflict_type), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
-void PhysicalCreateTable::Init(QueryContext* query_context) {}
+void PhysicalCreateTable::Init(QueryContext *query_context) {}
 
 bool PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

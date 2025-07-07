@@ -16,27 +16,27 @@ module;
 
 #include <string>
 
-module block_meta;
+module infinity_core;
 
-import kv_code;
-import third_party;
-import kv_store;
-import segment_meta;
-import table_meeta;
-import new_catalog;
-import infinity_context;
+import :kv_code;
+import :third_party;
+import :kv_store;
+import :segment_meta;
+import :table_meeta;
+import :new_catalog;
+import :infinity_context;
 
-import buffer_manager;
-import block_version;
-import version_file_worker;
+import :buffer_manager;
+import :block_version;
+import :version_file_worker;
 
-import buffer_handle;
-import meta_info;
+import :buffer_handle;
+import :meta_info;
 import column_def;
-import column_meta;
-import fast_rough_filter;
-import kv_utility;
-import logger;
+import :column_meta;
+import :fast_rough_filter;
+import :kv_utility;
+import :logger;
 
 namespace infinity {
 

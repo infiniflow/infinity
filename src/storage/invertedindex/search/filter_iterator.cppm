@@ -14,16 +14,16 @@
 
 module;
 
-export module filter_iterator;
-import stl;
-import doc_iterator;
-import query_node;
+export module infinity_core:filter_iterator;
+import :stl;
+import :doc_iterator;
+import :query_node;
 import internal_types;
-import index_defines;
-import common_query_filter;
-import base_expression;
-import roaring_bitmap;
-import column_index_reader;
+import :index_defines;
+import :common_query_filter;
+import :base_expression;
+import :roaring_bitmap;
+import :column_index_reader;
 
 namespace infinity {
 

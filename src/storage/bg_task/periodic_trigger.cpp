@@ -14,18 +14,18 @@
 
 module;
 
-module periodic_trigger;
+module infinity_core;
 
-import stl;
-import logger;
-import infinity_exception;
-import background_process;
-import compaction_process;
-import bg_task;
-import third_party;
+import :stl;
+import :logger;
+import :infinity_exception;
+import :background_process;
+import :compaction_process;
+import :bg_task;
+import :third_party;
 
-import new_txn_manager;
-import infinity_context;
+import :new_txn_manager;
+import :infinity_context;
 
 namespace infinity {
 

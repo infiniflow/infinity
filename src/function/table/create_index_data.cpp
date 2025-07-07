@@ -14,9 +14,9 @@
 
 module;
 
-module create_index_data;
+module infinity_core;
 
-import block_index;
+import :block_index;
 
 namespace infinity {
 

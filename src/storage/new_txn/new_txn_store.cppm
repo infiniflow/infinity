@@ -14,22 +14,20 @@
 
 module;
 
-export module new_txn_store;
+export module infinity_core:new_txn_store;
 
-import stl;
+import :stl;
 
-import status;
+import :status;
 import internal_types;
-import index_base;
+import :index_base;
 import extra_ddl_info;
-import column_def;
-import third_party;
-import logger;
-import meta_key;
+import :third_party;
+import :meta_key;
 
 namespace infinity {
 
-class NewTxn;
+export class NewTxn;
 class BGTaskProcessor;
 struct DataBlock;
 enum class CompactStatementType;

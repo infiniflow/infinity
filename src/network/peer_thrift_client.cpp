@@ -17,21 +17,21 @@ module;
 #include <exception>
 #include <string>
 
-module peer_thrift_client;
+module infinity_core;
 
-import stl;
-import third_party;
-import logger;
-import peer_server_thrift_types;
-import status;
-import thrift;
-import infinity_exception;
-import peer_task;
-import infinity_context;
-import cluster_manager;
+import :stl;
+import :third_party;
+import :logger;
+import :peer_server_thrift_types;
+import :status;
+import :thrift;
+import :infinity_exception;
+import :peer_task;
+import :infinity_context;
+import :cluster_manager;
 import admin_statement;
-import node_info;
-import config;
+import :node_info;
+import :config;
 
 namespace infinity {
 

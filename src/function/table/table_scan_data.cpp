@@ -14,11 +14,11 @@
 
 module;
 
-import stl;
-import global_block_id;
-import block_index;
+module infinity_core;
 
-module table_scan_function_data;
+import :stl;
+import :global_block_id;
+import :block_index;
 
 namespace infinity {
 

@@ -14,13 +14,13 @@
 
 module;
 
-export module base_txn_store;
+export module infinity_core:base_txn_store;
 
-import stl;
+import :stl;
 import internal_types;
-import txn_state;
+import :txn_state;
 import column_def;
-import wal_entry;
+import :wal_entry;
 
 namespace infinity {
 

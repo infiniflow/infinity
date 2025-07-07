@@ -17,21 +17,22 @@ module;
 #include <string>
 #include <vector>
 
-module physical_merge_aggregate;
-import stl;
-import third_party;
-import query_context;
-import operator_state;
-import logger;
-import value;
-import data_block;
+module infinity_core;
+import :stl;
+import :third_party;
+import :query_context;
+import :operator_state;
+import :logger;
+import :value;
+import :data_block;
 import logical_type;
-import physical_aggregate;
-import aggregate_expression;
-import infinity_exception;
-import hash_table;
+import :physical_aggregate;
+import :aggregate_expression;
+import :infinity_exception;
+import :hash_table;
 import column_def;
-import column_vector;
+import :column_vector;
+import internal_types;
 
 namespace infinity {
 

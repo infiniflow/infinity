@@ -23,13 +23,13 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module diskann_mem_data_store;
+export module infinity_core:diskann_mem_data_store;
 
-import stl;
-import diskann_dist_func;
-import diskann_utils;
-import infinity_exception;
-import local_file_handle;
+import :stl;
+import :diskann_dist_func;
+import :diskann_utils;
+import :infinity_exception;
+import :local_file_handle;
 
 namespace infinity {
 export template <typename DataType>

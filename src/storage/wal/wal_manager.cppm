@@ -14,16 +14,18 @@
 
 module;
 
-export module wal_manager;
+export module infinity_core:wal_manager;
 
-import stl;
-import options;
-import blocking_queue;
-import log_file;
+import :stl;
+// import :options;
+import :blocking_queue;
+import :log_file;
+import :options;
 
 namespace infinity {
+// class FlushOptionType;
 
-class Storage;
+export class Storage;
 class BGTaskProcessor;
 class NewTxn;
 class CheckpointTaskBase;

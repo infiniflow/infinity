@@ -3,10 +3,11 @@ module;
 #include <cstddef>
 #include <vector>
 
-module aho_corasick;
+module infinity_core;
 
-import stl;
-import darts;
+import :stl;
+import :darts;
+import :aho_corasick;
 
 namespace infinity {
 

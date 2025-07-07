@@ -14,18 +14,18 @@
 
 module;
 
-export module var_buffer;
+export module infinity_core:var_buffer;
 
-import stl;
-import buffer_obj;
-import buffer_handle;
-import logger;
+import :stl;
+import :buffer_obj;
+import :buffer_handle;
+// import :logger;
 
 namespace infinity {
 
 class BufferManager;
 
-export class VarBuffer {
+class VarBuffer {
     friend class VarFileWorker;
 
 public:

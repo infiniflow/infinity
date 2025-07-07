@@ -15,18 +15,18 @@
 module;
 
 #include <sstream>
-import stl;
-import expression_type;
 
-import scalar_function;
+module infinity_core;
 
-module function_expression;
+import :stl;
+import :expression_type;
+import :scalar_function;
 
 namespace infinity {
 
 FunctionExpression::FunctionExpression(ScalarFunction function, Vector<SharedPtr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {
-    if(arguments_.size() == 0) {
+    if (arguments_.size() == 0) {
         nullary_ = true;
     }
 }

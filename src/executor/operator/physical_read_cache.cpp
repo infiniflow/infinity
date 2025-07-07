@@ -13,12 +13,12 @@ module;
 
 #include <vector>
 
-module physical_read_cache;
+module infinity_core;
 
-import column_binding;
-import infinity_exception;
-import data_block;
-import column_vector;
+import :column_binding;
+import :infinity_exception;
+import :data_block;
+import :column_vector;
 
 namespace infinity {
 

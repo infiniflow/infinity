@@ -14,16 +14,16 @@
 
 module;
 
-export module bmp_index_file_worker;
+export module infinity_core:bmp_index_file_worker;
 
-import stl;
-import index_file_worker;
-import file_worker;
-import index_base;
+import :stl;
+import :index_file_worker;
+import :file_worker;
+import :index_base;
 import column_def;
-import file_worker_type;
+import :file_worker_type;
 import sparse_info;
-import persistence_manager;
+import :persistence_manager;
 
 namespace infinity {
 

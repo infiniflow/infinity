@@ -14,20 +14,20 @@
 
 module;
 
-module txn_allocator;
+module infinity_core;
 
-import stl;
-import txn_allocator_task;
-import new_txn;
-import logger;
-import storage;
-import third_party;
-import base_txn_store;
-import txn_state;
-import infinity_exception;
-import new_catalog;
-import catalog_cache;
-import status;
+import :stl;
+import :txn_allocator_task;
+import :new_txn;
+import :logger;
+import :storage;
+import :third_party;
+import :base_txn_store;
+import :txn_state;
+import :infinity_exception;
+import :new_catalog;
+import :catalog_cache;
+import :status;
 
 namespace infinity {
 

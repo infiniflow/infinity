@@ -16,25 +16,25 @@ module;
 
 #include <thread>
 
-module mem_index_appender;
+module infinity_core;
 
-import stl;
-import bg_task;
-import logger;
-import infinity_exception;
-import third_party;
-import blocking_queue;
-import infinity_context;
-import base_memindex;
-import status;
-import wal_manager;
+import :stl;
+import :bg_task;
+import :logger;
+import :infinity_exception;
+import :third_party;
+import :blocking_queue;
+import :infinity_context;
+import :base_memindex;
+import :status;
+import :wal_manager;
 import global_resource_usage;
 
-import new_txn_manager;
-import new_txn;
-import column_vector;
-import mem_index;
-import memory_indexer;
+import :new_txn_manager;
+import :new_txn;
+import :column_vector;
+import :mem_index;
+import :memory_indexer;
 
 namespace infinity {
 

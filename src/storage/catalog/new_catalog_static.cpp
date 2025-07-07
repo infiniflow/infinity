@@ -16,39 +16,41 @@ module;
 
 #include <vector>
 
-module new_catalog;
+module infinity_core;
 
-import stl;
-import third_party;
-import block_version;
-import infinity_exception;
-import table_def;
-import kv_code;
-import kv_store;
-import column_vector;
-import wal_entry;
-import infinity_context;
-import logger;
-import default_values;
-import new_txn;
-import data_access_state;
-import roaring_bitmap;
+import :stl;
+import :third_party;
+import :block_version;
+import :infinity_exception;
+import :table_def;
+import :kv_code;
+import :kv_store;
+import :column_vector;
+import :wal_entry;
+import :infinity_context;
+import :logger;
+import :default_values;
+import :new_txn;
+import :data_access_state;
+import :roaring_bitmap;
 
-import catalog_meta;
-import db_meeta;
-import table_meeta;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import mem_index;
-import scalar_function_set;
-import special_function;
+import :catalog_meta;
+import :db_meeta;
+import :table_meeta;
+import :segment_meta;
+import :block_meta;
+import :column_meta;
+import :table_index_meeta;
+import :segment_index_meta;
+import :chunk_index_meta;
+import :mem_index;
+import :scalar_function_set;
+import :special_function;
 
 import logical_type;
 import data_type;
+
+import column_def;
 
 namespace infinity {
 

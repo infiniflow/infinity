@@ -13,15 +13,18 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
-import stl;
-import infinity_exception;
-import third_party;
-module fst;
-import :bytes;
-import :node;
-import :registry;
-import :writer;
+
+module infinity_core;
+
+import :stl;
+import :infinity_exception;
+import :third_party;
+import :fst.bytes;
+import :fst.node;
+import :fst.registry;
+import :fst.writer;
 
 namespace infinity {
 

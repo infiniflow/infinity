@@ -14,10 +14,10 @@
 
 module;
 
-export module emvb_index;
-import stl;
-import emvb_shared_vec;
-import roaring_bitmap;
+export module infinity_core:emvb_index;
+import :stl;
+import :emvb_shared_vec;
+import :roaring_bitmap;
 
 namespace infinity {
 

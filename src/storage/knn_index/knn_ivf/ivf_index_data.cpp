@@ -16,31 +16,31 @@ module;
 
 #include <algorithm>
 #include <cassert>
-module ivf_index_data;
+module infinity_core;
 
-import stl;
-import index_ivf;
-import ivf_index_storage;
+import :stl;
+import :index_ivf;
+import :ivf_index_storage;
 import column_def;
-import index_base;
+import :index_base;
 import embedding_info;
 import internal_types;
-import buffer_manager;
-import infinity_exception;
-import status;
+import :buffer_manager;
+import :infinity_exception;
+import :status;
 import data_type;
-import default_values;
-import column_vector;
-import logger;
-import kmeans_partition;
+import :default_values;
+import :column_vector;
+import :logger;
+import :kmeans_partition;
 import logical_type;
-import ivf_index_util_func;
+import :ivf_index_util_func;
 
-import column_meta;
-import block_meta;
-import segment_meta;
-import new_catalog;
-import kv_store;
+import :column_meta;
+import :block_meta;
+import :segment_meta;
+import :new_catalog;
+import :kv_store;
 
 namespace infinity {
 

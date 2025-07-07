@@ -16,11 +16,11 @@ module;
 
 #include <sstream>
 
-module logical_unnest_aggregate;
+module infinity_core;
 
-import stl;
-import column_binding;
-import logical_node;
+import :stl;
+import :column_binding;
+import :logical_node;
 import internal_types;
 
 namespace infinity {

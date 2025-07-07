@@ -1,21 +1,21 @@
 module;
 #include <cassert>
 
-module position_list_encoder;
-import stl;
-import byte_slice_writer;
+module infinity_core;
+import :stl;
+import :byte_slice_writer;
 
-import file_writer;
-import file_reader;
-import vbyte_compressor;
-import index_defines;
-import posting_byte_slice;
-import skiplist_writer;
-import position_list_format_option;
-import posting_list_format;
-import inmem_position_list_decoder;
-import skiplist_reader;
-import short_list_optimize_util;
+import :file_writer;
+import :file_reader;
+import :vbyte_compressor;
+import :index_defines;
+import :posting_byte_slice;
+import :skiplist_writer;
+import :position_list_format_option;
+import :posting_list_format;
+import :inmem_position_list_decoder;
+import :skiplist_reader;
+import :short_list_optimize_util;
 
 namespace infinity {
 PositionListEncoder::PositionListEncoder(const PostingFormatOption &format_option, const PositionListFormat *pos_list_format)

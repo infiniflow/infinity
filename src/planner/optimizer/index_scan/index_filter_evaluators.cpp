@@ -16,29 +16,30 @@ module;
 
 #include <cassert>
 #include <vector>
-module index_filter_evaluators;
+module infinity_core;
 
-import stl;
-import roaring_bitmap;
-import secondary_index_data;
-import secondary_index_in_mem;
-import buffer_obj;
-import buffer_handle;
-import filter_expression_push_down;
-import filter_fulltext_expression;
-import query_node;
-import column_index_reader;
-import infinity_exception;
-import status;
+import :stl;
+import :roaring_bitmap;
+import :secondary_index_data;
+import :secondary_index_in_mem;
+import :buffer_obj;
+import :buffer_handle;
+import :filter_expression_push_down;
+import :filter_fulltext_expression;
+import :query_node;
+import :column_index_reader;
+import :infinity_exception;
+import :status;
 import internal_types;
-import third_party;
-import doc_iterator;
-import score_threshold_iterator;
+import :third_party;
+import :doc_iterator;
+import :score_threshold_iterator;
 import column_def;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import mem_index;
+import :table_index_meeta;
+import :segment_index_meta;
+import :chunk_index_meta;
+import :mem_index;
+import logical_type;
 
 namespace infinity {
 

@@ -16,16 +16,8 @@ module;
 
 #include <vector>
 
-module cluster_manager;
+module infinity_core;
 
-import stl;
-import status;
-import config;
-import infinity_context;
-import storage;
-import logger;
-import infinity_exception;
-import wal_manager;
 import admin_statement;
 
 namespace infinity {

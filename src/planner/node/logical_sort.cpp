@@ -16,14 +16,14 @@ module;
 
 #include <sstream>
 
-module logical_sort;
+module infinity_core;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_expression;
+import :base_expression;
 import internal_types;
 import select_statement;
 

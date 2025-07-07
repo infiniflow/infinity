@@ -13,20 +13,20 @@
 // limitations under the License.
 module;
 #include <chrono>
-module current_time;
-import stl;
-import config;
-import new_catalog;
-import status;
+module infinity_core;
+import :stl;
+import :config;
+import :new_catalog;
+import :status;
 import logical_type;
-import infinity_context;
-import infinity_exception;
-import scalar_function;
-import scalar_function_set;
-import third_party;
+import :infinity_context;
+import :infinity_exception;
+import :scalar_function;
+import :scalar_function_set;
+import :third_party;
 import internal_types;
 import data_type;
-import column_vector;
+import :column_vector;
 
 namespace infinity {
 using namespace std::chrono;

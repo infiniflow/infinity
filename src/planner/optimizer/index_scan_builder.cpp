@@ -15,28 +15,28 @@
 module;
 
 #include <vector>
-module index_scan_builder;
+module infinity_core;
 
-import stl;
-import logical_node;
-import logical_node_type;
-import logical_filter;
-import logical_table_scan;
-import logical_index_scan;
-import logical_knn_scan;
-import logical_match;
-import logical_match_tensor_scan;
-import logical_match_scan_base;
-import logical_project;
-import logical_fusion;
-import query_context;
-import logical_node_visitor;
-import infinity_exception;
-import logger;
-import third_party;
-import filter_expression_push_down;
-import base_table_ref;
-import lazy_load;
+import :stl;
+import :logical_node;
+import :logical_node_type;
+import :logical_filter;
+import :logical_table_scan;
+import :logical_index_scan;
+import :logical_knn_scan;
+import :logical_match;
+import :logical_match_tensor_scan;
+import :logical_match_scan_base;
+import :logical_project;
+import :logical_fusion;
+import :query_context;
+import :logical_node_visitor;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :filter_expression_push_down;
+import :base_table_ref;
+import :lazy_load;
 
 namespace infinity {
 

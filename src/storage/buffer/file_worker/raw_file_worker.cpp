@@ -17,14 +17,15 @@ module;
 #include <cassert>
 #include <tuple>
 
-module raw_file_worker;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import local_file_handle;
-import third_party;
-import status;
-import logger;
+import :stl;
+import :infinity_exception;
+import :local_file_handle;
+import :third_party;
+import :status;
+import :logger;
+import :raw_file_worker;
 
 namespace infinity {
 

@@ -23,15 +23,17 @@ module;
 #include <cstring>
 #include <filesystem>
 #include <iostream>
-import stl;
-import term;
-import analyzer;
-import common_analyzer;
-import logger;
-import status;
-import ijma;
 
-module korean_analyzer;
+module infinity_core;
+
+import :stl;
+import :term;
+import :analyzer;
+import :common_analyzer;
+import :logger;
+import :status;
+import :ijma;
+import :korean_analyzer;
 
 namespace fs = std::filesystem;
 

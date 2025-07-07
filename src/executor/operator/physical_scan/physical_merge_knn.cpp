@@ -14,27 +14,29 @@
 
 module;
 
-module physical_merge_knn;
+#include "parser/type/complex/embedding_type.h"
 
-import stl;
-import query_context;
+module infinity_core;
 
-import physical_operator_type;
-import operator_state;
-import logger;
-import status;
-import infinity_exception;
-import merge_knn_data;
-import knn_result_handler;
-import merge_knn;
-import block_index;
-import buffer_manager;
-import third_party;
-import default_values;
-import data_block;
-import knn_expression;
-import value;
-import column_vector;
+import :stl;
+import :query_context;
+
+import :physical_operator_type;
+import :operator_state;
+import :logger;
+import :status;
+import :infinity_exception;
+import :merge_knn_data;
+import :knn_result_handler;
+import :merge_knn;
+import :block_index;
+import :buffer_manager;
+import :third_party;
+import :default_values;
+import :data_block;
+import :knn_expression;
+import :value;
+import :column_vector;
 
 namespace infinity {
 

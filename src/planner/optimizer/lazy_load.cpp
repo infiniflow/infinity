@@ -15,27 +15,27 @@
 module;
 
 #include <vector>
-module lazy_load;
+module infinity_core;
 
-import stl;
-import logical_node;
-import column_binding;
-import base_expression;
-import column_expression;
-import logical_node_type;
-import logical_table_scan;
-import logical_index_scan;
-import logical_knn_scan;
-import logical_match;
-import logical_match_tensor_scan;
-import logical_match_scan_base;
-import logical_fusion;
-import logical_unnest;
-import base_table_ref;
-import load_meta;
-import special_function;
-import infinity_exception;
-import third_party;
+import :stl;
+import :logical_node;
+import :column_binding;
+import :base_expression;
+import :column_expression;
+import :logical_node_type;
+import :logical_table_scan;
+import :logical_index_scan;
+import :logical_knn_scan;
+import :logical_match;
+import :logical_match_tensor_scan;
+import :logical_match_scan_base;
+import :logical_fusion;
+import :logical_unnest;
+import :base_table_ref;
+import :load_meta;
+import :special_function;
+import :infinity_exception;
+import :third_party;
 
 namespace infinity {
 

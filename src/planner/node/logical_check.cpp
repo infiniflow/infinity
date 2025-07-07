@@ -16,13 +16,15 @@ module;
 
 #include <sstream>
 
-module logical_check;
+module infinity_core;
 
-import stl;
+import :stl;
 import internal_types;
-import infinity_exception;
-import column_binding;
-import logger;
+import :infinity_exception;
+import :column_binding;
+import :logger;
+import check_statement;
+import :logical_check;
 
 namespace infinity {
 

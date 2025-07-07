@@ -1,23 +1,23 @@
 module;
 
-module posting_merger;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import file_writer;
-import doc_list_encoder;
-import inmem_posting_decoder;
-import position_list_encoder;
-import posting_list_format;
-import index_defines;
-import posting_writer;
-import vector_with_lock;
-import posting_decoder;
-import term_meta;
-import column_index_iterator;
-import segment_term_posting;
+import :file_writer;
+import :doc_list_encoder;
+import :inmem_posting_decoder;
+import :position_list_encoder;
+import :posting_list_format;
+import :index_defines;
+import :posting_writer;
+import :vector_with_lock;
+import :posting_decoder;
+import :term_meta;
+import :column_index_iterator;
+import :segment_term_posting;
 import internal_types;
-import third_party;
+import :third_party;
 
 namespace infinity {
 

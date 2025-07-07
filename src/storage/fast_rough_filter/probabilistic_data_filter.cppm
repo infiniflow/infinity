@@ -14,14 +14,14 @@
 
 module;
 
-export module probabilistic_data_filter;
-import stl;
+export module infinity_core:probabilistic_data_filter;
+import :stl;
 import internal_types;
-import value;
-import binary_fuse_filter;
-import logger;
-import third_party;
-import infinity_exception;
+import :value;
+import :binary_fuse_filter;
+// import :logger;
+import :third_party;
+import :infinity_exception;
 
 namespace infinity {
 

@@ -2,13 +2,13 @@ module;
 
 #include <string>
 
-module letter_segmenter;
+module infinity_core;
 
-import stl;
-import segmenter;
-import analyze_context;
-import lexeme;
-import character_util;
+import :stl;
+import :segmenter;
+import :analyze_context;
+import :lexeme;
+import :character_util;
 
 namespace infinity {
 const std::wstring LetterSegmenter::SEGMENTER_NAME = L"LETTER_SEGMENTER";

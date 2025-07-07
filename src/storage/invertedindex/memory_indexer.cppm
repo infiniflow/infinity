@@ -16,28 +16,28 @@ module;
 
 #include <cstdio>
 
-export module memory_indexer;
-import stl;
+export module infinity_core:memory_indexer;
+import :stl;
 
-import index_defines;
-import posting_writer;
-import column_vector;
-import column_inverter;
-import third_party;
+import :index_defines;
+import :posting_writer;
+import :column_vector;
+import :column_inverter;
+import :third_party;
 import internal_types;
-import ring;
-import skiplist;
+import :ring;
+import :skiplist;
 import internal_types;
-import map_with_lock;
-import vector_with_lock;
-import buf_writer;
-import posting_list_format;
-import external_sort_merger;
-import persistence_manager;
-import base_memindex;
-import memindex_tracer;
-import mem_usage_change;
-import chunk_index_meta;
+import :map_with_lock;
+import :vector_with_lock;
+import :buf_writer;
+import :posting_list_format;
+import :external_sort_merger;
+import :persistence_manager;
+import :base_memindex;
+import :memindex_tracer;
+import :mem_usage_change;
+import :chunk_index_meta;
 
 namespace infinity {
 

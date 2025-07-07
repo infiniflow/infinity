@@ -16,14 +16,14 @@ module;
 
 #include <cassert>
 
-module dict_reader;
+module infinity_core;
 
-import stl;
-import term_meta;
-import posting_list_format;
-import fst;
-import mmap;
-import infinity_exception;
+import :stl;
+import :term_meta;
+import :posting_list_format;
+import :fst.fst;
+import :mmap;
+import :infinity_exception;
 
 namespace infinity {
 

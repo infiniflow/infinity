@@ -14,23 +14,23 @@
 
 module;
 
-export module physical_merge_aggregate;
+export module infinity_core:physical_merge_aggregate;
 
-import base_table_ref;
-import load_meta;
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
+import :base_table_ref;
+import :load_meta;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
 
-import infinity_exception;
-import value;
-import data_block;
-import stl;
+import :infinity_exception;
+import :value;
+import :data_block;
+import :stl;
 
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

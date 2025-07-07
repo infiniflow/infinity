@@ -16,12 +16,12 @@ module;
 
 #include <tuple>
 
-export module meta_tree;
+export module infinity_core:meta_tree;
 
-import stl;
-import meta_type;
-import meta_key;
-import third_party;
+import :stl;
+import :meta_type;
+import :meta_key;
+import :third_party;
 import internal_types;
 import check_statement;
 

@@ -16,12 +16,12 @@ module;
 
 #include <sstream>
 
-module logical_aggregate;
+module infinity_core;
 
-import stl;
-import column_binding;
+import :stl;
+import :column_binding;
 
-import base_expression;
+import :base_expression;
 import internal_types;
 
 namespace infinity {

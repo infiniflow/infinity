@@ -16,9 +16,9 @@ module;
 
 #include "type/complex/row_id.h"
 
-export module mem_index;
+export module infinity_core:mem_index;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

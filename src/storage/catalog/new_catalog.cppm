@@ -14,36 +14,36 @@
 
 module;
 
-export module new_catalog;
+export module infinity_core:new_catalog;
 
-import stl;
-import status;
-import meta_info;
+import :stl;
+import :status;
+import :meta_info;
 import extra_ddl_info;
-import default_values;
+import :default_values;
 import internal_types;
-import buffer_handle;
+import :buffer_handle;
 import column_def;
-import profiler;
-import third_party;
-import storage;
-import meta_tree;
+import :profiler;
+import :third_party;
+import :storage;
+import :meta_tree;
 
 namespace infinity {
 
 class NewTxn;
 struct MemIndex;
 class TableIndexReaderCache;
-class DBMeeta;
-class TableMeeta;
-class SegmentMeta;
-class BlockMeta;
-class ColumnMeta;
-class TableIndexMeeta;
-class SegmentIndexMeta;
-class ChunkIndexMeta;
+export class DBMeeta;
+export class TableMeeta;
+export class SegmentMeta;
+export class BlockMeta;
+export class ColumnMeta;
+export class TableIndexMeeta;
+export class SegmentIndexMeta;
+export class ChunkIndexMeta;
 class BufferObj;
-class ColumnVector;
+export struct ColumnVector;
 struct MetaKey;
 class KVStore;
 class KVInstance;

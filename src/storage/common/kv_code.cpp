@@ -16,11 +16,12 @@ module;
 
 #include <string>
 
-module kv_code;
+module infinity_core;
 
-import stl;
-import third_party;
-import infinity_exception;
+import :stl;
+import :third_party;
+import :infinity_exception;
+import :kv_code;
 
 namespace infinity {
 

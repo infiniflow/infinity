@@ -14,10 +14,10 @@
 
 module;
 
-export module kv_utility;
+export module infinity_core:kv_utility;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import internal_types;
 
 namespace infinity {

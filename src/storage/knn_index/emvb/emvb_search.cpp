@@ -22,18 +22,18 @@ module;
 #include <map>
 #include <vector>
 
-module emvb_search;
-import stl;
-import emvb_result_handler;
-import simd_init;
-import emvb_simd_funcs;
-import mlas_matrix_multiply;
-import emvb_product_quantization;
-import emvb_shared_vec;
-import infinity_exception;
-import roaring_bitmap;
-import block_index;
-import knn_filter;
+module infinity_core;
+import :stl;
+import :emvb_result_handler;
+import :simd_init;
+import :emvb_simd_funcs;
+import :mlas_matrix_multiply;
+import :emvb_product_quantization;
+import :emvb_shared_vec;
+import :infinity_exception;
+import :roaring_bitmap;
+import :block_index;
+import :knn_filter;
 
 namespace infinity {
 

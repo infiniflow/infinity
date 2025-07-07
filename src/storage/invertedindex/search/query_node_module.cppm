@@ -16,7 +16,7 @@ module;
 
 #include "query_node.h"
 
-export module query_node;
+export module infinity_core:query_node;
 
 namespace infinity {
 

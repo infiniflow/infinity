@@ -14,11 +14,11 @@
 
 module;
 
-module cached_index_scan;
+module infinity_core;
 
-import logical_index_scan;
-import physical_index_scan;
-import logical_node_type;
+import :logical_index_scan;
+import :physical_index_scan;
+import :logical_node_type;
 
 namespace infinity {
 

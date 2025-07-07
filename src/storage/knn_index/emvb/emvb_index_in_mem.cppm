@@ -14,10 +14,10 @@
 
 module;
 
-export module emvb_index_in_mem;
-import stl;
+export module infinity_core:emvb_index_in_mem;
+import :stl;
 import internal_types;
-import roaring_bitmap;
+import :roaring_bitmap;
 
 namespace infinity {
 

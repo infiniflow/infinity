@@ -26,9 +26,9 @@
 
 import compilation_config;
 
-import profiler;
-import virtual_store;
-import third_party;
+import :profiler;
+import :virtual_store;
+import :third_party;
 import statement_common;
 import internal_types;
 

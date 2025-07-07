@@ -14,13 +14,9 @@
 
 module;
 
-export module session;
+export module infinity_core:session;
 
-import stl;
-import config;
-import options;
-import profiler;
-import global_resource_usage;
+import :stl;
 
 namespace infinity {
 

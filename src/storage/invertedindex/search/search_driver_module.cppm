@@ -16,7 +16,7 @@ module;
 
 #include "search_driver.h"
 
-export module search_driver;
+export module infinity_core:search_driver;
 
 namespace infinity {
 

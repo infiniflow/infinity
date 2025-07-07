@@ -4,20 +4,23 @@
 
 module;
 
-module hnsw_handler;
+#include "parser/type/complex/embedding_type.h"
 
-import buffer_manager;
-import buffer_handle;
-import block_column_iter;
-import memindex_tracer;
-import default_values;
+module infinity_core;
+
+import :buffer_manager;
+import :buffer_handle;
+import :block_column_iter;
+import :memindex_tracer;
+import :default_values;
 import logical_type;
-import multivector_util;
-import infinity_exception;
-import third_party;
-import column_vector;
-import local_file_handle;
-import chunk_index_meta;
+import :multivector_util;
+import :infinity_exception;
+import :third_party;
+import :column_vector;
+import :local_file_handle;
+import :chunk_index_meta;
+import embedding_info;
 
 namespace infinity {
 

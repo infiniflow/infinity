@@ -13,31 +13,24 @@
 // limitations under the License.
 module;
 
-export module infinity;
+export module infinity_core:infinity;
 
-import stl;
-import config;
-import resource_manager;
-import task_scheduler;
-import storage;
-import status;
-import query_result;
-import query_options;
-import infinity_context;
-import session;
-import parsed_expr;
-import search_expr;
-import insert_row_expr;
+import :stl;
+import :query_options;
+import command_statement;
 import column_def;
 import create_index_info;
+import insert_row_expr;
+import parsed_expr;
 import update_statement;
 import explain_statement;
-import command_statement;
+import search_expr;
 import select_statement;
-import global_resource_usage;
-import query_context;
 
 namespace infinity {
+class BaseSession;
+class QueryContext;
+class QueryResult;
 
 export class Infinity {
 public:

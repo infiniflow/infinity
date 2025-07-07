@@ -14,17 +14,17 @@
 
 module;
 
-module user_defined_analyzer;
+module infinity_core;
 #if 0
 #include "Python.h"
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-import status;
-import third_party;
-import defer_op;
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
+import :status;
+import :third_party;
+import :defer_op;
 
 namespace infinity {
 

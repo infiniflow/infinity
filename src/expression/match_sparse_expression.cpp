@@ -17,23 +17,25 @@ module;
 #include <sstream>
 #include <vector>
 
-module match_sparse_expression;
+module infinity_core;
 
-import stl;
+import :stl;
 import logical_type;
 import internal_types;
-import third_party;
-import column_expression;
-import status;
-import logger;
-import infinity_exception;
-import cast_function;
-import cast_expression;
-import bound_cast_func;
-import value;
+import :third_party;
+import :column_expression;
+import :status;
+import :logger;
+import :infinity_exception;
+import :cast_function;
+import :cast_expression;
+import :bound_cast_func;
+import :value;
 import constant_expr;
 import sparse_info;
-import value_expression;
+import :value_expression;
+import match_sparse_expr;
+import statement_common;
 
 namespace infinity {
 

@@ -14,12 +14,12 @@
 
 module;
 
-export module logical_command;
+export module infinity_core:logical_command;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
 import internal_types;
 import command_statement;

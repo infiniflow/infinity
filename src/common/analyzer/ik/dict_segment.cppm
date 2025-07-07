@@ -1,12 +1,13 @@
 module;
 
-export module ik_dict_segment;
+export module infinity_core:ik_dict_segment;
 
-import stl;
-import hit;
+import :stl;
+import :hit;
+
 namespace infinity {
 
-export class DictSegment {
+class DictSegment {
 public:
     static HashMap<wchar_t, wchar_t> char_map_;
 

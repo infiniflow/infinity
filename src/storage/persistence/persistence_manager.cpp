@@ -16,19 +16,20 @@ module;
 #include <cassert>
 #include <filesystem>
 
-module persistence_manager;
-import stl;
-import uuid;
+module infinity_core;
+
+import :stl;
+import :uuid;
 import serialize;
-import third_party;
-import infinity_exception;
-import virtual_store;
-import logger;
+import :third_party;
+import :infinity_exception;
+import :virtual_store;
+import :logger;
 import global_resource_usage;
-import obj_stat_accessor;
-import kv_store;
-import kv_code;
-import infinity_context;
+import :obj_stat_accessor;
+import :kv_store;
+import :kv_code;
+import :infinity_context;
 
 namespace fs = std::filesystem;
 

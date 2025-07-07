@@ -18,31 +18,33 @@ namespace infinity {
 struct ChunkIndexMetaInfo;
 }
 
-export module bmp_handler;
+export module infinity_core:bmp_handler;
 
-import stl;
-import bmp_alg;
-import bmp_util;
-import index_base;
+import :stl;
+import :bmp_alg;
+import :bmp_util;
+import :index_base;
 import column_def;
 import internal_types;
-import index_bmp;
+import :index_bmp;
 import sparse_info;
 import internal_types;
-import buffer_handle;
-import base_memindex;
-import memindex_tracer;
-import sparse_util;
-import infinity_exception;
+import :buffer_handle;
+import :base_memindex;
+import :memindex_tracer;
+import :sparse_util;
+import :infinity_exception;
+import :abstract_bmp;
+import :column_vector;
 
 namespace infinity {
 
 class BufferManager;
-class ColumnVector;
+// class ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 
-using AbstractBMP = std::variant<UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
+export using AbstractBMP = std::variant<UniquePtr<BMPAlg<f32, i32, BMPCompressType::kCompressed>>,
                                  UniquePtr<BMPAlg<f32, i32, BMPCompressType::kRaw>>,
                                  UniquePtr<BMPAlg<f32, i16, BMPCompressType::kCompressed>>,
                                  UniquePtr<BMPAlg<f32, i16, BMPCompressType::kRaw>>,

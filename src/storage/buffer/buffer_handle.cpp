@@ -14,13 +14,13 @@
 
 module;
 
-import stl;
-import buffer_handle;
-import buffer_obj;
-import logger;
-import file_worker_type;
+module infinity_core;
 
-module buffer_handle;
+import :stl;
+import :buffer_handle;
+import :buffer_obj;
+import :logger;
+import :file_worker_type;
 
 namespace infinity {
 BufferHandle::BufferHandle(BufferObj *buffer_obj, void *data) : buffer_obj_(buffer_obj), data_(data) {}

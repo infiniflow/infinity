@@ -17,29 +17,29 @@ module;
 #include <algorithm>
 #include <vector>
 
-module physical_index_scan;
+module infinity_core;
 
-import query_context;
-import operator_state;
-import default_values;
-import buffer_handle;
-import infinity_exception;
-import logger;
-import third_party;
-import data_block;
+import :query_context;
+import :operator_state;
+import :default_values;
+import :buffer_handle;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :data_block;
 import logical_type;
-import secondary_index_in_mem;
-import fast_rough_filter;
-import roaring_bitmap;
-import filter_value_type_classification;
-import physical_scan_base;
-import result_cache_manager;
-import block_index;
+import :secondary_index_in_mem;
+import :fast_rough_filter;
+import :roaring_bitmap;
+import :filter_value_type_classification;
+import :physical_scan_base;
+import :result_cache_manager;
+import :block_index;
 
-import status;
-import new_catalog;
-import new_txn;
-import segment_meta;
+import :status;
+import :new_catalog;
+import :new_txn;
+import :segment_meta;
 
 namespace infinity {
 

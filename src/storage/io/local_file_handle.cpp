@@ -20,13 +20,13 @@ module;
 #include <sys/stat.h>
 #include <unistd.h>
 
-module local_file_handle;
+module infinity_core;
 
-import third_party;
-import status;
-import virtual_store;
-import infinity_exception;
-import logger;
+import :third_party;
+import :status;
+import :virtual_store;
+import :infinity_exception;
+import :logger;
 
 namespace infinity {
 

@@ -13,10 +13,10 @@
 // limitations under the License.
 module;
 
-export module infinity_exception;
+export module infinity_core:infinity_exception;
 
-import stl;
-import status;
+import :stl;
+import :status;
 
 namespace infinity {
 

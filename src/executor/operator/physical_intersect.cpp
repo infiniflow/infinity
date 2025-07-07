@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_intersect;
+import :query_context;
+import :operator_state;
+import :physical_intersect;
 
 namespace infinity {
 
-void PhysicalIntersect::Init(QueryContext* query_context) {}
+void PhysicalIntersect::Init(QueryContext *query_context) {}
 
 bool PhysicalIntersect::Execute(QueryContext *, OperatorState *) { return true; }
 

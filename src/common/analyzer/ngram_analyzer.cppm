@@ -14,12 +14,13 @@
 
 module;
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-export module ngram_analyzer;
+export module infinity_core:ngram_analyzer;
+
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
 
 namespace infinity {
 export class NGramAnalyzer : public Analyzer {

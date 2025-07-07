@@ -20,16 +20,16 @@ module;
 #include <string>
 #include <vector>
 
-module index_ivf;
+module infinity_core;
 
-import infinity_exception;
-import stl;
-import index_base;
-import status;
+import :infinity_exception;
+import :stl;
+import :index_base;
+import :status;
 import serialize;
 import logical_type;
 import statement_common;
-import logger;
+import :logger;
 import embedding_info;
 import internal_types;
 import data_type;

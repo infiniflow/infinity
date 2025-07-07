@@ -17,13 +17,13 @@ module;
 #include <cassert>
 #include <vector>
 
-module or_iterator;
+module infinity_core;
 import internal_types;
 
-import stl;
-import index_defines;
-import multi_doc_iterator;
-import doc_iterator;
+import :stl;
+import :index_defines;
+import :multi_doc_iterator;
+import :doc_iterator;
 namespace infinity {
 
 void DocIteratorHeap::BuildHeap() {

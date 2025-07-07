@@ -14,21 +14,21 @@
 
 module;
 
-export module bound_select_statement;
+export module infinity_core:bound_select_statement;
 
-import bound_statement;
-import logical_knn_scan;
-import base_expression;
-import stl;
-import bind_context;
-import logical_node;
-import table_ref;
+import :bound_statement;
+import :logical_knn_scan;
+import :base_expression;
+import :stl;
+import :bind_context;
+import :logical_node;
+import :table_ref;
 
-import query_context;
-import search_expression;
-import knn_expression;
+// import :query_context;
+import :search_expression;
+import :knn_expression;
 import select_statement;
-import highlighter;
+import :highlighter;
 
 namespace infinity {
 

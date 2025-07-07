@@ -16,17 +16,17 @@ module;
 
 #include <sstream>
 
-module scalar_function_set;
+module infinity_core;
 
-import stl;
-import base_expression;
-import scalar_function;
+import :stl;
+import :base_expression;
+import :scalar_function;
 
-import infinity_exception;
-import cast_table;
-import logger;
-import status;
-import third_party;
+import :infinity_exception;
+import :cast_table;
+import :logger;
+import :status;
+import :third_party;
 
 namespace infinity {
 

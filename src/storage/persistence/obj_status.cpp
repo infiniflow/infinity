@@ -16,12 +16,12 @@ module;
 
 #include <__iterator/next.h>
 
-module obj_status;
+module infinity_core;
 
 import serialize;
-import status;
-import logger;
-import third_party;
+import :status;
+import :logger;
+import :third_party;
 
 namespace infinity {
 

@@ -5,18 +5,18 @@ module;
 #include <nanobind/nanobind.h>
 #include <string>
 
-export module wrap_infinity;
+export module infinity_core:wrap_infinity;
 
-import stl;
-import config;
-import resource_manager;
-import task_scheduler;
-import storage;
-import status;
-import query_result;
-import query_options;
-import infinity_context;
-import session;
+import :stl;
+import :config;
+import :resource_manager;
+import :task_scheduler;
+import :storage;
+import :status;
+import :query_result;
+import :query_options;
+import :infinity_context;
+import :session;
 import parsed_expr;
 import search_expr;
 import insert_row_expr;
@@ -26,7 +26,7 @@ import update_statement;
 import explain_statement;
 import command_statement;
 import select_statement;
-import infinity;
+import :infinity;
 import data_type;
 import type_info;
 import logical_type;

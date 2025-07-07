@@ -21,36 +21,36 @@ module;
 #include <parquet/properties.h>
 #include <string>
 
-module physical_export;
+module infinity_core;
 
-import query_context;
-import operator_state;
-import logger;
+// import :query_context;
+import :operator_state;
+import :logger;
 import statement_common;
-import third_party;
+import :third_party;
 import column_def;
-import column_vector;
-import value;
-import virtual_store;
-import stl;
+import :column_vector;
+import :value;
+import :virtual_store;
+import :stl;
 import logical_type;
 import embedding_info;
 import sparse_info;
 import array_info;
-import status;
-import buffer_manager;
-import default_values;
+import :status;
+import :buffer_manager;
+import :default_values;
 import internal_types;
-import virtual_store;
-import local_file_handle;
-import knn_filter;
-import block_index;
+import :virtual_store;
+import :local_file_handle;
+import :knn_filter;
+import :block_index;
 
-import new_txn;
-import block_meta;
-import column_meta;
-import new_catalog;
-import roaring_bitmap;
+import :new_txn;
+import :block_meta;
+import :column_meta;
+import :new_catalog;
+import :roaring_bitmap;
 
 namespace infinity {
 

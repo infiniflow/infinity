@@ -19,9 +19,9 @@ class ColumnDef;
 struct RowID;
 } // namespace infinity
 
-export module hnsw_lsg_builder;
+export module infinity_core:hnsw_lsg_builder;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

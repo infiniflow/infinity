@@ -16,14 +16,14 @@ module;
 
 #include <vector>
 
-module result_cache_manager;
+module infinity_core;
 
-import cached_scan_base;
-import infinity_exception;
-import logical_match;
-import physical_match;
-import logical_node_type;
-import logger;
+import :cached_scan_base;
+import :infinity_exception;
+import :logical_match;
+import :physical_match;
+import :logical_node_type;
+import :logger;
 
 namespace infinity {
 

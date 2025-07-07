@@ -14,12 +14,9 @@
 
 module;
 
-module logger;
+module infinity_core;
 
-import stl;
-import config;
-import third_party;
-import status;
+import :config;
 
 namespace infinity {
 

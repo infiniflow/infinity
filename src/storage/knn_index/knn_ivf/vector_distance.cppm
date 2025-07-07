@@ -14,10 +14,11 @@
 
 module;
 #include <type_traits>
-import stl;
-import simd_functions;
 
-export module vector_distance;
+export module infinity_core:vector_distance;
+
+import :stl;
+import :simd_functions;
 
 namespace infinity {
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>

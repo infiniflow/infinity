@@ -14,17 +14,20 @@
 
 module;
 
-module bmp_handler;
+#include "parser/type/complex/embedding_type.h"
 
-import buffer_manager;
-import buffer_handle;
-import block_column_iter;
-import sparse_util;
-import third_party;
-import logger;
-import buffer_obj;
-import local_file_handle;
-import chunk_index_meta;
+module infinity_core;
+
+import :buffer_manager;
+import :buffer_handle;
+import :block_column_iter;
+import :sparse_util;
+import :third_party;
+import :logger;
+import :buffer_obj;
+import :local_file_handle;
+import :chunk_index_meta;
+import sparse_info;
 
 namespace infinity {
 

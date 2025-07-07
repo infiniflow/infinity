@@ -14,9 +14,9 @@
 
 module;
 
-export module modulo;
+export module infinity_core:modulo;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

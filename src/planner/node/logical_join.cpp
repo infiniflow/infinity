@@ -17,14 +17,15 @@ module;
 #include <sstream>
 #include <vector>
 
-module logical_join;
+module infinity_core;
 
-import stl;
-import column_binding;
+import :stl;
+import :column_binding;
 
-import logical_node_type;
-import base_expression;
+import :logical_node_type;
+import :base_expression;
 import internal_types;
+import join_reference;
 
 namespace infinity {
 

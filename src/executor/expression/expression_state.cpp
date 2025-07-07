@@ -16,30 +16,30 @@ module;
 
 #include <vector>
 
-module expression_state;
+module infinity_core;
 
-import infinity_exception;
-import stl;
-import third_party;
-import column_vector;
-import expression_type;
+import :infinity_exception;
+import :stl;
+import :third_party;
+import :column_vector;
+import :expression_type;
 import logical_type;
-import aggregate_expression;
-import base_expression;
-import case_expression;
-import cast_expression;
-import column_expression;
-import function_expression;
-import in_expression;
-import reference_expression;
-import value_expression;
-import filter_fulltext_expression;
-import status;
+import :aggregate_expression;
+import :base_expression;
+import :case_expression;
+import :cast_expression;
+import :column_expression;
+import :function_expression;
+import :in_expression;
+import :reference_expression;
+import :value_expression;
+import :filter_fulltext_expression;
+import :status;
 
-import default_values;
+import :default_values;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

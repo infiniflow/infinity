@@ -13,11 +13,12 @@
 // limitations under the License.
 module;
 
-export module logger;
+export module infinity_core:logger;
 
-import stl;
-import third_party;
-import status;
+import :stl;
+// import infinity_core;
+import :status;
+import :third_party;
 
 namespace infinity {
 

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 module;
-export module filter_fulltext_expression;
-import base_expression;
+export module infinity_core:filter_fulltext_expression;
+import :base_expression;
 import data_type;
-import stl;
+import :stl;
 import function_expr;
-import filter_expression_push_down;
-import roaring_bitmap;
+import :filter_expression_push_down;
+import :roaring_bitmap;
 
 namespace infinity {
 

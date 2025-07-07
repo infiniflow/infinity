@@ -16,10 +16,13 @@ module;
 
 #include <sstream>
 #include <string>
-module whitespace_analyzer;
-import stl;
-import term;
-import analyzer;
+
+module infinity_core;
+
+import :stl;
+import :term;
+import :analyzer;
+import :whitespace_analyzer;
 
 namespace infinity {
 

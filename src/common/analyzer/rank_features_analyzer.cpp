@@ -15,12 +15,12 @@
 module;
 
 #include <string>
-module rank_features_analyzer;
-import stl;
-import term;
-import analyzer;
-import smallfloat;
-import third_party;
+module infinity_core;
+import :stl;
+import :term;
+import :analyzer;
+import :smallfloat;
+import :third_party;
 
 namespace infinity {
 

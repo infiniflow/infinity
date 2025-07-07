@@ -17,18 +17,18 @@ module;
 #include <concepts>
 #include <type_traits>
 
-export module binary_operator;
+export module infinity_core:binary_operator;
 
-import stl;
-import column_vector;
-import vector_buffer;
+import :stl;
+import :column_vector;
+import :vector_buffer;
 
-import infinity_exception;
-import roaring_bitmap;
-import third_party;
+import :infinity_exception;
+import :roaring_bitmap;
+import :third_party;
 import internal_types;
-import status;
-import logger;
+import :status;
+import :logger;
 
 namespace infinity {
 

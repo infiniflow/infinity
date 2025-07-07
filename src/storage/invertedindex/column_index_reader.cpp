@@ -17,39 +17,38 @@ module;
 #include <cassert>
 #include <vector>
 
-module column_index_reader;
+module infinity_core;
 
-import stl;
-
-import segment_posting;
-import index_segment_reader;
-import posting_iterator;
-import index_defines;
-import disk_index_segment_reader;
-import inmem_index_segment_reader;
-import memory_indexer;
-import dict_reader;
-import posting_list_format;
+import :stl;
+import :segment_posting;
+import :index_segment_reader;
+import :posting_iterator;
+import :index_defines;
+import :disk_index_segment_reader;
+import :inmem_index_segment_reader;
+import :memory_indexer;
+import :dict_reader;
+import :posting_list_format;
 import internal_types;
-import infinity_exception;
+import :infinity_exception;
 import create_index_info;
-import index_base;
-import index_full_text;
-import third_party;
-import term_doc_iterator;
-import default_values;
-import logger;
-import table_meeta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import new_txn;
-import status;
-import mem_index;
-import kv_store;
+import :index_base;
+import :index_full_text;
+import :third_party;
+import :term_doc_iterator;
+import :default_values;
+import :logger;
+import :table_meeta;
+import :table_index_meeta;
+import :segment_index_meta;
+import :chunk_index_meta;
+import :new_txn;
+import :status;
+import :mem_index;
+import :kv_store;
 
-import new_catalog;
-import buffer_handle;
+import :new_catalog;
+import :buffer_handle;
 
 namespace infinity {
 

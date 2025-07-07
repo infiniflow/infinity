@@ -16,27 +16,27 @@ module;
 
 #include <string>
 
-module physical_sort;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
-import data_block;
-import default_values;
-import column_vector;
-import expression_state;
-import base_expression;
-import expression_evaluator;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
+import :data_block;
+import :default_values;
+import :column_vector;
+import :expression_state;
+import :base_expression;
+import :expression_evaluator;
 
-import physical_operator_type;
-import operator_state;
-import data_block;
-import infinity_exception;
-import third_party;
-import status;
-import physical_top;
-import logger;
+import :physical_operator_type;
+import :operator_state;
+import :data_block;
+import :infinity_exception;
+import :third_party;
+import :status;
+import :physical_top;
+import :logger;
 
 namespace infinity {
 

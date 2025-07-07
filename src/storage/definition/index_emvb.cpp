@@ -19,19 +19,20 @@ module;
 #include <sstream>
 #include <string>
 
-module index_emvb;
+module infinity_core;
 
-import stl;
-import status;
-import base_table_ref;
-import infinity_exception;
-import third_party;
-import logger;
+import :stl;
+import :status;
+import :base_table_ref;
+import :infinity_exception;
+import :third_party;
+import :logger;
 import logical_type;
 import type_info;
 import embedding_info;
 import internal_types;
 import serialize;
+import statement_common;
 
 namespace infinity {
 

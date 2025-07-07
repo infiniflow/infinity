@@ -2,26 +2,26 @@ module;
 
 #include <cassert>
 
-module multi_posting_decoder;
+module infinity_core;
 
-import stl;
-import byte_slice;
-import byte_slice_reader;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
 
-import index_decoder;
-import in_doc_pos_iterator;
-import in_doc_pos_state;
-import in_doc_state_keeper;
-import segment_posting;
-import index_defines;
-import posting_writer;
-import term_meta;
-import posting_list_format;
-import inmem_posting_decoder;
-import inmem_position_list_decoder;
-import skiplist_reader;
+import :index_decoder;
+import :in_doc_pos_iterator;
+import :in_doc_pos_state;
+import :in_doc_state_keeper;
+import :segment_posting;
+import :index_defines;
+import :posting_writer;
+import :term_meta;
+import :posting_list_format;
+import :inmem_posting_decoder;
+import :inmem_position_list_decoder;
+import :skiplist_reader;
 import internal_types;
-import third_party;
+import :third_party;
 
 namespace infinity {
 

@@ -18,14 +18,14 @@ module;
 #include <set>
 #include <unistd.h>
 
-module file_reader;
+module infinity_core;
 
-import stl;
-import status;
-import infinity_exception;
-import third_party;
-import logger;
-import virtual_store;
+import :stl;
+import :status;
+import :infinity_exception;
+import :third_party;
+import :logger;
+import :virtual_store;
 
 namespace infinity {
 

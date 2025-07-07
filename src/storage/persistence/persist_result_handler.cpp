@@ -16,16 +16,16 @@ module;
 
 #include <vector>
 
-module persist_result_handler;
+module infinity_core;
 
-import infinity_exception;
-import third_party;
-import virtual_store;
-import infinity_context;
-import peer_task;
-import logger;
+import :infinity_exception;
+import :third_party;
+import :virtual_store;
+import :infinity_context;
+import :peer_task;
+import :logger;
 import admin_statement;
-import obj_status;
+import :obj_status;
 
 namespace infinity {
 

@@ -18,33 +18,34 @@ module;
 #include <sstream>
 #include <vector>
 
-module wal_entry;
+module infinity_core;
 
-import crc;
+import :crc;
 import serialize;
-import data_block;
-import table_def;
-import index_base;
-import infinity_exception;
+import :data_block;
+import :table_def;
+import :index_base;
+import :infinity_exception;
 
-import stl;
-import defer_op;
-import third_party;
+import :stl;
+import :defer_op;
+import :third_party;
 import internal_types;
-import logger;
-import block_version;
-import index_defines;
+import :logger;
+import :block_version;
+import :index_defines;
 import create_index_info;
-import persistence_manager;
-import infinity_context;
-import virtual_store;
-import chunk_index_meta;
-import table_meeta;
-import segment_meta;
-import block_meta;
-import column_meta;
-import default_values;
-import status;
+import :persistence_manager;
+import :infinity_context;
+import :virtual_store;
+import :chunk_index_meta;
+import :table_meeta;
+import :segment_meta;
+import :block_meta;
+import :column_meta;
+import :default_values;
+import :status;
+import statement_common;
 
 namespace infinity {
 

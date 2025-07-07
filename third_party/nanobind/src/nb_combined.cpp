@@ -52,7 +52,7 @@
 
    - The suffix of the final shared library depends on the Python version and
      platform. You can query the Python binary about the right extension via
-     "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
+     "import :sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
 
    - Some of the above details change when creating a limited API /
      stable ABI build, which is possible starting with Python 3.12. See the

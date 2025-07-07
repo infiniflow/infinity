@@ -1,8 +1,8 @@
 module;
 
-export module ltrim;
+export module infinity_core:ltrim;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -16,13 +16,13 @@ module;
 
 #include <sstream>
 
-module logical_view_scan;
+module infinity_core;
 
-import stl;
-import column_binding;
+import :stl;
+import :column_binding;
 
-import base_expression;
-import view;
+import :base_expression;
+import :view;
 import internal_types;
 
 namespace infinity {

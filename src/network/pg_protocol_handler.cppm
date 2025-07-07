@@ -13,13 +13,13 @@
 // limitations under the License.
 module;
 
-export module pg_protocol_handler;
+export module infinity_core:pg_protocol_handler;
 
-import stl;
-import boost;
-import pg_message;
-import buffer_reader;
-import buffer_writer;
+import :stl;
+import :boost;
+import :pg_message;
+import :buffer_reader;
+import :buffer_writer;
 
 namespace infinity {
 

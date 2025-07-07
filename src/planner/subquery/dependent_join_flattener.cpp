@@ -13,40 +13,40 @@
 // limitations under the License.
 module;
 
-module dependent_join_flattener;
+module infinity_core;
 
-import status;
-import stl;
+import :status;
+import :stl;
 
-import logical_node;
-import logical_node_type;
-import third_party;
+import :logical_node;
+import :logical_node_type;
+import :third_party;
 
-import infinity_exception;
-import logical_aggregate;
-import logical_join;
-import logical_table_scan;
-import logical_cross_product;
-import logical_project;
+import :infinity_exception;
+import :logical_aggregate;
+import :logical_join;
+import :logical_table_scan;
+import :logical_cross_product;
+import :logical_project;
 
-import function_expression;
-import base_expression;
-import column_expression;
+import :function_expression;
+import :base_expression;
+import :column_expression;
 
-import binding;
-import base_table_ref;
+import :binding;
+import :base_table_ref;
 
-import new_catalog;
-import function_set;
-import scalar_function;
-import scalar_function_set;
-import corrlated_expr_detector;
-import rewrite_correlated_expression;
+import :new_catalog;
+import :function_set;
+import :scalar_function;
+import :scalar_function_set;
+import :corrlated_expr_detector;
+import :rewrite_correlated_expression;
 import internal_types;
 import join_reference;
 import data_type;
-import logger;
-import block_index;
+import :logger;
+import :block_index;
 
 namespace infinity {
 

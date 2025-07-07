@@ -16,16 +16,16 @@ module;
 
 #include <sstream>
 
-module table_def;
+module infinity_core;
 
-import stl;
+import :stl;
 import data_type;
 import serialize;
 import internal_types;
-import infinity_exception;
+import :infinity_exception;
 import parsed_expr;
 import constant_expr;
-import logger;
+import :logger;
 
 namespace infinity {
 

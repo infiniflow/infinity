@@ -14,9 +14,13 @@
 
 module;
 
-module logical_alter;
+module infinity_core;
 
 import logical_type;
+import :stl;
+import data_type;
+import :column_binding;
+import :logical_alter;
 
 namespace infinity {
 

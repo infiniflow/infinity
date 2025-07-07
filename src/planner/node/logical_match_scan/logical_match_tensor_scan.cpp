@@ -16,22 +16,22 @@ module;
 
 #include <sstream>
 
-module logical_match_tensor_scan;
+module infinity_core;
 
-import stl;
-import base_table_ref;
-import column_binding;
-import logical_node_type;
-import match_tensor_expression;
-import default_values;
+import :stl;
+import :base_table_ref;
+import :column_binding;
+import :logical_node_type;
+import :match_tensor_expression;
+import :default_values;
 import logical_type;
 import internal_types;
-import third_party;
-import explain_logical_plan;
+import :third_party;
+import :explain_logical_plan;
 import search_options;
-import infinity_exception;
-import status;
-import logger;
+import :infinity_exception;
+import :status;
+import :logger;
 
 namespace infinity {
 

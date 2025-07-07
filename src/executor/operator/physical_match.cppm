@@ -14,30 +14,23 @@
 
 module;
 
-export module physical_match;
+export module infinity_core:physical_match;
 
-import stl;
-
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import meta_info;
-import base_expression;
-import match_expression;
-import base_table_ref;
-import load_meta;
-import infinity_exception;
-import internal_types;
-import data_type;
-import common_query_filter;
-import logger;
-import column_index_reader;
-import query_node;
-import doc_iterator;
-import parse_fulltext_options;
+import :stl;
+import :physical_operator;
+import :parse_fulltext_options;
+import :doc_iterator;
+import :base_table_ref;
+import :common_query_filter;
+import :meta_info;
 
 namespace infinity {
+class BaseExpression;
+struct BM25Params;
+enum class FulltextSimilarity;
+struct QueryNode;
+struct IndexReader;
+class MatchExpression;
 
 class ResultCacheManager;
 struct DataBlock;

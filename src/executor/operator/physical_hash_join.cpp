@@ -15,15 +15,18 @@
 module;
 
 #include <string>
-import query_context;
-import operator_state;
-import stl;
 
-module physical_hash_join;
+module infinity_core;
+
+import :query_context;
+import :operator_state;
+import :stl;
+import :physical_hash_join;
+import data_type;;
 
 namespace infinity {
 
-void PhysicalHashJoin::Init(QueryContext* query_context) {}
+void PhysicalHashJoin::Init(QueryContext *query_context) {}
 
 bool PhysicalHashJoin::Execute(QueryContext *, OperatorState *) { return true; }
 

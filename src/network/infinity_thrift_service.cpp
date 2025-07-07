@@ -18,25 +18,25 @@ module;
 #include <string>
 #include <vector>
 
-module infinity_thrift_service;
+module infinity_core;
 
-import third_party;
-import logger;
-import query_options;
-import infinity_thrift_types;
-import infinity;
-import stl;
-import infinity_context;
-import file_writer;
-import value;
-import infinity_exception;
+import :third_party;
+import :logger;
+import :query_options;
+import :infinity_thrift_types;
+import :infinity;
+import :stl;
+import :infinity_context;
+import :file_writer;
+import :value;
+import :infinity_exception;
 import logical_type;
 import internal_types;
 import search_options;
 import column_def;
 import statement_common;
 import data_type;
-import status;
+import :status;
 import embedding_info;
 import sparse_info;
 import array_info;
@@ -57,13 +57,13 @@ import explain_statement;
 import create_index_info;
 import command_statement;
 import select_statement;
-import data_block;
-import table_def;
+import :data_block;
+import :table_def;
 import extra_ddl_info;
-import defer_op;
+import :defer_op;
 
-import column_vector;
-import query_result;
+import :column_vector;
+import :query_result;
 
 namespace infinity {
 
