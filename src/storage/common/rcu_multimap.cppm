@@ -3,7 +3,7 @@ module;
 #include <cassert>
 #include <cstdio>
 
-export module rcu_multimap;
+export module infinity_core:rcu_multimap;
 
 import :stl;
 
