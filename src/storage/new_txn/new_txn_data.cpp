@@ -124,7 +124,7 @@ struct NewTxnCompactState {
 
         for (SizeT i = 0; i < column_cnt_; ++i) {
             ColumnMeta column_meta(i, *block_meta_);
-            status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorTipe::kReadWrite, column_vectors_[i]);
+            status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorMode::kReadWrite, column_vectors_[i]);
             if (!status.ok()) {
                 return status;
             }
@@ -290,7 +290,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             if (!status.ok()) {
                 return status;
             }
-            col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorTipe::kReadWrite);
+            col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorMode::kReadWrite);
             // if (VarBufferManager *var_buffer_mgr = col->buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
             //     SizeT chunk_size = var_buffer_mgr->TotalSize();
             //     Status status = column_meta.SetChunkOffset(chunk_size);
@@ -862,7 +862,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
 Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset) {
     ColumnVector dest_vec;
     {
-        Status status = NewCatalog::GetColumnVector(column_meta, dest_offset, ColumnVectorTipe::kReadWrite, dest_vec);
+        Status status = NewCatalog::GetColumnVector(column_meta, dest_offset, ColumnVectorMode::kReadWrite, dest_vec);
         if (!status.ok()) {
             return status;
         }
@@ -994,7 +994,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
         ColumnMeta column_meta(column_id, block_meta);
 
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[column_id]);
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vectors[column_id]);
         if (!status.ok()) {
             return status;
         }
@@ -1142,7 +1142,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         }
 
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(*column_meta, 0 /*row_count*/, ColumnVectorTipe::kReadWrite, column_vector);
+        status = NewCatalog::GetColumnVector(*column_meta, 0 /*row_count*/, ColumnVectorMode::kReadWrite, column_vector);
         if (!status.ok()) {
             return status;
         }

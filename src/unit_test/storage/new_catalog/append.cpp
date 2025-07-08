@@ -335,7 +335,7 @@ TEST_P(TestTxnAppend, test_append1) {
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             Value v1 = col.GetValue(0);
@@ -348,7 +348,7 @@ TEST_P(TestTxnAppend, test_append1) {
             SizeT column_idx = 1;
             ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
 
             EXPECT_TRUE(status.ok());
             Value v1 = col.GetValue(0);
@@ -528,7 +528,7 @@ TEST_P(TestTxnAppend, test_append2) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
@@ -548,7 +548,7 @@ TEST_P(TestTxnAppend, test_append2) {
                 SizeT column_idx = 1;
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 if (idx % 2 == 0) {
@@ -3566,7 +3566,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
@@ -3581,7 +3581,7 @@ TEST_P(TestTxnAppend, test_append_append_concurrent) {
                             ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
-                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
