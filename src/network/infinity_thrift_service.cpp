@@ -3556,23 +3556,77 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentN
 // Snapshot operations
 void InfinityThriftService::CreateTableSnapshot(infinity_thrift_rpc::CommonResponse &response, 
                                           const infinity_thrift_rpc::CreateTableSnapshotRequest &request) {
-    LOG_ERROR("CreateTableSnapshot: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("CreateTableSnapshot: Not implemented yet");
+    // LOG_ERROR("CreateTableSnapshot: Not implemented yet");
+    // response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    // response.__set_error_msg("CreateTableSnapshot: Not implemented yet");
+    auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+    if (status.ok()) {
+        auto result = infinity->CreateTableSnapshot(request.db_name, request.table_name, request.snapshot_name);
+        ProcessQueryResult(response, result, "CreateTableSnapshot");
+    } else {
+        ProcessStatus(response, status, "CreateTableSnapshot");
+    }
 }
 
-void InfinityThriftService::RestoreSnapshot(infinity_thrift_rpc::CommonResponse &response, 
-                                                const infinity_thrift_rpc::RestoreSnapshotRequest &request) {
-    LOG_ERROR("RestoreSnapshot: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("RestoreSnapshot: Not implemented yet");
+void InfinityThriftService::RestoreSnapshot(infinity_thrift_rpc::CommonResponse &response,
+                                            const infinity_thrift_rpc::RestoreSnapshotRequest &request) {
+    try {
+        auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+        if (!status.ok()) {
+            response.__set_error_code((i64)(status.code()));
+            response.__set_error_msg(status.message());
+            return;
+        }
+
+        QueryResult result;
+        if (request.scope == "table") {
+            result = infinity->RestoreTableSnapshot(request.snapshot_name);
+        } else if (request.scope == "database") {
+            result = infinity->RestoreDatabaseSnapshot(request.snapshot_name);
+        } else if (request.scope == "system") {
+            result = infinity->RestoreSystemSnapshot(request.snapshot_name);
+        } else {
+            response.__set_error_code((i64)(ErrorCode::kInvalidParameter));
+            response.__set_error_msg("RestoreSnapshot: Invalid scope: " + request.scope);
+            return;
+        }
+        
+        if (result.IsOk()) {
+            response.__set_error_code((i64)(ErrorCode::kOk));
+            response.__set_error_msg("RestoreSnapshot: Success");
+        } else {
+            response.__set_error_code((i64)(result.ErrorCode()));
+            response.__set_error_msg(result.ErrorMsg());
+        }
+    } catch (const std::exception &e) {
+        response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
+        response.__set_error_msg("RestoreSnapshot: " + String(e.what()));
+    }
 }
 
-void InfinityThriftService::DropSnapshot(infinity_thrift_rpc::CommonResponse &response, 
-                                        const infinity_thrift_rpc::DropSnapshotRequest &request) {
-    LOG_ERROR("DropSnapshot: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("DropSnapshot: Not implemented yet");
+void InfinityThriftService::DropSnapshot(infinity_thrift_rpc::CommonResponse &response,
+                                         const infinity_thrift_rpc::DropSnapshotRequest &request) {
+    try {
+        auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+        if (!status.ok()) {
+            response.__set_error_code((i64)(status.code()));
+            response.__set_error_msg(status.message());
+            return;
+        }
+
+        QueryResult result = infinity->DropSnapshot(request.snapshot_name);
+        
+        if (result.IsOk()) {
+            response.__set_error_code((i64)(ErrorCode::kOk));
+            response.__set_error_msg("DropSnapshot: Success");
+        } else {
+            response.__set_error_code((i64)(result.ErrorCode()));
+            response.__set_error_msg(result.ErrorMsg());
+        }
+    } catch (const std::exception &e) {
+        response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
+        response.__set_error_msg("DropSnapshot: " + String(e.what()));
+    }
 }
 
 void InfinityThriftService::ShowSnapshot(infinity_thrift_rpc::ShowSnapshotResponse &response, 
@@ -3591,15 +3645,51 @@ void InfinityThriftService::ListSnapshots(infinity_thrift_rpc::ListSnapshotsResp
 
 void InfinityThriftService::CreateDatabaseSnapshot(infinity_thrift_rpc::CommonResponse &response, 
                                                    const infinity_thrift_rpc::CreateDatabaseSnapshotRequest &request) {
-    LOG_ERROR("CreateDatabaseSnapshot: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("CreateDatabaseSnapshot: Not implemented yet");
+    try {
+        auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+        if (!status.ok()) {
+            response.__set_error_code((i64)(status.code()));
+            response.__set_error_msg(status.message());
+            return;
+        }
+
+        QueryResult result = infinity->CreateDatabaseSnapshot(request.db_name, request.snapshot_name);
+        
+        if (result.IsOk()) {
+            response.__set_error_code((i64)(ErrorCode::kOk));
+            response.__set_error_msg("CreateDatabaseSnapshot: Success");
+        } else {
+            response.__set_error_code((i64)(result.ErrorCode()));
+            response.__set_error_msg(result.ErrorMsg());
+        }
+    } catch (const std::exception &e) {
+        response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
+        response.__set_error_msg("CreateDatabaseSnapshot: " + String(e.what()));
+    }
 }
 
-void InfinityThriftService::CreateSystemSnapshot(infinity_thrift_rpc::CommonResponse &response,     
+void InfinityThriftService::CreateSystemSnapshot(infinity_thrift_rpc::CommonResponse &response, 
                                                  const infinity_thrift_rpc::CreateSystemSnapshotRequest &request) {
-    LOG_ERROR("CreateSystemSnapshot: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("CreateSystemSnapshot: Not implemented yet");
+    try {
+        auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+        if (!status.ok()) {
+            response.__set_error_code((i64)(status.code()));
+            response.__set_error_msg(status.message());
+            return;
+        }
+
+        QueryResult result = infinity->CreateSystemSnapshot(request.snapshot_name);
+        
+        if (result.IsOk()) {
+            response.__set_error_code((i64)(ErrorCode::kOk));
+            response.__set_error_msg("CreateSystemSnapshot: Success");
+        } else {
+            response.__set_error_code((i64)(result.ErrorCode()));
+            response.__set_error_msg(result.ErrorMsg());
+        }
+    } catch (const std::exception &e) {
+        response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
+        response.__set_error_msg("CreateSystemSnapshot: " + String(e.what()));
+    }
 }
 } // namespace infinity
