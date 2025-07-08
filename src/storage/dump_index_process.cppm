@@ -25,7 +25,7 @@ namespace infinity {
 
 class NewTxn;
 class BGTask;
-class DumpIndexTask;
+class DumpMemIndexTask;
 
 export class DumpIndexProcessor {
 public:
@@ -43,7 +43,7 @@ public:
 private:
     void NewScanAndOptimize();
 
-    void DoDump(DumpIndexTask *dump_task);
+    void DoDump(DumpMemIndexTask *dump_task);
 
     void Process();
 

@@ -52,7 +52,7 @@ private:
         if (seg_cursor >= segment_count_) {
             return INVALID_ROWID;
         }
-        return (*seg_postings_)[seg_cursor].GetBaseRowId();
+        return (*seg_postings_)[seg_cursor].GetBeginRowID();
     }
 
     inline u32 LocateSegment(u32 start_seg_cursor, RowID start_row_id) {

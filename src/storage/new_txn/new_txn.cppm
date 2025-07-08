@@ -249,7 +249,8 @@ public:
 
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name);
 
-    Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+    Status
+    DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, RowID begin_row_id = RowID());
 
     Status OptimizeAllIndexes();
 

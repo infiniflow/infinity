@@ -123,7 +123,13 @@ public:
 
     Status GetTableInfo(TableInfo &table_info);
 
-    Status GetTableDetail(TableDetail &table_detail, const String &db_name, const String &table_name);
+    Status GetTableDetail(TableDetail &table_detail);
+
+    Pair<String, String> GetDBTableName() const { return MakePair(db_name_, table_name_); }
+    void SetDBTableName(const String &db_name, const String &table_name) {
+        db_name_ = db_name;
+        table_name_ = table_name;
+    }
 
     Status AddColumn(const ColumnDef &column_def);
 
@@ -180,6 +186,8 @@ private:
     KVInstance *kv_instance_{};
     String db_id_str_;
     String table_id_str_;
+    String db_name_{};
+    String table_name_{};
 
     Optional<String> comment_;
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;

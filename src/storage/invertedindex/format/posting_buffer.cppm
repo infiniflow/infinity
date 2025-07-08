@@ -2,11 +2,12 @@ module;
 
 #include <cassert>
 
+export module posting_buffer;
+
 import stl;
 import posting_field;
 import file_writer;
 import file_reader;
-export module posting_buffer;
 
 namespace infinity {
 

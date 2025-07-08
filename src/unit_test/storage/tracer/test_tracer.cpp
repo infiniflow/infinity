@@ -16,77 +16,33 @@
 
 import base_test;
 import stl;
-import memindex_tracer;
 import base_memindex;
-import emvb_index_in_mem;
+import mem_index;
+import memindex_tracer;
 import bg_task;
 import blocking_queue;
 import third_party;
 import logger;
 import new_txn;
-import compilation_config;
 import infinity_context;
-import chunk_index_meta;
+import compilation_config;
 
 using namespace infinity;
 
 class TestMemIndexTracer;
 
-class TestMemIndex : public BaseMemIndex {
-public:
-    TestMemIndex(SharedPtr<String> index_name, TestMemIndexTracer *tracer, bool trace);
-
-    virtual ~TestMemIndex();
-
-    MemIndexTracerInfo GetInfo() const override {
-        std::lock_guard lck(mtx_);
-        return MemIndexTracerInfo(index_name_, table_name_, db_name_, mem_used_, row_count_);
-    }
-
-    void IncreaseMemoryUsage(SizeT usage, SizeT row_cnt);
-
-    void Dump(SizeT &usage, SizeT &row_cnt) && {
-        std::lock_guard lck(mtx_);
-        usage = mem_used_;
-        row_cnt = row_count_;
-        mem_used_ = 0;
-        row_count_ = 0;
-        trace_ = false;
-    }
-
-    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override {return ChunkIndexMetaInfo{"", {}, row_count_, 0};}
-
-public:
-    SharedPtr<String> db_name_;
-    SharedPtr<String> table_name_;
-    SharedPtr<String> index_name_;
-
-private:
-    mutable std::mutex mtx_;
-    SizeT mem_used_ = 0;
-    SizeT row_count_ = 0;
-
-    TestMemIndexTracer *tracer_;
-    bool trace_;
-};
-
 class TestCatalog {
 public:
     void SetTracer(TestMemIndexTracer *tracer) { tracer_ = tracer; }
 
-private:
-    TestMemIndex *GetMemIndexInner(const String &index_name);
-
 public:
-    Vector<BaseMemIndex *> GetMemIndexes();
+    Vector<SharedPtr<MemIndexDetail>> GetMemIndexes();
 
-    TestMemIndex *GetMemIndex(const String &index_name);
+    SharedPtr<MemIndex> GetMemIndex(const String &index_name);
 
-    void AppendMemIndex(const String &index_name, SizeT mem_used, SizeT row_cnt);
+    void AppendMemIndex(const String &index_name, SizeT row_cnt, SizeT mem_used);
 
-    bool DumpMemIndex(const String &index_name, SizeT &mem_used, SizeT &row_cnt);
-
-    bool CleanupIndex(const String &index_name);
+    void DumpMemIndex(const String &index_name);
 
     void reset() { memindexes_.clear(); }
 
@@ -94,63 +50,69 @@ private:
     TestMemIndexTracer *tracer_;
 
     std::mutex mtx_;
-    HashMap<String, UniquePtr<TestMemIndex>> memindexes_;
+    HashMap<String, SharedPtr<MemIndex>> memindexes_;
 };
 
-Vector<BaseMemIndex *> TestCatalog::GetMemIndexes() {
-    Vector<BaseMemIndex *> ret;
+Vector<SharedPtr<MemIndexDetail>> TestCatalog::GetMemIndexes() {
+    Vector<SharedPtr<MemIndexDetail>> ret;
     for (auto &iter : memindexes_) {
-        ret.push_back(iter.second.get());
+        SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
+        SharedPtr<DummyIndexInMem> memindex = iter.second->GetDummyIndex();
+        detail->index_name_ = memindex->index_name_;
+        detail->table_name_ = memindex->table_name_;
+        detail->db_name_ = memindex->db_name_;
+        detail->mem_used_ = memindex->mem_used_;
+        detail->row_count_ = memindex->row_cnt_;
+        ret.push_back(detail);
     }
+    std::sort(ret.begin(), ret.end(), [](const SharedPtr<MemIndexDetail> &lhs, const SharedPtr<MemIndexDetail> &rhs) {
+        return lhs->mem_used_ > rhs->mem_used_;
+    });
     return ret;
 }
 
-TestMemIndex *TestCatalog::GetMemIndexInner(const String &index_name) {
+SharedPtr<MemIndex> TestCatalog::GetMemIndex(const String &index_name) {
+    std::lock_guard lck(mtx_);
     auto iter = memindexes_.find(index_name);
     if (iter != memindexes_.end()) {
-        return iter->second.get();
+        return iter->second;
     }
-    auto memindex = MakeUnique<TestMemIndex>(MakeShared<String>(index_name), tracer_, true);
-    auto *ret = memindex.get();
-    memindexes_.emplace(index_name, std::move(memindex));
-    return ret;
+    return nullptr;
 }
 
-TestMemIndex *TestCatalog::GetMemIndex(const String &index_name) {
-    std::lock_guard lck(mtx_);
-    return GetMemIndexInner(index_name);
-}
-
-void TestCatalog::AppendMemIndex(const String &index_name, SizeT mem_used, SizeT row_cnt) {
-    std::lock_guard lck(mtx_);
-    auto *memindex = GetMemIndexInner(index_name);
-    memindex->IncreaseMemoryUsage(mem_used, row_cnt);
-}
-
-bool TestCatalog::DumpMemIndex(const String &index_name, SizeT &mem_used, SizeT &row_cnt) {
-    std::lock_guard lck(mtx_);
-    if (auto iter = memindexes_.find(index_name); iter != memindexes_.end()) {
-        auto memindex = std::move(iter->second);
-        memindexes_.erase(iter);
-        std::move(*memindex).Dump(mem_used, row_cnt);
-        return true;
+void TestCatalog::AppendMemIndex(const String &index_name, SizeT row_cnt, SizeT mem_used) {
+    SharedPtr<MemIndex> mem_index = nullptr;
+    {
+        std::lock_guard lck(mtx_);
+        auto iter = memindexes_.find(index_name);
+        if (iter != memindexes_.end()) {
+            mem_index = iter->second;
+        } else {
+            mem_index = MakeShared<MemIndex>();
+            mem_index->SetDummyIndex(MakeShared<DummyIndexInMem>("db1", "tbl1", index_name, 0, tracer_));
+            memindexes_.emplace(index_name, mem_index);
+        }
     }
-    return false;
+    mem_index->GetDummyIndex()->Append(row_cnt, mem_used);
 }
 
-bool TestCatalog::CleanupIndex(const String &index_name) {
-    std::lock_guard lck(mtx_);
-    if (auto iter = memindexes_.find(index_name); iter != memindexes_.end()) {
-        memindexes_.erase(iter);
-        return true;
+void TestCatalog::DumpMemIndex(const String &index_name) {
+    SharedPtr<MemIndex> memindex = nullptr;
+    {
+        std::lock_guard lck(mtx_);
+        if (auto iter = memindexes_.find(index_name); iter != memindexes_.end()) {
+            memindex = std::move(iter->second);
+            memindexes_.erase(iter);
+        }
     }
-    return false;
+    if (memindex != nullptr) {
+        memindex->GetDummyIndex()->Dump();
+    }
 }
 
 class TestMemIndexTracer : public MemIndexTracer {
 public:
-    TestMemIndexTracer(SizeT index_memory_limit, TestCatalog &catalog, bool may_fail)
-        : MemIndexTracer(index_memory_limit), catalog_(catalog), may_fail_(may_fail) {
+    TestMemIndexTracer(SizeT index_memory_limit, TestCatalog &catalog) : MemIndexTracer(index_memory_limit), catalog_(catalog) {
         dump_thread_ = Thread([this] { DumpRoutine(); });
     }
 
@@ -161,61 +123,31 @@ public:
         EXPECT_EQ(this->cur_index_memory(), 0ul);
     }
 
-    void TriggerDump(UniquePtr<DumpIndexTask> task) override { task_queue_.Enqueue(std::move(task)); }
+    void TriggerDump(SharedPtr<DumpMemIndexTask> task) override {
+        LOG_INFO(fmt::format("Submit dump task: {}", task->ToString()));
+        task_queue_.Enqueue(std::move(task));
+    }
 
     NewTxn *GetTxn() override { return nullptr; }
 
-    Vector<BaseMemIndex *> GetAllMemIndexes(NewTxn *new_txn) override { return {}; }
+    Vector<SharedPtr<MemIndexDetail>> GetAllMemIndexes(NewTxn *new_txn) override { return catalog_.GetMemIndexes(); }
 
-    Vector<EMVBIndexInMem *> GetEMVBMemIndexes(NewTxn *new_txn) override { return {}; }
-
-    void HandleDump(UniquePtr<DumpIndexTask> task);
+    void HandleDump(SharedPtr<DumpMemIndexTask> task);
 
 private:
     void DumpRoutine();
 
 private:
     TestCatalog &catalog_;
-    bool may_fail_;
 
-    BlockingQueue<UniquePtr<DumpIndexTask>> task_queue_{"TestMemIndexTracer"};
+    BlockingQueue<SharedPtr<DumpMemIndexTask>> task_queue_{"TestMemIndexTracer"};
     Thread dump_thread_;
 };
 
-TestMemIndex::TestMemIndex(SharedPtr<String> index_name, TestMemIndexTracer *tracer, bool trace) : tracer_(tracer), trace_(trace) {
-    db_name_ = MakeShared<String>("test_db");
-    table_name_ = MakeShared<String>("test_table");
-    index_name_ = index_name;
-}
-
-TestMemIndex::~TestMemIndex() {
-    if (trace_) {
-        tracer_->DecreaseMemUsed(mem_used_);
-    }
-}
-
-void TestMemIndex::IncreaseMemoryUsage(SizeT usage, SizeT row_cnt) {
-    {
-        std::lock_guard lck(mtx_);
-        mem_used_ += usage;
-        row_count_ += row_cnt;
-    }
-    tracer_->IncreaseMemoryUsage(usage);
-}
-
-void TestMemIndexTracer::HandleDump(UniquePtr<DumpIndexTask> task) {
-    auto *mem_index = static_cast<TestMemIndex *>(task->mem_index_);
-    static int dump_id = 0;
-    if ((dump_id++) % 4 != 0 || !may_fail_) { // success dump
-        SizeT dumped_size = 0;
-        SizeT row_cnt = 0;
-        bool res = catalog_.DumpMemIndex(*mem_index->index_name_, dumped_size, row_cnt);
-        if (res) {
-            this->DumpDone(dumped_size, mem_index);
-        }
-    } else { // fail dump
-        this->DumpFail(mem_index);
-    }
+void TestMemIndexTracer::HandleDump(SharedPtr<DumpMemIndexTask> task) {
+    SharedPtr<MemIndex> mem_index = catalog_.GetMemIndex(task->index_name_);
+    catalog_.DumpMemIndex(task->index_name_);
+    this->DumpDone(mem_index);
 }
 
 void TestMemIndexTracer::DumpRoutine() {
@@ -242,12 +174,20 @@ TEST_F(MemIndexTracerTest, test1) {
     SizeT memory_limit = 50;
     TestCatalog catalog;
 
-    TestMemIndexTracer tracer(memory_limit, catalog, false);
+    TestMemIndexTracer tracer(memory_limit, catalog);
     catalog.SetTracer(&tracer);
 
     catalog.AppendMemIndex("idx1", 10, 10);
     catalog.AppendMemIndex("idx2", 30, 30);
     catalog.AppendMemIndex("idx3", 20, 20);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // Check idx2 has been dumpped.
+    Vector<SharedPtr<MemIndexDetail>> details = catalog.GetMemIndexes();
+    EXPECT_EQ(details.size(), 2);
+    for (const auto &detail : details) {
+        EXPECT_NE(detail->index_name_, "idx2");
+    }
 
     infinity::InfinityContext::instance().UnInit();
 }
@@ -261,12 +201,12 @@ TEST_F(MemIndexTracerTest, test2) {
     infinity::InfinityContext::instance().InitPhase1(config_path);
     infinity::InfinityContext::instance().InitPhase2();
 
-    auto Test = [](bool may_fail) {
+    auto Test = []() {
         int thread_n = 2;
         SizeT memory_limit = 50;
         TestCatalog catalog;
 
-        TestMemIndexTracer tracer(memory_limit, catalog, may_fail);
+        TestMemIndexTracer tracer(memory_limit, catalog);
         catalog.SetTracer(&tracer);
         int index_n = 10;
         int max_append_mem = 10;
@@ -278,7 +218,7 @@ TEST_F(MemIndexTracerTest, test2) {
                 String idx_name = "idx" + std::to_string(idx_i);
                 SizeT mem = rand() % max_append_mem + 1;
                 SizeT row_cnt = mem;
-                catalog.AppendMemIndex(idx_name, mem, row_cnt);
+                catalog.AppendMemIndex(idx_name, row_cnt, mem);
             }
         };
         Vector<Thread> threads;
@@ -289,8 +229,7 @@ TEST_F(MemIndexTracerTest, test2) {
             th.join();
         }
     };
-    Test(false);
-    Test(true);
+    Test();
 
     infinity::InfinityContext::instance().UnInit();
 }

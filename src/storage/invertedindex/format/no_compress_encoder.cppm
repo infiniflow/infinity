@@ -1,10 +1,10 @@
 module;
 
+export module no_compress_encoder;
+
 import stl;
 import byte_slice_reader;
 import byte_slice_writer;
-
-export module no_compress_encoder;
 
 namespace infinity {
 

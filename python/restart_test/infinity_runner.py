@@ -112,7 +112,7 @@ class InfinityRunner:
         return self.process is not None
 
     def connect(self, uri: str):
-        try_n = 10
+        try_n = 15
         infinity_obj = None
         for i in range(try_n):
             try:

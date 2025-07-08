@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module year;
+
+import stl;
 
 namespace infinity {
 

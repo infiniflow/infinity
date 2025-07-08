@@ -14,13 +14,13 @@
 
 module;
 
+export module scalar_function_set;
+
 import stl;
 import base_expression;
 import scalar_function;
 import function;
 import function_set;
-
-export module scalar_function_set;
 
 namespace infinity {
 

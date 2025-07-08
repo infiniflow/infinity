@@ -35,17 +35,20 @@ import base_memindex;
 import memindex_tracer;
 import column_vector;
 import buffer_obj;
+import rcu_multimap;
 
 namespace infinity {
 
 constexpr u32 map_memory_bloat_factor = 3;
 
+// No wrapper needed anymore - RcuMultiMap now works with POD types directly
+
 template <typename RawValueType>
 class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     using KeyType = ConvertToOrderedType<RawValueType>;
     const RowID begin_row_id_;
-    mutable std::shared_mutex map_mutex_;
-    MultiMap<KeyType, u32> in_mem_secondary_index_;
+    // Replaced MultiMap + mutex with RcuMultiMap for better concurrent performance
+    RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
@@ -57,7 +60,7 @@ public:
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
-        std::shared_lock lock(map_mutex_);
+        // RcuMultiMap is thread-safe, no lock needed
         return in_mem_secondary_index_.size();
     }
 
@@ -71,7 +74,11 @@ public:
     void Dump(BufferObj *buffer_obj) const override {
         BufferHandle handle = buffer_obj->Load();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-        data_ptr->InsertData(&in_mem_secondary_index_);
+
+        MultiMap<KeyType, u32> temp_map;
+        const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+
+        data_ptr->InsertData(&temp_map);
     }
     Pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);
@@ -81,7 +88,7 @@ public:
 private:
     u32 InsertInner(auto &iter) {
         u32 inserted_count = 0;
-        std::unique_lock lock(map_mutex_);
+        // No lock needed - RcuMultiMap handles concurrency internally
         while (true) {
             auto opt = iter.Next();
             if (!opt.has_value()) {
@@ -92,10 +99,12 @@ private:
                 auto column_vector = iter.column_vector();
                 Span<const char> data = column_vector->GetVarcharInner(*v_ptr);
                 const KeyType key = ConvertToOrderedKeyValue(std::string_view{data.data(), data.size()});
-                in_mem_secondary_index_.emplace(key, offset);
+                // Insert u32 offset directly
+                in_mem_secondary_index_.Insert(key, offset);
             } else {
                 const KeyType key = ConvertToOrderedKeyValue(*v_ptr);
-                in_mem_secondary_index_.emplace(key, offset);
+                // Insert u32 offset directly
+                in_mem_secondary_index_.Insert(key, offset);
             }
             ++inserted_count;
         }
@@ -103,17 +112,17 @@ private:
     }
 
     Pair<u32, Bitmask> RangeQueryInner(const u32 segment_row_count, const KeyType b, const KeyType e) const {
-        std::shared_lock lock(map_mutex_);
-        const auto begin = in_mem_secondary_index_.lower_bound(b);
-        const auto end = in_mem_secondary_index_.upper_bound(e);
-        const u32 result_size = std::distance(begin, end);
+        Vector<u32> result;
+        const u32 result_size = in_mem_secondary_index_.range(b, e, result);
         Pair<u32, Bitmask> result_var(result_size, Bitmask(segment_row_count));
         result_var.second.SetAllFalse();
-        for (auto it = begin; it != end; ++it) {
-            if (const auto offset = it->second; offset < segment_row_count) {
+
+        for (const u32 offset : result) {
+            if (offset < segment_row_count) {
                 result_var.second.SetTrue(offset);
             }
         }
+
         result_var.second.RunOptimize();
         return result_var;
     }

@@ -28,7 +28,7 @@ import internal_types;
 import ring;
 import skiplist;
 import internal_types;
-import map_with_lock;
+import rcu_multimap;
 import vector_with_lock;
 import buf_writer;
 import posting_list_format;
@@ -54,7 +54,8 @@ public:
 
     using PostingPtr = SharedPtr<PostingWriter>;
     // using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
-    using PostingTableStore = MapWithLock<String, PostingPtr>;
+    // using PostingTableStore = MapWithLock<String, PostingPtr>;
+    using PostingTableStore = RcuMap<String, PostingPtr>;
 
     struct PostingTable {
         PostingTable();
@@ -109,7 +110,7 @@ public:
 
     String GetBaseName() const { return base_name_; }
 
-    RowID GetBaseRowId() const { return base_row_id_; }
+    RowID GetBeginRowID() const override { return base_row_id_; }
 
     u32 GetDocCount() const {
         std::unique_lock<std::mutex> lock(mutex_);

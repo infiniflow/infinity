@@ -32,6 +32,7 @@ import logger;
 namespace infinity {
 
 class BufferObj;
+class TableIndexMeeta;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
@@ -136,7 +137,13 @@ constexpr LogicalType GetLogicalType<TimestampT> = LogicalType::kTimestamp;
 template <>
 constexpr LogicalType GetLogicalType<VarcharT> = LogicalType::kVarchar;
 
-export class SecondaryIndexData {
+// Cardinality tag types for template specialization
+export struct HighCardinalityTag {};
+export struct LowCardinalityTag {};
+
+// Template base class for SecondaryIndexData with cardinality parameter
+export template <typename CardinalityTag>
+class SecondaryIndexDataBase {
 protected:
     u32 chunk_row_count_ = 0;
     // pgm index
@@ -146,9 +153,9 @@ protected:
     SegmentOffset *offset_ptr_ = nullptr;
 
 public:
-    explicit SecondaryIndexData(u32 chunk_row_count) : chunk_row_count_(chunk_row_count) {}
+    explicit SecondaryIndexDataBase(u32 chunk_row_count) : chunk_row_count_(chunk_row_count) {}
 
-    virtual ~SecondaryIndexData() = default;
+    virtual ~SecondaryIndexDataBase() = default;
 
     [[nodiscard]] Pair<const void *, const SegmentOffset *> GetKeyOffsetPointer() const { return {key_ptr_, offset_ptr_}; }
 
@@ -168,8 +175,25 @@ public:
     virtual void InsertData(const void *ptr) = 0;
 
     virtual void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) = 0;
+
+    // Virtual methods for low cardinality access (default implementations for high cardinality)
+    virtual u32 GetUniqueKeyCount() const { return 0; }
+    virtual const void *GetUniqueKeysPtr() const { return nullptr; }
+    virtual const void *GetOffsetsForKeyPtr(const void *key_ptr) const { return nullptr; }
 };
 
-export SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
+// Type aliases for backward compatibility
+export using SecondaryIndexData = SecondaryIndexDataBase<HighCardinalityTag>;
+
+export SecondaryIndexDataBase<HighCardinalityTag> *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
+
+// New factory function that can create both cardinality variants
+export template <typename CardinalityTag>
+SecondaryIndexDataBase<CardinalityTag> *
+GetSecondaryIndexDataWithCardinality(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
+
+// Factory function that determines cardinality from TableIndexMeeta
+export void *
+GetSecondaryIndexDataWithMeeta(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate, TableIndexMeeta *table_index_meeta);
 
 } // namespace infinity

@@ -151,10 +151,7 @@ public:
 public:
     SharedPtr<MetaTree> MakeMetaTree() const;
     Vector<SharedPtr<MetaKey>> MakeMetaKeys() const;
-    Status RestoreCatalogCache(Storage *storage_ptr);
-
-    SharedPtr<SystemCache> GetSystemCache() const;
-    SystemCache *GetSystemCachePtr() const;
+    UniquePtr<SystemCache> RestoreCatalogCache(Storage *storage_ptr);
 
     KVStore *kv_store() const;
 
@@ -164,7 +161,6 @@ private:
     mutable std::mutex catalog_cache_mtx_{};
 
     HashMap<u64, SharedPtr<HashMap<u64, SharedPtr<TableCache>>>> table_cache_map_{};
-    SharedPtr<SystemCache> system_cache_{};
 
 public:
     Status AddBlockLock(String block_key);

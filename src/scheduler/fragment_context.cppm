@@ -14,6 +14,8 @@
 
 module;
 
+export module fragment_context;
+
 import stl;
 import fragment_task;
 import query_context;
@@ -29,8 +31,6 @@ import logger;
 import third_party;
 import compact_state_data;
 import infinity_context;
-
-export module fragment_context;
 
 namespace infinity {
 
@@ -111,7 +111,7 @@ public:
     inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
 
     inline void FlushProfiler(TaskProfiler &profiler) {
-        if(profiler.Enable()) {
+        if (profiler.Enable()) {
             query_context_->FlushProfiler(std::move(profiler));
         }
     }

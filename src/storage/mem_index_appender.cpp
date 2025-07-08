@@ -90,16 +90,16 @@ void MemIndexAppender::Process() {
                     }
                     if (storage_mode == StorageMode::kWritable) {
                         auto append_mem_index_task = static_cast<AppendMemIndexTask *>(bg_task.get());
-                        if (append_mem_index_task->mem_index_->memory_indexer_ == nullptr) {
+                        SharedPtr<MemoryIndexer> memory_indexer = append_mem_index_task->mem_index_->GetFulltextIndex();
+                        if (memory_indexer == nullptr) {
                             // Only used for full text index, currently
                             UnrecoverableError("Not inverted index");
                         }
-                        MemoryIndexer *memory_indexer = append_mem_index_task->mem_index_->memory_indexer_.get();
-                        if (memory_indexer_map.find(memory_indexer) == memory_indexer_map.end()) {
-                            memory_indexers.push_back(memory_indexer);
-                            memory_indexer_map.emplace(memory_indexer, MakeShared<AppendMemIndexBatch>());
+                        if (memory_indexer_map.find(memory_indexer.get()) == memory_indexer_map.end()) {
+                            memory_indexers.push_back(memory_indexer.get());
+                            memory_indexer_map.emplace(memory_indexer.get(), MakeShared<AppendMemIndexBatch>());
                         }
-                        AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
+                        AppendMemIndexBatch *append_mem_index_batch = memory_indexer_map[memory_indexer.get()].get();
                         append_mem_index_batch->InsertTask(append_mem_index_task);
                         memory_indexer->AsyncInsertBottom(append_mem_index_task->input_column_,
                                                           append_mem_index_task->offset_,

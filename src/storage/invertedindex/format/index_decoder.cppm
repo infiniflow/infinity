@@ -1,5 +1,7 @@
 module;
 
+export module index_decoder;
+
 import stl;
 import byte_slice;
 
@@ -8,8 +10,6 @@ import posting_decoder;
 import index_defines;
 import posting_field;
 import doc_list_format_option;
-
-export module index_decoder;
 
 namespace infinity {
 

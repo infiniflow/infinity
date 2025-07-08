@@ -14,6 +14,8 @@
 
 module;
 
+export module bound_select_statement;
+
 import bound_statement;
 import logical_knn_scan;
 import base_expression;
@@ -27,8 +29,6 @@ import search_expression;
 import knn_expression;
 import select_statement;
 import highlighter;
-
-export module bound_select_statement;
 
 namespace infinity {
 

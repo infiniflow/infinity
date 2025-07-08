@@ -33,6 +33,9 @@ class IndexBase;
 class NewTxn;
 // enum class UsageFlag;
 
+// Enum for secondary index cardinality
+export enum class SecondaryIndexCardinality : u8 { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
+
 export class TableIndexMeeta {
 public:
     TableIndexMeeta(String index_id_str, TableMeeta &table_meta);
@@ -86,6 +89,11 @@ private:
 
 public:
     String FtIndexCacheTag() const;
+
+    // Methods for secondary index cardinality
+    Status SetSecondaryIndexCardinality(SecondaryIndexCardinality cardinality);
+
+    Tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality();
 
 private:
     KVInstance &kv_instance_;

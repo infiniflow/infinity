@@ -171,27 +171,27 @@ Vector<Pair<String, String>> NewCatalog::GetAllMemIndexInfo() {
     {
         std::unique_lock lock(mem_index_mtx_);
         for (const auto &mem_index_pair : mem_index_map_) {
-            if (mem_index_pair.second->memory_hnsw_index_ != nullptr) {
+            if (mem_index_pair.second->GetHnswIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "hnsw"});
                 continue;
             }
-            if (mem_index_pair.second->memory_ivf_index_ != nullptr) {
+            if (mem_index_pair.second->GetIVFIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "ivf"});
                 continue;
             }
-            if (mem_index_pair.second->memory_indexer_ != nullptr) {
+            if (mem_index_pair.second->GetFulltextIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "full-text"});
                 continue;
             }
-            if (mem_index_pair.second->memory_secondary_index_ != nullptr) {
+            if (mem_index_pair.second->GetSecondaryIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "secondary"});
                 continue;
             }
-            if (mem_index_pair.second->memory_emvb_index_ != nullptr) {
+            if (mem_index_pair.second->GetEMVBIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "emvb"});
                 continue;
             }
-            if (mem_index_pair.second->memory_bmp_index_ != nullptr) {
+            if (mem_index_pair.second->GetBMPIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "bmp"});
                 continue;
             }
@@ -405,11 +405,6 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
             simdjson::padded_string json(pm_path_key->value_);
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json);
-            String object_key = doc["obj_key"].get<String>();
-            if (object_key == "KEY_EMPTY") {
-                kv_instance_ptr->Delete(KeyEncode::PMObjectKey(pm_path_key->path_key_));
-                return true;
-            }
         }
         return false;
     });
@@ -419,7 +414,7 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     return meta_keys;
 }
 
-Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
+UniquePtr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
 
     auto meta_tree = this->MakeMetaTree();
@@ -427,7 +422,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     // String meta_tree_str = meta_tree->ToJson().dump(4);
     // LOG_INFO(meta_tree_str);
 
-    system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
+    UniquePtr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {
     //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
@@ -440,12 +435,8 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     //                          current_segment_row_count));
     // }
 
-    return Status::OK();
+    return system_cache;
 }
-
-SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_; }
-
-SystemCache *NewCatalog::GetSystemCachePtr() const { return system_cache_.get(); }
 
 KVStore *NewCatalog::kv_store() const { return kv_store_; }
 

@@ -18,6 +18,8 @@
 #include <memory>
 #include <string>
 
+#include "query_node.h"
+
 namespace infinity {
 
 struct QueryNode;

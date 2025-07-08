@@ -14,14 +14,14 @@
 
 module;
 
+export module buffer_writer;
+
 import boost;
 import pg_message;
 import ring_buffer_iterator;
 import default_values;
 import stl;
 import global_resource_usage;
-
-export module buffer_writer;
 
 namespace infinity {
 

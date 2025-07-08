@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module sum;
+
+import stl;
 
 namespace infinity {
 

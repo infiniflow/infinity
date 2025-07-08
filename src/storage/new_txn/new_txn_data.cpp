@@ -202,7 +202,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     // status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
-    SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
+    SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();
     Vector<SegmentID> segment_ids;
 
     SizeT input_block_count = input_blocks.size();
@@ -361,7 +361,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     ImportTxnStore *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
     for (SizeT segment_idx = 0; segment_idx < segment_count; ++segment_idx) {
         SizeT input_block_start_idx = segment_idx * DEFAULT_BLOCK_PER_SEGMENT;
-        SizeT input_block_end_idx = std::min(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT, input_blocks.size());
+        SizeT input_block_end_idx = std::min(std::size_t(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT), input_blocks.size());
         import_txn_store->input_blocks_in_imports_.emplace(
             segment_ids[segment_idx], Vector<SharedPtr<DataBlock>>(input_blocks.begin() + input_block_start_idx,
                                                                    input_blocks.begin() + input_block_end_idx));
@@ -619,7 +619,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     // Fake commit timestamp, in prepare commit phase, it will be replaced by real commit timestamp
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    SystemCache *system_cache = new_catalog_->GetSystemCachePtr();
+    SystemCache *system_cache = txn_mgr_->GetSystemCachePtr();
     u64 db_id = std::stoull(table_meta.db_id_str());
     u64 table_id = std::stoull(table_meta.table_id_str());
     Vector<SegmentID> new_segment_ids;
@@ -1440,27 +1440,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
 
             for (SizeT i = 0; i < table_index_metas.size(); ++i) {
                 const String &index_name = (*index_name_strs)[i];
-                SegmentIndexMeta segment_index_meta(segment_id, table_index_metas[i]);
-                SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-
-                if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
-                    return Status::UnexpectedError(
-                        fmt::format("No mem index to dump for table: {}, index: {}, segment: {}", table_name, index_name, segment_id));
-                }
-
-                SharedPtr<NewTxn> new_txn_shared = txn_mgr_->BeginTxnShared(MakeUnique<String>("Dump index"), TransactionType::kNormal);
-                SharedPtr<DumpIndexTask> dump_index_task{};
-                if (mem_index->GetBaseMemIndex() != nullptr) {
-                    mem_index->SetBaseMemIndexInfo(db_name, table_name, index_name, segment_id);
-                    const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-                    dump_index_task = MakeShared<DumpIndexTask>(const_cast<BaseMemIndex *>(base_mem_index), new_txn_shared);
-
-                } else if (mem_index->GetEMVBIndex() != nullptr) {
-                    mem_index->SetEMVBMemIndexInfo(db_name, table_name, index_name, segment_id);
-                    EMVBIndexInMem *emvb_mem_index = mem_index->GetEMVBIndex().get();
-                    dump_index_task = MakeShared<DumpIndexTask>(emvb_mem_index, new_txn_shared);
-                }
-
+                SharedPtr<DumpMemIndexTask> dump_index_task = MakeShared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id);
                 // Trigger dump index processor to dump mem index for new sealed segment
                 auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
                 dump_index_processor->Submit(dump_index_task);

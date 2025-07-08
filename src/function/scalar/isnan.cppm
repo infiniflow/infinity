@@ -1,7 +1,5 @@
 module;
 
-import stl;
-
 export module isnan;
 
 namespace infinity {

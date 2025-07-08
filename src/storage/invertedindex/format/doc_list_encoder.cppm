@@ -1,5 +1,7 @@
 module;
 
+export module doc_list_encoder;
+
 import stl;
 
 import file_writer;
@@ -9,8 +11,6 @@ import skiplist_writer;
 import inmem_doc_list_decoder;
 import index_defines;
 import doc_list_format_option;
-
-export module doc_list_encoder;
 
 namespace infinity {
 

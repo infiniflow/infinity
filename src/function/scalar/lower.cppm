@@ -1,8 +1,8 @@
 module;
 
-import stl;
-
 export module lower;
+
+import stl;
 
 namespace infinity {
 

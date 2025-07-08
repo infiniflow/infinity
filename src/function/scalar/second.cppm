@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module second;
+
+import stl;
 
 namespace infinity {
 

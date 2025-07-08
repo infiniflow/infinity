@@ -601,30 +601,102 @@ Bitmask IndexFilterEvaluatorOR::Evaluate(const SegmentID segment_id, const Segme
     return result;
 }
 
-template <typename ColumnValueType>
+template <typename ColumnValueType, typename CardinalityTag>
 struct TrunkReader {
+    using SecondaryIndexOrderedT = ConvertToOrderedType<ColumnValueType>;
+    virtual ~TrunkReader() = default;
+    virtual void OutPut(Bitmask &selected_rows) = 0;
+};
+
+// Specialization for HighCardinalityTag - includes GetResultCnt
+template <typename ColumnValueType>
+struct TrunkReader<ColumnValueType, HighCardinalityTag> {
     using SecondaryIndexOrderedT = ConvertToOrderedType<ColumnValueType>;
     virtual ~TrunkReader() = default;
     virtual u32 GetResultCnt(Pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT> interval_range) = 0;
     virtual void OutPut(Bitmask &selected_rows) = 0;
 };
 
-template <typename ColumnValueType>
-struct TrunkReaderT final : TrunkReader<ColumnValueType> {
-    using KeyType = typename TrunkReader<ColumnValueType>::SecondaryIndexOrderedT;
+template <typename ColumnValueType, typename CardinalityTag>
+struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
+    using KeyType = typename TrunkReader<ColumnValueType, CardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
     BufferObj *index_buffer_ = nullptr;
-    const SecondaryIndexData *index_ = nullptr;
+    const SecondaryIndexDataBase<CardinalityTag> *index_ = nullptr;
+    u32 begin_pos_ = 0;
+    u32 end_pos_ = 0;
+    // For LowCardinality: store the range for processing
+    Pair<KeyType, KeyType> current_range_;
+
+    TrunkReaderT(const u32 segment_row_count, BufferObj *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
+    TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<CardinalityTag> *index)
+        : segment_row_count_(segment_row_count), index_(index) {}
+
+    // Method to set range for LowCardinality processing
+    void SetRange(const Pair<KeyType, KeyType> &range) { current_range_ = range; }
+
+    void OutPut(Bitmask &selected_rows) override {
+        if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
+            // High cardinality: use traditional approach
+            const u32 begin_pos = begin_pos_;
+            const u32 end_pos = end_pos_;
+            const auto index_handle = index_buffer_->Load();
+            const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_handle.GetData());
+            const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
+            // output result
+            for (u32 i = begin_pos; i < end_pos; ++i) {
+                selected_rows.SetTrue(offset_ptr[i]);
+            }
+        } else {
+            // Low cardinality: use RoaringBitmap approach
+            const auto [begin_val, end_val] = current_range_;
+            const auto index_handle = index_buffer_->Load();
+            const auto index = static_cast<const SecondaryIndexDataBase<CardinalityTag> *>(index_handle.GetData());
+
+            // Get unique keys count and pointer through base class interface
+            u32 unique_key_count = index->GetUniqueKeyCount();
+            if (unique_key_count == 0)
+                return;
+
+            const KeyType *unique_keys = static_cast<const KeyType *>(index->GetUniqueKeysPtr());
+
+            // Find keys in range [begin_val, end_val]
+            auto begin_it = std::lower_bound(unique_keys, unique_keys + unique_key_count, begin_val);
+            auto end_it = std::upper_bound(unique_keys, unique_keys + unique_key_count, end_val);
+
+            // For each key in range, add its offsets to the result
+            for (auto it = begin_it; it != end_it; ++it) {
+                const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(it));
+                if (bitmap) {
+                    bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
+                        selected_rows.SetTrue(offset);
+                        return true; // continue iteration
+                    });
+                }
+            }
+        }
+    }
+};
+
+// Specialization for HighCardinalityTag that includes GetResultCnt
+template <typename ColumnValueType>
+struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<ColumnValueType, HighCardinalityTag> {
+    using KeyType = typename TrunkReader<ColumnValueType, HighCardinalityTag>::SecondaryIndexOrderedT;
+    const u32 segment_row_count_;
+    BufferObj *index_buffer_ = nullptr;
+    const SecondaryIndexDataBase<HighCardinalityTag> *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
     TrunkReaderT(const u32 segment_row_count, BufferObj *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
-    TrunkReaderT(const u32 segment_row_count, const SecondaryIndexData *index) : segment_row_count_(segment_row_count), index_(index) {}
+    TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<HighCardinalityTag> *index)
+        : segment_row_count_(segment_row_count), index_(index) {}
+
     u32 GetResultCnt(const Pair<KeyType, KeyType> interval_range) override {
         Optional<BufferHandle> index_handle;
-        const SecondaryIndexData *index = nullptr;
+        const SecondaryIndexDataBase<HighCardinalityTag> *index = nullptr;
         if (index_buffer_) {
             index_handle = index_buffer_->Load();
-            index = static_cast<const SecondaryIndexData *>(index_handle->GetData());
+            index = static_cast<const SecondaryIndexDataBase<HighCardinalityTag> *>(index_handle->GetData());
         } else {
             index = index_;
         }
@@ -703,11 +775,12 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
         const u32 result_size = end_pos - begin_pos;
         return result_size;
     }
+
     void OutPut(Bitmask &selected_rows) override {
         const u32 begin_pos = begin_pos_;
         const u32 end_pos = end_pos_;
         const auto index_handle = index_buffer_->Load();
-        const auto index = static_cast<const SecondaryIndexData *>(index_handle.GetData());
+        const auto index = static_cast<const SecondaryIndexDataBase<HighCardinalityTag> *>(index_handle.GetData());
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
         for (u32 i = begin_pos; i < end_pos; ++i) {
@@ -716,9 +789,21 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     }
 };
 
+template <typename ColumnValueType, typename CardinalityTag>
+struct TrunkReaderM final : TrunkReader<ColumnValueType, CardinalityTag> {
+    using KeyType = typename TrunkReader<ColumnValueType, CardinalityTag>::SecondaryIndexOrderedT;
+    const u32 segment_row_count_;
+    SharedPtr<SecondaryIndexInMem> memory_secondary_index_;
+    Pair<u32, Bitmask> result_cache_;
+    TrunkReaderM(const u32 segment_row_count, const SharedPtr<SecondaryIndexInMem> &memory_secondary_index)
+        : segment_row_count_(segment_row_count), memory_secondary_index_(memory_secondary_index) {}
+    void OutPut(Bitmask &selected_rows) override { selected_rows.MergeOr(result_cache_.second); }
+};
+
+// Specialization for HighCardinalityTag that includes GetResultCnt
 template <typename ColumnValueType>
-struct TrunkReaderM final : TrunkReader<ColumnValueType> {
-    using KeyType = typename TrunkReader<ColumnValueType>::SecondaryIndexOrderedT;
+struct TrunkReaderM<ColumnValueType, HighCardinalityTag> final : TrunkReader<ColumnValueType, HighCardinalityTag> {
+    using KeyType = typename TrunkReader<ColumnValueType, HighCardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_;
     Pair<u32, Bitmask> result_cache_;
@@ -734,10 +819,10 @@ struct TrunkReaderM final : TrunkReader<ColumnValueType> {
 };
 
 template <typename ColumnValueType>
-Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
-                            SegmentIndexMeta *index_meta,
-                            const SegmentOffset segment_row_count) {
-    Vector<UniquePtr<TrunkReader<ColumnValueType>>> trunk_readers;
+Bitmask ExecuteSingleRangeHighCardinalityT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
+                                           SegmentIndexMeta *index_meta,
+                                           const SegmentOffset segment_row_count) {
+    Vector<UniquePtr<TrunkReader<ColumnValueType, HighCardinalityTag>>> trunk_readers;
     auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -749,13 +834,13 @@ Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, Co
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
+        trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType, HighCardinalityTag>>(segment_row_count, index_buffer));
     }
     SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
     if (mem_index) {
         SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
         if (secondary_index) {
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, secondary_index));
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType, HighCardinalityTag>>(segment_row_count, secondary_index));
         }
     }
 
@@ -772,14 +857,67 @@ Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, Co
     return part_result;
 }
 
+template <typename ColumnValueType>
+Bitmask ExecuteSingleRangeLowCardinalityT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
+                                          SegmentIndexMeta *index_meta,
+                                          const SegmentOffset segment_row_count) {
+    Vector<UniquePtr<TrunkReader<ColumnValueType, LowCardinalityTag>>> trunk_readers;
+    auto [chunk_ids_ptr, status] = index_meta->GetChunkIDs1();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    for (ChunkID chunk_id : *chunk_ids_ptr) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
+        BufferObj *index_buffer = nullptr;
+        Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType, LowCardinalityTag>>(segment_row_count, index_buffer));
+    }
+    SharedPtr<MemIndex> mem_index = index_meta->GetMemIndex();
+    if (mem_index) {
+        SharedPtr<SecondaryIndexInMem> secondary_index = mem_index->GetSecondaryIndex();
+        if (secondary_index) {
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType, LowCardinalityTag>>(segment_row_count, secondary_index));
+        }
+    }
+
+    // output result - for LowCardinality, we don't use GetResultCnt optimization
+    Bitmask part_result(segment_row_count);
+    part_result.SetAllFalse();
+    for (auto &trunk_reader : trunk_readers) {
+        // Set the range for LowCardinality processing
+        auto *typed_reader = static_cast<TrunkReaderT<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get());
+        typed_reader->SetRange(interval_range);
+        // directly output without GetResultCnt optimization
+        trunk_reader->OutPut(part_result);
+    }
+    part_result.RunOptimize();
+    return part_result;
+}
+
 template <typename ColumnValueT>
 Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count) const {
     Optional<SegmentIndexMeta> index_meta;
     index_meta.emplace(segment_id, *new_secondary_index_);
+
+    // Check cardinality to determine which execution path to use
+    auto [cardinality, status] = new_secondary_index_->GetSecondaryIndexCardinality();
+    if (!status.ok()) {
+        // Default to HighCardinality if unable to determine
+        cardinality = SecondaryIndexCardinality::kHighCardinality;
+    }
+
     Bitmask result(segment_row_count);
     result.SetAllFalse();
     for (const auto rng : secondary_index_start_end_pairs_) {
-        const auto part_result = ExecuteSingleRangeT<ColumnValueT>(rng, &*index_meta, segment_row_count);
+        Bitmask part_result(segment_row_count);
+        if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            part_result = ExecuteSingleRangeHighCardinalityT<ColumnValueT>(rng, &*index_meta, segment_row_count);
+        } else {
+            part_result = ExecuteSingleRangeLowCardinalityT<ColumnValueT>(rng, &*index_meta, segment_row_count);
+        }
         result.MergeOr(part_result);
     }
     result.RunOptimize();

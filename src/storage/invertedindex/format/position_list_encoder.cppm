@@ -1,5 +1,7 @@
 module;
 
+export module position_list_encoder;
+
 import stl;
 import byte_slice;
 import byte_slice_writer;
@@ -12,7 +14,6 @@ import skiplist_writer;
 import position_list_format_option;
 import posting_list_format;
 import inmem_position_list_decoder;
-export module position_list_encoder;
 
 namespace infinity {
 

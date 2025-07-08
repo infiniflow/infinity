@@ -28,7 +28,7 @@ import third_party;
 namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(SegmentID segment_id, MemoryIndexer *memory_indexer)
     : IndexSegmentReader(segment_id, std::numeric_limits<ChunkID>::max()), posting_table_(memory_indexer->GetPostingTable()),
-      base_row_id_(memory_indexer->GetBaseRowId()) {}
+      base_row_id_(memory_indexer->GetBeginRowID()) {}
 
 bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position) const {
     SharedPtr<PostingWriter> writer;
