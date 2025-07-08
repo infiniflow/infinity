@@ -1290,6 +1290,17 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
                 }
             }
 
+            LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
+                                  "block min_ts {}, block "
+                                  "max_ts {}, block checkpoint_ts {}",
+                                  segment_id,
+                                  block_id,
+                                  flush_column,
+                                  flush_version,
+                                  option.checkpoint_ts_,
+                                  block_lock->min_ts_,
+                                  block_lock->max_ts_,
+                                  block_lock->checkpoint_ts_));
             if (!flush_column or !flush_version) {
                 continue;
             } else {
