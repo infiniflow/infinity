@@ -164,6 +164,7 @@ void ColumnVector::Initialize(BufferObj *buffer_obj,
         }
     }
     tail_index_ = current_row_count;
+    LOG_INFO(fmt::format("Abc ColumnVector::Initialize tail_index_ {}", tail_index_));
 }
 
 void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorTipe vector_tipe) {
@@ -900,6 +901,8 @@ Value ColumnVector::GetValue(SizeT index) const {
             fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index_);
         UnrecoverableError(error_message);
     }
+
+    LOG_INFO(fmt::format("GetValue: index={}  tail_index_{}", index, tail_index_));
 
     // Not valid, make a same data type with null indicator
     if (!(this->nulls_ptr_->IsTrue(index))) {
@@ -2189,6 +2192,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
     }
     this->tail_index_ += count;
+ //   LOG_INFO(fmt::format("Abc ColumnVector::AppendWith {} rows to column vector, tail index is now {}", count, this->tail_index_));
 }
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {

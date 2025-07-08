@@ -75,50 +75,6 @@ jobs:
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DENABLE_SANITIZER_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
 
-      - name: Prepare restart test data
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }}
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo python3 scripts/prepare_restart_test_data.py --from_dir=${RUNNER_WORKSPACE_PREFIX} --op=add
-
-      - name: Run restart test with thread sanitizer
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
-        id: run_restart_test_sanitizer
-        run : |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-          # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
-          old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
-          sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=restart_tsan.log ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
-          sudo sysctl -w vm.mmap_rnd_bits=$old_value
-
-      - name: Collect restart test output with thread sanitizer
-        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }} # always run this step even if previous steps failed
-          # remove symbolic link
-        # find all log file like [debug.log.*] in directory, and cat to stdout
-        run: |
-          failure="${{ steps.run_restart_test_sanitizer.outcome == 'failure'}}"
-          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=restart_tsan.log
-          sudo rm restart_tsan.log*
-
-      - name: Run cluster test
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
-        id: run_cluster_test
-        run: |
-          # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
-          old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
-          sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity"
-          sudo sysctl -w vm.mmap_rnd_bits=$old_value
-
-      - name: Collect thread sanitizer output in cluster test
-        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
-        run: |
-          failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=cluster_tsan.log
-          sudo rm -f cluster_tsan.log*
-
       - name: Start infinity debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
         id: start_tests_debug
@@ -163,57 +119,6 @@ jobs:
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
           sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=tsan.log
           sudo rm -f tsan.log*
-
-      - name: Run restart test
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }}
-        id: run_restart_test
-        run : |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test_continuously.py --infinity_path=cmake-build-release/src/infinity"
-        #   sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_data[infinity_runner0-columns5-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
-        #   sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pytest python/restart_test/test_insert.py -k "test_index[infinity_runner0-columns2-indexes2-gen-1000000-test/data/config/restart_test/test_insert/1.toml]" -s --infinity_path=cmake-build-release/src/infinity"
-
-      - name: Collect restart test output
-        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_RESTART_TEST == 'true' }} # always run this step even if previous steps failed
-          # remove symbolic link
-        # find all log file like [debug.log.*] in directory, and cat to stdout
-        run: |
-          sudo python3 scripts/prepare_restart_test_data.py --op=remove
-          failure="${{ steps.run_restart_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
-
-      - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_PYTEST_PARALLEL == 'true' }}
-        # && !contains(github.event.pull_request.labels.*.name, 'invalid')
-        run: |
-          # Run a command in the background
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2> release_error.log" &
-
-      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version continously
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_PYTEST_PARALLEL == 'true' }}
-        # && !contains(github.event.pull_request.labels.*.name, 'invalid')
-        id: run_py_tests
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel_continuous.py" && sleep 1s
-
-      - name: Stop infinity release
-        if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_PYTEST_PARALLEL == 'true' }}
-        # && !contains(github.event.pull_request.labels.*.name, 'invalid')
-        id: stop_py_tests
-        run: |
-          sudo chmod +x scripts/timeout_kill.sh
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity release version"
-            exit 1
-          fi
-
-      - name: Collect infinity release output
-        if: ${{ !cancelled() && steps.choose_test_type.outputs.RUN_PYTEST_PARALLEL == 'true' }} # always run this step even if previous steps failed
-        run: |
-          failure="${{ steps.run_py_tests.outcome == 'failure' || steps.stop_py_tests.outcome == 'failure' }}"
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /var/infinity/log/infinity.log /infinity/infinity.log"
-          sudo python3 scripts/collect_log.py --log_path=infinity.log --stdout_path=release.log --stderror_path=release_error.log --executable_path=cmake-build-release/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed

@@ -701,6 +701,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Pair<RowID, 
     auto append_in_column = [&]() {
         ColumnVector col;
         {
+            LOG_INFO(fmt::format("Abc NewTxn::AppendIndex: txn_id: {}, column_idx: {}  cur_offset {}  cur_row_cnt {}", txn_context_ptr_->txn_id_, column_idx, cur_offset, cur_row_cnt));
             Status status = NewCatalog::GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorTipe::kReadOnly, col);
             if (!status.ok()) {
                 return status;

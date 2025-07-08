@@ -844,6 +844,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
         for (SizeT column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
             const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
             ColumnMeta column_meta(column_idx, block_meta);
+            LOG_INFO(fmt::format("Abc NewTxn::AppendInBlock, txn_id: {}, column_idx: {}, block_offset: {}, append_rows: {}, input_offset: {}",
+                                  txn_context_ptr_->txn_id_, column_idx, block_offset, append_rows, input_offset));
             Status status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
                 return status;
