@@ -6,10 +6,6 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
-### Parser
-
-add_subdirectory(parser)
-
 ### Infinity
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
@@ -334,6 +330,9 @@ add_executable(infinity
 #        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
 #        ${network_cppm}
 #)
+
+### Parser (built after infinity_core so it can access modules)
+add_subdirectory(parser)
 
 add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
