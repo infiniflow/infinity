@@ -1,7 +1,10 @@
-#include "query_node.h"
+module;
+
 #include <cassert>
 #include <chrono>
 #include <cmath>
+
+module query_node;
 
 import stl;
 import third_party;

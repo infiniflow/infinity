@@ -1,6 +1,6 @@
-#line 2 "search_lexer.cpp"
+#line 1 "search_lexer.cpp"
 
-#line 4 "search_lexer.cpp"
+#line 3 "search_lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -89,6 +89,7 @@ typedef int16_t flex_int16_t;
 typedef uint16_t flex_uint16_t;
 typedef int32_t flex_int32_t;
 typedef uint32_t flex_uint32_t;
+typedef uint64_t flex_uint64_t;
 #else
 typedef signed char flex_int8_t;
 typedef short int flex_int16_t;
@@ -219,7 +220,7 @@ typedef size_t yy_size_t;
 #endif
 
 /* %if-not-reentrant */
-extern int yyleng;
+extern yy_size_t yyleng;
 /* %endif */
 
 /* %if-c-only */
@@ -271,15 +272,15 @@ struct yy_buffer_state
 	/* Number of characters read into yy_ch_buf, not including EOB
 	 * characters.
 	 */
-	int yy_n_chars;
+        yy_size_t yy_n_chars;
 
-	/* Whether we "own" the buffer - i.e., we know we created it,
-	 * and can realloc() it to grow it, and should free() it to
-	 * delete it.
-	 */
-	int yy_is_our_buffer;
+        /* Whether we "own" the buffer - i.e., we know we created it,
+         * and can realloc() it to grow it, and should free() it to
+         * delete it.
+         */
+        int yy_is_our_buffer;
 
-	/* Whether this is an "interactive" input source; if so, and
+        /* Whether this is an "interactive" input source; if so, and
 	 * if we're using stdio for input, then we want to use getc()
 	 * instead of fread(), to make sure we stop fetching input after
 	 * each newline.
@@ -402,24 +403,23 @@ int yyFlexLexer::yylex()
 /* Done after the current pattern has been matched and before the
  * corresponding action - sets up yytext.
  */
-#define YY_DO_BEFORE_ACTION \
-	(yytext_ptr) = yy_bp; \
-/* %% [2.0] code to fiddle yytext and yyleng for yymore() goes here \ */\
-	yyleng = (int) (yy_cp - yy_bp); \
-	(yy_hold_char) = *yy_cp; \
-	*yy_cp = '\0'; \
-/* %% [3.0] code to copy yytext_ptr to yytext[] goes here, if %array \ */\
-	(yy_c_buf_p) = yy_cp;
-/* %% [4.0] data tables for the DFA and the user's section 1 definitions go here */
+#define YY_DO_BEFORE_ACTION                                                                                                                  \
+            (yytext_ptr) = yy_bp;                                                                                                                    \
+            /* %% [2.0] code to fiddle yytext and yyleng for yymore() goes here \ */                                                                 \
+            yyleng = (yy_size_t)(yy_cp - yy_bp);                                                                                                     \
+            (yy_hold_char) = *yy_cp;                                                                                                                 \
+            *yy_cp = '\0';                                                                                                                           \
+            /* %% [3.0] code to copy yytext_ptr to yytext[] goes here, if %array \ */                                                                \
+            (yy_c_buf_p) = yy_cp;
+        /* %% [4.0] data tables for the DFA and the user's section 1 definitions go here */
 #define YY_NUM_RULES 20
 #define YY_END_OF_BUFFER 21
-/* This struct is not used in this scanner,
-   but its presence is necessary. */
-struct yy_trans_info
-	{
-	flex_int32_t yy_verify;
-	flex_int32_t yy_nxt;
-	};
+        /* This struct is not used in this scanner,
+           but its presence is necessary. */
+        struct yy_trans_info {
+            flex_int32_t yy_verify;
+            flex_int32_t yy_nxt;
+        };
 static const flex_int16_t yy_accept[56] =
     {   0,
         0,    0,    0,    0,    0,    0,   21,   20,    1,   11,
@@ -1192,40 +1192,20 @@ void yyFlexLexer::switch_streams( std::istream* new_in, std::ostream* new_out )
 	switch_streams(*new_in, *new_out);
 }
 
-#ifdef YY_INTERACTIVE
-int yyFlexLexer::LexerInput( char* buf, int /* max_size */ )
-#else
-int yyFlexLexer::LexerInput( char* buf, int max_size )
-#endif
-{
-	if ( yyin.eof() || yyin.fail() )
-		return 0;
+// Implement LexerInput and LexerOutput for SearchScannerInfinitySyntaxFlexLexer
+int SearchScannerInfinitySyntaxFlexLexer::LexerInput(char *buf, int max_size) {
+    if (yyin.eof() || yyin.fail())
+        return 0;
 
-#ifdef YY_INTERACTIVE
-	yyin.get( buf[0] );
+    yyin.read(buf, max_size);
 
-	if ( yyin.eof() )
-		return 0;
-
-	if ( yyin.bad() )
-		return -1;
-
-	return 1;
-
-#else
-	(void) yyin.read( buf, max_size );
-
-	if ( yyin.bad() )
-		return -1;
-	else
-		return yyin.gcount();
-#endif
+    if (yyin.bad())
+        return -1;
+    else
+        return yyin.gcount();
 }
 
-void yyFlexLexer::LexerOutput( const char* buf, int size )
-{
-	(void) yyout.write( buf, size );
-}
+void SearchScannerInfinitySyntaxFlexLexer::LexerOutput(const char *buf, int size) { (void)yyout.write(buf, size); }
 /* %ok-for-header */
 
 /* %endif */
@@ -1287,56 +1267,46 @@ int yyFlexLexer::yy_get_next_buffer()
 
 	else
 		{
-			int num_to_read =
-			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
+            yy_size_t num_to_read = YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
-		while ( num_to_read <= 0 )
-			{ /* Not enough room in the buffer - grow it. */
+            while (num_to_read <= 0) { /* Not enough room in the buffer - grow it. */
 
-			/* just a shorter name for the current buffer */
-			YY_BUFFER_STATE b = YY_CURRENT_BUFFER_LVALUE;
+                /* just a shorter name for the current buffer */
+                YY_BUFFER_STATE b = YY_CURRENT_BUFFER_LVALUE;
 
-			int yy_c_buf_p_offset =
-				(int) ((yy_c_buf_p) - b->yy_ch_buf);
+                int yy_c_buf_p_offset = (int)((yy_c_buf_p)-b->yy_ch_buf);
 
-			if ( b->yy_is_our_buffer )
-				{
-				int new_size = b->yy_buf_size * 2;
+                if (b->yy_is_our_buffer) {
+                    yy_size_t new_size = b->yy_buf_size * 2;
 
-				if ( new_size <= 0 )
-					b->yy_buf_size += b->yy_buf_size / 8;
-				else
-					b->yy_buf_size *= 2;
+                    if (new_size <= 0)
+                        b->yy_buf_size += b->yy_buf_size / 8;
+                    else
+                        b->yy_buf_size *= 2;
 
-				b->yy_ch_buf = (char *)
-					/* Include room in for 2 EOB chars. */
-					yyrealloc( (void *) b->yy_ch_buf,
-							 (yy_size_t) (b->yy_buf_size + 2)  );
-				}
-			else
-				/* Can't grow it, we don't own it. */
-				b->yy_ch_buf = NULL;
+                    b->yy_ch_buf = (char *)
+                        /* Include room in for 2 EOB chars. */
+                        yyrealloc((void *)b->yy_ch_buf, (yy_size_t)(b->yy_buf_size + 2));
+                } else
+                    /* Can't grow it, we don't own it. */
+                    b->yy_ch_buf = NULL;
 
-			if ( ! b->yy_ch_buf )
-				YY_FATAL_ERROR(
-				"fatal error - scanner input buffer overflow" );
+                if (!b->yy_ch_buf)
+                    YY_FATAL_ERROR("fatal error - scanner input buffer overflow");
 
-			(yy_c_buf_p) = &b->yy_ch_buf[yy_c_buf_p_offset];
+                (yy_c_buf_p) = &b->yy_ch_buf[yy_c_buf_p_offset];
 
-			num_to_read = YY_CURRENT_BUFFER_LVALUE->yy_buf_size -
-						number_to_move - 1;
+                num_to_read = YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
+            }
 
-			}
+            if (num_to_read > YY_READ_BUF_SIZE)
+                num_to_read = YY_READ_BUF_SIZE;
 
-		if ( num_to_read > YY_READ_BUF_SIZE )
-			num_to_read = YY_READ_BUF_SIZE;
+            /* Read in more data. */
+            YY_INPUT((&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move]), (yy_n_chars), num_to_read);
 
-		/* Read in more data. */
-		YY_INPUT( (&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move]),
-			(yy_n_chars), num_to_read );
-
-		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = (yy_n_chars);
-		}
+            YY_CURRENT_BUFFER_LVALUE->yy_n_chars = (yy_n_chars);
+                }
 
 	if ( (yy_n_chars) == 0 )
 		{
@@ -1359,11 +1329,10 @@ int yyFlexLexer::yy_get_next_buffer()
 
 	if (((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
 		/* Extend the array by 50%, plus the number we really need. */
-		int new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
-		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) yyrealloc(
-			(void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf, (yy_size_t) new_size  );
-		if ( ! YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
-			YY_FATAL_ERROR( "out of dynamic memory in yy_get_next_buffer()" );
+                yy_size_t new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
+                YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *)yyrealloc((void *)YY_CURRENT_BUFFER_LVALUE->yy_ch_buf, (yy_size_t)new_size);
+                if (!YY_CURRENT_BUFFER_LVALUE->yy_ch_buf)
+                    YY_FATAL_ERROR("out of dynamic memory in yy_get_next_buffer()");
 		/* "- 2" to take care of EOB's */
 		YY_CURRENT_BUFFER_LVALUE->yy_buf_size = (int) (new_size - 2);
 	}
@@ -1463,13 +1432,11 @@ int yyFlexLexer::yy_get_next_buffer()
 	if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
 		{ /* need to shift things up to make room */
 		/* +2 for EOB chars. */
-		int number_to_move = (yy_n_chars) + 2;
-		char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[
-					YY_CURRENT_BUFFER_LVALUE->yy_buf_size + 2];
-		char *source =
-				&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move];
+                yy_size_t number_to_move = (yy_n_chars) + 2;
+                char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[YY_CURRENT_BUFFER_LVALUE->yy_buf_size + 2];
+                char *source = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move];
 
-		while ( source > YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
+                while ( source > YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
 			*--dest = *--source;
 
 		yy_cp += (int) (dest - source);
@@ -1515,47 +1482,45 @@ int yyFlexLexer::yy_get_next_buffer()
 
 		else
 			{ /* need more input */
-			int offset = (int) ((yy_c_buf_p) - (yytext_ptr));
-			++(yy_c_buf_p);
+                    yy_size_t offset = (yy_c_buf_p) - (yytext_ptr);
+                    ++(yy_c_buf_p);
 
-			switch ( yy_get_next_buffer(  ) )
-				{
-				case EOB_ACT_LAST_MATCH:
-					/* This happens because yy_g_n_b()
-					 * sees that we've accumulated a
-					 * token and flags that we need to
-					 * try matching the token before
-					 * proceeding.  But for input(),
-					 * there's no matching to consider.
-					 * So convert the EOB_ACT_LAST_MATCH
-					 * to EOB_ACT_END_OF_FILE.
-					 */
+                    switch (yy_get_next_buffer()) {
+                        case EOB_ACT_LAST_MATCH:
+                            /* This happens because yy_g_n_b()
+                             * sees that we've accumulated a
+                             * token and flags that we need to
+                             * try matching the token before
+                             * proceeding.  But for input(),
+                             * there's no matching to consider.
+                             * So convert the EOB_ACT_LAST_MATCH
+                             * to EOB_ACT_END_OF_FILE.
+                             */
 
-					/* Reset buffer status. */
-					yyrestart( yyin );
+                            /* Reset buffer status. */
+                            yyrestart(yyin);
 
-					/*FALLTHROUGH*/
+                            /*FALLTHROUGH*/
 
-				case EOB_ACT_END_OF_FILE:
-					{
-					if ( yywrap(  ) )
-						return 0;
+                        case EOB_ACT_END_OF_FILE: {
+                            if (yywrap())
+                                return 0;
 
-					if ( ! (yy_did_buffer_switch_on_eof) )
-						YY_NEW_FILE;
+                            if (!(yy_did_buffer_switch_on_eof))
+                                YY_NEW_FILE;
 #ifdef __cplusplus
 					return yyinput();
 #else
 					return input();
 #endif
-					}
+                        }
 
-				case EOB_ACT_CONTINUE_SCAN:
-					(yy_c_buf_p) = (yytext_ptr) + offset;
-					break;
-				}
-			}
-		}
+                        case EOB_ACT_CONTINUE_SCAN:
+                            (yy_c_buf_p) = (yytext_ptr) + offset;
+                            break;
+                    }
+                }
+                }
 
 	c = *(unsigned char *) (yy_c_buf_p);	/* cast for 8-bit char's */
 	*(yy_c_buf_p) = '\0';	/* preserve yytext */
@@ -1992,19 +1957,17 @@ void yyFlexLexer::LexerError( const char* msg )
 /* Redefine yyless() so it works in section 3 code. */
 
 #undef yyless
-#define yyless(n) \
-	do \
-		{ \
-		/* Undo effects of setting up yytext. */ \
-        int yyless_macro_arg = (n); \
-        YY_LESS_LINENO(yyless_macro_arg);\
-		yytext[yyleng] = (yy_hold_char); \
-		(yy_c_buf_p) = yytext + yyless_macro_arg; \
-		(yy_hold_char) = *(yy_c_buf_p); \
-		*(yy_c_buf_p) = '\0'; \
-		yyleng = yyless_macro_arg; \
-		} \
-	while ( 0 )
+#define yyless(n)                                                                                                                                    \
+    do {                                                                                                                                             \
+        /* Undo effects of setting up yytext. */                                                                                                     \
+        yy_size_t yyless_macro_arg = (n);                                                                                                            \
+        YY_LESS_LINENO(yyless_macro_arg);                                                                                                            \
+        yytext[yyleng] = (yy_hold_char);                                                                                                             \
+        (yy_c_buf_p) = yytext + yyless_macro_arg;                                                                                                    \
+        (yy_hold_char) = *(yy_c_buf_p);                                                                                                              \
+        *(yy_c_buf_p) = '\0';                                                                                                                        \
+        yyleng = yyless_macro_arg;                                                                                                                   \
+    } while (0)
 
 /* Accessor  methods (get/set functions) to struct members. */
 
