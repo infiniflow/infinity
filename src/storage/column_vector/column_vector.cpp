@@ -902,7 +902,7 @@ Value ColumnVector::GetValue(SizeT index) const {
         UnrecoverableError(error_message);
     }
 
-    LOG_INFO(fmt::format("GetValue: index={}  tail_index_{}", index, tail_index_));
+    //LOG_INFO(fmt::format("GetValue: index={}  tail_index_{}", index, tail_index_));
 
     // Not valid, make a same data type with null indicator
     if (!(this->nulls_ptr_->IsTrue(index))) {
