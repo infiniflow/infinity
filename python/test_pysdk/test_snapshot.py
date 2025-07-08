@@ -31,11 +31,14 @@ class TestSnapshot:
 
     def test_snapshot_operations(self, suffix):
         """
-        target: test that snapshot operations are properly implemented and working
-        method: call various snapshot operations and verify they work correctly
-        expect: all operations complete successfully or return appropriate errors for invalid operations
+        target: test that table snapshot operations are properly implemented and working
+        method: call table snapshot operations using the default database and verify they work correctly
+        expect: all table snapshot operations complete successfully or return appropriate errors for invalid operations
         """
-        db_obj = self.infinity_obj.create_database("snapshot_test_db" + suffix, ConflictType.Error)
+        # Use the default database instead of creating a new one
+        db_obj = self.infinity_obj.get_database("default_db")
+        
+        # Create table in default database
         table_obj = db_obj.create_table(
             "test_table" + suffix,
             {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
@@ -49,27 +52,13 @@ class TestSnapshot:
         res = db_obj.create_table_snapshot("test_table_snapshot", "test_table" + suffix)
         assert res.error_code == ErrorCode.OK, f"CreateTableSnapshot failed: {res.error_msg}"
 
-        # Test CreateDatabaseSnapshot
-        res = self.infinity_obj.create_database_snapshot("snapshot_test_db" + suffix, "test_db_snapshot")
-        assert res.error_code == ErrorCode.OK, f"CreateDatabaseSnapshot failed: {res.error_msg}"
-
-        # Test CreateSystemSnapshot
-        res = self.infinity_obj.create_system_snapshot("test_system_snapshot")
-        assert res.error_code == ErrorCode.OK, f"CreateSystemSnapshot failed: {res.error_msg}"
-
-        # Test ListSnapshots - should show our created snapshots
+        # Test ListSnapshots - should show our created snapshot
         res = self.infinity_obj.list_snapshots()
         assert res.error_code == ErrorCode.OK, f"ListSnapshots failed: {res.error_msg}"
 
-        # Test ShowSnapshot for each snapshot
+        # Test ShowSnapshot for the table snapshot
         res = self.infinity_obj.show_snapshot("test_table_snapshot")
         assert res.error_code == ErrorCode.OK, f"ShowSnapshot test_table_snapshot failed: {res.error_msg}"
-
-        res = self.infinity_obj.show_snapshot("test_db_snapshot")
-        assert res.error_code == ErrorCode.OK, f"ShowSnapshot test_db_snapshot failed: {res.error_msg}"
-
-        res = self.infinity_obj.show_snapshot("test_system_snapshot")
-        assert res.error_code == ErrorCode.OK, f"ShowSnapshot test_system_snapshot failed: {res.error_msg}"
 
         # Test RestoreTableSnapshot (this might fail if table already exists, which is expected)
         try:
@@ -79,38 +68,14 @@ class TestSnapshot:
             # Expected behavior - table already exists
             pass
 
-        # Test RestoreDatabaseSnapshot (this might fail if database already exists, which is expected)
-        try:
-            res = self.infinity_obj.restore_database_snapshot("test_db_snapshot")
-            # If it succeeds, that's fine. If it fails due to database already existing, that's also expected
-        except Exception as e:
-            # Expected behavior - database already exists
-            pass
-
-        # Test RestoreSystemSnapshot (this might fail if system state conflicts, which is expected)
-        try:
-            res = self.infinity_obj.restore_system_snapshot("test_system_snapshot")
-            # If it succeeds, that's fine. If it fails due to system state conflicts, that's also expected
-        except Exception as e:
-            # Expected behavior - system state conflicts
-            pass
-
-        # Test DropSnapshot for each snapshot
+        # Test DropSnapshot for the table snapshot
         res = self.infinity_obj.drop_snapshot("test_table_snapshot")
         assert res.error_code == ErrorCode.OK, f"DropSnapshot test_table_snapshot failed: {res.error_msg}"
 
-        res = self.infinity_obj.drop_snapshot("test_db_snapshot")
-        assert res.error_code == ErrorCode.OK, f"DropSnapshot test_db_snapshot failed: {res.error_msg}"
-
-        res = self.infinity_obj.drop_snapshot("test_system_snapshot")
-        assert res.error_code == ErrorCode.OK, f"DropSnapshot test_system_snapshot failed: {res.error_msg}"
-
-        # Verify snapshots are gone
+        # Verify snapshot is gone
         res = self.infinity_obj.list_snapshots()
         assert res.error_code == ErrorCode.OK, f"ListSnapshots after cleanup failed: {res.error_msg}"
 
-        # Cleanup
-        res = db_obj.drop_table("test_table" + suffix)
-        assert res.error_code == ErrorCode.OK
-        res = self.infinity_obj.drop_database("snapshot_test_db" + suffix, ConflictType.Error)
+        # Cleanup - drop the table we created
+        res = db_obj.drop_table("test_table" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

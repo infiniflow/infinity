@@ -3423,6 +3423,26 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowCurrentNodeRe
     }
 }
 
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSnapshotResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListSnapshotsResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
                                                const QueryResult &result,
                                                const std::string_view error_header) {
@@ -3543,7 +3563,19 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockCol
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
+
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshotResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshotsResponse &response,
                                                const QueryResult &result,
                                                const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
@@ -3631,16 +3663,24 @@ void InfinityThriftService::DropSnapshot(infinity_thrift_rpc::CommonResponse &re
 
 void InfinityThriftService::ShowSnapshot(infinity_thrift_rpc::ShowSnapshotResponse &response, 
                                           const infinity_thrift_rpc::ShowSnapshotRequest &request) {
-    LOG_ERROR("ShowSnapshot: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("ShowSnapshot: Not implemented yet");
+    auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+    if (status.ok()) {
+        auto result = infinity->ShowSnapshot(request.snapshot_name);
+        ProcessQueryResult(response, result, "ShowSnapshot");
+    } else {
+        ProcessStatus(response, status, "ShowSnapshot");
+    }
 }
 
 void InfinityThriftService::ListSnapshots(infinity_thrift_rpc::ListSnapshotsResponse &response, 
                                           const infinity_thrift_rpc::ListSnapshotsRequest &request) {
-    LOG_ERROR("ListSnapshots: Not implemented yet");
-    response.__set_error_code((i64)(ErrorCode::kNotSupported));
-    response.__set_error_msg("ListSnapshots: Not implemented yet");
+    auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+    if (status.ok()) {
+        auto result = infinity->ListSnapshots();
+        ProcessQueryResult(response, result, "ListSnapshots");
+    } else {
+        ProcessStatus(response, status, "ListSnapshots");
+    }
 }
 
 void InfinityThriftService::CreateDatabaseSnapshot(infinity_thrift_rpc::CommonResponse &response, 
@@ -3690,6 +3730,36 @@ void InfinityThriftService::CreateSystemSnapshot(infinity_thrift_rpc::CommonResp
     } catch (const std::exception &e) {
         response.__set_error_code((i64)(ErrorCode::kUnexpectedError));
         response.__set_error_msg("CreateSystemSnapshot: " + String(e.what()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshotResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshotsResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
     }
 }
 } // namespace infinity
