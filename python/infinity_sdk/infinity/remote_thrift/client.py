@@ -403,3 +403,41 @@ class ThriftInfinityClient:
     @retry_wrapper
     def compact(self, db_name: str, table_name: str):
         return self.client.Compact(CompactRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+    
+    @retry_wrapper
+    def create_table_snapshot(self, db_name: str, table_name: str, snapshot_name: str):
+        return self.client.CreateTableSnapshot(CreateTableSnapshotRequest(session_id=self.session_id,
+                                                                             db_name=db_name,
+                                                                             table_name=table_name,
+                                                                             snapshot_name=snapshot_name))
+
+    @retry_wrapper
+    def create_database_snapshot(self, db_name: str, snapshot_name: str):
+        return self.client.CreateDatabaseSnapshot(CreateDatabaseSnapshotRequest(session_id=self.session_id,
+                                                                             db_name=db_name,
+                                                                             snapshot_name=snapshot_name))
+
+    @retry_wrapper
+    def create_system_snapshot(self, snapshot_name: str):
+        return self.client.CreateSystemSnapshot(CreateSystemSnapshotRequest(session_id=self.session_id,
+                                                                             snapshot_name=snapshot_name))
+    
+    @retry_wrapper
+    def restore_snapshot(self, snapshot_name: str, scope: str):
+        return self.client.RestoreSnapshot(RestoreSnapshotRequest(session_id=self.session_id,
+                                                                             snapshot_name=snapshot_name,
+                                                                             scope=scope))
+    
+    @retry_wrapper
+    def list_snapshots(self):
+        return self.client.ListSnapshots(ListSnapshotsRequest(session_id=self.session_id))
+    
+    @retry_wrapper
+    def show_snapshot(self, snapshot_name: str):
+        return self.client.ShowSnapshot(ShowSnapshotRequest(session_id=self.session_id,
+                                                                             snapshot_name=snapshot_name))
+    
+    @retry_wrapper
+    def drop_snapshot(self, snapshot_name: str):
+        return self.client.DropSnapshot(DropSnapshotRequest(session_id=self.session_id,
+                                                                             snapshot_name=snapshot_name))

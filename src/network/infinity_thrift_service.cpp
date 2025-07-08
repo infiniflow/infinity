@@ -3553,4 +3553,53 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentN
     }
 }
 
+// Snapshot operations
+void InfinityThriftService::CreateTableSnapshot(infinity_thrift_rpc::CommonResponse &response, 
+                                          const infinity_thrift_rpc::CreateTableSnapshotRequest &request) {
+    LOG_ERROR("CreateTableSnapshot: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("CreateTableSnapshot: Not implemented yet");
+}
+
+void InfinityThriftService::RestoreSnapshot(infinity_thrift_rpc::CommonResponse &response, 
+                                                const infinity_thrift_rpc::RestoreSnapshotRequest &request) {
+    LOG_ERROR("RestoreSnapshot: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("RestoreSnapshot: Not implemented yet");
+}
+
+void InfinityThriftService::DropSnapshot(infinity_thrift_rpc::CommonResponse &response, 
+                                        const infinity_thrift_rpc::DropSnapshotRequest &request) {
+    LOG_ERROR("DropSnapshot: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("DropSnapshot: Not implemented yet");
+}
+
+void InfinityThriftService::ShowSnapshot(infinity_thrift_rpc::ShowSnapshotResponse &response, 
+                                          const infinity_thrift_rpc::ShowSnapshotRequest &request) {
+    LOG_ERROR("ShowSnapshot: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("ShowSnapshot: Not implemented yet");
+}
+
+void InfinityThriftService::ListSnapshots(infinity_thrift_rpc::ListSnapshotsResponse &response, 
+                                          const infinity_thrift_rpc::ListSnapshotsRequest &request) {
+    LOG_ERROR("ListSnapshots: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("ListSnapshots: Not implemented yet");
+}
+
+void InfinityThriftService::CreateDatabaseSnapshot(infinity_thrift_rpc::CommonResponse &response, 
+                                                   const infinity_thrift_rpc::CreateDatabaseSnapshotRequest &request) {
+    LOG_ERROR("CreateDatabaseSnapshot: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("CreateDatabaseSnapshot: Not implemented yet");
+}
+
+void InfinityThriftService::CreateSystemSnapshot(infinity_thrift_rpc::CommonResponse &response,     
+                                                 const infinity_thrift_rpc::CreateSystemSnapshotRequest &request) {
+    LOG_ERROR("CreateSystemSnapshot: Not implemented yet");
+    response.__set_error_code((i64)(ErrorCode::kNotSupported));
+    response.__set_error_msg("CreateSystemSnapshot: Not implemented yet");
+}
 } // namespace infinity
