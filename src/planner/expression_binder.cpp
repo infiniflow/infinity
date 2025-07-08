@@ -416,7 +416,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
                     cast_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
                     CastParameters cast_parameters;
                     cast.function(element_column_vector, cast_column_vector, 1, cast_parameters);
-                    Value cast_val = cast_column_vector->GetValue(0);
+                    Value cast_val = cast_column_vector->GetValueByIndex(0);
                     element = std::move(cast_val);
                 }
             }
@@ -659,7 +659,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
         cast.function(argument_column_vector, cast_column_vector, argument_count, cast_parameters);
 
         for (SizeT idx = 0; idx < argument_count; idx++) {
-            Value val = cast_column_vector->GetValue(idx);
+            Value val = cast_column_vector->GetValueByIndex(idx);
             in_expression_ptr->TryPut(std::move(val));
         }
     } else {

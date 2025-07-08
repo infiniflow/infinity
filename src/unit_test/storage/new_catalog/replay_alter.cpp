@@ -153,7 +153,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_cnt; ++i) {
-                auto value = column_vector.GetValue(i);
+                auto value = column_vector.GetValueByIndex(i);
                 EXPECT_EQ(value, Value::MakeVarchar(""));
             }
         }

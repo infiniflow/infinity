@@ -139,7 +139,7 @@ TEST_P(TestTxnAlter, add_column0) {
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_count; ++i) {
-                EXPECT_EQ(col.GetValue(i), v);
+                EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
 
@@ -268,7 +268,7 @@ TEST_P(TestTxnAlter, drop_column0) {
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_count; ++i) {
-                EXPECT_EQ(col.GetValue(i), v);
+                EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
 

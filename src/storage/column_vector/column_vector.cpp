@@ -971,7 +971,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return res;
         }
         case LogicalType::kArray: {
-            const auto array_value = GetValue(row_index);
+            const auto array_value = GetValueByIndex(row_index);
             return array_value.ToString();
         }
         case LogicalType::kRowID: {
@@ -993,7 +993,7 @@ String ColumnVector::ToString(SizeT row_index) const {
     return String();
 }
 
-Value ColumnVector::GetValue(SizeT index) const {
+Value ColumnVector::GetValueByIndex(SizeT index) const {
     if (!initialized) {
         String error_message = "Column vector isn't initialized.";
         UnrecoverableError(error_message);

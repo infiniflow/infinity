@@ -125,7 +125,7 @@ export class BGMemIndexTracer : public MemIndexTracer {
 public:
     BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr);
 
-    ~BGMemIndexTracer();
+    ~BGMemIndexTracer() override;
 
     void TriggerDump(SharedPtr<DumpMemIndexTask> task) override;
 

@@ -338,9 +338,9 @@ TEST_P(TestTxnAppendConcurrent, test_append1) {
             status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            Value v1 = col.GetValue(0);
+            Value v1 = col.GetValueByIndex(0);
             EXPECT_EQ(v1, Value::MakeInt(1));
-            Value v2 = col.GetValue(1);
+            Value v2 = col.GetValueByIndex(1);
             EXPECT_EQ(v2, Value::MakeInt(2));
         }
 
@@ -351,9 +351,9 @@ TEST_P(TestTxnAppendConcurrent, test_append1) {
             status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
 
             EXPECT_TRUE(status.ok());
-            Value v1 = col.GetValue(0);
+            Value v1 = col.GetValueByIndex(0);
             EXPECT_EQ(v1, Value::MakeVarchar("abc"));
-            Value v2 = col.GetValue(1);
+            Value v2 = col.GetValueByIndex(1);
             EXPECT_EQ(v2, Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     }
@@ -535,12 +535,12 @@ TEST_P(TestTxnAppendConcurrent, test_append2) {
 
                 if (idx % 2 == 0) {
                     for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-                        Value v1 = col.GetValue(row_id);
+                        Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeInt(row_id));
                     }
                 } else {
                     for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-                        Value v1 = col.GetValue(row_id);
+                        Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeInt(2 * row_id));
                     }
                 }
@@ -555,12 +555,12 @@ TEST_P(TestTxnAppendConcurrent, test_append2) {
 
                 if (idx % 2 == 0) {
                     for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-                        Value v1 = col.GetValue(row_id);
+                        Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeVarchar(fmt::format("abc_{}", row_id)));
                     }
                 } else {
                     for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-                        Value v1 = col.GetValue(row_id);
+                        Value v1 = col.GetValueByIndex(row_id);
                         EXPECT_EQ(v1, Value::MakeVarchar(fmt::format("abcdefghijklmnopqrstuvwxyz_{}", row_id)));
                     }
                 }
@@ -1311,10 +1311,10 @@ TEST_P(TestTxnAppendConcurrent, test_append_append_concurrent) {
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
-                                EXPECT_EQ(col.GetValue(row_id), Value::MakeInt(row_id));
+                                EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeInt(row_id));
                             }
                             for (SizeT row_id = 4096; row_id < 8192; ++row_id) {
-                                EXPECT_EQ(col.GetValue(row_id), Value::MakeInt(row_id - 4096));
+                                EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeInt(row_id - 4096));
                             }
                         }
                         {
@@ -1326,10 +1326,10 @@ TEST_P(TestTxnAppendConcurrent, test_append_append_concurrent) {
                             EXPECT_TRUE(status.ok());
 
                             for (SizeT row_id = 0; row_id < 4096; ++row_id) {
-                                EXPECT_EQ(col.GetValue(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id)));
+                                EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id)));
                             }
                             for (SizeT row_id = 4096; row_id < 8192; ++row_id) {
-                                EXPECT_EQ(col.GetValue(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id - 4096)));
+                                EXPECT_EQ(col.GetValueByIndex(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id - 4096)));
                             }
                         }
                     }

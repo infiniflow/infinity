@@ -89,7 +89,7 @@ bool ArrayTryCastToArray::Run<ArrayT, ArrayT>(const ArrayT &source,
             CastParameters cast_parameters;
             cast_func.function(src_elem_column_vector, cast_elem_column_vector, job_size, cast_parameters);
             for (u64 i = 0; i < job_size; ++i) {
-                result_elements.emplace_back(cast_elem_column_vector->GetValue(i));
+                result_elements.emplace_back(cast_elem_column_vector->GetValueByIndex(i));
             }
             next_job_idx += job_size;
         }

@@ -62,7 +62,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -77,10 +77,10 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         String s = "hello" + std::to_string(i);
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -97,7 +97,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
@@ -118,7 +118,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -132,10 +132,10 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + std::to_string(i);
         column_vector.AppendByStringView(s);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
@@ -143,10 +143,10 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         String s = "hello" + std::to_string(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
         column_constant.Reset();
@@ -167,7 +167,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -183,14 +183,14 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         String s = "hello" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -212,7 +212,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -227,10 +227,10 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -249,7 +249,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -266,7 +266,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         String s = "hello" + std::to_string(2 * i);
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -287,7 +287,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -304,7 +304,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
         i64 src_idx = start_idx + i;
         String s = "hello" + std::to_string(src_idx);
 
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -322,7 +322,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -337,10 +337,10 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         String s = "hellohellohello" + std::to_string(i);
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -357,7 +357,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hellohellohello" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -378,7 +378,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -393,10 +393,10 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         String s = "hellohellohello" + std::to_string(i);
         column_vector.AppendByStringView(s);
 
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
@@ -404,10 +404,10 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         String s = "hellohellohello" + std::to_string(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
         column_constant.Reset();
@@ -424,7 +424,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -440,14 +440,14 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         String s = "hellohellohello" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -469,7 +469,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -484,10 +484,10 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -503,7 +503,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -518,10 +518,10 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
         String s = "Professional" + std::to_string(i);
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -538,7 +538,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "Professional" + std::to_string(i);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
     }
@@ -559,7 +559,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -574,20 +574,20 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
         String s = "Professional" + std::to_string(i);
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "Professional" + std::to_string(i);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
         column_constant.Reset();

@@ -272,7 +272,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(NewBuildFastRoughFilterArg &
         } else {
             for (SizeT block_off = 0; block_off < block_row_cnt; ++block_off) {
                 if constexpr (std::is_same_v<ValueType, VarcharT>) {
-                    Value val = column_vector.GetValue(block_off);
+                    Value val = column_vector.GetValueByIndex(block_off);
                     const String &str = val.GetVarchar();
                     input_data.push_back(ConvertValueToU64(str));
                 } else {
@@ -345,7 +345,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(NewBuildFastRoughFilterArg 
         for (auto block_off_opt = block_visitor.Next(); block_off_opt; block_off_opt = block_visitor.Next()) {
             BlockOffset block_off = *block_off_opt;
             if constexpr (std::is_same_v<ValueType, VarcharT>) {
-                Value val = column_vector.GetValue(block_off);
+                Value val = column_vector.GetValueByIndex(block_off);
                 const String &str = val.GetVarchar();
                 UpdateMin(block_min_value, str);
                 UpdateMax(block_max_value, str);
@@ -420,7 +420,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(NewBuildFastRoughFilter
         MinMaxInnerValueType block_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
         for (auto block_off_opt = block_visitor.Next(); block_off_opt; block_visitor.Next()) {
             BlockOffset block_off = *block_off_opt;
-            Value val = column_vector.GetValue(block_off);
+            Value val = column_vector.GetValueByIndex(block_off);
             if constexpr (std::is_same_v<ValueType, VarcharT>) {
                 const String &str = val.GetVarchar();
                 UpdateMin(block_min_value, str);

@@ -154,10 +154,10 @@ TEST_P(TestTxnImport, test_import1) {
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-                EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
             }
             {
                 SizeT column_idx = 1;
@@ -167,10 +167,10 @@ TEST_P(TestTxnImport, test_import1) {
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-                EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-                EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-                EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             }
         };
 
@@ -609,10 +609,10 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -622,10 +622,10 @@ TEST_P(TestTxnImport, test_import_drop_db) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 
@@ -1148,10 +1148,10 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -1161,10 +1161,10 @@ TEST_P(TestTxnImport, test_import_drop_table) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 
@@ -1743,10 +1743,10 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -1756,10 +1756,10 @@ TEST_P(TestTxnImport, test_import_add_columns) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 
@@ -2376,10 +2376,10 @@ TEST_P(TestTxnImport, test_import_drop_columns) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
     };
 
@@ -2978,10 +2978,10 @@ TEST_P(TestTxnImport, test_import) {
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-                EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
             }
             {
                 SizeT column_idx = 1;
@@ -2991,10 +2991,10 @@ TEST_P(TestTxnImport, test_import) {
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-                EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-                EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-                EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             }
         };
 
@@ -3088,10 +3088,10 @@ TEST_P(TestTxnImport, test_import_append_table) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -3101,10 +3101,10 @@ TEST_P(TestTxnImport, test_import_append_table) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 
@@ -3699,10 +3699,10 @@ TEST_P(TestTxnImport, test_import_import_table) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -3712,10 +3712,10 @@ TEST_P(TestTxnImport, test_import_import_table) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 
@@ -4542,10 +4542,10 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -4555,10 +4555,10 @@ TEST_P(TestTxnImport, test_import_and_create_index) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 
@@ -5162,10 +5162,10 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
         }
         {
             SizeT column_idx = 1;
@@ -5175,10 +5175,10 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
-            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
-            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     };
 

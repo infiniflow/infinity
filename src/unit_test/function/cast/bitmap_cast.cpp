@@ -103,7 +103,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
         }
         Value v = Value::MakeBitmap(bitmap);
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BitmapT bitmap;
@@ -115,7 +115,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
                 bitmap.SetBit(j, false);
             }
         }
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBitmap);
         EXPECT_EQ(vx.value_.bitmap, bitmap);
     }

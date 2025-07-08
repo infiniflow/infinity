@@ -114,7 +114,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     return ExportToFileInner(query_context, export_op_state, [this](const Vector<ColumnVector> &column_vectors, SizeT row_idx) {
         String line;
         for (SizeT select_column_idx = 0; select_column_idx < column_vectors.size(); ++select_column_idx) {
-            Value v = column_vectors[select_column_idx].GetValue(row_idx);
+            Value v = column_vectors[select_column_idx].GetValueByIndex(row_idx);
             switch (v.type().type()) {
                 case LogicalType::kArray:
                 case LogicalType::kEmbedding:
@@ -160,23 +160,23 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
             ColumnID select_column_idx = select_columns[block_column_idx];
             switch (select_column_idx) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
-                    Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
                     v.AppendToJson("_row_id", line_json);
                     break;
                 }
                 case COLUMN_IDENTIFIER_CREATE: {
-                    Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
                     v.AppendToJson("_create_timestamp", line_json);
                     break;
                 }
                 case COLUMN_IDENTIFIER_DELETE: {
-                    Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
                     v.AppendToJson("_delete_timestamp", line_json);
                     break;
                 }
                 default: {
                     ColumnDef *column_def = column_defs[select_column_idx].get();
-                    Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
                     v.AppendToJson(column_def->name(), line_json);
                 }
             }
@@ -463,7 +463,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
                     --offset;
                     continue;
                 }
-                Value v = exported_column_vector.GetValue(row_idx);
+                Value v = exported_column_vector.GetValueByIndex(row_idx);
                 append_line(v);
                 if (limit_ != 0 && row_count == limit_) {
                     goto new_label_return;
@@ -1099,7 +1099,7 @@ SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const Colum
     SharedPtr<arrow::ArrayBuilder> array_builder = GetArrowBuilder(*column_type);
 
     for (const auto idx : block_rows_for_output) {
-        auto value = column_vector.GetValue(idx);
+        auto value = column_vector.GetValueByIndex(idx);
         value.AppendToArrowArray(*column_type, array_builder.get());
     }
 

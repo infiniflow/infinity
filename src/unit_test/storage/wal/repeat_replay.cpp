@@ -150,7 +150,7 @@ TEST_P(RepeatReplayTest, append) {
                 EXPECT_TRUE(status.ok());
 
                 for (u32 i = 0; i < row_count; ++i) {
-                    EXPECT_EQ(col1.GetValue(i), v);
+                    EXPECT_EQ(col1.GetValueByIndex(i), v);
                 }
             };
 

@@ -1085,7 +1085,7 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
             evaluator.Init(nullptr);
             evaluator.Execute(cast_expr, expr_state, output_column_vector);
 
-            default_values.push_back(output_column_vector->GetValue(0));
+            default_values.push_back(output_column_vector->GetValueByIndex(0));
         }
     }
 

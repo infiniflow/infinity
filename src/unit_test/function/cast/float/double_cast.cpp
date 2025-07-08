@@ -263,10 +263,10 @@ TEST_F(DoubleCastTest, double_cast1) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i));
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i));
     }
@@ -284,7 +284,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         bool result = double2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_FALSE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
             i32 check_value = 0;
             if (i >= std::numeric_limits<i8>::min() && i <= std::numeric_limits<i8>::max()) {
@@ -307,7 +307,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         bool result = double2small_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
             i32 check_value = 0;
             if (i >= std::numeric_limits<i16>::min() && i <= std::numeric_limits<i16>::max()) {
@@ -330,7 +330,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         bool result = double2integer_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
             i32 check_value = static_cast<i32>(i);
             EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(check_value));
@@ -350,7 +350,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         bool result = double2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
             i32 check_value = static_cast<i32>(i);
             EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(check_value));
@@ -385,7 +385,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         bool result = double2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
             i32 check_value = static_cast<i32>(i);
             EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(check_value));
@@ -408,7 +408,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             f64 check_value = static_cast<f64>(i);
             String check_str(std::to_string(check_value));
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             const String &s2 = vx.GetVarchar();
             EXPECT_STREQ(s2.c_str(), check_str.c_str());
         }
