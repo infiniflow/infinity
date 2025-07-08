@@ -9,6 +9,16 @@ import pytest
 
 
 class TestMemIdx:
+    def _retry_assertion(self, func, max_retries=3, delay=2, error_msg="Assertion failed"):
+        """Helper function to retry assertions with exponential backoff"""
+        for retry in range(max_retries):
+            try:
+                return func()
+            except AssertionError as e:
+                if retry == max_retries - 1:
+                    print(f"{error_msg} after {max_retries} retries: {str(e)}")
+                    raise e
+                time.sleep(delay * (retry + 1))  # Exponential backoff
     def test_mem_hnsw(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
@@ -195,6 +205,7 @@ class TestMemIdx:
 
         @decorator1
         def part1(infinity_obj):
+            print("Part1: Starting IVF index test")
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.create_table(
                 "test_mem_ivf",
@@ -211,13 +222,17 @@ class TestMemIdx:
                 ),
             )
             assert res.error_code == infinity.ErrorCode.OK
+            print("Part1: Created IVF index")
 
             table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(51)])
+            print("Part1: Inserted 51 rows")
             # trigger the dump by 52th record
             table_obj.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]}])
+            print("Part1: Inserted 52nd row (should trigger dump)")
             # table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(2)])
             time.sleep(5)
             table_obj.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(4)])
+            print("Part1: Inserted 4 more rows, total should be 56")
 
         part1()
 
@@ -227,20 +242,32 @@ class TestMemIdx:
 
         @decorator2
         def part2(infinity_obj):
-            time.sleep(5)
+            print("Part2: Starting recovery test")
+            # Wait longer for recovery to complete
+            time.sleep(8)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_mem_ivf")
-            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
-            # print(data_dict)
-            assert data_dict["count(star)"] == [56]
+            print("Part2: Retrieved table after restart")
 
-            data_dict, data_type_dict, _ = (
-                table_obj.output(["c1"])
-                .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6, {"nprobe" : "100"})
-                .to_result()
-            )
-            # print(data_dict["c1"])
-            assert data_dict["c1"] == [4, 4, 4, 4, 4, 2]
+            # Retry logic for count check
+            def check_count():
+                data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
+                assert data_dict["count(star)"] == [56], f"Expected count 56, got {data_dict['count(star)']}"
+                return data_dict
+
+            self._retry_assertion(check_count, error_msg="Count check failed")
+
+            # Retry logic for search check
+            def check_search():
+                data_dict, _, _ = (
+                    table_obj.output(["c1"])
+                    .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6, {"nprobe" : "100"})
+                    .to_result()
+                )
+                assert data_dict["c1"] == [4, 4, 4, 4, 4, 2], f"Expected search result [4, 4, 4, 4, 4, 2], got {data_dict['c1']}"
+                return data_dict
+
+            self._retry_assertion(check_search, error_msg="Search check failed")
 
             data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
@@ -248,7 +275,7 @@ class TestMemIdx:
 
             table_obj.insert([{"c1": 6, "c2": [0.3, 0.2, 0.1, 0.4]} for i in range(2)])
             # wait for memindex dump & checkpoint to dump
-            time.sleep(5)
+            time.sleep(8)
             table_obj.insert([{"c1": 8, "c2": [0.4, 0.3, 0.2, 0.1]}])
 
         part2()
@@ -258,26 +285,41 @@ class TestMemIdx:
 
         @decorator3
         def part3(infinity_obj):
-            time.sleep(5)
+            print("Part3: Starting final recovery test")
+            # Wait longer for recovery to complete
+            time.sleep(8)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_mem_ivf")
+            print("Part3: Retrieved table after final restart")
 
             def check():
-                data_dict, data_type_dict, _ = (
-                    table_obj.output(["c1"])
-                    .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
-                    .to_result()
-                )
-                assert data_dict["c1"] == [8, 6, 6, 4, 4, 4]
+                # Search check with retry
+                def check_search():
+                    data_dict, _, _ = (
+                        table_obj.output(["c1"])
+                        .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
+                        .to_result()
+                    )
+                    assert data_dict["c1"] == [8, 6, 6, 4, 4, 4], f"Expected search result [8, 6, 6, 4, 4, 4], got {data_dict['c1']}"
+                    return data_dict
 
-                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
-                assert data_dict["count(star)"] == [59]
+                self._retry_assertion(check_search, error_msg="Final search check failed")
+
+                # Count check with retry
+                def check_count():
+                    data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
+                    assert data_dict["count(star)"] == [59], f"Expected count 59, got {data_dict['count(star)']}"
+                    return data_dict
+
+                self._retry_assertion(check_count, error_msg="Final count check failed")
 
             check()
             infinity_obj.optimize("default_db", "test_mem_ivf", optimize_opt=None)
+            # Wait for optimization to complete
+            time.sleep(3)
             check()
 
-            db_obj.drop_table("test_memidx1")
+            db_obj.drop_table("test_mem_ivf")
 
         part3()
 

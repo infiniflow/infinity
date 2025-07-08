@@ -132,7 +132,17 @@ void DumpIndexProcessor::DoDump(DumpMemIndexTask *dump_task) {
         if (!bg_task_info->task_info_list_.empty()) {
             new_txn_mgr->AddTaskInfo(bg_task_info);
         }
-    } while (!commit_status.ok() && rollback_status.ok() && (commit_status.code_ == ErrorCode::kTxnConflict || ++retry_count <= 3));
+    } while (!commit_status.ok() && rollback_status.ok() && (commit_status.code_ == ErrorCode::kTxnConflict) && ++retry_count <= 5);
+
+    if (!commit_status.ok()) {
+        LOG_ERROR(fmt::format("Failed to dump mem index {}.{}.{} in segment {} after {} retries: {}",
+                              db_name,
+                              table_name,
+                              index_name,
+                              segment_id,
+                              retry_count,
+                              commit_status.message()));
+    }
 }
 
 void DumpIndexProcessor::Process() {

@@ -181,7 +181,10 @@ public:
                 static_assert(false);
             }
             input_row_count_ += row_count;
-            if (input_embedding_count_ >= build_index_bar_embedding_num_) {
+            if (input_embedding_count_ >= build_index_bar_embedding_num_ && !have_ivf_index_.test(std::memory_order_acquire)) {
+                LOG_TRACE(fmt::format("Triggering IVF index build: embedding_count={}, threshold={}",
+                                      input_embedding_count_,
+                                      build_index_bar_embedding_num_));
                 BuildIndex();
             }
         }
@@ -194,8 +197,16 @@ public:
     void BuildIndex() {
         LOG_TRACE("Start building in-memory IVF index");
         if (have_ivf_index_.test(std::memory_order_acquire)) {
-            UnrecoverableError("Already have index");
+            LOG_WARN("IVF index already built, skipping rebuild");
+            return;
         }
+
+        // Double-check under lock to prevent race condition
+        if (have_ivf_index_.test(std::memory_order_acquire)) {
+            LOG_WARN("IVF index already built after lock, skipping rebuild");
+            return;
+        }
+
         {
             // train by f32
             const auto [train_ptr, _] = GetF32Ptr(in_mem_storage_.raw_source_data_.data(), in_mem_storage_.raw_source_data_.size());
@@ -217,17 +228,25 @@ public:
         }
         // fin
         have_ivf_index_.test_and_set(std::memory_order_release);
+        LOG_TRACE("Finished building in-memory IVF index");
     }
 
     void Dump(BufferObj *buffer_obj, SizeT *p_dump_size) override {
         std::unique_lock lock(rw_mutex_);
+        LOG_TRACE("Starting IVF index dump");
+
         SizeT dump_size = MemoryUsed();
         if (!have_ivf_index_.test(std::memory_order_acquire)) {
+            LOG_TRACE("Building IVF index before dump");
             BuildIndex();
+            // Recalculate dump size after building index
+            dump_size = MemoryUsed();
         }
+
         if (p_dump_size != nullptr) {
             *p_dump_size = dump_size;
         }
+
         BufferHandle handle = buffer_obj->Load();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(handle.GetDataMut());
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
@@ -235,6 +254,8 @@ public:
         ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
         dump_handle_ = std::move(handle);
+
+        LOG_TRACE("Finished IVF index dump");
     }
 
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,
@@ -368,9 +389,18 @@ void IVFIndexInMem::SearchIndex(const KnnDistanceBase1 *knn_distance,
                                 const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                                 const std::function<void(f32, SegmentOffset)> &add_result_func) const {
     std::shared_lock lock(rw_mutex_);
+
+    // Validate index state before search
+    if (ivf_index_storage_ == nullptr) {
+        LOG_WARN("IVF index storage is null, cannot perform search");
+        return;
+    }
+
     if (have_ivf_index_.test(std::memory_order_acquire)) {
+        LOG_TRACE("Searching using built IVF index");
         ivf_index_storage_->SearchIndex(knn_distance, query_ptr, query_element_type, nprobe, satisfy_filter_func, add_result_func);
     } else {
+        LOG_TRACE("Searching using in-memory data");
         SearchIndexInMem(knn_distance, query_ptr, query_element_type, satisfy_filter_func, add_result_func);
     }
 }

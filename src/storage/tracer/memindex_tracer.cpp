@@ -65,11 +65,18 @@ void MemIndexTracer::DumpDone(SharedPtr<MemIndex> mem_index) {
     std::lock_guard lck(mtx_);
     auto iter = proposed_dump_.find(mem_index);
     if (iter == proposed_dump_.end()) {
+        LOG_TRACE("DumpDone: Memory index not found in proposed dump map");
         return;
     }
     SizeT dump_size = iter->second;
-    proposed_dump_size_ -= dump_size;
+    if (proposed_dump_size_ >= dump_size) {
+        proposed_dump_size_ -= dump_size;
+    } else {
+        LOG_WARN(fmt::format("DumpDone: proposed_dump_size_ {} is less than dump_size {}", proposed_dump_size_, dump_size));
+        proposed_dump_size_ = 0;
+    }
     proposed_dump_.erase(iter);
+    LOG_TRACE(fmt::format("DumpDone: Removed dump task, remaining proposed_dump_size_: {}", proposed_dump_size_));
 }
 
 Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {

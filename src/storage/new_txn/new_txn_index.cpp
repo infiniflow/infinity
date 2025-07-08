@@ -1883,6 +1883,13 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
             return status;
         }
     }
+
+    // Log completion of memory index recovery
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (index_status.ok()) {
+        LOG_INFO(fmt::format("Completed memory index recovery for index: {}", *index_base->index_name_));
+    }
+
     return Status::OK();
 }
 
