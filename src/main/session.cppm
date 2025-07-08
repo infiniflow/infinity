@@ -37,6 +37,8 @@ public:
     BaseSession(u64 session_id, SessionType session_type)
         : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type), session_id_(session_id) {}
 
+    virtual ~BaseSession() = default;
+
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
@@ -86,7 +88,7 @@ public:
 #endif
     }
 
-    ~LocalSession() {
+    ~LocalSession() override {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("LocalSession");
 #endif
@@ -102,7 +104,7 @@ public:
 #endif
     }
 
-    ~RemoteSession() {
+    ~RemoteSession() override {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("RemoteSession");
 #endif
