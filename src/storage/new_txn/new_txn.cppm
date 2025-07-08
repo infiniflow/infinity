@@ -94,6 +94,7 @@ struct DeleteTxnStore;
 struct DropTableTxnStore;
 struct RenameTableTxnStore;
 struct RestoreTableTxnStore;
+struct RestoreDatabaseTxnStore;
 struct UpdateTxnStore;
 class BufferManager;
 class IndexBase;
@@ -584,6 +585,8 @@ private:
     bool CheckConflictTxnStore(const DropTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     bool IsReplay() const;
@@ -621,6 +624,7 @@ public:
                                              const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
                                              const String &snapshot_name,
                                              RestoreTableTxnStore *txn_store);
+    Status RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta);
 
 
 

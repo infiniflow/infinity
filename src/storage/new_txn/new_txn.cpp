@@ -1547,6 +1547,7 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
 }
 
 Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info) {
+    Cleanup();
     this->SetTxnType(TransactionType::kRestoreDatabase);
     const String &db_name = database_snapshot_info->db_name_;
 
@@ -1561,7 +1562,7 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     }
 
     String db_id_str;
-     status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+    status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1570,7 +1571,7 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->db_id_str_ = db_id_str;
-    
+    txn_store->db_comment_ = database_snapshot_info->db_comment_;
     // Copy database snapshot files
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     String snapshot_name = database_snapshot_info->snapshot_name_;
@@ -2483,8 +2484,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
 }
 
 Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
 
     const String &db_name = restore_table_snapshot_cmd->db_name_;
 
@@ -2496,8 +2496,20 @@ Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapsho
         return status;
     }
 
+    status = RestoreTableFromSnapshot(restore_table_snapshot_cmd, *db_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    Status status;  
     Optional<TableMeeta> table_meta;
-    status = NewCatalog::AddNewTable(*db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
+    status = NewCatalog::AddNewTable(db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
     // table with the same name already exists
     if (!status.ok()) {
         return status;
@@ -2514,40 +2526,9 @@ Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapsho
         return status;
     }
 
-
-    
-    // const String &db_id_str = restore_table_snapshot_cmd->db_id_;
-    // const String &table_id_str = restore_table_snapshot_cmd->table_id_;
-    
-    // for (const WalSegmentInfoV2 &segment_info : restore_table_snapshot_cmd->segment_infos_) {
-    //     SegmentMeta segment_meta(segment_info.segment_id_, *table_meta);
-
-    //     status = table_meta->CommitSegment(segment_info.segment_id_, commit_ts);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    //     for (const BlockID &block_id : segment_info.block_ids_) {
-    //         status = segment_meta.CommitBlock(block_id, commit_ts);
-    //         if (!status.ok()) {
-    //             return status;
-    //         }
-    //     }
-
-    //     // Convert WalSegmentInfoV2 to WalSegmentInfo for CommitSegmentVersion
-    //     WalSegmentInfo wal_segment_info;
-    //     wal_segment_info.segment_id_ = segment_info.segment_id_;
-    //     // Note: WalSegmentInfoV2 doesn't have block_infos_, so we can't populate them
-    //     // This might need to be handled differently depending on the requirements
-        
-    //     status = this->CommitSegmentVersion(wal_segment_info, segment_meta);
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-
-    //     // BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
-    // }
-
     return Status::OK();
+    
+    
 }
 
 Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd) {
@@ -2559,7 +2540,12 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
     if (!status.ok()) {
         return status;
     }
-    // Get database ID
+    for (const auto &restore_table_snapshot_cmd : restore_database_snapshot_cmd->restore_table_wal_cmds_) {
+        status = RestoreTableFromSnapshot(&restore_table_snapshot_cmd, *db_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -2699,6 +2685,12 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kUpdate: {
             return CheckConflictTxnStore(static_cast<const UpdateTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kRestoreTable: {
+            return CheckConflictTxnStore(static_cast<const RestoreTableTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
+        case TransactionType::kRestoreDatabase: {
+            return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         case TransactionType::kNewCheckpoint:
         default: {
             return false;
@@ -2824,6 +2816,45 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
             }
             break;
         }
+        case TransactionType::kRestoreDatabase: {
+            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            if (restore_database_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateDB: {
+            CreateDBTxnStore *create_db_txn_store = static_cast<CreateDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kRestoreDatabase: {
+            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(previous_txn->base_txn_store_.get());
+            if (restore_database_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
         default: {
         }
     }
@@ -2933,6 +2964,62 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
             if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        default: {
+        }
+    }
+
+    if (conflict) {
+        cause = fmt::format("{} vs. {}", previous_txn->base_txn_store_->ToString(), txn_store.ToString());
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
+    const String &db_name = txn_store.db_name_;
+    const String &table_name = txn_store.table_name_;
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kCreateTable: {
+            CreateTableTxnStore *create_table_txn_store = static_cast<CreateTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (create_table_txn_store->db_name_ == db_name && create_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kRenameTable: {
+            RenameTableTxnStore *rename_table_txn_store = static_cast<RenameTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (rename_table_txn_store->db_name_ == db_name && rename_table_txn_store->new_table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kDropDB: {
+            DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
+            if (drop_db_txn_store->db_name_ == db_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
                 retry_query = false;
                 conflict = true;
             }
@@ -4315,6 +4402,14 @@ bool NewTxn::CheckConflictTxnStore(const RenameTableTxnStore &txn_store, NewTxn 
             }
             break;
         }
+        case TransactionType::kRestoreTable: {
+            RestoreTableTxnStore *restore_table_txn_store = static_cast<RestoreTableTxnStore *>(previous_txn->base_txn_store_.get());
+            if (restore_table_txn_store->db_name_ == db_name && restore_table_txn_store->table_name_ == table_name) {
+                retry_query = false;
+                conflict = true;
+            }
+            break;
+        }
         default: {
         }
     }
@@ -4829,6 +4924,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             // }
             
             // for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                
             //     for (const auto &segment_index_info : index_cmd.segment_index_infos_) {
             //         metas.emplace_back(MakeUnique<SegmentIndexMetaKey>(restore_table_txn_store->db_id_str_, 
             //                                                            restore_table_txn_store->table_id_str_, 
@@ -4849,6 +4945,23 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             //     LOG_WARN(fmt::format("Failed to cleanup metadata during restore table rollback: {}", cleanup_status.message()));
             // }
             
+            break;
+        }
+        case TransactionType::kRestoreDatabase: {
+            Config *config = InfinityContext::instance().config();
+            String data_dir = config->DataDir();
+            RestoreDatabaseTxnStore *restore_database_txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
+            // Remove the database directory
+            String db_dir = fmt::format("{}/db_{}", 
+                                          data_dir, 
+                                          restore_database_txn_store->db_id_str_);
+            
+            if (VirtualStore::Exists(db_dir)) {
+                Status remove_status = VirtualStore::RemoveDirectory(db_dir);
+                if (!remove_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to remove database directory during rollback: {}", db_dir));
+                }
+            }
             break;
         }
         default: {

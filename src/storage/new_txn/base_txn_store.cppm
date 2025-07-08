@@ -146,6 +146,7 @@ export struct RestoreDatabaseTxnStore : public BaseTxnStore {
 
     String db_name_{};
     String db_id_str_{};
+    String db_comment_{};
     Vector<SharedPtr<RestoreTableTxnStore>> restore_table_txn_stores_{};
 
     String ToString() const final;

@@ -190,16 +190,17 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(const nloh
     return table_index_snapshot;
 }
 
-Status TableSnapshotInfo::Serialize(const String &save_dir, TxnTimeStamp commit_ts) {
+Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id) {
 
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
+    LOG_INFO(fmt::format("Serialize snapshot at {} with txn_id {}", snapshot_name_, txn_id));
     // Create temporary directory for atomic operation
     String temp_snapshot_dir = fmt::format("{}/temp_{}_{}", 
                                           save_dir, 
                                           snapshot_name_, 
-                                          commit_ts);
+                                          txn_id);
     
     // Create temporary directory
     Status create_temp_status = VirtualStore::MakeDirectory(temp_snapshot_dir);

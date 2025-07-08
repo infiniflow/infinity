@@ -107,13 +107,25 @@ String RestoreDatabaseTxnStore::ToString() const { return fmt::format("{}: datab
 
 SharedPtr<WalEntry> RestoreDatabaseTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
-    // wal_entry->commit_ts_ = commit_ts;
-    // Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
-    // for (const auto &restore_table_txn_store : restore_table_txn_stores_) {
-    //     restore_table_wal_cmds.push_back(restore_table_txn_store->ToWalEntry(commit_ts));   
-    // }
-    // SharedPtr<WalCmd> wal_command = MakeShared<WalCmdRestoreDatabaseSnapshot>(db_name_, db_id_str_, restore_table_wal_cmds);
-    // wal_entry->cmds_.push_back(wal_command);
+    wal_entry->commit_ts_ = commit_ts;
+    Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
+    for (const auto &restore_table_txn_store : restore_table_txn_stores_) {
+        // Create WalCmdRestoreTableSnapshot directly from the stored data
+        WalCmdRestoreTableSnapshot restore_table_cmd(
+            restore_table_txn_store->db_name_,
+            restore_table_txn_store->db_id_str_,
+            restore_table_txn_store->table_name_,
+            restore_table_txn_store->table_id_str_,
+            restore_table_txn_store->snapshot_name_,
+            restore_table_txn_store->table_def_,
+            restore_table_txn_store->segment_infos_,
+            restore_table_txn_store->index_cmds_,
+            restore_table_txn_store->files_
+        );
+        restore_table_wal_cmds.push_back(restore_table_cmd);
+    }
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdRestoreDatabaseSnapshot>(db_name_, db_id_str_, db_comment_, restore_table_wal_cmds);
+    wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
 

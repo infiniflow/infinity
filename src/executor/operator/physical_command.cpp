@@ -445,22 +445,42 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
             const String &snapshot_name = snapshot_cmd->name();
 
-            auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
+            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
 
-            new_txn_mgr->PrintAllKeyValue();
+            // new_txn_mgr->PrintAllKeyValue();
 
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {
                     LOG_INFO(fmt::format("Execute snapshot create"));
 
                     // TODO: do we need a new checkpoint in case the last one just create the table
-                    // Get WAL manager and check if checkpoint is already in progress
+                    // // Get WAL manager and check if checkpoint is already in progress
+                    // auto *wal_manager = query_context->storage()->wal_manager();
+                    // if (wal_manager->IsCheckpointing()) {
+                    //     LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
+                    //     Status status = Status::Checkpointing();
+                    //     RecoverableError(status);
+                    // } else {
+                    //     // Get current commit state
+                    //     TxnTimeStamp max_commit_ts{};
+                    //     i64 wal_size{};
+                    //     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                    //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+
+                    //     // Create and configure checkpoint task
+                    //     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                    //     checkpoint_task->ExecuteWithNewTxn();
+                    // }
+
+                    // check the current ckp_ts
                     auto *wal_manager = query_context->storage()->wal_manager();
-                    if (wal_manager->IsCheckpointing()) {
-                        LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
-                        Status status = Status::Checkpointing();
-                        RecoverableError(status);
+                    auto *new_txn = query_context->GetNewTxn();
+                    TxnTimeStamp ckp_ts = wal_manager->LastCheckpointTS();
+                    TxnTimeStamp begin_ts = new_txn->BeginTS();
+                    if (ckp_ts > begin_ts) {
+                        LOG_INFO(fmt::format("Newer data areflushed skip checkpoint directly take snapshot"));
                     } else {
+                        LOG_INFO(fmt::format("Older data are not flushed, create a new checkpoint"));
                         // Get current commit state
                         TxnTimeStamp max_commit_ts{};
                         i64 wal_size{};
@@ -469,12 +489,15 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
                         // Create and configure checkpoint task
                         auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-                        NewTxn *new_txn = query_context->GetNewTxn();
-                        checkpoint_task->new_txn_ = new_txn;
-                        checkpoint_task->ExecuteWithNewTxn();
+                        // Submit to background processor
+                        auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+                        bg_processor->Submit(checkpoint_task);
                     }
 
-
+                    // wait for checkpoint to complete
+                    while (wal_manager->LastCheckpointTS() < begin_ts) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    }
 
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {

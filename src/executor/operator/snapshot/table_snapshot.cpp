@@ -34,7 +34,6 @@ namespace infinity {
 
 Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
     auto *txn_ptr = query_context->GetNewTxn();
-    auto *txn_mgr = txn_ptr->txn_mgr();
     const String &db_name = query_context->schema_name();
 
     SharedPtr<TableSnapshotInfo> table_snapshot;
@@ -45,7 +44,7 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     }
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
-    status = table_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
+    status = table_snapshot->Serialize(snapshot_dir, txn_ptr->TxnID());
     if (!status.ok()) {
         return status;
     }

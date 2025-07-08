@@ -936,13 +936,16 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             break;
         }
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
-            // String db_name = ReadBufAdv<String>(ptr);
-            // i32 restore_table_n = ReadBufAdv<i32>(ptr);
-            // Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
-            // for (i32 i = 0; i < restore_table_n; ++i) {
-            //     restore_table_wal_cmds.push_back(WalCmdRestoreTableSnapshot::ReadBufferAdv(ptr, max_bytes));
-            // }
-            // cmd = MakeShared<WalCmdRestoreDatabaseSnapshot>(db_name, restore_table_wal_cmds);
+            String db_name = ReadBufAdv<String>(ptr);
+            String db_id = ReadBufAdv<String>(ptr);
+            String db_comment = ReadBufAdv<String>(ptr);
+            i32 restore_table_n = ReadBufAdv<i32>(ptr);
+            Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds;
+            for (i32 i = 0; i < restore_table_n; ++i) {
+                ReadBufAdv<WalCommandType>(ptr);
+                restore_table_wal_cmds.push_back(WalCmdRestoreTableSnapshot::ReadBufferAdv(ptr, max_bytes));
+            }
+            cmd = MakeShared<WalCmdRestoreDatabaseSnapshot>(db_name, db_id, db_comment, restore_table_wal_cmds);
             break;
         }
         default: {
@@ -978,27 +981,33 @@ WalCmdCreateIndexV2 WalCmdCreateIndexV2::ReadBufferAdv(const char *&ptr, i32 max
     return cmd;
 }
 
-// WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
-//     String db_name = ReadBufAdv<String>(ptr);
-//     String db_id = ReadBufAdv<String>(ptr);
-//     String table_name = ReadBufAdv<String>(ptr);
-//     String table_id = ReadBufAdv<String>(ptr);
-//     SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, max_bytes);
-//     i32 segment_info_n = ReadBufAdv<i32>(ptr);
-//     Vector<WalSegmentInfoV2> segment_infos;
-//     for (i32 i = 0; i < segment_info_n; ++i) {
-//         segment_infos.push_back(WalSegmentInfoV2::ReadBufferAdv(ptr));
-//     }
-//     i32 index_info_n = ReadBufAdv<i32>(ptr);
-//     Vector<WalCmdCreateIndexV2> index_cmds;
-//     for (i32 i = 0; i < index_info_n; ++i) {
-//         //read in the command type
-//         ReadBufAdv<WalCommandType>(ptr);
-//         index_cmds.push_back(WalCmdCreateIndexV2::ReadBufferAdv(ptr, max_bytes));
-//     }
-//     cmd = MakeShared<WalCmdRestoreTableSnapshot>(db_name, db_id, table_name, table_id, table_def, segment_infos, index_cmds);
-//     return cmd;
-// }
+WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char *&ptr, i32 max_bytes) {
+    const char *const ptr_end = ptr + max_bytes;
+    String db_name = ReadBufAdv<String>(ptr);
+    String db_id = ReadBufAdv<String>(ptr);
+    String table_name = ReadBufAdv<String>(ptr);
+    String table_id = ReadBufAdv<String>(ptr);
+    String snapshot_name = ReadBufAdv<String>(ptr);
+    SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
+    i32 segment_info_n = ReadBufAdv<i32>(ptr);
+    Vector<WalSegmentInfoV2> segment_infos;
+    for (i32 i = 0; i < segment_info_n; ++i) {
+        segment_infos.push_back(WalSegmentInfoV2::ReadBufferAdv(ptr));
+    }
+    i32 index_info_n = ReadBufAdv<i32>(ptr);
+    Vector<WalCmdCreateIndexV2> index_cmds;
+    for (i32 i = 0; i < index_info_n; ++i) {
+        //read in the command type
+        ReadBufAdv<WalCommandType>(ptr);
+        index_cmds.push_back(WalCmdCreateIndexV2::ReadBufferAdv(ptr, max_bytes));
+    }
+    i32 files_n = ReadBufAdv<i32>(ptr);
+    Vector<String> files;
+    for (i32 i = 0; i < files_n; ++i) {
+        files.push_back(ReadBufAdv<String>(ptr));
+    }
+    return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
+}
 
 bool WalCmdCreateDatabase::operator==(const WalCmd &other) const {
     const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
@@ -3192,6 +3201,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::RESTORE_TABLE_SNAPSHOT:
             command = "RESTORE_TABLE_SNAPSHOT";
+            break;
+        case WalCommandType::RESTORE_DATABASE_SNAPSHOT:
+            command = "RESTORE_DATABASE_SNAPSHOT";
             break;
         default: {
             String error_message = "Unknown command type";

@@ -457,6 +457,22 @@ void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
             }
             break;
         }
+        case TransactionType::kRestoreDatabase: {
+            BaseTxnStore *base_txn_store = txn->GetTxnStore();
+            if (base_txn_store != nullptr) {
+                RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store);
+                u64 db_id = std::stoull(txn_store->db_id_str_);
+                system_cache_->AddNewDbCache(txn_store->db_name_, db_id);
+                for (const auto &restore_table_txn_store : txn_store->restore_table_txn_stores_) {
+                    system_cache_->AddNewTableCache(db_id,restore_table_txn_store->table_id_, restore_table_txn_store->table_name_);
+                    system_cache_->ApplySegmentIDs(db_id, restore_table_txn_store->table_id_, restore_table_txn_store->segment_infos_.size());
+                    for (const auto &index_cmd : restore_table_txn_store->index_cmds_) {
+                        system_cache_->AddNewIndexCache(db_id, restore_table_txn_store->table_id_, index_cmd.index_id_);
+                    }
+                }
+            }
+            break;
+        }
         case TransactionType::kDropTable: {
             BaseTxnStore *base_txn_store = txn->GetTxnStore();
             // base_txn_store means the drop with ignore
