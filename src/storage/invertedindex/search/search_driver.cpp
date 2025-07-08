@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
 #include <cassert>
 #include <iostream>
 #include <sstream>
 #include <utility>
+#include <map>
 
-#include "search_driver.h"
+// #include "search_driver.h"
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
@@ -30,7 +32,7 @@
 // import :third_party;
 // import :analyzer;
 // import :analyzer_pool;
-import infinity_core;
+module infinity_core;
 
 namespace infinity {
 
@@ -67,8 +69,8 @@ void ParseFields(const std::string &fields_str, std::vector<std::pair<std::strin
     }
 }
 
-std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string &fields_str, const std::string &query) const {
-    std::unique_ptr<QueryNode> parsed_query_tree;
+UniquePtr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string &fields_str, const std::string &query) const {
+    UniquePtr<QueryNode> parsed_query_tree;
     std::vector<std::pair<std::string, float>> fields;
     ParseFields(fields_str, fields);
     if (fields.empty()) {
@@ -79,7 +81,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
             parsed_query_tree->MultiplyWeight(fields[0].second);
         }
     } else {
-        std::vector<std::unique_ptr<QueryNode>> or_children;
+        std::vector<UniquePtr<QueryNode>> or_children;
         for (auto &[default_field, boost] : fields) {
             if (auto sub_result = ParseSingle(query, &default_field)) {
                 sub_result->MultiplyWeight(boost);
@@ -154,7 +156,7 @@ inline std::string GetAnalyzerName(const std::string &field, const std::map<std:
 
 inline static const auto keyword_analyzer_name_int = AnalyzerPool::AnalyzerNameToInt(AnalyzerPool::KEYWORD.data());
 
-std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, const std::string *default_field_ptr) const {
+UniquePtr<QueryNode> SearchDriver::ParseSingle(const std::string &query, const std::string *default_field_ptr) const {
     std::istringstream iss(query);
     if (!iss.good()) {
         return nullptr;
@@ -167,7 +169,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     if (const auto default_analyzer_name_int = AnalyzerPool::AnalyzerNameToInt(default_analyzer_name.c_str());
         default_analyzer_name_int != keyword_analyzer_name_int && operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax) {
         // use parser
-        std::unique_ptr<QueryNode> result;
+        UniquePtr<QueryNode> result;
         const auto scanner = std::make_unique<SearchScannerInfinitySyntax>(&iss);
         const auto parser = std::make_unique<SearchParser>(*scanner, *this, *default_field_ptr, result);
         if (constexpr int accept = 0; parser->parse() != accept) {
@@ -190,7 +192,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
             q->column_ = default_field;
             return q;
         }
-        std::unique_ptr<MultiQueryNode> multi_query;
+        UniquePtr<MultiQueryNode> multi_query;
         if (default_analyzer_name_int == keyword_analyzer_name_int) {
             multi_query = std::make_unique<KeywordQueryNode>();
         } else if (operator_option_ == FulltextQueryOperatorOption::kOr) {
@@ -208,7 +210,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     }
 }
 
-std::unique_ptr<QueryNode>
+UniquePtr<QueryNode>
 SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::string &text, const bool from_quoted, const unsigned long slop) const {
     assert(operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
     if (text.empty()) {

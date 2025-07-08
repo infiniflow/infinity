@@ -24,6 +24,7 @@ import :infinity_exception;
 import :column_binding;
 import :logger;
 import show_statement;
+import data_type;
 
 namespace infinity {
 

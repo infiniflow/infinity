@@ -23,6 +23,7 @@ import :expression_type;
 import :infinity_exception;
 import :logger;
 import :case_expression;
+import data_type;
 
 namespace infinity {
 

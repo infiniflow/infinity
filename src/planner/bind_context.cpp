@@ -35,6 +35,7 @@ import global_resource_usage;
 import :meta_info;
 import parsed_expr;
 import search_expr;
+import data_type;
 
 namespace infinity {
 

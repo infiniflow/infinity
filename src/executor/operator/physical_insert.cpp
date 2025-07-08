@@ -42,6 +42,7 @@ import :infinity_context;
 
 import column_def;
 import :new_txn;
+import data_type;
 
 namespace infinity {
 

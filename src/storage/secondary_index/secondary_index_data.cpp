@@ -34,6 +34,7 @@ import :buffer_obj;
 import :table_index_meeta;
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

@@ -27,6 +27,7 @@ import sql_parser;
 import admin_statement;
 import show_statement;
 import parser_assert;
+import global_resource_usage;
 
 namespace infinity {
 

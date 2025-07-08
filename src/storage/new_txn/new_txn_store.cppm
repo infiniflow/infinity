@@ -24,13 +24,13 @@ import :index_base;
 import extra_ddl_info;
 import :third_party;
 import :meta_key;
+import command_statement;
 
 namespace infinity {
 
 export class NewTxn;
 class BGTaskProcessor;
 struct DataBlock;
-enum class CompactStatementType;
 class BufferManager;
 
 class KVInstance;

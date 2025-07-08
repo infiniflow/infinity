@@ -26,6 +26,7 @@ import :logical_node;
 import :base_expression;
 import internal_types;
 import select_statement;
+import data_type;
 
 namespace infinity {
 

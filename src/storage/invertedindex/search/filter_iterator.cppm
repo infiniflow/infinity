@@ -15,6 +15,7 @@
 module;
 
 export module infinity_core:filter_iterator;
+
 import :stl;
 import :doc_iterator;
 import :query_node;
@@ -26,8 +27,28 @@ import :roaring_bitmap;
 import :column_index_reader;
 
 namespace infinity {
+// struct BM25Params;
+// enum class FulltextSimilarity;
 
 export class FilterIterator final : public DocIterator {
+
+    struct CreateSearchParams {
+        const TableInfo *table_info;
+        const IndexReader *index_reader;
+        EarlyTermAlgo early_term_algo;
+        FulltextSimilarity ft_similarity;
+        const BM25Params &bm25_params;
+        u32 minimum_should_match;
+        u32 topn;
+        const Vector<String> &index_names_;
+
+        [[nodiscard]] CreateSearchParams RemoveMSM() const {
+            CreateSearchParams copy_value = *this;
+            copy_value.minimum_should_match = 0;
+            return copy_value;
+        }
+    };
+
 public:
     explicit FilterIterator(CommonQueryFilter *common_query_filter, UniquePtr<DocIterator> &&query_iterator)
         : common_query_filter_(common_query_filter), query_iterator_(std::move(query_iterator)) {}

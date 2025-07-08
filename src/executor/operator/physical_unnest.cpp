@@ -40,6 +40,7 @@ import :status;
 import :unnest_expression;
 import :reference_expression;
 import :expression_type;
+import data_type;
 
 namespace infinity {
 

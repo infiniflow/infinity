@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "File: " << groundtruth_path << " doesn't exist" << std::endl;
         exit(-1);
     }
-    std::unique_ptr<float[]> queries_ptr;
+    UniquePtr<float[]> queries_ptr;
     size_t query_count;
     {
         int dim = -1;
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
     auto queries = queries_ptr.get();
     std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
     {
-        std::unique_ptr<int[]> gt;
+        UniquePtr<int[]> gt;
         size_t gt_count;
         int gt_top_k;
         {

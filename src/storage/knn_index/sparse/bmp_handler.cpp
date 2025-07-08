@@ -27,6 +27,7 @@ import :local_file_handle;
 import :chunk_index_meta;
 import sparse_info;
 import embedding_type;
+import column_def;
 
 namespace infinity {
 

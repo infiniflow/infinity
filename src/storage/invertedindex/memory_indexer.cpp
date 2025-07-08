@@ -67,6 +67,7 @@ import :virtual_store;
 import :local_file_handle;
 import :mem_usage_change;
 import :bg_task;
+import row_id;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length

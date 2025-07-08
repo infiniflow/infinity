@@ -26,7 +26,7 @@ namespace infinity {
 class KVInstance;
 // class ColumnDef;
 class TableMeeta;
-class SegmentInfo;
+export struct SegmentInfo;
 class FastRoughFilter;
 
 export enum class SegmentStatus : u8 {

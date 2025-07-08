@@ -40,6 +40,8 @@ import :status;
 import :new_catalog;
 import :new_txn;
 import :segment_meta;
+import data_type;
+import row_id;
 
 namespace infinity {
 

@@ -83,11 +83,12 @@ import :new_catalog;
 import :index_base;
 import :column_meta;
 import :mem_index;
+import data_type;
 
 namespace infinity {
 
 using AlignedMatchTensorExprHolderT =
-    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, std::unique_ptr<MatchTensorExpression>>;
+    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, UniquePtr<MatchTensorExpression>>;
 
 AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr, EmbeddingDataType column_embedding_type);
 

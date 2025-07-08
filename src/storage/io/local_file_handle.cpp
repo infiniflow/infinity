@@ -27,6 +27,7 @@ import :status;
 import :virtual_store;
 import :infinity_exception;
 import :logger;
+import global_resource_usage;
 
 namespace infinity {
 

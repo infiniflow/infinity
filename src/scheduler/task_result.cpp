@@ -18,6 +18,7 @@ module infinity_core;
 
 import :stl;
 import :data_block;
+import data_type;
 
 namespace infinity {
 

@@ -28,6 +28,8 @@ import :table_def;
 import :value;
 import :logger;
 import column_def;
+import row_id;
+import data_type;
 
 namespace infinity {
 

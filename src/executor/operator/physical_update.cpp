@@ -42,6 +42,7 @@ import :infinity_context;
 import :status;
 import :new_txn;
 import :txn_state;
+import data_type;
 
 namespace infinity {
 

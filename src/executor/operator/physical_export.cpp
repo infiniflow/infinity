@@ -51,6 +51,7 @@ import :block_meta;
 import :column_meta;
 import :new_catalog;
 import :roaring_bitmap;
+import data_type;
 
 namespace infinity {
 

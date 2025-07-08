@@ -1202,7 +1202,7 @@ public:
                                 insert_one_row->values_.emplace_back(std::move(const_expr));
                                 break;
                             }
-                            std::unique_ptr<ConstantExpr> const_sparse_expr = {};
+                            UniquePtr<ConstantExpr> const_sparse_expr = {};
                             if (value.size() == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                                 json_response["error_message"] = fmt::format("Empty sparse vector, cannot decide type");

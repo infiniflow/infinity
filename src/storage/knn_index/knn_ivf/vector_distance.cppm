@@ -28,7 +28,7 @@ DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
     } else {
         DiffType distance{};
         for (u32 i = 0; i < dimension; ++i) {
-            auto diff = (DiffType)(vector1[i] - vector2[i]);
+            auto diff = static_cast<DiffType>(vector1[i] - vector2[i]);
             distance += diff * diff;
         }
         return distance;

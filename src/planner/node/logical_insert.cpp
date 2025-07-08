@@ -22,6 +22,7 @@ import :stl;
 import :column_binding;
 import internal_types;
 import :logical_insert;
+import data_type;
 
 namespace infinity {
 

@@ -22,6 +22,7 @@ import :stl;
 import :third_party;
 import :infinity_exception;
 import :kv_code;
+import column_def;
 
 namespace infinity {
 

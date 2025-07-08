@@ -38,6 +38,7 @@ import :knn_result_handler;
 import :merge_knn;
 import :match_sparse_scan_function_data;
 import :result_cache_manager;
+import data_type;
 
 namespace infinity {
 

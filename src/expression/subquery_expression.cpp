@@ -24,6 +24,7 @@ import :expression_type;
 import subquery_expr;
 
 import logical_type;
+import data_type;
 
 namespace infinity {
 

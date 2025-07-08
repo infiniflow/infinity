@@ -19,6 +19,7 @@ module;
 module infinity_core;
 
 import admin_statement;
+import global_resource_usage;
 
 namespace infinity {
 

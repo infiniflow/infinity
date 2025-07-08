@@ -600,7 +600,7 @@ InsertRowExpr *WrapInsertRowExpr::GetInsertRowExpr(Status &status) {
     insert_row_expr->columns_ = std::move(columns);
     insert_row_expr->values_.reserve(values.size());
     for (auto &value : values) {
-        auto parsed_value_expr = std::unique_ptr<ParsedExpr>(value.GetParsedExpr(status));
+        auto parsed_value_expr = UniquePtr<ParsedExpr>(value.GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             return nullptr;
         }
@@ -968,7 +968,7 @@ WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const Stri
     insert_rows_ptr->reserve(insert_rows.size());
     for (auto &row_expr : insert_rows) {
         Status status;
-        auto row_expr_ptr = std::unique_ptr<InsertRowExpr>(row_expr.GetInsertRowExpr(status));
+        auto row_expr_ptr = UniquePtr<InsertRowExpr>(row_expr.GetInsertRowExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             return WrapQueryResult(status.code_, status.msg_->c_str());
         }

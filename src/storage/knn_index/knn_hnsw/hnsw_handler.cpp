@@ -20,6 +20,8 @@ import :local_file_handle;
 import :chunk_index_meta;
 import embedding_info;
 import embedding_type;
+import column_def;
+import row_id;
 
 namespace infinity {
 

@@ -553,7 +553,8 @@ static const flex_int16_t yy_rule_linenum[20] =
 
 /* Implementation of yyFlexScanner */
 #define SearchScannerDerived SearchScannerInfinitySyntax
-#include "search_scanner_derived.h"
+// #include "search_scanner_derived.h"
+import search_scanner_derived;
 #undef SearchScannerDerived
 #undef  YY_DECL
 #define YY_DECL int infinity::SearchScannerInfinitySyntax::yylex(infinity::SearchParser::semantic_type * const lval, infinity::SearchParser::location_type *loc)

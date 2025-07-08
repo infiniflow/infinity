@@ -27,6 +27,7 @@ import :column_expression;
 import :unnest_expression;
 import :reference_expression;
 import :column_expression;
+import data_type;
 
 namespace infinity {
 

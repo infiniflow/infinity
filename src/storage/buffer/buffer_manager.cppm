@@ -27,7 +27,7 @@ class BufferObj;
 class BufferObjectInfo;
 class KVInstance;
 class PersistenceManager;
-class ObjAddr;
+struct ObjAddr;
 class Status;
 
 class LRUCache {

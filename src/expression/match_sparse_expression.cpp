@@ -36,6 +36,7 @@ import sparse_info;
 import :value_expression;
 import match_sparse_expr;
 import statement_common;
+import data_type;
 
 namespace infinity {
 

@@ -56,7 +56,7 @@ public:
     }
 
     PqFlashIndex(This &&other)
-        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_), reader_(other.reader_) {
+        : data_dim_(other.data_dim_), num_points_(other.num_points_), n_chunks_(other.n_chunks_), metric_(other.metric_), reader_(std::move(other.reader_)) {
         this->aligned_dim_ = other.aligned_dim_;
         this->dist_cmp_ = std::move(other.dist_cmp_);
         this->dist_cmp_float_ = std::move(other.dist_cmp_float_);

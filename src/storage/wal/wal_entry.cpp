@@ -46,6 +46,8 @@ import :column_meta;
 import :default_values;
 import :status;
 import statement_common;
+import data_type;
+import column_def;
 
 namespace infinity {
 

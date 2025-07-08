@@ -24,6 +24,7 @@ import :logical_node_type;
 import :logical_node;
 import :logical_cross_product;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

@@ -48,9 +48,10 @@
 #line 18 "search_parser.y"
 
     // unique_ptr<QueryNode> requires sizeof(QueryNode)
-    #ifndef QUERY_NODE_H
-    #include "query_node.h"
-    #endif
+    // #ifndef QUERY_NODE_H
+    // #include "query_node.h"
+    // #endif
+    import infinity_core;
 
     namespace infinity {
         class SearchDriver;

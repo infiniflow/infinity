@@ -31,6 +31,7 @@ import column_def;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+import data_type;
 
 namespace infinity {
 

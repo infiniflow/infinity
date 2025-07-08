@@ -25,6 +25,7 @@ import :base_expression;
 import :index_base;
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

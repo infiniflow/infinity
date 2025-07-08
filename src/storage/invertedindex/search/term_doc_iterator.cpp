@@ -22,6 +22,7 @@ import :stl;
 import :column_length_io;
 import :logger;
 import :infinity_exception;
+import row_id;
 
 namespace infinity {
 

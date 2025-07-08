@@ -20,6 +20,7 @@ module infinity_core;
 import :column_binding;
 import :stl;
 import :logical_node;
+import data_type;
 
 namespace infinity {
 

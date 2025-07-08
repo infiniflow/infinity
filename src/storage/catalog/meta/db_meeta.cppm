@@ -23,7 +23,7 @@ import :new_catalog;
 namespace infinity {
 
 class KVInstance;
-class DatabaseInfo;
+struct DatabaseInfo;
 class NewTxn;
 
 export class DBMeeta {

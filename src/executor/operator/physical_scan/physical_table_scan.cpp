@@ -44,6 +44,8 @@ import :block_meta;
 import :new_catalog;
 import :column_meta;
 import :status;
+import data_type;
+import row_id;
 
 namespace infinity {
 

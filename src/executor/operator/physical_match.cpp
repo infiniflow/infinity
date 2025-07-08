@@ -68,6 +68,8 @@ import :cached_match;
 import :filter_iterator;
 import :score_threshold_iterator;
 import :new_txn;
+import row_id;
+import data_type;
 
 namespace infinity {
 

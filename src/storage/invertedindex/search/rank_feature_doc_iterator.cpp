@@ -21,6 +21,7 @@ module infinity_core;
 import :stl;
 // import :logger;
 import :smallfloat;
+import row_id;
 
 namespace infinity {
 

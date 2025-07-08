@@ -38,6 +38,7 @@ import :new_txn;
 import :status;
 import :defer_op;
 import row_id;
+import global_resource_usage;
 
 namespace infinity {
 

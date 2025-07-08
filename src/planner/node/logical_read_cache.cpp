@@ -22,6 +22,7 @@ import :default_values;
 import logical_type;
 import :result_cache_manager;
 import :infinity_exception;
+import data_type;
 
 namespace infinity {
 

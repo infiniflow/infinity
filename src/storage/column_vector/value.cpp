@@ -38,6 +38,7 @@ import sparse_info;
 import embedding_info;
 import logical_type;
 import embedding_type;
+import data_type;
 
 namespace infinity {
 

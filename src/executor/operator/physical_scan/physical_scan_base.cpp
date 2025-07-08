@@ -49,6 +49,7 @@ import :table_meeta;
 import :segment_meta;
 import :block_meta;
 import :new_txn;
+import row_id;
 
 namespace infinity {
 

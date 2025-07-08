@@ -25,6 +25,7 @@ import :status;
 import :infinity_exception;
 import :third_party;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

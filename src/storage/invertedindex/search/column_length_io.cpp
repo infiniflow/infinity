@@ -17,6 +17,7 @@ module;
 #include <cassert>
 #include <string>
 #include <vector>
+
 module infinity_core;
 
 import :stl;
@@ -24,6 +25,7 @@ import :column_index_reader;
 import :memory_indexer;
 import :buffer_obj;
 import :buffer_handle;
+import row_id;
 
 namespace infinity {
 

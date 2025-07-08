@@ -30,6 +30,7 @@ import :meta_info;
 import logical_type;
 import internal_types;
 import :explain_logical_plan;
+import data_type;
 
 namespace infinity {
 

@@ -56,7 +56,7 @@ public:
         // AlignedFree(data_);
     }
 
-    DiskAnnMemDataStore(const This &&other)
+    DiskAnnMemDataStore(This &&other)
         : capacity_(std::exchange(other.capacity_, 0)), dim_(std::exchange(other.dim_, 0)), distance_fn_(std::move(other.distance_fn_)),
           aligned_dim_(std::exchange(other.aligned_dim_, 0)), data_unique_(std::move(other.data_unique_)), data_(std::move(other.data_)),
           pre_computed_norms_(std::move(other.pre_computed_norms_)) {}
@@ -107,7 +107,7 @@ public:
         }
 
         if (distance_fn_.PreprocessingRequired()) {
-            distance_fn_.PreprocessBasePoints(data_, this->_aligned_dim, num_pts);
+            distance_fn_.PreprocessBasePoints(data_, this->aligned_dim_, num_pts);
         }
     }
 

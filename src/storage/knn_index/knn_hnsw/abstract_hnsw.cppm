@@ -16,9 +16,9 @@ module;
 
 #include <future>
 
-namespace infinity {
-struct ChunkIndexMetaInfo;
-}
+// namespace infinity {
+// struct ChunkIndexMetaInfo;
+// }
 
 export module infinity_core:abstract_hnsw;
 
@@ -44,6 +44,7 @@ import :buffer_handle;
 import :third_party;
 import :config;
 import :column_vector;
+import :chunk_index_meta;
 
 namespace infinity {
 

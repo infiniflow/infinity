@@ -27,7 +27,7 @@ namespace infinity {
 
 struct WalChunkIndexInfo;
 
-export enum class SegmentStatus;
+export enum class SegmentStatus : u8;
 
 export struct DatabaseInfo {
     SharedPtr<String> db_name_{};

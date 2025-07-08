@@ -701,3 +701,7 @@ export import :http_server;
 export import :thrift_server;
 export import :buffer_reader;
 export import :system_info;
+
+export using infinity::TableInfo;
+export using infinity::FulltextSimilarity;
+export using infinity::DocIterator;

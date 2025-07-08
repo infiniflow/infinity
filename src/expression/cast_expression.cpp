@@ -25,6 +25,7 @@ import :third_party;
 import :cast_function;
 import :status;
 import :logger;
+import data_type;
 
 namespace infinity {
 

@@ -40,6 +40,7 @@ import extra_ddl_info;
 import :wal_manager;
 import :infinity_context;
 import :new_txn;
+import data_type;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,

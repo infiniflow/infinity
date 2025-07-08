@@ -33,6 +33,7 @@ import :vector_buffer;
 import :column_vector;
 
 import logical_type;
+import column_def;
 
 namespace infinity {
 

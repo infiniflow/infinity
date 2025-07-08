@@ -33,7 +33,7 @@ import :chunk_index_meta;
 namespace infinity {
 
 class BufferManager;
-class ColumnVector;
+struct ColumnVector;
 class BufferObj;
 
 // export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,

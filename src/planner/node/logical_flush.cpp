@@ -24,6 +24,7 @@ import :column_binding;
 import internal_types;
 import :logical_flush;
 import flush_statement;
+import data_type;
 
 namespace infinity {
 

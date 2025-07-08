@@ -14,9 +14,9 @@
 
 module;
 
-namespace infinity {
-struct ChunkIndexMetaInfo;
-}
+// namespace infinity {
+// struct ChunkIndexMetaInfo;
+// }
 
 export module infinity_core:bmp_handler;
 
@@ -39,6 +39,7 @@ import :column_vector;
 
 namespace infinity {
 
+struct ChunkIndexMetaInfo;
 class BufferManager;
 // class ColumnVector;
 class BufferObj;

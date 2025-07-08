@@ -64,6 +64,8 @@ import :mem_index;
 import :base_memindex;
 import :emvb_index_in_mem;
 import :txn_context;
+import column_def;
+import row_id;
 
 namespace infinity {
 

@@ -23,7 +23,7 @@ import :selection;
 
 namespace infinity {
 class ExpressionState;
-class ColumnVector;
+struct ColumnVector;
 
 export class ExpressionSelector {
 public:

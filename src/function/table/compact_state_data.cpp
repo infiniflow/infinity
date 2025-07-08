@@ -22,6 +22,7 @@ module infinity_core;
 import :third_party;
 import :logger;
 import :block_index;
+import row_id;
 
 namespace infinity {
 

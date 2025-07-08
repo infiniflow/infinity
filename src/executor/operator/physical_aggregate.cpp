@@ -41,6 +41,7 @@ import :status;
 import logical_type;
 import internal_types;
 import column_def;
+import data_type;
 
 namespace infinity {
 

@@ -26,6 +26,7 @@ import :infinity_exception;
 import parsed_expr;
 import constant_expr;
 import :logger;
+import column_def;
 
 namespace infinity {
 

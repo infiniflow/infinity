@@ -27,6 +27,7 @@ import :base_expression;
 import :column_vector;
 import :third_party;
 import :logger;
+import data_type;
 
 namespace infinity {
 

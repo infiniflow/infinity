@@ -24,6 +24,7 @@ import :column_binding;
 import logical_type;
 import internal_types;
 import :logical_drop_view;
+import data_type;
 
 namespace infinity {
 

@@ -23,6 +23,7 @@ import :column_binding;
 import :block_index;
 import internal_types;
 import statement_common;
+import data_type;
 
 namespace infinity {
 

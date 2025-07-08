@@ -39,6 +39,7 @@ import logical_type;
 import :meta_tree;
 import :db_meeta;
 import check_statement;
+import data_type;
 
 namespace infinity {
 

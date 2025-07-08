@@ -61,6 +61,7 @@ import :persistence_manager;
 import :meta_key;
 import :catalog_cache;
 import :meta_type;
+import column_def;
 
 namespace infinity {
 

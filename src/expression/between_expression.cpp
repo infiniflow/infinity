@@ -22,6 +22,7 @@ import :stl;
 import :expression_type;
 import logical_type;
 import :between_expression;
+import data_type;
 
 namespace infinity {
 

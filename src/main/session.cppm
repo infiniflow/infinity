@@ -17,6 +17,7 @@ module;
 export module infinity_core:session;
 
 import :stl;
+import global_resource_usage;
 
 namespace infinity {
 

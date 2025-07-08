@@ -43,6 +43,7 @@ import :persist_result_handler;
 import :virtual_store;
 import :logger;
 import :file_worker;
+import row_id;
 
 namespace infinity {
 

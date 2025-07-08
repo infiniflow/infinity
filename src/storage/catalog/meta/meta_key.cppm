@@ -20,6 +20,7 @@ import :stl;
 import :meta_type;
 import :third_party;
 import :default_values;
+import column_def;
 
 namespace infinity {
 
@@ -32,7 +33,7 @@ export struct MetaKey {
     virtual String ToString() const = 0;
     virtual nlohmann::json ToJson() const = 0;
 };
-class ColumnDef;
+// class ColumnDef;
 
 export struct DBMetaKey final : public MetaKey {
     DBMetaKey(String db_id_str, String db_name) : MetaKey(MetaType::kDB), db_id_str_(std::move(db_id_str)), db_name_(std::move(db_name)) {}

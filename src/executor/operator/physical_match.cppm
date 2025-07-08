@@ -14,6 +14,8 @@
 
 module;
 
+// #include "storage/invertedindex/search/query_node.h"
+
 export module infinity_core:physical_match;
 
 import :stl;
@@ -23,13 +25,12 @@ import :doc_iterator;
 import :base_table_ref;
 import :common_query_filter;
 import :meta_info;
+import :query_node;
 
 namespace infinity {
 class BaseExpression;
 struct BM25Params;
 enum class FulltextSimilarity;
-struct QueryNode;
-struct IndexReader;
 class MatchExpression;
 
 class ResultCacheManager;

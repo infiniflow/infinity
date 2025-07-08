@@ -26,7 +26,7 @@ namespace infinity {
 
 class KVInstance;
 class TableDef;
-class TableInfo;
+struct TableInfo;
 class TableIndexReaderCache;
 class NewTxn;
 // struct SegmentUpdateTS;

@@ -36,6 +36,7 @@ import :knn_expression;
 import :value;
 import :column_vector;
 import embedding_type;
+import row_id;
 
 namespace infinity {
 

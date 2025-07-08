@@ -32,6 +32,7 @@ import :cluster_manager;
 import admin_statement;
 import :node_info;
 import :config;
+import global_resource_usage;
 
 namespace infinity {
 

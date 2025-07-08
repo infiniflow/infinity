@@ -129,6 +129,7 @@ import command_statement;
 import compact_statement;
 import check_statement;
 import optimize_statement;
+import data_type;
 
 namespace infinity {
 

@@ -32,6 +32,7 @@ import :infinity_exception;
 import :logger;
 import logical_type;
 import column_def;
+import data_type;
 
 namespace infinity {
 

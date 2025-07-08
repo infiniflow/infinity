@@ -30,6 +30,7 @@ import :function_expression;
 import :cast_expression;
 import :column_expression;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

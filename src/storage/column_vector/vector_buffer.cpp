@@ -28,6 +28,7 @@ import serialize;
 import internal_types;
 import logical_type;
 import sparse_info;
+import data_type;
 
 namespace infinity {
 

@@ -23,6 +23,7 @@ import :column_binding;
 import logical_type;
 import internal_types;
 import :logical_create_table;
+import data_type;
 
 namespace infinity {
 

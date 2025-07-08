@@ -21,6 +21,7 @@ module;
 module infinity_core;
 
 import compilation_config;
+import global_resource_usage;
 
 namespace infinity {
 using namespace std::chrono;

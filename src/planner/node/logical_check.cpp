@@ -25,6 +25,7 @@ import :column_binding;
 import :logger;
 import check_statement;
 import :logical_check;
+import data_type;
 
 namespace infinity {
 

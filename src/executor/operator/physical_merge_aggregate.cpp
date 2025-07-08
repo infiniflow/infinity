@@ -33,6 +33,7 @@ import :hash_table;
 import column_def;
 import :column_vector;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

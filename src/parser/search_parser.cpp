@@ -44,8 +44,10 @@
 // Unqualified %code blocks.
 #line 42 "search_parser.y"
 
-    #include "search_driver.h"
-    #include "search_scanner.h"
+    // import search_driver;
+    import search_scanner;
+    // #include "search_driver.h"
+    // #include "search_scanner.h"
 
     #undef yylex
     #define yylex scanner.yylex
@@ -54,7 +56,8 @@
     #include <sstream>
     #include <string>
     #include <vector>
-    #include "query_node.h"
+    import infinity_core;
+    // #include "query_node.h"
 
     // Avoid warnings with the error counter.
     #if defined(__GNUC__) || defined(__clang__)

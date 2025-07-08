@@ -40,6 +40,7 @@ import :abstract_hnsw;
 import :virtual_store;
 import :persistence_manager;
 import :local_file_handle;
+import column_def;
 
 namespace infinity {
 

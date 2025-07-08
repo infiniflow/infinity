@@ -22,7 +22,8 @@
 // clang-format off
 // the order of these includes is important
 #include <FlexLexer.h>
-#include "search_scanner_derived.h"
+// #include "search_scanner_derived.h"
+import search_scanner_derived;
 // clang-format on
 #undef yyFlexLexer
 #undef SearchScannerDerived

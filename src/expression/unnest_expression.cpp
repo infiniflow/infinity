@@ -25,6 +25,7 @@ import :infinity_exception;
 import array_info;
 import :column_expression;
 import :expression_type;
+import data_type;
 
 namespace infinity {
 

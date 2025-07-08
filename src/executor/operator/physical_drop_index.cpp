@@ -31,6 +31,7 @@ import :wal_manager;
 import :infinity_context;
 import :status;
 import :new_txn;
+import data_type;
 
 namespace infinity {
 

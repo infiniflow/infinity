@@ -18,11 +18,12 @@ export module infinity_core:emvb_index_in_mem;
 import :stl;
 import internal_types;
 import :roaring_bitmap;
+import column_def;
 
 namespace infinity {
 
 class BufferManager;
-class ColumnDef;
+// class ColumnDef;
 class IndexBase;
 class EMVBIndex;
 struct BlockIndex;

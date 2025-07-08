@@ -31,7 +31,7 @@ import :diskann_index_data;
 import :diskann_dist_func;
 
 namespace infinity {
-template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
+export template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
 class KnnDiskAnn {
     using DistType = typename Compare::DistanceType;
     using ResultHandler = ReservoirResultHandler<Compare>;
@@ -115,6 +115,10 @@ private:
     UniquePtr<ResultHandler> result_handler_{};
 
     const DistType *queries_{};
+
+    SizeT query_count_{}; // maybe unused
+    SizeT top_k_{}; // maybe unused
+
     bool begin_{false};
 };
 

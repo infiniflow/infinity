@@ -51,6 +51,7 @@ import logical_type;
 import data_type;
 
 import column_def;
+import row_id;
 
 namespace infinity {
 

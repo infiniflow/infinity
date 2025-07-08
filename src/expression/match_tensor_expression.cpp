@@ -29,6 +29,7 @@ import :status;
 import :logger;
 import logical_type;
 import match_tensor_expr;
+import data_type;
 
 namespace infinity {
 

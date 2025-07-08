@@ -18,14 +18,14 @@ export module infinity_core:emvb_index;
 import :stl;
 import :emvb_shared_vec;
 import :roaring_bitmap;
+import column_def;
+import row_id;
 
 namespace infinity {
 
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 class LocalFileHandle;
-struct RowID;
-class ColumnDef;
 class BufferManager;
 struct BlockIndex;
 class NewTxn;

@@ -19,6 +19,7 @@ import :column_binding;
 import :infinity_exception;
 import :data_block;
 import :column_vector;
+import data_type;
 
 namespace infinity {
 

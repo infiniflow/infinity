@@ -125,7 +125,7 @@ public:
         return const_expr != nullptr && const_expr->literal_type_ != LiteralType::kNull;
     }
 
-    const std::shared_ptr<ConstantExpr> default_value() const { return std::dynamic_pointer_cast<ConstantExpr>(default_expr_); }
+    [[nodiscard]] std::shared_ptr<ConstantExpr> default_value() const { return std::dynamic_pointer_cast<ConstantExpr>(default_expr_); }
 
     nlohmann::json ToJson() const;
     static std::shared_ptr<ColumnDef> FromJson(std::string_view col_def_str);

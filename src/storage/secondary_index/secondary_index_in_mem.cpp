@@ -35,7 +35,7 @@ import :base_memindex;
 import :memindex_tracer;
 import :column_vector;
 import :buffer_obj;
-import rcu_multimap;
+import :rcu_multimap;
 
 namespace infinity {
 

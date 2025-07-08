@@ -68,6 +68,7 @@ import :infinity_context;
 import statement_common;
 import :new_txn;
 import :txn_state;
+import data_type;
 
 namespace infinity {
 
@@ -1241,7 +1242,7 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
     if (!build_result.ok()) {
         RecoverableError(Status::ImportFileFormatError(build_result.status().ToString()));
     }
-    std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
+    UniquePtr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
 
     if (Status status = CheckParquetColumns(table_info_.get(), arrow_reader.get()); !status.ok()) {
         RecoverableError(status);

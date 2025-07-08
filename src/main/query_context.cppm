@@ -24,12 +24,12 @@ import :query_result;
 import base_statement;
 import admin_statement;
 import :profiler;
+import sql_parser;
 
 namespace infinity {
 enum class QueryPhase : i8;
 class TaskProfiler;
 class Optimizer;
-class SQLParser;
 class SessionManager;
 class ResourceManager;
 

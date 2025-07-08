@@ -30,6 +30,8 @@ import :default_values;
 import serialize;
 import logical_type;
 import :logger;
+import data_type;
+import row_id;
 
 namespace infinity {
 

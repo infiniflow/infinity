@@ -329,7 +329,7 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         insert_row->columns_ = std::move(field.column_names);
         insert_row->values_.reserve(field.parse_exprs.size());
         for (auto &expr : field.parse_exprs) {
-            auto parsed_expr = std::unique_ptr<ConstantExpr>(GetConstantFromProto(constant_status, *expr.type.constant_expr));
+            auto parsed_expr = UniquePtr<ConstantExpr>(GetConstantFromProto(constant_status, *expr.type.constant_expr));
             if (!constant_status.ok()) {
                 ProcessStatus(response, constant_status);
                 return;

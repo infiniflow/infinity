@@ -79,6 +79,8 @@ import :virtual_store;
 import :txn_context;
 import :kv_utility;
 import extra_ddl_info;
+import column_def;
+import row_id;
 
 namespace infinity {
 

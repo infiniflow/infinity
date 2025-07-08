@@ -6,10 +6,6 @@ module;
 
 #include <future>
 
-namespace infinity {
-struct ChunkIndexMetaInfo;
-}
-
 export module infinity_core:hnsw_handler;
 
 import :stl;
@@ -34,11 +30,12 @@ import :buffer_handle;
 import :third_party;
 import :config;
 import :abstract_hnsw;
+import :chunk_index_meta;
 
 namespace infinity {
 
 class BufferManager;
-class ColumnVector;
+struct ColumnVector;
 class BufferObj;
 class LocalFileHandle;
 

@@ -32,6 +32,7 @@ import search_options;
 import :infinity_exception;
 import :status;
 import :logger;
+import data_type;
 
 namespace infinity {
 

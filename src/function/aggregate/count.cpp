@@ -146,11 +146,11 @@ void RegisterCountFunction(NewCatalog *catalog_ptr) {
             UnaryAggregate<CountState<ArrayT, BigIntT>, ArrayT, BigIntT>(func_name, DataType(LogicalType::kArray), DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
-    {
-        AggregateFunction count_function =
-            UnaryAggregate<CountState<TupleT, BigIntT>, TupleT, BigIntT>(func_name, DataType(LogicalType::kTuple), DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
+    // {
+    //     AggregateFunction count_function =
+    //         UnaryAggregate<CountState<TupleT, BigIntT>, TupleT, BigIntT>(func_name, DataType(LogicalType::kTuple), DataType(LogicalType::kBigInt));
+    //     function_set_ptr->AddFunction(count_function);
+    // }
     {
         AggregateFunction count_function =
             UnaryAggregate<CountState<PointT, BigIntT>, PointT, BigIntT>(func_name, DataType(LogicalType::kPoint), DataType(LogicalType::kBigInt));
