@@ -46,5 +46,7 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def restore_table_snapshot(self, snapshot_name: str, table_name: str):
+    def restore_table_snapshot(self, snapshot_name: str):
         pass
+    
+    

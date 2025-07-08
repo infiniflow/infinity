@@ -137,29 +137,55 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
         
-    def show_snapshots(self):  
-        """List all snapshots in the database."""
-        res = self._client.show_snapshots()
-        if res.error_code == ErrorCode.OK:
-            return select_res_to_polars(res)  # Convert to Polars DataFrame
-        else:
-            raise InfinityException(res.error_code, res.error_msg)
-
-    def drop_snapshot(self, snapshot_name: str):
-        """Drop a snapshot."""
-        if not snapshot_name or not snapshot_name.strip():
-            raise InfinityException(ErrorCode.INVALID_SNAPSHOT_NAME, "Snapshot name cannot be empty")
-        
-        
-        res = self._client.drop_snapshot(
-            snapshot_name=snapshot_name
-        )
-        
+    def create_database_snapshot(self, snapshot_name: str, db_name: str):
+        res = self._client.create_database_snapshot(snapshot_name=snapshot_name, db_name=db_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-
+        
+    def restore_database_snapshot(self, snapshot_name: str):
+        res = self._client.restore_snapshot(snapshot_name=snapshot_name, scope="database")
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        
+    def create_system_snapshot(self, snapshot_name: str):
+        res = self._client.create_system_snapshot(snapshot_name=snapshot_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        
+    def restore_system_snapshot(self, snapshot_name: str):
+        res = self._client.restore_snapshot(snapshot_name=snapshot_name, scope="system")
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        
+    def list_snapshots(self):
+        res = self._client.list_snapshots()
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        
+    def show_snapshot(self, snapshot_name: str):
+        res = self._client.show_snapshot(snapshot_name=snapshot_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+    
+    def drop_snapshot(self, snapshot_name: str):
+        res = self._client.drop_snapshot(snapshot_name=snapshot_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+        
 
     @property
     def client(self):
