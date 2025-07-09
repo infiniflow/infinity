@@ -206,16 +206,7 @@ HnswIndexInMem::~HnswIndexInMem() {
             }
         },
         hnsw_);
-    if (trace_) {
-        auto *storage = InfinityContext::instance().storage();
-        if (storage == nullptr) {
-            return;
-        }
-        auto *memindex_tracer = storage->memindex_tracer();
-        if (memindex_tracer != nullptr) {
-            memindex_tracer->DecreaseMemUsed(mem_usage);
-        }
-    }
+    DecreaseMemoryUsageBase(mem_usage);
 }
 
 SizeT HnswIndexInMem::GetRowCount() const {
