@@ -63,7 +63,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -80,10 +80,10 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
 
         Value v = Value::MakeUuid(uuid);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -102,7 +102,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -122,7 +122,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0u), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0u), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -137,10 +137,10 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         UuidT uuid(s.c_str());
         column_vector.AppendByPtr((ptr_t)(&uuid));
 
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
@@ -149,10 +149,10 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         UuidT uuid(s.c_str());
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.uuid, uuid);
         column_constant.Reset();
     }
@@ -172,7 +172,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -190,16 +190,16 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
         Value v = Value::MakeUuid(uuid);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -221,7 +221,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -238,10 +238,10 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
         Value v = Value::MakeUuid(uuid);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -264,7 +264,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -283,7 +283,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
         String s('a' + (2 * i) % 26, 16);
         UuidT uuid(s.c_str());
 
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -308,7 +308,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
 
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -326,7 +326,7 @@ TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
         String s('a' + src_idx % 26, 16);
         UuidT uuid(s.c_str());
 
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }

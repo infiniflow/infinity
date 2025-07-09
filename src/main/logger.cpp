@@ -103,6 +103,9 @@ void Logger::Flush() {
 }
 
 void Logger::Shutdown() {
+    if (IS_LOGGER_INITIALIZED()) {
+        infinity_logger->flush();
+    }
     if (stdout_sinker.get() != nullptr or rotating_file_sinker.get() != nullptr) {
         spdlog::shutdown();
         stdout_sinker = nullptr;

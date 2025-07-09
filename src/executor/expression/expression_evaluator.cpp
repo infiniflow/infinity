@@ -178,7 +178,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<ValueExpression> &expr,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     // memory copy here.
     auto value = expr->GetValue();
-    output_column_vector->SetValue(0, value);
+    output_column_vector->SetValueByIndex(0, value);
     output_column_vector->Finalize(1);
 }
 
@@ -210,7 +210,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
     // in expression evaluates to a constant
     if (left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
         bool in_result =
-            (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValue(0)) : !expr->Exists(left_state_output->GetValue(0));
+            (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0)) : !expr->Exists(left_state_output->GetValueByIndex(0));
         for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
             output_column_vector->buffer_->SetCompactBit(idx, in_result);
         }
@@ -219,14 +219,14 @@ void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
     }
     if (expr->in_type() == InType::kIn) {
         for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
-            output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValue(idx)));
+            output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValueByIndex(idx)));
         }
         output_column_vector->Finalize(input_data_block_->row_count());
         return;
     }
     if (expr->in_type() == InType::kNotIn) {
         for (SizeT idx = 0; idx < input_data_block_->row_count(); idx++) {
-            output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValue(idx)));
+            output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValueByIndex(idx)));
         }
         output_column_vector->Finalize(input_data_block_->row_count());
         return;

@@ -110,7 +110,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
         polygon.SetPoint(3, p4);
         Value v = Value::MakePolygon(polygon);
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
@@ -120,7 +120,7 @@ TEST_F(PolygonCastTest, polygon_cast1) {
         BoxT bounding_box(PointT(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f),
                           PointT(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f));
 
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kPolygon);
         EXPECT_EQ(vx.value_.polygon.point_count, 4);
         EXPECT_EQ(*((PointT *)(vx.value_.polygon.ptr)), p1);

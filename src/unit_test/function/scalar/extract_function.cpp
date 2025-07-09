@@ -104,7 +104,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i + 1);
         }
@@ -148,7 +148,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i % 12 + 1);
         }
@@ -193,7 +193,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i % 28 + 1);
         }

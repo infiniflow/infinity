@@ -65,7 +65,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4 * 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -83,9 +83,9 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
         Value v = Value::MakeEmbedding(data);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -105,7 +105,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
     }
 
@@ -125,7 +125,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0u), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0u), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16 * 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -141,9 +141,9 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
         column_vector.AppendByPtr((const_ptr_t)data.data());
         Value v = Value::MakeEmbedding(data);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
@@ -153,10 +153,10 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
         Value v = Value::MakeEmbedding(data);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(v == vx, true);
 
         column_constant.Reset();
@@ -178,7 +178,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4 * 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -197,9 +197,9 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
         Value v = Value::MakeEmbedding(data);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     column_vector.Reset();
@@ -219,7 +219,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0u), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0u), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4 * 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -237,9 +237,9 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
         Value v = Value::MakeEmbedding(data);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -265,7 +265,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
     }
 
@@ -284,7 +284,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
             data[j] = static_cast<float>(2 * i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
     }
 }
@@ -311,7 +311,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
     }
 
@@ -329,7 +329,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
             data[j] = static_cast<float>(src_idx) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
     }
 }

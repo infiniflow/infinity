@@ -186,6 +186,7 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         switch (status_) {
             case BufferStatus::kNew: {
                 file_worker_->AllocateInMemory();
+                status_ = BufferStatus::kLoaded;
             }
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {

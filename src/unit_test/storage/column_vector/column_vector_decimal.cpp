@@ -67,7 +67,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -82,10 +82,10 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
         DecimalT decimal(0, static_cast<i64>(i));
         Value v = Value::MakeDecimal(decimal, decimal_info);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -101,7 +101,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
     }
@@ -120,7 +120,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -135,19 +135,19 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
         DecimalT decimal(0, static_cast<i64>(i));
         Value v = Value::MakeDecimal(decimal, decimal_info);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
         column_constant.Reset();
     }
@@ -168,7 +168,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -184,13 +184,13 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
         Value v = Value::MakeDecimal(decimal, decimal_info);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
     }
@@ -211,7 +211,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -226,10 +226,10 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
         Value v = Value::MakeDecimal(decimal, decimal_info);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -248,7 +248,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
     }
@@ -264,7 +264,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(2 * i));
     }
@@ -285,7 +285,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
     }
@@ -300,7 +300,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(src_idx));
     }

@@ -146,11 +146,11 @@ TEST_P(RepeatReplayTest, append) {
             auto check_column = [&](ColumnID column_id, const Value &v) {
                 ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector col1;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col1);
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col1);
                 EXPECT_TRUE(status.ok());
 
                 for (u32 i = 0; i < row_count; ++i) {
-                    EXPECT_EQ(col1.GetValue(i), v);
+                    EXPECT_EQ(col1.GetValueByIndex(i), v);
                 }
             };
 
