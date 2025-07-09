@@ -110,7 +110,7 @@ inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
         SizeT old_index_memory = cur_index_memory_.fetch_add(add);
         if (old_index_memory + add > index_memory_limit_ + proposed_dump_size_) {
             need_trigger_dump = true;
-            LOG_TRACE(fmt::format("mem index limit: {}, cur_index_memory_: {}, proposed_dump_size_: {}",
+            LOG_TRACE(fmt::format("mem index limit: {}, current index memory: {}, proposed dump size: {}, trigger dump index due to memory limit.",
                                   index_memory_limit_,
                                   old_index_memory + add,
                                   proposed_dump_size_));
@@ -125,7 +125,7 @@ export class BGMemIndexTracer : public MemIndexTracer {
 public:
     BGMemIndexTracer(SizeT index_memory_limit, NewTxnManager *txn_mgr);
 
-    ~BGMemIndexTracer();
+    ~BGMemIndexTracer() override;
 
     void TriggerDump(SharedPtr<DumpMemIndexTask> task) override;
 

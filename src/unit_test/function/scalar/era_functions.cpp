@@ -107,7 +107,7 @@ TEST_F(EraFunctionsTest, era_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
@@ -147,7 +147,7 @@ TEST_F(EraFunctionsTest, era_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
@@ -187,7 +187,7 @@ TEST_F(EraFunctionsTest, era_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
