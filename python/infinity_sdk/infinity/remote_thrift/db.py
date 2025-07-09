@@ -118,3 +118,65 @@ class RemoteDatabase(Database, ABC):
             return select_res_to_polars(res)
         else:
             raise InfinityException(res.error_code, res.error_msg)
+
+    @name_validity_check("table_name", "Table")
+    def create_table_snapshot(self, snapshot_name: str, table_name: str):
+        """
+        Create a snapshot of a specific table.
+        
+        Args:
+            snapshot_name (str): Name of the snapshot to create
+            table_name (str): Name of the table to snapshot
+        
+        Returns:
+            Result object indicating success/failure
+        """
+        # Validate parameters
+        if not snapshot_name or not snapshot_name.strip():
+            raise InfinityException(ErrorCode.INVALID_SNAPSHOT_NAME, "Snapshot name cannot be empty")
+        if not table_name or not table_name.strip():
+            raise InfinityException(ErrorCode.INVALID_TABLE_NAME, "Table name cannot be empty")
+        
+        # Call the underlying connection method
+        res = self._conn.create_table_snapshot(
+            db_name=self._db_name,
+            snapshot_name=snapshot_name,
+            table_name=table_name
+        )
+        
+        # Check result and handle errors
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def restore_table_snapshot(self, snapshot_name: str):
+        """
+        Restore a table snapshot.
+        
+        Args:
+            snapshot_name (str): Name of the snapshot to restore
+            table_name (str): Name of the table to restore to
+        
+        Returns:
+            Result object indicating success/failure
+        """
+        # Validate parameters
+        if not snapshot_name or not snapshot_name.strip():
+            raise InfinityException(ErrorCode.INVALID_SNAPSHOT_NAME, "Snapshot name cannot be empty")
+        if not table_name or not table_name.strip():
+            raise InfinityException(ErrorCode.INVALID_TABLE_NAME, "Table name cannot be empty")
+        
+        # Call the underlying connection method
+        res = self._conn.restore_table_snapshot(
+            db_name=self._db_name,
+            snapshot_name=snapshot_name
+        )
+        
+        # Check result and handle errors
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+   

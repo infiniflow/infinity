@@ -143,6 +143,15 @@ public:
     QueryResult
     ShowBlockColumn(const String &db_name, const String &table_name, const SegmentID &segment_id, const BlockID &block_id, const SizeT &column_id);
 
+    // TODO: ask whether need to add snapshot related functions
+    // QueryResult CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
+
+    // QueryResult RestoreTableSnapshot(const String &snapshot_name);
+
+    // QueryResult ShowSnapshots();
+
+    // QueryResult DropSnapshot(const String &snapshot_name);
+
     // Metrics
     QueryResult ShowBuffer();
     QueryResult ShowProfiles();
