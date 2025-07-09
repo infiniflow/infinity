@@ -54,6 +54,7 @@ private:
 };
 
 Vector<SharedPtr<MemIndexDetail>> TestCatalog::GetMemIndexes() {
+    std::unique_lock<std::mutex> lock(mtx_);
     Vector<SharedPtr<MemIndexDetail>> ret;
     for (auto &iter : memindexes_) {
         SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
