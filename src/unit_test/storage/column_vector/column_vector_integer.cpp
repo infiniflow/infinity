@@ -75,7 +75,7 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
 
     {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(3));
-        EXPECT_THROW(column_vector.SetValue(3, v), UnrecoverableException);
+        EXPECT_THROW(column_vector.SetValueByIndex(3, v), UnrecoverableException);
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {

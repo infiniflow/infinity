@@ -143,7 +143,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         String s = "hello" + std::to_string(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);
@@ -404,7 +404,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         String s = "hellohellohello" + std::to_string(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);
@@ -584,7 +584,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "Professional" + std::to_string(i);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);

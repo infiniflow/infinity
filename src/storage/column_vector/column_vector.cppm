@@ -157,7 +157,7 @@ public:
     Value GetValueByIndex(SizeT index) const;
 
     // Set the <index> element of the vector to the specified value.
-    void SetValue(SizeT index, const Value &value);
+    void SetValueByIndex(SizeT index, const Value &value);
 
     void Finalize(SizeT index);
 

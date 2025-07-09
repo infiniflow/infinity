@@ -135,7 +135,7 @@ void ColumnVector::AppendValue(const Value &value) {
         String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_);
         UnrecoverableError(error_message);
     }
-    SetValue(tail_index_++, value);
+    SetValueByIndex(tail_index_++, value);
 }
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
@@ -1150,7 +1150,7 @@ Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const ch
     return Value::MakeInvalid();
 }
 
-void ColumnVector::SetValue(SizeT index, const Value &value) {
+void ColumnVector::SetValueByIndex(SizeT index, const Value &value) {
     if (!initialized) {
         String error_message = "Column vector isn't initialized.";
         UnrecoverableError(error_message);

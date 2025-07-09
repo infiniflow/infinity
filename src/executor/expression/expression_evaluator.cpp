@@ -178,7 +178,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<ValueExpression> &expr,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     // memory copy here.
     auto value = expr->GetValue();
-    output_column_vector->SetValue(0, value);
+    output_column_vector->SetValueByIndex(0, value);
     output_column_vector->Finalize(1);
 }
 

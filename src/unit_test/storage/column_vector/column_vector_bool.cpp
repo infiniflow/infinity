@@ -75,7 +75,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
 
     {
         Value v = Value::MakeBool(true);
-        EXPECT_THROW(column_vector.SetValue(3, v), UnrecoverableException);
+        EXPECT_THROW(column_vector.SetValueByIndex(3, v), UnrecoverableException);
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -143,7 +143,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
         Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));

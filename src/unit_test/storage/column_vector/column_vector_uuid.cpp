@@ -149,7 +149,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
         UuidT uuid(s.c_str());
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);

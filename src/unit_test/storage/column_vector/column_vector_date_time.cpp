@@ -141,7 +141,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
         Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
@@ -388,7 +388,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
         Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
@@ -637,7 +637,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);
@@ -896,7 +896,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);
@@ -1155,7 +1155,7 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);

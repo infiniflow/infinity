@@ -153,7 +153,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         }
         Value v = Value::MakeEmbedding(data);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValueByIndex(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValueByIndex(0);

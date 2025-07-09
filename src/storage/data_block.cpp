@@ -223,7 +223,7 @@ void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) 
         String error_message = fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_);
         UnrecoverableError(error_message);
     }
-    column_vectors[column_index]->SetValue(row_index, val);
+    column_vectors[column_index]->SetValueByIndex(row_index, val);
 }
 
 void DataBlock::AppendValue(SizeT column_index, const Value &value) {
