@@ -36,6 +36,7 @@ import :sparse_util;
 import :infinity_exception;
 import :abstract_bmp;
 import :column_vector;
+import data_type;
 
 namespace infinity {
 

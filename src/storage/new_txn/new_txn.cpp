@@ -2487,6 +2487,11 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
 bool NewTxn::CheckConflictTxnStore(const DropDBTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query) {
     const String &db_name = txn_store.db_name_;
     bool conflict = false;
+    //    LOG_TRACE(fmt::format("Txn: {}, current cmd: {}, previous txn: {}, previous cmd: {}",
+    //                         this->txn_context_ptr_->txn_id_,
+    //                         txn_store.ToString(),
+    //                         previous_txn->txn_context_ptr_->txn_id_,
+    //                         previous_txn->base_txn_store_->ToString()));
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDropDB: {
             DropDBTxnStore *drop_db_txn_store = static_cast<DropDBTxnStore *>(previous_txn->base_txn_store_.get());
@@ -4411,10 +4416,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         return status;
     }
 
-    if (conflicted_txn_ != nullptr) {
-        // Wait for dependent transaction finished
-        conflicted_txn_->WaitForCompletion();
-    }
+    // TODO: due to dead lock, ignore the conflict txn.
+    //    if (conflicted_txn_ != nullptr) {
+    //        // Wait for dependent transaction finished
+    //        conflicted_txn_->WaitForCompletion();
+    //    }
 
     SetCompletion();
 

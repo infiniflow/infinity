@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module infinity_core;
 
 import :stl;

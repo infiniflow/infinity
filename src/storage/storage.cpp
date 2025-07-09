@@ -56,6 +56,7 @@ import :result_cache_manager;
 import global_resource_usage;
 import :txn_state;
 import :mem_index_appender;
+import :catalog_cache;
 
 import :wal_entry;
 
@@ -352,12 +353,8 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("Failed to commit txn for checkpoint");
     }
 
-    status = new_catalog_->RestoreCatalogCache(this);
-    if (!status.ok()) {
-        UnrecoverableError("Failed to restore catalog cache");
-    }
-
-    new_txn_mgr_->SetSystemCache();
+    UniquePtr<SystemCache> system_cache = new_catalog_->RestoreCatalogCache(this);
+    new_txn_mgr_->SetSystemCache(std::move(system_cache));
 
     if (system_start_ts == 0) {
         CreateDefaultDB();

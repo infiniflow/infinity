@@ -28,6 +28,7 @@ import :graph_store;
 import :infinity_exception;
 import serialize;
 import :data_store_util;
+import :plain_vec_store;
 
 namespace infinity {
 
@@ -60,15 +61,15 @@ public:
     DataStoreBase() = default;
     DataStoreBase(VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
         : vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)) {}
-    DataStoreBase(This &&other) : vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)) {}
-    DataStoreBase &operator=(This &&other) {
-        if (this != &other) {
-            vec_store_meta_ = std::move(other.vec_store_meta_);
-            graph_store_meta_ = std::move(other.graph_store_meta_);
-        }
-        return *this;
-    }
-    ~DataStoreBase() = default;
+    // DataStoreBase(This &&other) : vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)) {}
+    // DataStoreBase &operator=(This &&other) {
+    //     if (this != &other) {
+    //         vec_store_meta_ = std::move(other.vec_store_meta_);
+    //         graph_store_meta_ = std::move(other.graph_store_meta_);
+    //     }
+    //     return *this;
+    // }
+    // ~DataStoreBase() = default;
 
     typename VecStoreT::QueryType MakeQuery(QueryVecType query) const { return vec_store_meta_.MakeQuery(query); }
 
@@ -92,7 +93,7 @@ class DataStore : public DataStoreBase<VecStoreT, LabelType, OwnMem> {
 public:
     using This = DataStore<VecStoreT, LabelType, OwnMem>;
     using Base = DataStoreBase<VecStoreT, LabelType, OwnMem>;
-    using DataType = typename VecStoreT::DataType;
+    using JustMoreMisleadingName = typename VecStoreT::JustMoreMisleadingName;
     using QueryVecType = typename VecStoreT::QueryVecType;
     using Inner = DataStoreInner<VecStoreT, LabelType, OwnMem>;
     using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
@@ -267,7 +268,7 @@ public:
         while (true) {
             SizeT remain_size = chunk_size_ - last_chunk_size;
             auto [insert_n, used_up] =
-                inners_[chunk_num - 1].AddVec(std::move(query_iter), last_chunk_size, remain_size, this->vec_store_meta_, mem_usage);
+                inners_[chunk_num - 1].AddVec(std::forward<Iterator>(query_iter), last_chunk_size, remain_size, this->vec_store_meta_, mem_usage);
             cur_vec_num += insert_n;
             last_chunk_size += insert_n;
             if (cur_vec_num == max_chunk_n_ * chunk_size_) {
@@ -310,7 +311,7 @@ public:
         if constexpr (!VecStoreT::HasOptimize) {
             return;
         }
-        DenseVectorIter<DataType, LabelType> empty_iter(nullptr, this->dim(), 0);
+        DenseVectorIter<JustMoreMisleadingName, LabelType> empty_iter(nullptr, this->dim(), 0);
         AddVec(std::move(empty_iter));
     }
 
@@ -445,16 +446,16 @@ private:
 
 public:
     DataStore() = default;
-    DataStore(DataStore &&other) : Base(std::move(other)), inner_(std::move(other.inner_)), cur_vec_num_(other.cur_vec_num_) {}
-    DataStore &operator=(DataStore &&other) {
-        if (this != &other) {
-            Base::operator=(std::move(other));
-            inner_ = std::move(other.inner_);
-            cur_vec_num_ = other.cur_vec_num_;
-        }
-        return *this;
-    }
-    ~DataStore() = default;
+    // DataStore(DataStore &&other) : Base(std::move(other)), inner_(std::move(other.inner_)), cur_vec_num_(other.cur_vec_num_) {}
+    // DataStore &operator=(DataStore &&other) {
+    //     if (this != &other) {
+    //         Base::operator=(std::move(other));
+    //         inner_ = std::move(other.inner_);
+    //         cur_vec_num_ = other.cur_vec_num_;
+    //     }
+    //     return *this;
+    // }
+    // ~DataStore() = default;
 
     static This LoadFromPtr(const char *&ptr) {
         SizeT cur_vec_num = ReadBufAdv<SizeT>(ptr);
@@ -510,7 +511,7 @@ template <typename VecStoreT, typename LabelType, bool OwnMem>
 class DataStoreInnerBase {
 public:
     using This = DataStoreInner<VecStoreT, LabelType, OwnMem>;
-    using DataType = typename VecStoreT::DataType;
+    using JustMoreMisleadingName = typename VecStoreT::JustMoreMisleadingName;
     using VecStoreInner = typename VecStoreT::template Inner<OwnMem>;
     using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
     using GraphStoreInner = GraphStoreInner<OwnMem>;
@@ -701,7 +702,7 @@ public:
     DataStoreInner() = default;
 
     static This
-    LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT chunk_size, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) {
+    LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT chunk_size, VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) {
         auto vec_store_inner = VecStoreInner::LoadFromPtr(ptr, cur_vec_num, vec_store_meta);
         auto graph_store_inner = GraphStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, graph_store_meta);
         auto *labels = reinterpret_cast<const LabelType *>(ptr);

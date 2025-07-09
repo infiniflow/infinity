@@ -22,6 +22,7 @@ import embedding_info;
 import embedding_type;
 import column_def;
 import row_id;
+import :plain_vec_store;
 
 namespace infinity {
 
@@ -171,15 +172,15 @@ SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    using DataType = typename IndexT::DataType;
+                    using JustMoreMisleadingName = typename IndexT::JustMoreMisleadingName;
                     switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
                         case LogicalType::kEmbedding: {
-                            MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                            MemIndexInserterIter1<JustMoreMisleadingName> iter(block_offset, col, offset, row_count);
                             HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
                             break;
                         }
                         case LogicalType::kMultiVector: {
-                            MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                            MemIndexInserterIter1<MultiVectorRef<JustMoreMisleadingName>> iter(block_offset, col, offset, row_count);
                             HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
                             break;
                         }
@@ -319,7 +320,8 @@ void HnswHandler::LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::LoadFromPtr(file_handle, file_size);
+                    // index = IndexT::LoadFromPtr(file_handle, file_size);
+                    IndexT::LoadFromPtr(file_handle, file_size);
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }
@@ -391,7 +393,7 @@ void HnswHandler::CompressToLVQ() {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    using HnswIndexDataType = IndexT::DataType;
+                    using HnswIndexDataType = IndexT::JustMoreMisleadingName;
                     if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
                         UnrecoverableError("Invalid index type.");
                     } else {

@@ -16,25 +16,25 @@ module;
 
 export module infinity_core:abstract_bmp;
 
-import :stl;
-import :bmp_alg;
-import :bmp_util;
-import :index_base;
-import column_def;
-import internal_types;
-import :index_bmp;
-import sparse_info;
-import internal_types;
-import :buffer_handle;
-import :base_memindex;
-import :memindex_tracer;
-import :chunk_index_meta;
+// import :stl;
+// import :bmp_alg;
+// import :bmp_util;
+// import :index_base;
+// import column_def;
+// import internal_types;
+// import :index_bmp;
+// import sparse_info;
+// import internal_types;
+// import :buffer_handle;
+// import :base_memindex;
+// import :memindex_tracer;
+// import :chunk_index_meta;
 
 namespace infinity {
-
-class BufferManager;
-struct ColumnVector;
-class BufferObj;
+//
+// class BufferManager;
+// struct ColumnVector;
+// class BufferObj;
 
 // export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
 //                                         BMPAlg<f32, i32, BMPCompressType::kRaw> *,
@@ -65,7 +65,7 @@ class BufferObj;
 //                                         std::nullptr_t>;
 
 
-export struct BMPIndexInMem;
+// export struct BMPIndexInMem;
 // final : public BaseMemIndex {
 // public:
 //     BMPIndexInMem() : bmp_(nullptr) {}

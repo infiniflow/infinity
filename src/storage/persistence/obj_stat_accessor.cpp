@@ -17,6 +17,8 @@ module;
 #include <__iterator/prev.h>
 #include <cassert>
 
+#include "simdjson.h"
+
 module infinity_core;
 
 import :infinity_exception;
@@ -292,14 +294,14 @@ nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
 
 void ObjectStatAccessor_LocalStorage::Deserialize(std::string_view obj_str) {
     simdjson::padded_string obj_json(obj_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(obj_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(obj_json);
     std::unique_lock<std::shared_mutex> lock(mutex_);
     // SizeT len = 0;
     // if (SizeT len_json; doc["obj_stat_size"].get<SizeT>(len_json) == simdjson::SUCCESS) {
     //     len = len_json;
     // }
-    for (simdjson::array array = doc["obj_stat_array"]; auto item: array) {
+    for (simdjson::ondemand::array array = doc["obj_stat_array"]; auto item: array) {
         String obj_key = item["obj_key"].get<String>();
         ObjStat obj_stat;
         obj_stat.Deserialize(item["obj_stat"].raw_json());
@@ -422,14 +424,14 @@ nlohmann::json ObjectStatAccessor_ObjectStorage::Serialize() {
 
 void ObjectStatAccessor_ObjectStorage::Deserialize(std::string_view obj_str) {
     simdjson::padded_string obj_json(obj_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(obj_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(obj_json);
     // SizeT len = 0;
     // if (auto item = doc["obj_stat_size"]; item.error() == simdjson::SUCCESS) {
     //     len = item.get<SizeT>();
     // }
     std::unique_lock<std::shared_mutex> lock(mutex_);
-    for (simdjson::array array = doc["obj_stat_array"]; auto item: array) {
+    for (simdjson::ondemand::array array = doc["obj_stat_array"]; auto item: array) {
         String obj_key = item["obj_key"].get<String>();
         ObjStat obj_stat;
         obj_stat.Deserialize(item["obj_stat"].raw_json());

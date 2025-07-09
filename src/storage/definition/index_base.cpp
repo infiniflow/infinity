@@ -18,6 +18,8 @@ module;
 #include <string>
 #include <vector>
 
+#include "simdjson.h"
+
 module infinity_core;
 
 import :stl;
@@ -30,8 +32,8 @@ import :index_secondary;
 import :index_emvb;
 import :index_bmp;
 import :bmp_util;
-import :third_party;
-import :status;
+// import :third_party;
+// import :status;
 
 import :infinity_exception;
 import create_index_info;
@@ -221,8 +223,8 @@ nlohmann::json IndexBase::Serialize() const {
 
 SharedPtr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str) {
     simdjson::padded_string index_def_json(index_def_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(index_def_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(index_def_json);
 
     SharedPtr<IndexBase> res = nullptr;
     String index_type_name = doc["index_type"].get<String>();

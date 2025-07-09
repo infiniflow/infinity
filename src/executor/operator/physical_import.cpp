@@ -23,8 +23,9 @@ module;
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-
 #include <vector>
+
+#include "simdjson.h"
 
 module infinity_core;
 
@@ -564,9 +565,9 @@ void PhysicalImport::NewImportJSON(QueryContext *query_context, ImportOperatorSt
     }
 
     simdjson::padded_string json_arr(json_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_arr);
-    if (doc.type() != simdjson::json_type::array) {
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(json_arr);
+    if (doc.type() != simdjson::ondemand::json_type::array) {
         auto result_msg = MakeUnique<String>(fmt::format("Invalid json format, IMPORT 0 rows"));
         import_op_state->result_msg_ = std::move(result_msg);
         return;
@@ -670,24 +671,24 @@ void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
 
 SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
     simdjson::padded_string json_str(object_sv);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_str);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(json_str);
     switch (doc.type()) {
-        case simdjson::json_type::boolean: {
+        case simdjson::ondemand::json_type::boolean: {
             auto res = MakeShared<ConstantExpr>(LiteralType::kBoolean);
             res->bool_value_ = doc.get<bool>();
             return res;
         }
-        case simdjson::json_type::number: {
-            simdjson::number num = doc.get_number();
+        case simdjson::ondemand::json_type::number: {
+            simdjson::ondemand::number num = doc.get_number();
             switch (num.get_number_type()) {
-                case simdjson::number_type::unsigned_integer:
-                case simdjson::number_type::signed_integer: {
+                case simdjson::ondemand::number_type::unsigned_integer:
+                case simdjson::ondemand::number_type::signed_integer: {
                     auto res = MakeShared<ConstantExpr>(LiteralType::kInteger);
                     res->integer_value_ = (i64)num;
                     return res;
                 }
-                case simdjson::number_type::floating_point_number: {
+                case simdjson::ondemand::number_type::floating_point_number: {
                     auto res = MakeShared<ConstantExpr>(LiteralType::kDouble);
                     res->double_value_ = (double)num;
                     return res;
@@ -699,13 +700,13 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                 }
             }
         }
-        case simdjson::json_type::string: {
+        case simdjson::ondemand::json_type::string: {
             auto res = MakeShared<ConstantExpr>(LiteralType::kString);
             const String str = doc.get<String>();
             res->str_value_ = strdup(str.c_str());
             return res;
         }
-        case simdjson::json_type::array: {
+        case simdjson::ondemand::json_type::array: {
             const u32 array_size = doc.count_elements();
             if (array_size == 0) {
                 const auto error_info = "Empty json array!";
@@ -713,21 +714,21 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                 return nullptr;
             }
             std::vector<std::string_view> json_strs(array_size);
-            std::vector<simdjson::value> values(array_size);
+            std::vector<simdjson::ondemand::value> values(array_size);
             for (size_t index = 0; auto field : doc.get_array()) {
                 values[index] = field.value();
                 json_strs[index++] = values[index].raw_json();
             }
             switch (values[0].type()) {
-                case simdjson::json_type::boolean:
-                case simdjson::json_type::number: {
-                    std::vector<simdjson::number> nums(array_size);
+                case simdjson::ondemand::json_type::boolean:
+                case simdjson::ondemand::json_type::number: {
+                    std::vector<simdjson::ondemand::number> nums(array_size);
                     for (size_t index = 0; auto item : values) {
                         nums[index++] = item.get_number();
                     }
                     switch (nums[0].get_number_type()) {
-                        case simdjson::number_type::unsigned_integer:
-                        case simdjson::number_type::signed_integer: {
+                        case simdjson::ondemand::number_type::unsigned_integer:
+                        case simdjson::ondemand::number_type::signed_integer: {
                             auto res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
                             res->long_array_.resize(array_size);
                             for (u32 i = 0; i < array_size; ++i) {
@@ -735,7 +736,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                             }
                             return res;
                         }
-                        case simdjson::number_type::floating_point_number: {
+                        case simdjson::ondemand::number_type::floating_point_number: {
                             auto res = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
                             res->double_array_.resize(array_size);
                             for (u32 i = 0; i < array_size; ++i) {
@@ -750,7 +751,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                         }
                     }
                 }
-                case simdjson::json_type::array: {
+                case simdjson::ondemand::json_type::array: {
                     auto res = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
                     res->sub_array_array_.resize(array_size);
                     for (u32 i = 0; i < array_size; ++i) {
@@ -765,7 +766,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                 }
             }
         }
-        case simdjson::json_type::object: {
+        case simdjson::ondemand::json_type::object: {
             const u32 array_size = doc.count_fields();
             if (array_size != 1) {
                 const auto error_info = fmt::format("Unrecognized json object size: Expacted 1, but got {}", array_size);
@@ -780,7 +781,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(std::string_view object_sv) {
                     return nullptr;
                 }
                 auto value = obj.value();
-                if (value.type() != simdjson::json_type::array) {
+                if (value.type() != simdjson::ondemand::json_type::array) {
                     const auto error_info = fmt::format("Unrecognized json object type in array");
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
@@ -834,32 +835,32 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
         }
     }
     simdjson::padded_string json(object_sv);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(json);
     switch (doc.type()) {
-        case simdjson::json_type::array: {
+        case simdjson::ondemand::json_type::array: {
             const u32 array_size = doc.count_elements();
             if (array_size == 0) {
                 return res;
             }
             std::vector<std::string_view> json_strs(array_size);
-            std::vector<simdjson::value> values(array_size);
+            std::vector<simdjson::ondemand::value> values(array_size);
             for (size_t index = 0; auto field : doc.get_array()) {
                 values[index] = field.value();
                 json_strs[index++] = values[index].raw_json();
             }
-            if (values[0].type() != simdjson::json_type::number) {
+            if (values[0].type() != simdjson::ondemand::json_type::number) {
                 const auto error_info = fmt::format("Unrecognized json object type");
                 RecoverableError(Status::ImportFileFormatError(error_info));
                 return nullptr;
             }
-            std::vector<simdjson::number> nums(array_size);
+            std::vector<simdjson::ondemand::number> nums(array_size);
             for (size_t index = 0; auto item : values) {
                 nums[index++] = item.get_number();
             }
             switch (nums[0].get_number_type()) {
-                case simdjson::number_type::unsigned_integer:
-                case simdjson::number_type::signed_integer: {
+                case simdjson::ondemand::number_type::unsigned_integer:
+                case simdjson::ondemand::number_type::signed_integer: {
                     res->long_array_.resize(array_size);
                     for (u32 i = 0; i < array_size; ++i) {
                         res->long_array_[i] = (i64)nums[i];
@@ -873,7 +874,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
                 }
             }
         }
-        case simdjson::json_type::object: {
+        case simdjson::ondemand::json_type::object: {
             const u32 object_size = doc.count_fields();
             if (object_size == 0) {
                 return res;
@@ -888,17 +889,17 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
-                if (field_value.type() != simdjson::json_type::number) {
+                if (field_value.type() != simdjson::ondemand::json_type::number) {
                     const auto error_info = fmt::format("Unrecognized json object type in array");
                     RecoverableError(Status::ImportFileFormatError(error_info));
                     return nullptr;
                 }
 
-                simdjson::number num = field_value.get_number();
+                simdjson::ondemand::number num = field_value.get_number();
                 if (res->literal_type_ == LiteralType::kLongSparseArray) {
                     switch (num.get_number_type()) {
-                        case simdjson::number_type::unsigned_integer:
-                        case simdjson::number_type::signed_integer: {
+                        case simdjson::ondemand::number_type::unsigned_integer:
+                        case simdjson::ondemand::number_type::signed_integer: {
                             res->long_sparse_array_.first.push_back(field_key);
                             res->long_sparse_array_.second.push_back((i64)num);
                             break;
@@ -911,7 +912,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
                     }
                 } else {
                     switch (num.get_number_type()) {
-                        case simdjson::number_type::floating_point_number: {
+                        case simdjson::ondemand::number_type::floating_point_number: {
                             res->double_sparse_array_.first.push_back(field_key);
                             res->double_sparse_array_.second.push_back((double)num);
                             break;
@@ -936,13 +937,13 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(std::string_view object_
 
 void PhysicalImport::JSONLRowHandler(std::string_view line_sv, Vector<SharedPtr<ColumnVector>> &column_vectors) {
     simdjson::padded_string json_str(line_sv);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_str);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(json_str);
     for (SizeT i = 0; auto &column_vector_ptr : column_vectors) {
         ColumnVector &column_vector = *column_vector_ptr;
         const ColumnDef *column_def = table_info_->GetColumnDefByIdx(i++);
 
-        if (simdjson::value val; doc[column_def->name_].get(val) == simdjson::SUCCESS) {
+        if (simdjson::ondemand::value val; doc[column_def->name_].get(val) == simdjson::SUCCESS) {
             switch (column_vector.data_type()->type()) {
                 case LogicalType::kBoolean: {
                     bool v = val.get<bool>();

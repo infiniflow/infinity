@@ -38,6 +38,7 @@ import :base_memindex;
 import :memindex_tracer;
 import :mem_usage_change;
 import :chunk_index_meta;
+import :rcu_multimap;
 
 namespace infinity {
 
@@ -54,7 +55,8 @@ public:
 
     using PostingPtr = SharedPtr<PostingWriter>;
     // using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
-    using PostingTableStore = MapWithLock<String, PostingPtr>;
+    // using PostingTableStore = MapWithLock<String, PostingPtr>;
+    using PostingTableStore = RcuMap<String, PostingPtr>;
 
     struct PostingTable {
         PostingTable();

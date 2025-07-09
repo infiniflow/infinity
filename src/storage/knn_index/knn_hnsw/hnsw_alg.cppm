@@ -30,6 +30,7 @@ import :data_store;
 import :third_party;
 import serialize;
 import :dist_func_lsg_wrapper;
+import :plain_vec_store;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -49,7 +50,7 @@ export template <typename VecStoreType, typename LabelType, bool OwnMem>
 class KnnHnswBase {
 public:
     using This = KnnHnswBase<VecStoreType, LabelType, OwnMem>;
-    using DataType = typename VecStoreType::DataType;
+    using JustMoreMisleadingName = typename VecStoreType::JustMoreMisleadingName;
     using QueryVecType = typename VecStoreType::QueryVecType;
     using StoreType = typename VecStoreType::StoreType;
     using QueryType = typename VecStoreType::QueryType;

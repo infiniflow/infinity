@@ -47,14 +47,14 @@
 // "%code requires" blocks.
 #line 18 "search_parser.y"
 
-    // unique_ptr<QueryNode> requires sizeof(QueryNode)
-    // #ifndef QUERY_NODE_H
-    // #include "query_node.h"
-    // #endif
+    #include <memory>
+    #include <string>
+
+    // Import modules to get complete type definitions
     import infinity_core;
 
     namespace infinity {
-        class SearchDriver;
+        // Forward declaration for SearchScanner (defined in .h file)
         class SearchScanner;
 
         class InfString {
@@ -67,7 +67,7 @@
         };
     }
 
-#line 70 "search_parser.h"
+#line 71 "search_parser.h"
 
 # include <cassert>
 # include <cstdlib> // std::abort
@@ -208,7 +208,7 @@
 
 #line 10 "search_parser.y"
 namespace infinity {
-#line 211 "search_parser.h"
+#line 212 "search_parser.h"
 
 
 
@@ -1434,7 +1434,7 @@ switch (yykind)
 
 #line 10 "search_parser.y"
 } // infinity
-#line 1437 "search_parser.h"
+#line 1438 "search_parser.h"
 
 
 

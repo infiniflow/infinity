@@ -16,6 +16,7 @@ module;
 
 module infinity_core;
 
+import :stl;
 import :buffer_manager;
 import :buffer_handle;
 import :block_column_iter;
@@ -28,6 +29,8 @@ import :chunk_index_meta;
 import sparse_info;
 import embedding_type;
 import column_def;
+import :bmp_alg;
+// import data_type;
 
 namespace infinity {
 
@@ -240,9 +243,8 @@ void BMPHandler::Load(LocalFileHandle &file_handle) {
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::Load(file_handle);
-                } else {
-                    UnrecoverableError("BMPHandler::Load: index does not own memory");
+                    IndexT::Load(file_handle);
+                    // index = IndexT::Load(file_handle);
                 }
             }
         },

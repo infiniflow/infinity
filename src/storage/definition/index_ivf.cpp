@@ -14,11 +14,13 @@
 
 module;
 
-#include "json.hpp"
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "json.hpp"
+#include "simdjson.h"
 
 module infinity_core;
 
@@ -355,7 +357,7 @@ nlohmann::json IndexIVF::Serialize() const {
 
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroidOption &ivf_centroid_option) {
-    simdjson::object obj = val.get_object();
+    simdjson::ondemand::object obj = val.get_object();
     ivf_centroid_option.centroids_num_ratio_ = obj["centroids_num_ratio_"].get<float>();
     ivf_centroid_option.min_points_per_centroid_ = obj["min_points_per_centroid_"].get<u32>();
     ivf_centroid_option.max_points_per_centroid_ = obj["max_points_per_centroid_"].get<u32>();
@@ -363,7 +365,7 @@ auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroid
 }
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFStorageOption &ivf_storage_option) {
-    simdjson::object obj = val.get_object();
+    simdjson::ondemand::object obj = val.get_object();
     ivf_storage_option.type_ = (IndexIVFStorageOption::Type)(i8)obj["type_"].get<i8>();
     ivf_storage_option.plain_storage_data_type_ = (EmbeddingDataType)(int8_t)obj["plain_storage_data_type_"].get<int8_t>();
     ivf_storage_option.scalar_quantization_bits_ = obj["scalar_quantization_bits_"].get<u32>();
@@ -373,7 +375,7 @@ auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFStorageO
 }
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFOption &ivf_option) {
-    simdjson::object obj = val.get_object();
+    simdjson::ondemand::object obj = val.get_object();
     ivf_option.metric_ = (MetricType)(i8)obj["metric_"].get<i8>();
     ivf_option.centroid_option_ = obj["centroid_option_"].get<IndexIVFCentroidOption>();
     ivf_option.storage_option_ = obj["storage_option_"].get<IndexIVFStorageOption>();
@@ -382,8 +384,8 @@ auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFOption &
 
 IndexIVFOption IndexIVF::DeserializeIndexIVFOption(std::string_view ivf_option_str) {
     simdjson::padded_string ivf_option_json(ivf_option_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(ivf_option_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(ivf_option_json);
     return doc.get<IndexIVFOption>();
 }
 

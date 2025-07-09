@@ -4,34 +4,34 @@ module;
 #include <chrono>
 #include <cmath>
 
-// import :stl;
-// import :third_party;
-// import :status;
-// import :meta_info;
-// import :column_index_reader;
-// import :posting_iterator;
-// import :index_defines;
-// import :column_length_io;
-// import :infinity_exception;
-// import :logger;
-//
-// import :doc_iterator;
-// import :and_iterator;
-// import :and_not_iterator;
-// import :or_iterator;
-// import :term_doc_iterator;
-// import :phrase_doc_iterator;
-// import :blockmax_wand_iterator;
-// import :minimum_should_match_iterator;
-// import :parse_fulltext_options;
-// import :keyword_iterator;
-// import :must_first_iterator;
-// import :batch_or_iterator;
-// import :blockmax_leaf_iterator;
-// import :rank_feature_doc_iterator;
-// import :rank_features_doc_iterator;
-
 module infinity_core;
+
+import :stl;
+import :third_party;
+import :status;
+import :meta_info;
+import :column_index_reader;
+import :posting_iterator;
+import :index_defines;
+import :column_length_io;
+import :infinity_exception;
+import :logger;
+
+import :doc_iterator;
+import :and_iterator;
+import :and_not_iterator;
+import :or_iterator;
+import :term_doc_iterator;
+import :phrase_doc_iterator;
+import :blockmax_wand_iterator;
+import :minimum_should_match_iterator;
+import :parse_fulltext_options;
+import :keyword_iterator;
+import :must_first_iterator;
+import :batch_or_iterator;
+import :blockmax_leaf_iterator;
+import :rank_feature_doc_iterator;
+import :rank_features_doc_iterator;
 
 namespace infinity {
 
@@ -45,7 +45,7 @@ namespace infinity {
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
 void QueryNode::FilterOptimizeQueryTree() { UnrecoverableError("Should not reach here!"); }
 
-UniquePtr<QueryNode> QueryNode::GetOptimizedQueryTree(UniquePtr<QueryNode> root) {
+std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
     if (root->GetType() == QueryNodeType::FILTER) {
         root->FilterOptimizeQueryTree();
         return root;
@@ -62,7 +62,7 @@ UniquePtr<QueryNode> QueryNode::GetOptimizedQueryTree(UniquePtr<QueryNode> root)
         }
         LOG_DEBUG(std::move(oss).str());
     }
-    UniquePtr<QueryNode> optimized_root;
+    std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
         RecoverableError(Status::SyntaxError("Invalid query statement: Empty query tree"));
     }
@@ -114,7 +114,7 @@ UniquePtr<QueryNode> QueryNode::GetOptimizedQueryTree(UniquePtr<QueryNode> root)
     return optimized_root;
 }
 
-UniquePtr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
     for (auto &child : children_) {
         switch (child->GetType()) {
             case QueryNodeType::TERM:
@@ -157,7 +157,7 @@ UniquePtr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
 // invalid query: "A and ((not B) or C)" : subexpression "(not B) or C" is invalid
 // here it is equivalent to "(A and_not B) or (A and C)", but it is more simple to disallow this case
 
-UniquePtr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.empty()) {
         UnrecoverableError("Invalid query statement: NotQueryNode should have at least 1 children");
     }
@@ -206,12 +206,12 @@ UniquePtr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
 //                       Y     |      N       => build "and"
 //                       N     |      Y       => build "not" of (child or ...)
 
-UniquePtr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.size() < 2) {
         UnrecoverableError("Invalid query statement: AndQueryNode should have at least 2 children");
     }
-    std::vector<UniquePtr<QueryNode>> and_list;
-    std::vector<UniquePtr<QueryNode>> not_list;
+    std::vector<std::unique_ptr<QueryNode>> and_list;
+    std::vector<std::unique_ptr<QueryNode>> not_list;
     // 2.1.
     for (auto &child : children_) {
         switch (child->GetType()) {
@@ -298,12 +298,12 @@ UniquePtr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
 //                       Y    |      N       => build "or"
 //                       N    |      Y       => build "not" of (child and ...), here child can be term, "and", "and_not" or "or", need optimization
 
-UniquePtr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.size() < 2) {
         UnrecoverableError("Invalid query statement: OrQueryNode should have at least 2 children");
     }
-    std::vector<UniquePtr<QueryNode>> or_list;
-    std::vector<UniquePtr<QueryNode>> not_list;
+    std::vector<std::unique_ptr<QueryNode>> or_list;
+    std::vector<std::unique_ptr<QueryNode>> not_list;
     // 3.1.
     for (auto &child : children_) {
         switch (child->GetType()) {
@@ -357,7 +357,7 @@ UniquePtr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
         return not_node;
     } else if (not_list.empty()) {
         // merge duplicated TermQueryNode children
-        std::vector<UniquePtr<QueryNode>> or_list_tmp;
+        std::vector<std::unique_ptr<QueryNode>> or_list_tmp;
         for (auto &child1 : or_list) {
             if (child1->GetType() != QueryNodeType::TERM) {
                 or_list_tmp.emplace_back(std::move(child1));
@@ -395,7 +395,7 @@ UniquePtr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
     }
 }
 
-UniquePtr<QueryNode> RankFeaturesQueryNode::InnerGetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> RankFeaturesQueryNode::InnerGetNewOptimizedQueryTree() {
     UnrecoverableError("OptimizeInPlaceInner: Unexpected case! RankFeaturesQueryNode should not exist in parser output");
     return nullptr;
 }
@@ -403,18 +403,18 @@ UniquePtr<QueryNode> RankFeaturesQueryNode::InnerGetNewOptimizedQueryTree() {
 // 4. deal with "and_not":
 // "and_not" does not exist in parser output, it is generated during optimization
 
-UniquePtr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
     UnrecoverableError("OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output");
     return nullptr;
 }
 
-UniquePtr<QueryNode> KeywordQueryNode::InnerGetNewOptimizedQueryTree() {
+std::unique_ptr<QueryNode> KeywordQueryNode::InnerGetNewOptimizedQueryTree() {
     UnrecoverableError(std::format("{}: Should not reach here!", __func__));
     return nullptr;
 }
 
 // create search iterator
-UniquePtr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
+std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
     ColumnID column_id = params.table_info->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
@@ -443,7 +443,7 @@ UniquePtr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParams para
     return search;
 }
 
-UniquePtr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
+std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
     ColumnID column_id = params.table_info->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
@@ -462,7 +462,7 @@ UniquePtr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchPara
     return search;
 }
 
-UniquePtr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
+std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
     ColumnID column_id = params.table_info->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
@@ -474,7 +474,7 @@ UniquePtr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams pa
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
-    Vector<UniquePtr<PostingIterator>> posting_iterators;
+    Vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto &term : terms_) {
         auto posting_iterator = column_index_reader->Lookup(term, fetch_position);
         if (nullptr == posting_iterator) {
@@ -490,8 +490,8 @@ UniquePtr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams pa
     return search;
 }
 
-UniquePtr<DocIterator> AndQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<UniquePtr<DocIterator>> sub_doc_iters;
+std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     const auto next_params = params.RemoveMSM();
     for (auto &child : children_) {
@@ -514,8 +514,8 @@ UniquePtr<DocIterator> AndQueryNode::CreateSearch(const CreateSearchParams param
     }
 }
 
-UniquePtr<DocIterator> AndNotQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<UniquePtr<DocIterator>> sub_doc_iters;
+std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     // check if the first child is a valid query
     auto first_iter = children_.front()->CreateSearch(params, is_top_level);
@@ -538,9 +538,9 @@ UniquePtr<DocIterator> AndNotQueryNode::CreateSearch(const CreateSearchParams pa
     }
 }
 
-UniquePtr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<UniquePtr<DocIterator>> sub_doc_iters;
-    Vector<UniquePtr<DocIterator>> keyword_iters;
+std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    Vector<std::unique_ptr<DocIterator>> keyword_iters;
     sub_doc_iters.reserve(children_.size());
     bool all_are_term_or_phrase = true; // describe sub_doc_iters
     const QueryNode *only_child = nullptr;
@@ -563,7 +563,7 @@ UniquePtr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams params
         // no need for WAND
         all_are_term_or_phrase = false;
     }
-    auto GetIterResultT = [&params, &sub_doc_iters, &keyword_iters]<typename T>() -> UniquePtr<DocIterator> {
+    auto GetIterResultT = [&params, &sub_doc_iters, &keyword_iters]<typename T>() -> std::unique_ptr<DocIterator> {
         const u32 msm_bar = keyword_iters.empty() ? 1u : 0u;
         if (params.minimum_should_match > sub_doc_iters.size()) {
             return nullptr;
@@ -683,8 +683,8 @@ UniquePtr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams params
     if ((params.early_term_algo == EarlyTermAlgo::kAuto || params.early_term_algo == EarlyTermAlgo::kBatch) &&
         params.ft_similarity == FulltextSimilarity::kBM25 && term_children_need_batch()) {
         // term_iters will be non-empty
-        Vector<UniquePtr<DocIterator>> term_iters;
-        Vector<UniquePtr<DocIterator>> not_term_iters = std::move(keyword_iters);
+        Vector<std::unique_ptr<DocIterator>> term_iters;
+        Vector<std::unique_ptr<DocIterator>> not_term_iters = std::move(keyword_iters);
         for (auto &iter : sub_doc_iters) {
             if (iter->GetType() == DocIteratorType::kTermDocIterator) {
                 term_iters.emplace_back(std::move(iter));
@@ -718,8 +718,8 @@ UniquePtr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams params
     }
 }
 
-UniquePtr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
-    Vector<UniquePtr<DocIterator>> sub_doc_iters;
+std::unique_ptr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     const auto next_params = params.RemoveMSM();
     for (auto &child : children_) {
@@ -737,8 +737,8 @@ UniquePtr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSearchPar
     }
 }
 
-UniquePtr<DocIterator> KeywordQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    Vector<UniquePtr<DocIterator>> sub_doc_iters;
+std::unique_ptr<DocIterator> KeywordQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (const auto &child : children_) {
         if (child->GetType() != QueryNodeType::TERM) {
@@ -754,7 +754,7 @@ UniquePtr<DocIterator> KeywordQueryNode::CreateSearch(const CreateSearchParams p
     return std::make_unique<KeywordIterator>(std::move(sub_doc_iters), GetWeight());
 }
 
-UniquePtr<DocIterator> NotQueryNode::CreateSearch(CreateSearchParams, bool) const {
+std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(CreateSearchParams, bool) const {
     UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
     return nullptr;
 }

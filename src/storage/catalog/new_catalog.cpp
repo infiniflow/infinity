@@ -16,6 +16,9 @@ module;
 
 #include <filesystem>
 #include <string>
+
+#include "simdjson.h"
+
 module infinity_core;
 
 import :stl;
@@ -404,13 +407,8 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
         if (meta_key->type_ == MetaType::kPmObject) {
             auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
             simdjson::padded_string json(pm_path_key->value_);
-            simdjson::parser parser;
-            simdjson::document doc = parser.iterate(json);
-            String object_key = doc["obj_key"].get<String>();
-            if (object_key == "KEY_EMPTY") {
-                kv_instance_ptr->Delete(KeyEncode::PMObjectKey(pm_path_key->path_key_));
-                return true;
-            }
+            simdjson::ondemand::parser parser;
+            simdjson::ondemand::document doc = parser.iterate(json);
         }
         return false;
     });
@@ -420,7 +418,7 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
     return meta_keys;
 }
 
-Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
+UniquePtr<SystemCache> NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     LOG_INFO("Restore catalog cache");
 
     auto meta_tree = this->MakeMetaTree();
@@ -428,7 +426,7 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     // String meta_tree_str = meta_tree->ToJson().dump(4);
     // LOG_INFO(meta_tree_str);
 
-    system_cache_ = meta_tree->RestoreSystemCache(storage_ptr);
+    UniquePtr<SystemCache> system_cache = meta_tree->RestoreSystemCache(storage_ptr);
     // Vector<MetaTableObject *> table_ptrs = meta_tree->ListTables();
     // for (const auto &table_ptr : table_ptrs) {
     //     SegmentID unsealed_segment_id = table_ptr->GetUnsealedSegmentID();
@@ -441,12 +439,8 @@ Status NewCatalog::RestoreCatalogCache(Storage *storage_ptr) {
     //                          current_segment_row_count));
     // }
 
-    return Status::OK();
+    return system_cache;
 }
-
-SharedPtr<SystemCache> NewCatalog::GetSystemCache() const { return system_cache_; }
-
-SystemCache *NewCatalog::GetSystemCachePtr() const { return system_cache_.get(); }
 
 KVStore *NewCatalog::kv_store() const { return kv_store_; }
 

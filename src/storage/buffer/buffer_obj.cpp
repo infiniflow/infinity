@@ -105,17 +105,20 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kFreed: {
             buffer_mgr_->AddCacheMissCount();
+
+            if (type_ == BufferType::kEphemeral) {
+                String error_message = "Invalid status";
+                UnrecoverableError(error_message);
+            }
+
+            bool from_spill = type_ != BufferType::kPersistent;
+            file_worker_->ReadFromFile(from_spill);
+
             bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
             if (!free_success) {
                 String error_message = "Out of memory.";
                 UnrecoverableError(error_message);
             }
-            if (type_ == BufferType::kEphemeral) {
-                String error_message = "Invalid status";
-                UnrecoverableError(error_message);
-            }
-            bool from_spill = type_ != BufferType::kPersistent;
-            file_worker_->ReadFromFile(from_spill);
             break;
         }
         case BufferStatus::kNew: {

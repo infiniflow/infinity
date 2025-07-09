@@ -381,6 +381,10 @@ void SystemCache::AddNewDbCache(const String &db_name, u64 db_id) {
 
 void SystemCache::DropDbCache(u64 db_id) {
     std::unique_lock lock(cache_mtx_);
+    //    LOG_TRACE(fmt::format("Dropping db cache with id: {} db_cache_size: {}, db_name_size: {}",
+    //                         db_id,
+    //                         db_cache_map_.size(),
+    //                         db_name_map_.size()));
     auto cache_iter = db_cache_map_.find(db_id);
     if (cache_iter == db_cache_map_.end()) {
         LOG_ERROR(fmt::format("Db cache with id: {} not found", db_id));
@@ -482,6 +486,11 @@ Status SystemCache::AddDbCacheNolock(const SharedPtr<DbCache> &db_cache) {
     if (!insert_success) {
         UnrecoverableError(fmt::format("Db cache with id: {} already exists", db_cache->db_id()));
     }
+    //    LOG_TRACE(fmt::format("Adding db cache with id: {} and name: {}, name_map_size: {}, cache_map_size: {}",
+    //                         db_cache->db_id(),
+    //                         db_cache->db_name(),
+    //                         db_name_map_.size(),
+    //                         db_cache_map_.size()));
     return Status::OK();
 }
 

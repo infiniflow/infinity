@@ -13,8 +13,11 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
 #include <filesystem>
+
+#include "simdjson.h"
 
 module infinity_core;
 
@@ -46,8 +49,8 @@ nlohmann::json ObjAddr::Serialize() const {
 
 void ObjAddr::Deserialize(std::string_view obj_str) {
     simdjson::padded_string obj_json(obj_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(obj_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(obj_json);
     obj_key_ = doc["obj_key"].get<String>();
     part_offset_ = doc["part_offset"].get<SizeT>();
     part_size_ = doc["part_size"].get<SizeT>();

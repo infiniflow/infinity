@@ -15,6 +15,7 @@
 module;
 
 #include <cctype>
+#include <string>
 
 module infinity_core;
 

@@ -86,6 +86,8 @@ import :kv_store;
 import :meta_tree;
 import show_statement;
 import column_def;
+import data_type;
+import row_id;
 
 namespace infinity {
 

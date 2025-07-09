@@ -16,6 +16,8 @@ module;
 
 #include <vector>
 
+#include "simdjson.h"
+
 module infinity_core;
 
 import :stl;
@@ -53,12 +55,12 @@ nlohmann::json BlockColumnSnapshotInfo::Serialize() {
 
 SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(std::string_view column_block_str) {
     simdjson::padded_string column_block_json(column_block_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(column_block_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(column_block_json);
     auto column_block_snapshot = MakeShared<BlockColumnSnapshotInfo>();
     column_block_snapshot->column_id_ = doc["column_id"].get<ColumnID>();
     column_block_snapshot->filename_ = doc["filename"].get<String>();
-    if (simdjson::array array; doc["outlines"].get(array) == simdjson::SUCCESS) {
+    if (simdjson::ondemand::array array; doc["outlines"].get(array) == simdjson::SUCCESS) {
         for (auto outline_snapshot : array) {
             auto outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
             outline_snapshot_info->filename_ = outline_snapshot.get<String>();
@@ -80,8 +82,8 @@ nlohmann::json BlockSnapshotInfo::Serialize() {
 
 SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(std::string_view block_str) {
     simdjson::padded_string block_json(block_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(block_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(block_json);
     auto block_snapshot = MakeShared<BlockSnapshotInfo>();
     block_snapshot->block_id_ = doc["block_id"].get<BlockID>();
     block_snapshot->block_dir_ = doc["block_dir"].get<String>();
@@ -111,8 +113,8 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
 
 SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(std::string_view segment_str) {
     simdjson::padded_string segment_json(segment_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(segment_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(segment_json);
     auto segment_snapshot = MakeShared<SegmentSnapshotInfo>();
     segment_snapshot->segment_id_ = doc["segment_id"].get<SegmentID>();
     segment_snapshot->segment_dir_ = doc["segment_dir"].get<String>();
@@ -151,8 +153,8 @@ nlohmann::json SegmentIndexSnapshotInfo::Serialize() {
 
 SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(std::string_view segment_index_str) {
     simdjson::padded_string segment_index_json(segment_index_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(segment_index_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(segment_index_json);
     auto segment_index_snapshot = MakeShared<SegmentIndexSnapshotInfo>();
     segment_index_snapshot->segment_id_ = doc["segment_id"].get<SegmentID>();
     for (auto chunk_index_json : doc["chunk_indexes"]) {
@@ -174,8 +176,8 @@ nlohmann::json TableIndexSnapshotInfo::Serialize() {
 
 SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(std::string_view table_index_str) {
     simdjson::padded_string table_index_json(table_index_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(table_index_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(table_index_json);
     auto table_index_snapshot = MakeShared<TableIndexSnapshotInfo>();
     table_index_snapshot->index_dir_ = MakeShared<String>(doc["index_dir"].get<String>());
     table_index_snapshot->index_base_ = IndexBase::Deserialize(doc["index_base"].raw_json());
@@ -404,8 +406,8 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     }
 
     simdjson::padded_string snapshot_meta_json(json_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(snapshot_meta_json);
+    simdjson::ondemand::parser parser;
+    simdjson::ondemand::document doc = parser.iterate(snapshot_meta_json);
 
     //    LOG_INFO(snapshot_meta_json.dump());
 
@@ -433,13 +435,13 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     table_snapshot->next_segment_id_ = doc["next_segment_id"].get<SegmentID>();
     table_snapshot->row_count_ = doc["row_count"].get<SizeT>();
 
-    for (simdjson::array array = doc["column_definition"]; simdjson::simdjson_result<simdjson::value> column_def_json : array) {
+    for (simdjson::ondemand::array array = doc["column_definition"]; simdjson::simdjson_result<simdjson::ondemand::value> column_def_json : array) {
         SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json.raw_json());
         i64 column_id = column_def_json["column_id"].get<i64>();
         String column_name = column_def_json["column_name"].get<String>();
 
         std::set<ConstraintType> constraints;
-        if (simdjson::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
+        if (simdjson::ondemand::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
             for (auto column_constraint : constraints_json) {
                 ConstraintType constraint = (ConstraintType)(char)column_constraint.get<char>();
                 constraints.emplace(constraint);
@@ -460,12 +462,12 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
         table_snapshot->columns_.emplace_back(column_def);
     }
 
-    for (simdjson::array array = doc["segments"]; auto segment_meta_json : array) {
+    for (simdjson::ondemand::array array = doc["segments"]; auto segment_meta_json : array) {
         SharedPtr<SegmentSnapshotInfo> segment_snapshot = SegmentSnapshotInfo::Deserialize(segment_meta_json.raw_json());
         table_snapshot->segment_snapshots_.emplace(segment_snapshot->segment_id_, segment_snapshot);
     }
 
-    for (simdjson::array array = doc["table_indexes"]; auto table_index_meta_json : array) {
+    for (simdjson::ondemand::array array = doc["table_indexes"]; auto table_index_meta_json : array) {
         SharedPtr<TableIndexSnapshotInfo> table_index_snapshot = TableIndexSnapshotInfo::Deserialize(table_index_meta_json.raw_json());
         table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
     }
