@@ -870,12 +870,12 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
     dest_vec.AppendWith(column_vector, source_offset, append_rows);
 
     if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
-        // Ensure buffer obj is loaded.
+        //     Ensure buffer obj is loaded.
         SizeT _ = var_buffer_mgr->TotalSize();
-        // Status status = column_meta.SetChunkOffset(chunk_size);
-        // if (!status.ok()) {
-        //     return status;
-        // }
+        //     Status status = column_meta.SetChunkOffset(chunk_size);
+        //     if (!status.ok()) {
+        //         return status;
+        //     }
     }
     return Status::OK();
 }
@@ -1150,6 +1150,16 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         }
     }
 
+    SharedPtr<BlockLock> block_lock;
+    status = block_meta.GetBlockLock(block_lock);
+    if (!status.ok()) {
+        return status;
+    }
+    {
+        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+        block_lock->max_ts_ = this->CommitTS();
+    }
+
     return Status::OK();
 }
 
@@ -1241,17 +1251,19 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
             SharedPtr<BlockLock> block_lock;
             status = block_meta.GetBlockLock(block_lock);
             if (!status.ok()) {
-                return status;
+                LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, got no BlockLock", segment_id, block_id));
+                continue;
             }
 
             bool flush_version = false;
             bool flush_column = false;
             {
+                // TODO: Refactor min_ts_ and max_ts_ to per-column-ts
                 std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
                 if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
                     flush_version = true;
                 }
-                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->min_ts_)) {
+                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
                     flush_column = true;
                 }
             }
@@ -1276,6 +1288,17 @@ Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &o
                 }
             }
 
+            LOG_TRACE(fmt::format("NewTxn::CheckpointTable segment_id {}, block_id {}, flush_column {}, flush_version {}, option.checkpoint_ts_ {}, "
+                                  "block min_ts {}, block "
+                                  "max_ts {}, block checkpoint_ts {}",
+                                  segment_id,
+                                  block_id,
+                                  flush_column,
+                                  flush_version,
+                                  option.checkpoint_ts_,
+                                  block_lock->min_ts_,
+                                  block_lock->max_ts_,
+                                  block_lock->checkpoint_ts_));
             if (!flush_column or !flush_version) {
                 continue;
             } else {
