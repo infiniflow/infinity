@@ -245,7 +245,11 @@ QueryResult Infinity::Flush(const String &flush_type) {
     } else if (flush_type == "catalog") {
         flush_statement->type_ = FlushType::kCatalog;
     } else {
-        flush_statement->type_ = FlushType::kData;
+        LOG_TRACE(fmt::format("Unknown flush type: {}", flush_type));
+        QueryResult query_result;
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::InvalidQueryOption(fmt::format("Unknown flush type: '{}'", flush_type));
+        return query_result;
     }
 
     QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
