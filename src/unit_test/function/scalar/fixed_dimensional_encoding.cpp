@@ -16,6 +16,13 @@
 import base_test;
 import stl;
 import fixed_dimensional_encoding;
+import new_catalog;
+import data_block;
+import column_vector;
+import value;
+import data_type;
+import logical_type;
+import array_info;
 
 using namespace infinity;
 

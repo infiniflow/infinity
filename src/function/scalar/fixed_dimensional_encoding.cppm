@@ -19,6 +19,9 @@ module;
 export module fixed_dimensional_encoding;
 
 import stl;
+import new_catalog;
+import data_block;
+import column_vector;
 
 namespace infinity {
 
@@ -171,6 +174,10 @@ export Optional<Vector<float>> GenerateQueryFixedDimensionalEncoding(
 
 export Optional<Vector<float>> GenerateDocumentFixedDimensionalEncoding(
     const Vector<float>& tensor_data, const FixedDimensionalEncodingConfig& config);
+
+// SQL Function API
+export void RegisterFDEFunction(NewCatalog *catalog_ptr);
+export void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output);
 
 // Legacy compatibility functions for testing
 export namespace internal {
