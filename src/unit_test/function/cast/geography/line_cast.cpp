@@ -85,10 +85,10 @@ TEST_F(LineCastTest, line_cast1) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeLine(LineT(static_cast<f64>(i), static_cast<f64>(i), static_cast<f64>(i)));
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kLine);
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i));
         EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i));

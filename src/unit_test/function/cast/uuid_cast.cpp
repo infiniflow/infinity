@@ -91,7 +91,7 @@ TEST_F(UuidCastTest, uuid_cast1) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s('a' + i % 26, 16);
         UuidT uuid(s.c_str());
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kUuid);
         EXPECT_EQ(vx.value_.uuid, uuid);
     }
@@ -112,7 +112,7 @@ TEST_F(UuidCastTest, uuid_cast1) {
             UuidT uuid(s.c_str());
             String uuid_str(uuid.body, 16);
 
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             const String &s2 = vx.GetString();
             EXPECT_EQ(s2, s);
         }

@@ -142,11 +142,11 @@ TEST_P(TestTxnColumn, test_add_columns) {
         ColumnMeta column_meta(1, block_meta);
 
         ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+        status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
         EXPECT_TRUE(status.ok());
 
         for (u32 i = 0; i < row_count; ++i) {
-            EXPECT_EQ(col.GetValue(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValueByIndex(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
 
         status = new_txn_mgr->CommitTxn(txn);

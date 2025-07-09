@@ -233,10 +233,10 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
     }
@@ -254,7 +254,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         bool result = small2tiny_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_FALSE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
             i32 check_value = 0;
             if (i >= std::numeric_limits<i8>::min() && i <= std::numeric_limits<i8>::max()) {
@@ -276,7 +276,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         bool result = small2integer_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
             i16 check_value = static_cast<i16>(i);
             EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(check_value));
@@ -295,7 +295,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         bool result = small2bigint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
             i16 check_value = static_cast<i16>(i);
             EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(check_value));
@@ -315,7 +315,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         bool result = small2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
             HugeIntT check_value((static_cast<i16>(i) < 0) * -1, static_cast<i16>(i));
             EXPECT_EQ(vx.value_.huge_int, check_value);
@@ -335,7 +335,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         bool result = small2float_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
             i16 check_value = static_cast<i16>(i);
             EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(check_value));
@@ -355,7 +355,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         bool result = small2double_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters);
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
             i16 check_value = static_cast<i16>(i);
             EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(check_value));
@@ -391,7 +391,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             i16 check_value = static_cast<i16>(i);
             String check_str(std::to_string(check_value));
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             const String &s2 = vx.GetVarchar();
             EXPECT_STREQ(s2.c_str(), check_str.c_str());
         }

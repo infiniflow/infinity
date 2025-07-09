@@ -91,10 +91,10 @@ TEST_F(CircleCastTest, circle_cast1) {
         f64 r = static_cast<f64>(i);
         Value v = Value::MakeCircle(CircleT(p1, r));
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i));
         EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i));
