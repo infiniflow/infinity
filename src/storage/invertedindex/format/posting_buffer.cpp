@@ -11,135 +11,167 @@ import file_reader;
 
 namespace infinity {
 
-PostingBuffer::PostingBuffer() : buffer_(nullptr), capacity_(0), size_(0), is_buffer_valid_(true), posting_fields_(nullptr) {}
+// Constructor - initialize empty buffer state
+PostingBuffer::PostingBuffer()
+    : memory_buffer_(nullptr), column_capacity_(0), current_size_(0), buffer_validity_flag_(true), field_configuration_(nullptr) {}
 
-PostingBuffer::~PostingBuffer() { ReleaseBuffer(buffer_, capacity_); }
+// Destructor - clean up allocated memory
+PostingBuffer::~PostingBuffer() { ReleaseBuffer(memory_buffer_, column_capacity_); }
 
+// Reallocate buffer with larger capacity
 bool PostingBuffer::Reallocate() {
-    u8 old_capacity = capacity_;
-    u8 *old_buffer = (u8 *)buffer_;
-    u8 new_capacity = AllocatePlan(old_capacity);
-    if (new_capacity == old_capacity) {
+    u8 previous_capacity = column_capacity_;
+    u8 *previous_buffer = (u8 *)memory_buffer_;
+    u8 expanded_capacity = AllocatePlan(previous_capacity);
+
+    // Check if expansion is possible
+    if (expanded_capacity == previous_capacity) {
         return false;
     }
-    SizeT doc_item_size = new_capacity * posting_fields_->GetTotalSize();
-    u8 *new_buffer = (u8 *)malloc(doc_item_size);
 
-    BufferMemoryCopy(new_buffer, new_capacity, (u8 *)buffer_, capacity_, posting_fields_, size_);
+    // Calculate new buffer size
+    SizeT total_buffer_size = expanded_capacity * field_configuration_->GetTotalSize();
+    u8 *expanded_buffer = (u8 *)malloc(total_buffer_size);
 
-    is_buffer_valid_ = false;
+    // Copy existing data to new buffer
+    BufferMemoryCopy(expanded_buffer, expanded_capacity, (u8 *)memory_buffer_, column_capacity_, field_configuration_, current_size_);
 
-    buffer_ = new_buffer;
+    // Update buffer state atomically
+    buffer_validity_flag_ = false;
+    memory_buffer_ = expanded_buffer;
+    column_capacity_ = expanded_capacity;
+    buffer_validity_flag_ = true;
 
-    capacity_ = new_capacity;
-
-    is_buffer_valid_ = true;
-
-    ReleaseBuffer(old_buffer, old_capacity);
-
+    // Release old buffer
+    ReleaseBuffer(previous_buffer, previous_capacity);
     return true;
 }
 
-void PostingBuffer::ReleaseBuffer(u8 *buffer, u8 capacity) {
-    if (buffer == nullptr || capacity == 0) {
+// Release allocated buffer memory
+void PostingBuffer::ReleaseBuffer(u8 *buffer_ptr, u8 capacity) {
+    if (buffer_ptr == nullptr || capacity == 0) {
         return;
     }
-    free((void *)buffer);
+    free((void *)buffer_ptr);
 }
 
-void PostingBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingFields *posting_fields, u8 src_size) {
-    if (src == nullptr || src_size == 0) {
+// Copy buffer contents between different capacity buffers
+void PostingBuffer::BufferMemoryCopy(u8 *destination, u8 dest_columns, u8 *source, u8 src_columns, const PostingFields *fields, u8 source_size) {
+    // Early return for invalid source
+    if (source == nullptr || source_size == 0) {
         return;
     }
-    for (u8 i = 0; i < posting_fields->GetSize(); ++i) {
-        const PostingField *value = posting_fields->GetValue(i);
-        std::memcpy(GetRow(dst, dst_col_count, value), GetRow(src, src_col_count, value), src_size * value->GetSize());
+
+    // Copy each field's data
+    for (u8 field_index = 0; field_index < fields->GetSize(); ++field_index) {
+        const PostingField *field_info = fields->GetValue(field_index);
+        std::memcpy(GetRow(destination, dest_columns, field_info), GetRow(source, src_columns, field_info), source_size * field_info->GetSize());
     }
 }
 
-void PostingBuffer::Dump(const SharedPtr<FileWriter> &file) {
-    file->WriteVInt(size_);
-    file->WriteVInt(capacity_);
-    if (size_ > 0) {
-        for (u8 i = 0; i < posting_fields_->GetSize(); ++i) {
-            const PostingField *value = posting_fields_->GetValue(i);
-            u8 *buffer = GetRow(i);
-            file->Write((char *)buffer, (u32)size_ * value->GetSize());
+// Dump buffer contents to file
+void PostingBuffer::Dump(const SharedPtr<FileWriter> &output_file) {
+    output_file->WriteVInt(current_size_);
+    output_file->WriteVInt(column_capacity_);
+
+    if (current_size_ > 0) {
+        // Write each field's data
+        for (u8 field_index = 0; field_index < field_configuration_->GetSize(); ++field_index) {
+            const PostingField *field_info = field_configuration_->GetValue(field_index);
+            u8 *row_buffer = GetRow(field_index);
+            output_file->Write((char *)row_buffer, (u32)current_size_ * field_info->GetSize());
         }
     }
 }
 
-void PostingBuffer::Load(const SharedPtr<FileReader> &file) {
-    size_ = file->ReadVInt();
-    capacity_ = file->ReadVInt();
-    if (size_ > 0) {
-        Reserve(capacity_);
-        for (u8 i = 0; i < posting_fields_->GetSize(); ++i) {
-            const PostingField *value = posting_fields_->GetValue(i);
-            u8 *buffer = GetRow(i);
-            file->Read((char *)buffer, (u32)size_ * value->GetSize());
+// Load buffer contents from file
+void PostingBuffer::Load(const SharedPtr<FileReader> &input_file) {
+    current_size_ = input_file->ReadVInt();
+    column_capacity_ = input_file->ReadVInt();
+
+    if (current_size_ > 0) {
+        // Ensure buffer has sufficient capacity
+        Reserve(column_capacity_);
+
+        // Read each field's data
+        for (u8 field_index = 0; field_index < field_configuration_->GetSize(); ++field_index) {
+            const PostingField *field_info = field_configuration_->GetValue(field_index);
+            u8 *row_buffer = GetRow(field_index);
+            input_file->Read((char *)row_buffer, (u32)current_size_ * field_info->GetSize());
         }
     }
 }
 
-void PostingBuffer::Clear() { size_ = 0; }
+// Clear buffer contents
+void PostingBuffer::Clear() { current_size_ = 0; }
 
-bool PostingBuffer::SnapShot(PostingBuffer &posting_buffer) const {
-    posting_buffer.Clear();
+// Create snapshot of current buffer state
+bool PostingBuffer::SnapShot(PostingBuffer &target_buffer) const {
+    target_buffer.Clear();
 
-    if (posting_buffer.GetRowCount() != posting_fields_->GetSize()) {
+    // Validate row count compatibility
+    if (target_buffer.GetRowCount() != field_configuration_->GetSize()) {
         return false;
     }
-    if (buffer_ == nullptr || size_ == 0) {
+
+    // Handle empty buffer case
+    if (memory_buffer_ == nullptr || current_size_ == 0) {
         return true;
     }
 
-    // here we assume buffer size only can be increased
-    u8 snapshot_size = size_;
+    // Capture current state for snapshot
+    u8 snapshot_data_size = current_size_;
 
-    // snapshot_size <= snapshot_capacity in recycle pool
-    posting_buffer.Reserve(snapshot_size);
+    // Ensure target has sufficient capacity
+    target_buffer.Reserve(snapshot_data_size);
 
-    u8 snapshot_capacity = 0;
-    u8 *buffer_snapshot = buffer_;
+    u8 captured_capacity = 0;
+    u8 *captured_buffer = memory_buffer_;
+
+    // Atomic snapshot with consistency check
     do {
-        snapshot_capacity = capacity_;
-        buffer_snapshot = buffer_;
+        captured_capacity = column_capacity_;
+        captured_buffer = memory_buffer_;
 
-        BufferMemoryCopy((u8 *)posting_buffer.buffer_,
-                         posting_buffer.capacity_,
-                         (u8 *)buffer_snapshot,
-                         snapshot_capacity,
-                         posting_fields_,
-                         snapshot_size);
-    } while (!is_buffer_valid_ || buffer_ != buffer_snapshot || capacity_ > snapshot_capacity);
+        BufferMemoryCopy((u8 *)target_buffer.memory_buffer_,
+                         target_buffer.column_capacity_,
+                         (u8 *)captured_buffer,
+                         captured_capacity,
+                         field_configuration_,
+                         snapshot_data_size);
+    } while (!buffer_validity_flag_ || memory_buffer_ != captured_buffer || column_capacity_ > captured_capacity);
 
-    posting_buffer.size_ = snapshot_size;
+    target_buffer.current_size_ = snapshot_data_size;
     return true;
 }
 
-void PostingBuffer::Reserve(u8 capacity) {
-    if (capacity <= 0 || (buffer_ != nullptr && capacity_ >= capacity)) {
+// Reserve buffer capacity
+void PostingBuffer::Reserve(u8 required_capacity) {
+    // Skip if capacity is sufficient
+    if (required_capacity <= 0 || (memory_buffer_ != nullptr && column_capacity_ >= required_capacity)) {
         return;
     }
 
-    SizeT doc_item_size = capacity * posting_fields_->GetTotalSize();
+    // Calculate total memory needed
+    SizeT total_memory_size = required_capacity * field_configuration_->GetTotalSize();
+    u8 *new_buffer_ptr = (u8 *)malloc(total_memory_size);
 
-    u8 *new_buffer = (u8 *)malloc(doc_item_size);
-
-    if (buffer_ != nullptr) {
-        BufferMemoryCopy(new_buffer, capacity, (u8 *)buffer_, capacity_, posting_fields_, size_);
-        ReleaseBuffer((u8 *)buffer_, capacity_);
+    // Copy existing data if present
+    if (memory_buffer_ != nullptr) {
+        BufferMemoryCopy(new_buffer_ptr, required_capacity, (u8 *)memory_buffer_, column_capacity_, field_configuration_, current_size_);
+        ReleaseBuffer((u8 *)memory_buffer_, column_capacity_);
     }
 
-    buffer_ = new_buffer;
-    capacity_ = capacity;
+    // Update buffer pointers
+    memory_buffer_ = new_buffer_ptr;
+    column_capacity_ = required_capacity;
 }
 
-u8 PostingBuffer::AllocatePlan(u8 cur_capacity) {
-    if (cur_capacity < 2) {
+// Static allocation planning strategy
+u8 PostingBuffer::AllocatePlan(u8 current_capacity) {
+    if (current_capacity < 2) {
         return 2;
-    } else if (cur_capacity < 16) {
+    } else if (current_capacity < 16) {
         return 16;
     }
     return MAX_DOC_PER_RECORD;
