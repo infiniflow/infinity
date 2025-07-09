@@ -299,17 +299,15 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         UnrecoverableError(error_message);
     }
 
-    const auto &tensor_column = input.column_vectors[0];
-    const auto &dimension_column = input.column_vectors[1];
     SizeT row_count = input.row_count();
 
     for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
         // Get the dimension parameter
-        Value dimension_value = dimension_column->GetValue(row_idx);
+        Value dimension_value = input.GetValue(1, row_idx);
         BigIntT target_dimension = dimension_value.GetValue<BigIntT>();
 
         // Get the tensor data
-        Value tensor_value = tensor_column->GetValue(row_idx);
+        Value tensor_value = input.GetValue(0, row_idx);
 
         // Extract tensor data based on the tensor type
         Vector<float> tensor_data;
