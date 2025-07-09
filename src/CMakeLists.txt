@@ -332,7 +332,7 @@ add_executable(infinity
 #)
 
 ### Parser (built after infinity_core so it can access modules)
-#add_subdirectory(parser)
+add_subdirectory(parser)
 
 add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
