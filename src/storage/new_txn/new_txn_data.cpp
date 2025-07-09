@@ -286,7 +286,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
-            Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+            status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
             if (!status.ok()) {
                 return status;
             }
@@ -828,7 +828,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
 
     SharedPtr<BlockLock> block_lock;
     {
-        Status status = block_meta.GetBlockLock(block_lock);
+        status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
             return status;
         }
@@ -844,7 +844,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
         for (SizeT column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
             const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
             ColumnMeta column_meta(column_idx, block_meta);
-            Status status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
+            status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
                 return status;
             }
@@ -892,7 +892,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     {
         SharedPtr<BlockLock> block_lock;
-        Status status = block_meta.GetBlockLock(block_lock);
+        status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
             return status;
         }
@@ -903,7 +903,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
-            Status status = block_version->Delete(block_offset, commit_ts);
+            status = block_version->Delete(block_offset, commit_ts);
             if (!status.ok()) {
                 return status;
             }
@@ -956,7 +956,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const Vector<BlockOffs
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     {
         SharedPtr<BlockLock> block_lock;
-        Status status = block_meta.GetBlockLock(block_lock);
+        status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
             return status;
         }
@@ -966,7 +966,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const Vector<BlockOffs
         BufferHandle buffer_handle = version_buffer->Load();
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
         for (BlockOffset block_offset : block_offsets) {
-            Status status = block_version->Print(begin_ts, block_offset, ignore_invisible);
+            status = block_version->Print(begin_ts, block_offset, ignore_invisible);
             if (!status.ok()) {
                 return status;
             }
@@ -1074,8 +1074,6 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
         if (value_expr->Type() == *column_type) {
             default_values.push_back(value_expr->GetValue());
         } else {
-            const SharedPtr<DataType> &column_type = column_def->type();
-
             BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *column_type);
             SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *column_type);
             SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
@@ -1124,9 +1122,9 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
     }
     SizeT old_column_cnt = 0;
     {
-        auto [all_column_defs, status] = block_meta.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
+        auto [all_column_defs, col_status] = block_meta.segment_meta().table_meta().GetColumnDefs();
+        if (!col_status.ok()) {
+            return col_status;
         }
         old_column_cnt = all_column_defs->size() - column_defs.size();
     }
@@ -1147,7 +1145,7 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
             return status;
         }
 
-        for (SizeT i = 0; i < block_row_count; ++i) {
+        for (SizeT j = 0; j < block_row_count; ++j) {
             column_vector.AppendValue(default_value);
         }
     }
@@ -1197,15 +1195,15 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     };
 
     auto drop_columns_in_segment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
-        if (!status.ok()) {
-            return status;
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        if (!block_status.ok()) {
+            return block_status;
         }
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
-            status = drop_columns_in_block(block_meta);
-            if (!status.ok()) {
-                return status;
+            block_status = drop_columns_in_block(block_meta);
+            if (!block_status.ok()) {
+                return block_status;
             }
         }
         return Status::OK();
@@ -1623,9 +1621,9 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
 
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
-        auto [block_ids, status] = segment_meta.GetBlockIDs1();
-        if (!status.ok()) {
-            return status;
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        if (!block_status.ok()) {
+            return block_status;
         }
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
@@ -1768,7 +1766,7 @@ Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_m
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
-            Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+            status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
             if (!status.ok()) {
                 return status;
             }
