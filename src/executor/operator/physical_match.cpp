@@ -257,6 +257,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
                           static_cast<TimeDurationType>(finish_query_builder_time - finish_init_query_builder_time).count()));
 
     // 3 full text search
+    LOG_INFO(fmt::format("PhysicalMatch ExecuteFTSearch top_n: {}", top_n_));
     const auto [result_count, score_result, row_id_result] = ExecuteFTSearch(query_iterators, top_n_);
     auto finish_query_time = std::chrono::high_resolution_clock::now();
     LOG_DEBUG(fmt::format("PhysicalMatch Part 3: Full text search time: {} ms",
@@ -297,10 +298,13 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             u32 segment_offset = row_id.segment_offset_;
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
+            LOG_INFO(fmt::format("Abc PhysicalMatch: Output row_id: {}, segment_id: {}, segment_offset: {}, block_id: {}, block_offset: {}, output_block_row_id: {}",
+                          row_id.ToString(), segment_id, segment_offset, block_id, block_offset, output_block_row_id));
             SizeT column_id = 0;
             for (; column_id < column_n; ++column_id) {
                 output_to_data_block_helper
                     .AddOutputJobInfo(segment_id, block_id, column_ids[column_id], block_offset, output_block_idx, column_id, output_block_row_id);
+
                 output_block_ptr->column_vectors[column_id]->Finalize(output_block_ptr->column_vectors[column_id]->Size() + 1);
             }
             Value v = Value::MakeFloat(score_result[output_id]);

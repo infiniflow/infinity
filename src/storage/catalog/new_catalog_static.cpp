@@ -1187,6 +1187,7 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag u
 }
 
 Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector) {
+    LOG_INFO(fmt::format("Abc NewCatalog::GetColumnVector row_count: {}", row_count));
     SharedPtr<DataType> column_type{};
     {
         TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
