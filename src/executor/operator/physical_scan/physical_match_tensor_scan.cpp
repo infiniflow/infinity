@@ -409,7 +409,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                 ColumnMeta column_meta(this->search_column_id_, block_meta);
                                                 ColumnVector column_vector;
                                                 status =
-                                                    NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorTipe::kReadOnly, column_vector);
+                                                    NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorMode::kReadOnly, column_vector);
                                                 if (!status.ok()) {
                                                     UnrecoverableError(status.message());
                                                 }
@@ -474,7 +474,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             }
             ColumnMeta column_meta(this->search_column_id_, *block_meta);
             ColumnVector column_vector;
-            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, column_vector);
+            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -986,7 +986,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vec);
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vec);
         if (!status.ok()) {
             UnrecoverableError("GetRowCnt1 failed!");
         }

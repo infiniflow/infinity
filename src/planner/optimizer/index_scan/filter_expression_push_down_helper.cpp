@@ -488,7 +488,7 @@ Value FilterExpressionPushDownHelper::CalcValueResult(const SharedPtr<BaseExpres
         result_vector->Initialize();
         ExpressionEvaluator expr_evaluator; // does not need input_data_block_
         expr_evaluator.Execute(expression, expression_state, result_vector);
-        return result_vector->GetValue(0);
+        return result_vector->GetValueByIndex(0);
     }
 }
 

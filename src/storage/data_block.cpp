@@ -218,14 +218,14 @@ void DataBlock::Reset(SizeT capacity) {
     finalized = false;
 }
 
-Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return column_vectors[column_index]->GetValue(row_index); }
+Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return column_vectors[column_index]->GetValueByIndex(row_index); }
 
 void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
     if (column_index >= column_count_) {
         String error_message = fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_);
         UnrecoverableError(error_message);
     }
-    column_vectors[column_index]->SetValue(row_index, val);
+    column_vectors[column_index]->SetValueByIndex(row_index, val);
 }
 
 void DataBlock::AppendValue(SizeT column_index, const Value &value) {

@@ -151,12 +151,12 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
         if (column_id != cache_column_id) {
             // LOG_TRACE(fmt::format("Get column vector from segment_id: {}, block_id: {}, column_id: {}", segment_id, block_id, column_id));
             ColumnMeta column_meta(column_id, *cached_block_meta);
-            NewCatalog::GetColumnVector(column_meta, cached_block_row_cnt, ColumnVectorTipe::kReadOnly, cache_column_vector);
+            NewCatalog::GetColumnVector(column_meta, cached_block_row_cnt, ColumnVectorMode::kReadOnly, cache_column_vector);
 
             cache_column_id = column_id;
         }
-        auto val_for_update = cache_column_vector.GetValue(block_offset);
-        output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValue(output_row_id, val_for_update);
+        auto val_for_update = cache_column_vector.GetValueByIndex(block_offset);
+        output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValueByIndex(output_row_id, val_for_update);
     }
     output_job_infos.clear();
 }
