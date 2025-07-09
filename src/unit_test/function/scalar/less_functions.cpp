@@ -106,7 +106,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (static_cast<i8>(i) < static_cast<i8>(i + i)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -159,7 +159,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (static_cast<i16>(i) < static_cast<i16>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -212,7 +212,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (static_cast<i32>(i) < static_cast<i32>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -265,7 +265,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (static_cast<i64>(i) < static_cast<i64>(i / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -318,7 +318,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (HugeIntT(static_cast<i64>(i), static_cast<i64>(i)) < HugeIntT(static_cast<i64>(i / 2), static_cast<i64>(i / 2))) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -371,7 +371,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (static_cast<f32>(i) < (static_cast<f32>(i) / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -424,7 +424,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (static_cast<f64>(i) < (static_cast<f64>(i) / 2)) {
                 EXPECT_EQ(v.value_.boolean, true);
@@ -488,7 +488,7 @@ TEST_F(LessFunctionsTest, less_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
                 String s1 = "Helloworld" + std::to_string(i);

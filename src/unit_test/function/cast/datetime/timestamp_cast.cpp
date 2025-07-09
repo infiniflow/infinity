@@ -100,10 +100,10 @@ TEST_F(TimestampCastTest, datetime_cast1) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeTimestamp(TimestampT(static_cast<i32>(i), static_cast<i32>(i)));
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
         EXPECT_FLOAT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
         EXPECT_FLOAT_EQ(vx.value_.datetime.time, static_cast<i32>(i));

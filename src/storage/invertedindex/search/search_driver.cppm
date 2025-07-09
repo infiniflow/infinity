@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
 
 #include <map>
 #include <memory>
 #include <string>
 
-#include "query_node.h"
+export module search_driver;
+
+import stl;
+import query_node;
 
 namespace infinity {
 
-struct QueryNode;
-
-enum class FulltextQueryOperatorOption {
+export enum class FulltextQueryOperatorOption {
     kInfinitySyntax, // use parser's syntax
     kAnd,            // combine all terms with AND
     kOr,             // combine all terms with OR
@@ -33,7 +34,7 @@ enum class FulltextQueryOperatorOption {
 /**
  * Conducting the whole scanning and parsing.
  */
-class SearchDriver {
+export class SearchDriver {
 public:
     SearchDriver(const std::map<std::string, std::string> &field2analyzer,
                  const std::string &default_field,

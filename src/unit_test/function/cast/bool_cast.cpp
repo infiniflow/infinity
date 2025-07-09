@@ -86,10 +86,10 @@ TEST_F(BoolCastTest, bool_cast1) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeBool(i % 2 == 0);
         col_bool->AppendValue(v);
-        Value vx = col_bool->GetValue(i);
+        Value vx = col_bool->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_bool->GetValue(i);
+        Value vx = col_bool->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, i % 2 == 0);
     }
@@ -107,7 +107,7 @@ TEST_F(BoolCastTest, bool_cast1) {
     //        bool result = bool2varchar_ptr.function(col_bool, col_varchar_ptr, DEFAULT_VECTOR_SIZE, cast_parameters);
     //        EXPECT_TRUE(result);
     //        for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-    //            Value vx = col_varchar_ptr->GetValue(i);
+    //            Value vx = col_varchar_ptr->GetValueByIndex(i);
     //            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
     //            String res = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
     //            if (i % 2 == 0) {

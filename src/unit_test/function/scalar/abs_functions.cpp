@@ -97,7 +97,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             i8 res = static_cast<i8>(i);
             if (res == std::numeric_limits<i8>::min()) {
@@ -143,7 +143,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             i16 res = static_cast<i16>(i);
             EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
@@ -185,7 +185,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             i32 res = static_cast<i32>(i);
             EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
@@ -227,7 +227,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             i64 res = static_cast<i64>(i);
             EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
@@ -274,7 +274,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             f32 input = i - 16384;
             input -= 0.5;
@@ -322,7 +322,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
         func.function_(data_block, result);
 
         for (i64 i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             f64 input = i - 16384;
             input -= 0.5;

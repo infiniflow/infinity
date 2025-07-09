@@ -89,11 +89,11 @@ TEST_P(TestDataRequest, test_select) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(1));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(1));
         }
         {
             SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
-            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("abc"));
         }
     }
 }
@@ -128,11 +128,11 @@ TEST_P(TestDataRequest, test_delete) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
         {
             SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
-            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("def"));
+            EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("def"));
         }
     }
 }
@@ -167,13 +167,13 @@ TEST_P(TestDataRequest, test_update) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
-            EXPECT_EQ(col0->GetValue(1), Value::MakeInt(1));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(1), Value::MakeInt(1));
         }
         {
             SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
-            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("def"));
-            EXPECT_EQ(col1->GetValue(1), Value::MakeVarchar("xyz"));
+            EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("def"));
+            EXPECT_EQ(col1->GetValueByIndex(1), Value::MakeVarchar("xyz"));
         }
     }
 }
