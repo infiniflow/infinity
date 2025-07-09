@@ -117,7 +117,7 @@ public:
         dump_thread_ = Thread([this] { DumpRoutine(); });
     }
 
-    virtual ~TestMemIndexTracer() {
+    ~TestMemIndexTracer() override {
         task_queue_.Enqueue(nullptr);
         dump_thread_.join();
         catalog_.reset();

@@ -76,7 +76,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(v == vx, true);
     }
 
@@ -99,7 +99,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
                 data2[j] = double(static_cast<float>(i) + static_cast<float>(j) + 0.5f);
             }
             Value v = Value::MakeEmbedding(data2);
-            Value vx = col_target->GetValue(i);
+            Value vx = col_target->GetValueByIndex(i);
             EXPECT_EQ(v == vx, true);
         }
     }

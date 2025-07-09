@@ -464,11 +464,11 @@ TEST_P(WalReplayTest, wal_replay_append) {
                 auto check_column = [&](ColumnID column_id, const Value &v) {
                     ColumnMeta column_meta(column_id, block_meta);
                     ColumnVector col1;
-                    status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, col1);
+                    status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, col1);
                     EXPECT_TRUE(status.ok());
 
                     for (u32 i = 0; i < block_row_count; ++i) {
-                        EXPECT_EQ(col1.GetValue(i), v);
+                        EXPECT_EQ(col1.GetValueByIndex(i), v);
                     }
                 };
 
@@ -668,11 +668,11 @@ TEST_P(WalReplayTest, wal_replay_import) {
                     auto check_column = [&](ColumnID column_id, const Value &v) {
                         ColumnMeta column_meta(column_id, block_meta);
                         ColumnVector col1;
-                        status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, col1);
+                        status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorMode::kReadOnly, col1);
                         EXPECT_TRUE(status.ok());
 
                         for (u32 i = 0; i < block_row_count; ++i) {
-                            EXPECT_EQ(col1.GetValue(i), v);
+                            EXPECT_EQ(col1.GetValueByIndex(i), v);
                         }
                     };
 

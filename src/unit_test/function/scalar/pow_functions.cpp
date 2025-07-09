@@ -106,7 +106,7 @@ TEST_F(PowFunctionsTest, mul_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, std::pow(static_cast<f32>(i), static_cast<f32>(i % 4)));
         }
@@ -155,7 +155,7 @@ TEST_F(PowFunctionsTest, mul_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, std::pow(static_cast<f64>(i), static_cast<f64>(i % 4)));
         }

@@ -211,7 +211,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     ColumnVector column_vector;
                     ColumnMeta column_meta(column_id, *current_block_meta);
                     SizeT row_cnt = range_state->block_offset_end();
-                    Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                    Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorMode::kReadOnly, column_vector);
                     if (!status.ok()) {
                         RecoverableError(status);
                     }

@@ -120,14 +120,14 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
                         }
                         analyzer->SetCharOffset(true);
                         for (SizeT i = 0; i < num_rows; ++i) {
-                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValue(i).GetVarchar();
+                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
                             String output;
                             Highlighter::instance().GetHighlightWithStemmer(query_terms, raw_content, output, analyzer.get());
                             highlight_column->AppendValue(Value::MakeVarchar(output));
                         }
                     } else {
                         for (SizeT i = 0; i < num_rows; ++i) {
-                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValue(i).GetVarchar();
+                            String raw_content = output_data_block->column_vectors[expr_idx]->GetValueByIndex(i).GetVarchar();
                             String output;
                             Highlighter::instance().GetHighlightWithoutStemmer(query_terms, raw_content, output);
                             highlight_column->AppendValue(Value::MakeVarchar(output));

@@ -91,10 +91,10 @@ TEST_F(LineSegCastTest, line_seg_cast1) {
         PointT p2(static_cast<f64>(i + 1), static_cast<f64>(i + 1));
         Value v = Value::MakeLineSegment(LineSegT(p1, p2));
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i));
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i));

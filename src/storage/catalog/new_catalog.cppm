@@ -61,7 +61,7 @@ class SystemCache;
 class FunctionSet;
 class SpecialFunction;
 
-enum class ColumnVectorTipe;
+enum class ColumnVectorMode;
 
 template <bool init_all_true>
 struct RoaringBitmap;
@@ -329,7 +329,7 @@ public:
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
 
-    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
+    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 
