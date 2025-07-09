@@ -27,6 +27,7 @@ jobs:
     name: run slow test
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'slow-test') }}
     runs-on: ["self-hosted", "slow-test" ]
+    timeout-minutes: 720 # 12 hours
     steps:
 
       - name: Choose test type
