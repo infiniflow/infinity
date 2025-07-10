@@ -28,20 +28,20 @@ import internal_types;
 import :column_vector;
 
 namespace infinity {
-export template <typename DataType1>
+export template <typename DataType>
 class MemIndexInserterIter1 {
 public:
-    using ValueType = const DataType1 *;
+    using ValueType = const DataType *;
 
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
         : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
 
-    Optional<Pair<const DataType1 *, SegmentOffset>> Next() {
+    Optional<Pair<const DataType *, SegmentOffset>> Next() {
         if (cur_ == end_) {
             return None;
         }
         const void *ret = col_.data() + cur_ * ele_size_;
-        const auto *v_ptr = reinterpret_cast<const DataType1 *>(ret);
+        const auto *v_ptr = reinterpret_cast<const DataType *>(ret);
         return std::make_pair(v_ptr, block_offset_ + cur_++);
     }
 
@@ -90,22 +90,22 @@ private:
     SizeT multi_vector_cur_ = 0;
 };
 
-export template <typename DataType1, typename IdxType>
-class MemIndexInserterIter1<SparseVecRef<DataType1, IdxType>> {
+export template <typename DataType, typename IdxType>
+class MemIndexInserterIter1<SparseVecRef<DataType, IdxType>> {
 public:
-    using ValueType = SparseVecRef<DataType1, IdxType>;
+    using ValueType = SparseVecRef<DataType, IdxType>;
 
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
         : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
 
-    Optional<Pair<SparseVecRef<DataType1, IdxType>, SegmentOffset>> Next() {
+    Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
         if (cur_ == end_) {
             return None;
         }
         auto [data_span, index_span, nnz] = col_.GetSparseRaw(cur_++);
-        auto *data_ptr = reinterpret_cast<const DataType1 *>(data_span.data());
+        auto *data_ptr = reinterpret_cast<const DataType *>(data_span.data());
         auto *index_ptr = reinterpret_cast<const IdxType *>(index_span.data());
-        return std::make_pair(SparseVecRef<DataType1, IdxType>(nnz, index_ptr, data_ptr), block_offset_ + cur_ - 1);
+        return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, index_ptr, data_ptr), block_offset_ + cur_ - 1);
     }
 
 private:

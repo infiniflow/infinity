@@ -33,22 +33,22 @@ import :data_store_util;
 
 namespace infinity {
 
-export template <typename DataType1, typename LocalCacheType, typename CompressType>
+export template <typename DataType, typename LocalCacheType, typename CompressType>
 struct LVQData {
-    DataType1 scale_;
-    DataType1 bias_;
+    DataType scale_;
+    DataType bias_;
     LocalCacheType local_cache_;
     CompressType compress_vec_[];
 };
 
-export template <typename DataType1, typename CompressType, typename LVQCache, bool OwnMem>
+export template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
 class LVQVecStoreInner;
 
-export template <typename DataType1, typename CompressType, typename LVQCache>
+export template <typename DataType, typename CompressType, typename LVQCache>
 class LVQVecStoreMetaType {
 public:
     using LocalCacheType = LVQCache::LocalCacheType;
-    using LVQData = LVQData<DataType1, LocalCacheType, CompressType>;
+    using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
     struct LVQQuery {
         UniquePtr<LVQData> inner_;
         operator const LVQData *() const { return inner_.get(); }
@@ -63,19 +63,19 @@ public:
     using DistanceType = f32;
 };
 
-template <typename DataType1, typename CompressType, typename LVQCache, bool OwnMem>
+template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
 class LVQVecStoreMetaBase {
 public:
     // Compress type must be i8 temporarily
     static_assert(std::is_same<CompressType, i8>() || std::is_same<CompressType, void>());
     constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for i8
 
-    using This = LVQVecStoreMetaBase<DataType1, CompressType, LVQCache, OwnMem>;
-    using Inner = LVQVecStoreInner<DataType1, CompressType, LVQCache, OwnMem>;
+    using This = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem>;
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCache, OwnMem>;
     using LocalCacheType = LVQCache::LocalCacheType;
     using GlobalCacheType = LVQCache::GlobalCacheType;
-    using LVQData = LVQVecStoreMetaType<DataType1, CompressType, LVQCache>::LVQData;
-    using LVQQuery = LVQVecStoreMetaType<DataType1, CompressType, LVQCache>::LVQQuery;
+    using LVQData = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::LVQData;
+    using LVQQuery = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::LVQQuery;
 
 public:
     LVQVecStoreMetaBase() : dim_(0), compress_data_size_(0), normalize_(false) {}
@@ -103,19 +103,19 @@ public:
         }
     }
 
-    LVQQuery MakeQuery(const DataType1 *vec) const {
+    LVQQuery MakeQuery(const DataType *vec) const {
         LVQQuery query(compress_data_size_);
         CompressTo(vec, query.inner_.get());
         return query;
     }
 
-    void CompressTo(const DataType1 *src, LVQData *dest) const {
-        UniquePtr<DataType1[]> normalized;
+    void CompressTo(const DataType *src, LVQData *dest) const {
+        UniquePtr<DataType[]> normalized;
         if (normalize_) {
-            normalized = MakeUniqueForOverwrite<DataType1[]>(this->dim_);
-            DataType1 norm = 0;
+            normalized = MakeUniqueForOverwrite<DataType[]>(this->dim_);
+            DataType norm = 0;
             for (SizeT j = 0; j < this->dim_; ++j) {
-                DataType1 x = src[j];
+                DataType x = src[j];
                 norm += x * x;
             }
             norm = std::sqrt(norm);
@@ -131,19 +131,19 @@ public:
 
         CompressType *compress = dest->compress_vec_;
 
-        DataType1 lower = std::numeric_limits<DataType1>::max();
-        DataType1 upper = -std::numeric_limits<DataType1>::max();
+        DataType lower = std::numeric_limits<DataType>::max();
+        DataType upper = -std::numeric_limits<DataType>::max();
         for (SizeT j = 0; j < dim_; ++j) {
-            auto x = static_cast<DataType1>(src[j] - mean_[j]);
+            auto x = static_cast<DataType>(src[j] - mean_[j]);
             lower = std::min(lower, x);
             upper = std::max(upper, x);
         }
-        DataType1 scale = (upper - lower) / max_bucket_idx_;
-        DataType1 bias = lower - std::numeric_limits<CompressType>::min() * scale;
+        DataType scale = (upper - lower) / max_bucket_idx_;
+        DataType bias = lower - std::numeric_limits<CompressType>::min() * scale;
         if (scale == 0) {
             std::fill(compress, compress + dim_, 0);
         } else {
-            DataType1 scale_inv = 1 / scale;
+            DataType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim_; ++j) {
                 auto c = std::floor((src[j] - mean_[j] - bias) * scale_inv + 0.5);
                 assert(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min());
@@ -164,16 +164,16 @@ public:
     const MeanType *mean() const { return mean_.get(); }
 
 protected:
-    void DecompressByMeanTo(const LVQData *src, const MeanType *mean, DataType1 *dest) const {
+    void DecompressByMeanTo(const LVQData *src, const MeanType *mean, DataType *dest) const {
         const CompressType *compress = src->compress_vec_;
-        DataType1 scale = src->scale_;
-        DataType1 bias = src->bias_;
+        DataType scale = src->scale_;
+        DataType bias = src->bias_;
         for (SizeT i = 0; i < dim_; ++i) {
             dest[i] = scale * compress[i] + bias + mean[i];
         }
     }
 
-    void DecompressTo(const LVQData *src, DataType1 *dest) const { DecompressByMeanTo(src, mean_.get(), dest); };
+    void DecompressTo(const LVQData *src, DataType *dest) const { DecompressByMeanTo(src, mean_.get(), dest); };
 
 protected:
     SizeT dim_;
@@ -313,14 +313,14 @@ public:
     }
 };
 
-template <typename DataType1, typename CompressType, typename LVQCache, bool OwnMem>
+template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
 class LVQVecStoreInnerBase {
 public:
-    using This = LVQVecStoreInnerBase<DataType1, CompressType, LVQCache, OwnMem>;
-    using Meta = LVQVecStoreMetaBase<DataType1, CompressType, LVQCache, OwnMem>;
+    using This = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem>;
+    using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem>;
     // Decompress: Q = scale * C + bias + Mean
     using LocalCacheType = LVQCache::LocalCacheType;
-    using LVQData = LVQData<DataType1, LocalCacheType, CompressType>;
+    using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
 
 public:
     LVQVecStoreInnerBase() = default;
@@ -364,14 +364,14 @@ public:
     }
 };
 
-export template <typename DataType1, typename CompressType, typename LVQCache, bool OwnMem>
-class LVQVecStoreInner : public LVQVecStoreInnerBase<DataType1, CompressType, LVQCache, OwnMem> {
+export template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
+class LVQVecStoreInner : public LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem> {
 public:
-    using This = LVQVecStoreInner<DataType1, CompressType, LVQCache, OwnMem>;
-    using Meta = LVQVecStoreMetaBase<DataType1, CompressType, LVQCache, OwnMem>;
+    using This = LVQVecStoreInner<DataType, CompressType, LVQCache, OwnMem>;
+    using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem>;
     using LocalCacheType = LVQCache::LocalCacheType;
-    using LVQData = LVQData<DataType1, LocalCacheType, CompressType>;
-    using Base = LVQVecStoreInnerBase<DataType1, CompressType, LVQCache, OwnMem>;
+    using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
+    using Base = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem>;
 
 private:
     LVQVecStoreInner(SizeT max_vec_num, const Meta &meta) { this->ptr_ = MakeUnique<char[]>(max_vec_num * meta.compress_data_size()); }
@@ -401,18 +401,18 @@ public:
         return ret;
     }
 
-    void SetVec(SizeT idx, const DataType1 *vec, const Meta &meta, SizeT &mem_usage) { meta.CompressTo(vec, GetVecMut(idx, meta)); }
+    void SetVec(SizeT idx, const DataType *vec, const Meta &meta, SizeT &mem_usage) { meta.CompressTo(vec, GetVecMut(idx, meta)); }
 
 private:
     LVQData *GetVecMut(SizeT idx, const Meta &meta) { return reinterpret_cast<LVQData *>(this->ptr_.get() + idx * meta.compress_data_size()); }
 };
 
-export template <typename DataType1, typename CompressType, typename LVQCache>
-class LVQVecStoreInner<DataType1, CompressType, LVQCache, false> : public LVQVecStoreInnerBase<DataType1, CompressType, LVQCache, false> {
+export template <typename DataType, typename CompressType, typename LVQCache>
+class LVQVecStoreInner<DataType, CompressType, LVQCache, false> : public LVQVecStoreInnerBase<DataType, CompressType, LVQCache, false> {
 public:
-    using This = LVQVecStoreInner<DataType1, CompressType, LVQCache, false>;
-    using Meta = LVQVecStoreMetaBase<DataType1, CompressType, LVQCache, false>;
-    using Base = LVQVecStoreInnerBase<DataType1, CompressType, LVQCache, false>;
+    using This = LVQVecStoreInner<DataType, CompressType, LVQCache, false>;
+    using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, false>;
+    using Base = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, false>;
 
 private:
     LVQVecStoreInner(const char *ptr) { this->ptr_ = ptr; }

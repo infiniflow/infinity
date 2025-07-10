@@ -44,20 +44,20 @@ concept DataIteratorConcept = requires(Iterator iter) {
     { iter.Next() } -> std::same_as<Optional<Pair<RtnType, LabelType>>>;
 };
 
-export template <typename DataType1, typename LabelType>
+export template <typename DataType, typename LabelType>
 class DenseVectorIter {
-    const DataType1 *ptr_;
+    const DataType *ptr_;
     const SizeT dim_;
-    const DataType1 *const ptr_end_;
+    const DataType *const ptr_end_;
     LabelType label_;
 
 public:
-    using ValueType = const DataType1 *;
+    using ValueType = const DataType *;
 
-    DenseVectorIter(const DataType1 *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
+    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
         : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
-    Optional<Pair<const DataType1 *, LabelType>> Next() {
+    Optional<Pair<const DataType *, LabelType>> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
             return None;
@@ -67,29 +67,29 @@ public:
     }
 };
 
-export template <typename DataType1, typename IdxType, typename LabelType>
+export template <typename DataType, typename IdxType, typename LabelType>
 class SparseVectorIter {
     const i64 *indptr_;
     const IdxType *indice_;
-    const DataType1 *data_;
+    const DataType *data_;
     const i64 *indptr_end_;
     LabelType label_;
 
 public:
-    using ValueType = SparseVecRef<DataType1, IdxType>;
+    using ValueType = SparseVecRef<DataType, IdxType>;
 
-    SparseVectorIter(const i64 *indptr, const IdxType *indice, const DataType1 *data, i32 vec_num, LabelType offset = 0)
+    SparseVectorIter(const i64 *indptr, const IdxType *indice, const DataType *data, i32 vec_num, LabelType offset = 0)
         : indptr_(indptr), indice_(indice), data_(data), indptr_end_(indptr_ + vec_num + 1), label_(offset) {}
 
-    Optional<Pair<SparseVecRef<DataType1, IdxType>, LabelType>> Next() {
+    Optional<Pair<SparseVecRef<DataType, IdxType>, LabelType>> Next() {
         if (indptr_ + 1 == indptr_end_) {
             return None;
         }
         i64 nnz = indptr_[1] - indptr_[0];
         const IdxType *indice = indice_ + indptr_[0];
-        const DataType1 *data = data_ + indptr_[0];
+        const DataType *data = data_ + indptr_[0];
         ++indptr_;
-        return std::make_pair(SparseVecRef<DataType1, IdxType>(nnz, indice, data), label_++);
+        return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, indice, data), label_++);
     }
 };
 
