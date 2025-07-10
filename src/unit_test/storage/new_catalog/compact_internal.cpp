@@ -192,17 +192,17 @@ TEST_P(TestTxnCompactInternal, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(1), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 2), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 1), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2 + 1), Value::MakeInt(2));
-                EXPECT_EQ(col.GetValue(block_row_cnt - 2), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt - 1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 2), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 1), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 + 1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 2), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 1), Value::MakeInt(2));
             }
         }
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
@@ -231,17 +231,17 @@ TEST_P(TestTxnCompactInternal, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
                 if (block_id == 3) {
-                    EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 2), Value::MakeInt(1));
-                    EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 1), Value::MakeInt(2));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 2), Value::MakeInt(1));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 1), Value::MakeInt(2));
                 } else {
-                    EXPECT_EQ(col.GetValue(block_row_cnt - 2), Value::MakeInt(1));
-                    EXPECT_EQ(col.GetValue(block_row_cnt - 1), Value::MakeInt(2));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 2), Value::MakeInt(1));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 1), Value::MakeInt(2));
                 }
             }
         }
@@ -380,17 +380,17 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(1), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 2), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 1), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt / 2 + 1), Value::MakeInt(2));
-                EXPECT_EQ(col.GetValue(block_row_cnt - 2), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(block_row_cnt - 1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 2), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 1), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 + 1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 2), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 1), Value::MakeInt(2));
             }
         }
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
@@ -419,17 +419,17 @@ TEST_P(TestTxnCompactInternal, test_compact_with_index) {
                 ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
-                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorMode::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
-                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
-                EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
                 if (block_id == 3) {
-                    EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 2), Value::MakeInt(1));
-                    EXPECT_EQ(col.GetValue(block_row_cnt / 2 - 1), Value::MakeInt(2));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 2), Value::MakeInt(1));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt / 2 - 1), Value::MakeInt(2));
                 } else {
-                    EXPECT_EQ(col.GetValue(block_row_cnt - 2), Value::MakeInt(1));
-                    EXPECT_EQ(col.GetValue(block_row_cnt - 1), Value::MakeInt(2));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 2), Value::MakeInt(1));
+                    EXPECT_EQ(col.GetValueByIndex(block_row_cnt - 1), Value::MakeInt(2));
                 }
             }
         }

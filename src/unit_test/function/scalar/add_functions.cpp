@@ -107,7 +107,7 @@ TEST_F(AddFunctionsTest, add_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             i16 res = static_cast<i16>(static_cast<i8>(i)) * 2;
             if (res < std::numeric_limits<i8>::min() || res > std::numeric_limits<i8>::max()) {
@@ -161,7 +161,7 @@ TEST_F(AddFunctionsTest, add_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             i32 res = static_cast<i32>(static_cast<i16>(i)) * 2;
             if (res < std::numeric_limits<i16>::min() || res > std::numeric_limits<i16>::max()) {
@@ -215,7 +215,7 @@ TEST_F(AddFunctionsTest, add_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             i64 res = static_cast<i64>(static_cast<i32>(i)) * 2;
             if (res < std::numeric_limits<i32>::min() || res > std::numeric_limits<i32>::max()) {
@@ -269,7 +269,7 @@ TEST_F(AddFunctionsTest, add_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             i64 res;
             if (__builtin_add_overflow(static_cast<i64>(i), static_cast<i64>(i), &res)) {
@@ -323,7 +323,7 @@ TEST_F(AddFunctionsTest, add_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             f32 res = static_cast<f32>(i) * 2;
             if (std::isinf(res) || std::isnan(res)) {
@@ -377,7 +377,7 @@ TEST_F(AddFunctionsTest, add_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             f64 res = static_cast<f64>(i) * 2;
             if (std::isinf(res) || std::isnan(res)) {

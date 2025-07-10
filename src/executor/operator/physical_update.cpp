@@ -95,7 +95,7 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
                             UnrecoverableError("Expect the column vector has only one row");
                             return false;
                         }
-                        Value value = output_column_vector->GetValue(0);
+                        Value value = output_column_vector->GetValueByIndex(0);
                         SizeT row_count = input_data_block_ptr->row_count();
                         output_column_vector = ColumnVector::Make(MakeShared<DataType>(expr->Type()));
                         output_column_vector->Initialize();

@@ -90,7 +90,7 @@ TEST_F(CurrentTimestampFunctionsTest, current_timestamp_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < 1; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTimestamp);
         }
     }

@@ -1186,7 +1186,7 @@ Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag u
     return Status::OK();
 }
 
-Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector) {
+Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector) {
     SharedPtr<DataType> column_type{};
     {
         TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();

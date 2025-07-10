@@ -382,7 +382,7 @@ Status NewTxn::GetTables(const String &db_name, Vector<SharedPtr<TableDetail>> &
     for (const String &table_name : table_names) {
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
-        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+        status = GetTableMeta(db_name, table_name, db_meta, table_meta);
         if (!status.ok()) {
             return status;
         }
@@ -1425,6 +1425,7 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
+    DeferFn defer1([&] { LOG_FLUSH(); });
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
@@ -1451,6 +1452,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     if (!wal_manager->SetCheckpointing()) {
         // Checkpointing
+        LOG_INFO(fmt::format("checkpoint ts: {} skipped due to the system is checkpointing.", checkpoint_ts));
         return Status::OK();
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
@@ -1462,6 +1464,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return status;
     }
 
+    LOG_DEBUG(fmt::format("checkpoint ts {}, got {} DBs.", checkpoint_ts, db_id_strs_ptr->size()));
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -1501,6 +1504,8 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, Ch
     if (!status.ok()) {
         return status;
     }
+
+    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_id_strs_ptr->size()));
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
         status = this->CheckpointTable(table_meta, option, ckp_txn_store);
@@ -2189,7 +2194,7 @@ Status NewTxn::PrepareCommitAddColumns(const WalCmdAddColumnsV2 *add_columns_cmd
     }
     for (const auto &column : add_columns_cmd->column_defs_) {
         column->id_ = next_column_id++;
-        Status status = table_meta->AddColumn(*column);
+        status = table_meta->AddColumn(*column);
         if (!status.ok()) {
             return status;
         }
@@ -2243,7 +2248,7 @@ Status NewTxn::PrepareCommitCheckpoint(const WalCmdCheckpointV2 *checkpoint_cmd)
     }
     for (const String &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, this);
-        Status status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
+        status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
         }
@@ -2259,7 +2264,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
-        Status status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
+         status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
         }
@@ -4338,7 +4343,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                                                                  create_index_txn_store->index_id_str_,
                                                                  *create_index_txn_store->index_base_->index_name_));
 
-                Status status = CleanupInner(std::move(metas));
+                status = CleanupInner(std::move(metas));
                 if (!status.ok()) {
                     UnrecoverableError("During PostRollback, cleanup failed.");
                 }
@@ -4895,9 +4900,9 @@ Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_nam
     }
     SharedPtr<ColumnDef> column_def;
     {
-        auto [column_defs, status] = table_meta->GetColumnDefs();
-        if (!status.ok()) {
-            return status;
+        auto [column_defs, col_status] = table_meta->GetColumnDefs();
+        if (!col_status.ok()) {
+            return col_status;
         }
         for (auto &column : *column_defs) {
             if (column->name() == column_name) {

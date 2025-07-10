@@ -111,7 +111,7 @@ TEST_F(PathCastTest, path_cast1) {
         path.SetPoint(3, p4);
         Value v = Value::MakePath(path);
         col_source->AppendValue(v);
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
     }
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.1f, static_cast<f64>(i) - 0.3f);
@@ -119,7 +119,7 @@ TEST_F(PathCastTest, path_cast1) {
         PointT p3(static_cast<f64>(i) + 0.2f, static_cast<f64>(i) - 0.4f);
         PointT p4(static_cast<f64>(i) + 0.6f, static_cast<f64>(i) - 0.8f);
 
-        Value vx = col_source->GetValue(i);
+        Value vx = col_source->GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kPath);
         EXPECT_EQ(vx.value_.path.point_count, 4);
         EXPECT_EQ(vx.value_.path.closed, 0);

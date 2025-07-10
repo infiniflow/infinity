@@ -523,6 +523,7 @@ void MemoryIndexer::Reset() {
     }
     column_lengths_.Clear();
     DecreaseMemoryUsage(mem_used_);
+    mem_used_ = 0;
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
