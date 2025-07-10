@@ -185,3 +185,173 @@ TEST_P(TxnReplayExceptionTest, test_replay_create_db) {
         EXPECT_TRUE(status.ok());
     }
 }
+
+TEST_P(TxnReplayExceptionTest, test_replay_import) {
+    using namespace infinity;
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto new_table_name = std::make_shared<std::string>("tb2");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    SharedPtr<String> index_name = MakeShared<String>("index_name");
+    SharedPtr<String> index_comment_ptr = MakeShared<String>("index_comment");
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    u32 block_row_cnt = 8192;
+    {
+        auto make_input_block = [&] {
+            auto input_block = MakeShared<DataBlock>();
+            auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+                for (u32 i = 0; i < block_row_cnt; i += 2) {
+                    col.AppendValue(v1);
+                    col.AppendValue(v2);
+                }
+            };
+            // Initialize input block
+            {
+                auto col1 = ColumnVector::Make(column_def1->type());
+                col1->Initialize();
+                append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = ColumnVector::Make(column_def2->type());
+                col2->Initialize();
+                append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
+
+        for (int i = 0; i < 2; ++i) {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+            Status status = txn->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        TxnTimeStamp commit_ts = txn->CommitTS();
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        auto check_block = [&](BlockMeta &block_meta) {
+            NewTxnGetVisibleRangeState state;
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, commit_ts, state);
+            EXPECT_TRUE(status.ok());
+
+            BlockOffset offset = 0;
+            Pair<BlockOffset, BlockOffset> range;
+            bool next = state.Next(offset, range);
+            EXPECT_TRUE(next);
+            EXPECT_EQ(range.first, 0);
+            EXPECT_EQ(range.second, block_row_cnt);
+            offset = range.second;
+            next = state.Next(offset, range);
+            EXPECT_FALSE(next);
+
+            SizeT row_count = state.block_offset_end();
+            {
+                SizeT column_idx = 0;
+                ColumnMeta column_meta(column_idx, block_meta);
+                ColumnVector col;
+
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeInt(2));
+            }
+            {
+                SizeT column_idx = 1;
+                ColumnMeta column_meta(column_idx, block_meta);
+                ColumnVector col;
+
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValueByIndex(0), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValueByIndex(8190), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValueByIndex(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            }
+        };
+
+        auto check_segment = [&](SegmentMeta &segment_meta) {
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+
+            for (auto block_id : *block_ids) {
+                BlockMeta block_meta(block_id, segment_meta);
+                check_block(block_meta);
+            }
+        };
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta);
+            check_segment(segment_meta);
+        }
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        Status status = txn1->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->kv_store()->Flush();
+    RestartTxnMgr();
+
+    {
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+        Vector<String> db_names;
+        Status status = txn2->ListDatabase(db_names);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(Set<String>(db_names.begin(), db_names.end()), Set<String>({"default_db"}));
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+    }
+}

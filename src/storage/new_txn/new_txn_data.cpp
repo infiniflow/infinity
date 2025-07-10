@@ -206,9 +206,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     Vector<SegmentID> segment_ids;
 
     SizeT input_block_count = input_blocks.size();
-    SizeT segment_count = input_block_count % DEFAULT_BLOCK_PER_SEGMENT == 0
-                        ? input_block_count / DEFAULT_BLOCK_PER_SEGMENT
-                        : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
+    SizeT segment_count = input_block_count % DEFAULT_BLOCK_PER_SEGMENT == 0 ? input_block_count / DEFAULT_BLOCK_PER_SEGMENT
+                                                                             : input_block_count / DEFAULT_BLOCK_PER_SEGMENT + 1;
 
     // If the number of input blocks is 0, infinity would output
     // "IMPORT 0 Rows" instead of throwing an exception.
@@ -363,8 +362,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         SizeT input_block_start_idx = segment_idx * DEFAULT_BLOCK_PER_SEGMENT;
         SizeT input_block_end_idx = std::min(std::size_t(input_block_start_idx + DEFAULT_BLOCK_PER_SEGMENT), input_blocks.size());
         import_txn_store->input_blocks_in_imports_.emplace(
-            segment_ids[segment_idx], Vector<SharedPtr<DataBlock>>(input_blocks.begin() + input_block_start_idx,
-                                                                   input_blocks.begin() + input_block_end_idx));
+            segment_ids[segment_idx],
+            Vector<SharedPtr<DataBlock>>(input_blocks.begin() + input_block_start_idx, input_blocks.begin() + input_block_end_idx));
     }
     import_txn_store->segment_infos_.insert(import_txn_store->segment_infos_.end(), segment_infos.begin(), segment_infos.end());
     import_txn_store->segment_ids_.insert(import_txn_store->segment_ids_.end(), segment_ids.begin(), segment_ids.end());
@@ -394,11 +393,37 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 }
 
 Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    String segment_id_key = KeyEncode::CatalogTableSegmentKey(import_cmd->db_id_, import_cmd->table_id_, import_cmd->segment_info_.segment_id_);
+    String commit_ts_str;
+    Status status = kv_instance_->Get(segment_id_key, commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp commit_ts_from_kv = std::stoull(commit_ts_str);
+        if (commit_ts == commit_ts_from_kv) {
+            LOG_WARN(fmt::format("Skipping replay import: Segment {} already exists in table {} of database {} with commit ts {}, txn: {}.",
+                                 import_cmd->segment_info_.segment_id_,
+                                 import_cmd->table_name_,
+                                 import_cmd->db_name_,
+                                 commit_ts,
+                                 txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay import: Segment {} already exists in table {} of database {} with commit ts {}, but replaying with commit "
+                                  "ts {}, txn: {}.",
+                                  import_cmd->segment_info_.segment_id_,
+                                  import_cmd->table_name_,
+                                  import_cmd->db_name_,
+                                  commit_ts_from_kv,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Segment already exists with different commit timestamp");
+        }
+    }
+
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    Status status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
