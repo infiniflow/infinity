@@ -65,12 +65,14 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
                 UnrecoverableError(status_read.message());
             }
 
-            nlohmann::json snapshot_json = nlohmann::json::parse(json_str);
+            simdjson::padded_string json_pad(json_str);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
             SnapshotBrief snapshot_brief;
-            snapshot_brief.snapshot_name_ = snapshot_json["snapshot_name"];
-            snapshot_brief.scope_ = snapshot_json["snapshot_scope"];
+            snapshot_brief.snapshot_name_ = doc["snapshot_name"].get<String>();
+            snapshot_brief.scope_ = (SnapshotScope)(u8)doc["snapshot_scope"].get<u8>();
 
-            snapshot_brief.commit_ts_ = snapshot_json["commit_ts"];
+            snapshot_brief.commit_ts_ = doc["commit_ts"].get<u64>();
 
 //            std::filesystem::path compressed_file(snapshot_path);
 //            compressed_file.replace_extension("lz4");
