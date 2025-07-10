@@ -49,3 +49,31 @@ class InfinityConnection(ABC):
     @abstractmethod
     def disconnect(self):
         pass
+
+    @abstractmethod
+    def create_database_snapshot(self, snapshot_name: str, db_name: str):
+        pass
+
+    @abstractmethod
+    def restore_database_snapshot(self, snapshot_name: str):
+        pass
+
+    @abstractmethod
+    def create_system_snapshot(self, snapshot_name: str):
+        pass
+
+    @abstractmethod
+    def restore_system_snapshot(self, snapshot_name: str):
+        pass
+
+    @abstractmethod
+    def list_snapshots(self):
+        pass
+
+    @abstractmethod
+    def show_snapshot(self, snapshot_name: str):
+        pass
+    
+    @abstractmethod
+    def drop_snapshot(self, snapshot_name: str):
+        pass
