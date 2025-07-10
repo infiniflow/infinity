@@ -522,10 +522,8 @@ TableCache *SystemCache::GetTableCacheNolock(u64 db_id, u64 table_id) {
     return table_cache;
 }
 
-nlohmann::json SystemCache::ToJson() const {
-    nlohmann::json result;
+void SystemCache::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
     std::unique_lock lock(cache_mtx_);
-    return result;
 }
 
 } // namespace infinity

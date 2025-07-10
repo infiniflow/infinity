@@ -82,7 +82,7 @@ export struct ObjStat {
         return *this;
     }
 
-    nlohmann::json Serialize() const;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
     String ToString() const;
 

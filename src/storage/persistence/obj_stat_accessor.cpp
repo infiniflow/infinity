@@ -16,6 +16,7 @@ module;
 
 #include <__iterator/prev.h>
 #include <cassert>
+#include <utility>
 
 module obj_stat_accessor;
 
@@ -276,18 +277,23 @@ void ObjectStatAccessor_LocalStorage::CheckValid(SizeT current_object_size) {
     }
 }
 
-nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
+void ObjectStatAccessor_LocalStorage::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     std::shared_lock<std::shared_mutex> lock(mutex_);
-    nlohmann::json json_obj;
-    json_obj["obj_stat_size"] = obj_map_.size();
-    json_obj["obj_stat_array"] = nlohmann::json::array();
+    writer.Key("obj_stat_size");
+    writer.Uint64(obj_map_.size());
+
+    writer.Key("obj_stat_array");
+    writer.StartArray();
     for (auto &[obj_key, obj_stat] : obj_map_) {
-        nlohmann::json pair;
-        pair["obj_key"] = obj_key;
-        pair["obj_stat"] = obj_stat.Serialize();
-        json_obj["obj_stat_array"].emplace_back(pair);
+        writer.Key("obj_key");
+        writer.String(obj_key.c_str());
+
+        writer.Key("obj_stat");
+        writer.StartObject();
+        obj_stat.Serialize(writer);
+        writer.EndObject();
     }
-    return json_obj;
+    writer.EndArray();
 }
 
 void ObjectStatAccessor_LocalStorage::Deserialize(std::string_view obj_str) {
@@ -406,18 +412,23 @@ void ObjectStatAccessor_ObjectStorage::CheckValid(SizeT current_object_size) {
     }
 }
 
-nlohmann::json ObjectStatAccessor_ObjectStorage::Serialize() {
+void ObjectStatAccessor_ObjectStorage::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     std::shared_lock<std::shared_mutex> lock(mutex_);
-    nlohmann::json json_obj;
-    json_obj["obj_stat_size"] = obj_map_.obj_map().size();
-    json_obj["obj_stat_array"] = nlohmann::json::array();
+    writer.Key("obj_stat_size");
+    writer.Uint64(obj_map_.obj_map().size());
+
+    writer.Key("obj_stat_array");
+    writer.StartArray();
     for (const auto &[obj_key, lru_iter] : obj_map_.obj_map()) {
-        nlohmann::json pair;
-        pair["obj_key"] = obj_key;
-        pair["obj_stat"] = lru_iter->obj_stat_.Serialize();
-        json_obj["obj_stat_array"].emplace_back(pair);
+        writer.Key("obj_key");
+        writer.String(obj_key.c_str());
+
+        writer.Key("obj_stat");
+        writer.StartObject();
+        lru_iter->obj_stat_.Serialize(writer);
+        writer.EndObject();
     }
-    return json_obj;
+    writer.EndArray();
 }
 
 void ObjectStatAccessor_ObjectStorage::Deserialize(std::string_view obj_str) {

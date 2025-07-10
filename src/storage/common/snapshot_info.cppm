@@ -43,7 +43,7 @@ export struct BlockColumnSnapshotInfo {
     u64 last_chunk_offset_;
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 
-    nlohmann::json Serialize();
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer);
     static SharedPtr<BlockColumnSnapshotInfo> Deserialize(std::string_view column_block_str);
 };
 
@@ -55,7 +55,7 @@ export struct BlockSnapshotInfo {
     Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
     String fast_rough_filter_;
 
-    nlohmann::json Serialize();
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer);
     static SharedPtr<BlockSnapshotInfo> Deserialize(std::string_view block_str);
 };
 
@@ -69,7 +69,7 @@ export struct SegmentSnapshotInfo {
     TxnTimeStamp actual_row_count_;
     Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
 
-    nlohmann::json Serialize();
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer);
     static SharedPtr<SegmentSnapshotInfo> Deserialize(std::string_view segment_str);
 };
 
@@ -77,14 +77,14 @@ export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
     String base_name_;
     Vector<String> files_;
-    nlohmann::json Serialize();
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer);
     static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(std::string_view chunk_index_str);
 };
 
 export struct SegmentIndexSnapshotInfo {
     SegmentID segment_id_;
     Vector<SharedPtr<ChunkIndexSnapshotInfo>> chunk_index_snapshots_{};
-    nlohmann::json Serialize();
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer);
     static SharedPtr<SegmentIndexSnapshotInfo> Deserialize(std::string_view segment_index_str);
 };
 
@@ -92,7 +92,7 @@ export struct TableIndexSnapshotInfo {
     SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
     Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
-    nlohmann::json Serialize();
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer);
     static SharedPtr<TableIndexSnapshotInfo> Deserialize(std::string_view table_index_str);
 };
 

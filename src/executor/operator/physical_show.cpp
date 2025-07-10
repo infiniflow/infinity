@@ -5795,10 +5795,24 @@ void PhysicalShow::ExecuteShowCatalog(QueryContext *query_context, ShowOperatorS
 
     auto *new_catalog = query_context->storage()->new_catalog();
     auto meta_tree_ptr = new_catalog->MakeMetaTree();
-    auto meta_json = meta_tree_ptr->ToJson();
 
     constexpr int json_intent = 4;
-    auto meta_str = meta_json.dump(json_intent);
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        meta_tree_ptr->ToJson(writer);
+        writer.EndObject();
+    }
+    {
+        rapidjson::Document doc;
+        doc.Parse(sb.GetString());
+        sb.Clear();
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+        doc.Accept(writer);
+        writer.SetIndent(' ', json_intent);
+    }
+    auto meta_str = sb.GetString();
 
     // create data block for output state
     Vector<SharedPtr<DataType>> column_types{varchar_type};
@@ -5828,10 +5842,24 @@ void PhysicalShow::ExecuteShowCatalogToFile(QueryContext *query_context, ShowOpe
         } else {
             auto *new_catalog = query_context->storage()->new_catalog();
             auto meta_tree_ptr = new_catalog->MakeMetaTree();
-            auto meta_json = meta_tree_ptr->ToJson();
 
             constexpr int json_intent = 4;
-            auto meta_str = meta_json.dump(json_intent);
+            rapidjson::StringBuffer sb;
+            {
+                rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                writer.StartObject();
+                meta_tree_ptr->ToJson(writer);
+                writer.EndObject();
+            }
+            {
+                rapidjson::Document doc;
+                doc.Parse(sb.GetString());
+                sb.Clear();
+                rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+                doc.Accept(writer);
+                writer.SetIndent(' ', json_intent);
+            }
+            auto meta_str = sb.GetString();
             file << meta_str;
             file.close();
             status_message = "OK";

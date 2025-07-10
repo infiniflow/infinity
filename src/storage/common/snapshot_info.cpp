@@ -40,14 +40,18 @@ import parsed_expr;
 
 namespace infinity {
 
-nlohmann::json BlockColumnSnapshotInfo::Serialize() {
-    nlohmann::json json_res;
-    json_res["column_id"] = column_id_;
-    json_res["filename"] = filename_;
+void BlockColumnSnapshotInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
+    writer.Key("column_id");
+    writer.Uint64(column_id_);
+    writer.Key("filename");
+    writer.String(filename_.c_str());
+
+    writer.Key("outlines");
+    writer.StartArray();
     for (const auto &outline_snapshot : outline_snapshots_) {
-        json_res["outlines"].emplace_back(outline_snapshot->filename_);
+        writer.String(outline_snapshot->filename_.c_str());
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(std::string_view column_block_str) {
@@ -67,14 +71,20 @@ SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(std::str
     return column_block_snapshot;
 }
 
-nlohmann::json BlockSnapshotInfo::Serialize() {
-    nlohmann::json json_res;
-    json_res["block_id"] = block_id_;
-    json_res["block_dir"] = block_dir_;
+void BlockSnapshotInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
+    writer.Key("block_id");
+    writer.Uint(block_id_);
+    writer.Key("block_dir");
+    writer.String(block_dir_.c_str());
+
+    writer.Key("columns");
+    writer.StartArray();
     for (const auto &column_block_snapshot : column_block_snapshots_) {
-        json_res["columns"].emplace_back(column_block_snapshot->Serialize());
+        writer.StartObject();
+        column_block_snapshot->Serialize(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(std::string_view block_str) {
@@ -91,21 +101,30 @@ SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(std::string_view blo
     return block_snapshot;
 }
 
-nlohmann::json SegmentSnapshotInfo::Serialize() {
-    nlohmann::json json_res;
+void SegmentSnapshotInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
+    writer.Key("segment_id");
+    writer.Uint(segment_id_);
+    writer.Key("segment_dir");
+    writer.String(segment_dir_.c_str());
+    writer.Key("first_delete_ts");
+    writer.Uint64(first_delete_ts_);
+    writer.Key("deprecate_ts");
+    writer.Uint64(deprecate_ts_);
+    writer.Key("row_count");
+    writer.Uint64(row_count_);
+    writer.Key("actual_row_count");
+    writer.Uint64(actual_row_count_);
+    writer.Key("segment_status");
+    writer.Uint((u8)status_);
 
-    json_res["segment_id"] = segment_id_;
-    json_res["segment_dir"] = segment_dir_;
-    json_res["first_delete_ts"] = first_delete_ts_;
-    json_res["deprecate_ts"] = deprecate_ts_;
-    json_res["row_count"] = row_count_;
-    json_res["actual_row_count"] = actual_row_count_;
-    json_res["segment_status"] = status_;
-
+    writer.Key("columns");
+    writer.StartArray();
     for (const auto &block_snapshot : block_snapshots_) {
-        json_res["blocks"].emplace_back(block_snapshot->Serialize());
+        writer.StartObject();
+        block_snapshot->Serialize(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(std::string_view segment_str) {
@@ -129,23 +148,25 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(std::string_view
     return segment_snapshot;
 }
 
-nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
-    nlohmann::json json_res;
-    return json_res;
-}
+void ChunkIndexSnapshotInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {}
 
 SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(std::string_view chunk_index_str) {
     auto chunk_index_snapshot = MakeShared<ChunkIndexSnapshotInfo>();
     return chunk_index_snapshot;
 }
 
-nlohmann::json SegmentIndexSnapshotInfo::Serialize() {
-    nlohmann::json json_res;
-    json_res["segment_id"] = segment_id_;
+void SegmentIndexSnapshotInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
+    writer.Key("segment_id");
+    writer.Uint(segment_id_);
+
+    writer.Key("chunk_indexes");
+    writer.StartArray();
     for (const auto &chunk_index_snapshot : chunk_index_snapshots_) {
-        json_res["chunk_indexes"].emplace_back(chunk_index_snapshot->Serialize());
+        writer.StartObject();
+        chunk_index_snapshot->Serialize(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(std::string_view segment_index_str) {
@@ -161,14 +182,23 @@ SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexSnapshotInfo::Deserialize(std::s
     return segment_index_snapshot;
 }
 
-nlohmann::json TableIndexSnapshotInfo::Serialize() {
-    nlohmann::json json_res;
-    json_res["index_dir"] = *index_dir_;
-    json_res["index_base"] = index_base_->Serialize();
+void TableIndexSnapshotInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
+    writer.Key("index_dir");
+    writer.String(index_dir_->c_str());
+
+    writer.Key("index_base");
+    writer.StartObject();
+    index_base_->Serialize(writer);
+    writer.EndObject();
+
+    writer.Key("segment_indexes");
+    writer.StartArray();
     for (const auto &segment_index_entry : index_by_segment_) {
-        json_res["segment_indexes"].emplace_back(segment_index_entry.second->Serialize());
+        writer.StartObject();
+        segment_index_entry.second->Serialize(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(std::string_view table_index_str) {
@@ -277,57 +307,104 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     //    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
     //    VirtualStore::RemoveDirectory(directory);
 
-    nlohmann::json json_res;
-    json_res["version"] = version_;
-    json_res["snapshot_name"] = snapshot_name_;
-    json_res["snapshot_scope"] = SnapshotScope::kTable;
-    json_res["database_name"] = db_name_;
-    json_res["table_name"] = table_name_;
-    json_res["table_comment"] = table_comment_;
-    //    json_res["md5"] = md5;
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        {
+            writer.Key("version");
+            writer.Uint64(version_);
+            writer.Key("snapshot_name");
+            writer.String(snapshot_name_.c_str());
+            writer.Key("snapshot_scope");
+            writer.Uint((u8)SnapshotScope::kTable);
+            writer.Key("database_name");
+            writer.String(db_name_.c_str());
+            writer.Key("table_name");
+            writer.String(table_name_.c_str());
+            writer.Key("table_comment");
+            writer.String(table_comment_.c_str());
 
-    json_res["txn_id"] = txn_id_;
-    json_res["begin_ts"] = begin_ts_;
-    json_res["commit_ts"] = commit_ts_;
-    json_res["max_commit_ts"] = max_commit_ts_;
-    json_res["table_entry_dir"] = table_entry_dir_;
+            writer.Key("txn_id");
+            writer.Uint64(txn_id_);
+            writer.Key("begin_ts");
+            writer.Uint64(begin_ts_);
+            writer.Key("commit_ts");
+            writer.Uint64(commit_ts_);
+            writer.Key("max_commit_ts");
+            writer.Uint64(max_commit_ts_);
+            writer.Key("table_entry_dir");
+            writer.String(table_entry_dir_.c_str());
 
-    json_res["next_column_id"] = next_column_id_;
-    json_res["unsealed_id"] = unsealed_id_;
-    json_res["next_segment_id"] = next_segment_id_;
-    json_res["row_count"] = row_count_;
+            writer.Key("next_column_id");
+            writer.Uint64(next_column_id_);
+            writer.Key("unsealed_id");
+            writer.Uint(unsealed_id_);
+            writer.Key("next_segment_id");
+            writer.Uint(next_segment_id_);
+            writer.Key("row_count");
+            writer.Uint64(row_count_);
 
-    for (const auto &column_def : this->columns_) {
-        nlohmann::json column_def_json;
-        column_def_json["column_type"] = column_def->type()->Serialize();
-        column_def_json["column_id"] = column_def->id();
-        column_def_json["column_name"] = column_def->name();
+            writer.Key("column_definition");
+            writer.StartArray();
+            for (const auto &column_def : this->columns_) {
+                writer.StartObject();
 
-        for (const auto &column_constraint : column_def->constraints_) {
-            column_def_json["constraints"].emplace_back(column_constraint);
+                writer.Key("column_type");
+                writer.StartObject();
+                column_def->type()->Serialize(writer);
+                writer.EndObject();
+
+                writer.Key("column_id");
+                writer.Uint64(column_def->id());
+                writer.Key("column_name");
+                writer.String(column_def->name().c_str());
+
+                writer.Key("constraints");
+                writer.StartArray();
+                for (const auto &column_constraint : column_def->constraints_) {
+                    writer.Int((i32)column_constraint);
+                }
+                writer.EndArray();
+
+                if (!(column_def->comment().empty())) {
+                    writer.Key("column_comment");
+                    writer.String(column_def->comment().c_str());
+                }
+
+                if (column_def->has_default_value()) {
+                    writer.Key("default");
+                    writer.StartObject();
+                    auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
+                    default_expr->Serialize(writer);
+                    writer.EndObject();
+                }
+
+                writer.EndObject();
+            }
+            writer.EndArray();
+
+            writer.Key("segments");
+            writer.StartArray();
+            for (const auto &segment_snapshot_pair : segment_snapshots_) {
+                writer.StartObject();
+                segment_snapshot_pair.second->Serialize(writer);
+                writer.EndObject();
+            }
+            writer.EndArray();
+
+            writer.Key("table_indexes");
+            writer.StartArray();
+            for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
+                writer.StartObject();
+                table_index_snapshot_pair.second->Serialize(writer);
+                writer.EndObject();
+            }
+            writer.EndArray();
         }
-
-        if (!(column_def->comment().empty())) {
-            column_def_json["column_comment"] = column_def->comment();
-        }
-
-        if (column_def->has_default_value()) {
-            auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
-            column_def_json["default"] = default_expr->Serialize();
-        }
-
-        json_res["column_definition"].emplace_back(column_def_json);
+        writer.EndObject();
     }
-
-    for (const auto &segment_snapshot_pair : segment_snapshots_) {
-        json_res["segments"].emplace_back(segment_snapshot_pair.second->Serialize());
-    }
-
-    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
-        json_res["table_indexes"].emplace_back(table_index_snapshot_pair.second->Serialize());
-    }
-
-    String json_string = json_res.dump();
+    String json_string = sb.GetString();
 
     Path save_path = Path(save_dir) / fmt::format("{}.json", snapshot_name_);
 
@@ -345,7 +422,7 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     }
     snapshot_file_handle->Sync();
 
-    LOG_INFO(fmt::format("{}", json_res.dump()));
+    LOG_INFO(fmt::format("{}", json_string));
 }
 
 Vector<String> TableSnapshotInfo::GetFiles() const {

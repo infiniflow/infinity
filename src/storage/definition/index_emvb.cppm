@@ -55,7 +55,7 @@ public:
 
     String ToString() const override;
 
-    nlohmann::json Serialize() const override;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const override;
 
     const u32 residual_pq_subspace_num_ = 0;
     const u32 residual_pq_subspace_bits_ = 0;

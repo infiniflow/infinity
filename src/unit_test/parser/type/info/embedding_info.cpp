@@ -47,8 +47,19 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
     EXPECT_EQ(embedding_info_ptr->Dimension(), (u64)EMBEDDING_LIMIT);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemInt64);
 
-    nlohmann::json json;
-    json["type_info"] = embedding_info_ptr->Serialize();
-    //    std::cout << json.dump() << std::endl;
-    //    EXPECT_EQ(json.dump(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        {
+            writer.Key("type_info");
+            writer.StartObject();
+            embedding_info_ptr->Serialize(writer);
+            writer.EndObject();
+        }
+        writer.EndObject();
+    }
+    String json_str = sb.GetString();
+    std::cout << json_str << std::endl;
+    EXPECT_EQ(json_str, "{\"type_info\":{\"dimension\":65536,\"embedding_type\":4}}");
 }

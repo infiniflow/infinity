@@ -338,19 +338,43 @@ void IndexIVF::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
     }
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFCentroidOption, centroids_num_ratio_, min_points_per_centroid_, max_points_per_centroid_);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFStorageOption,
-                                   type_,
-                                   plain_storage_data_type_,
-                                   scalar_quantization_bits_,
-                                   product_quantization_subspace_num_,
-                                   product_quantization_subspace_bits_);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IndexIVFOption, metric_, centroid_option_, storage_option_);
+void IndexIVF::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    IndexBase::Serialize(writer);
+    writer.Key("ivf_option");
+    writer.StartObject();
+    {
+        writer.Key("metric_");
+        writer.Int((i8)ivf_option_.metric_);
 
-nlohmann::json IndexIVF::Serialize() const {
-    nlohmann::json res = IndexBase::Serialize();
-    res["ivf_option"] = ivf_option_;
-    return res;
+        writer.Key("centroid_option_");
+        writer.StartObject();
+        {
+            writer.Key("centroids_num_ratio_");
+            writer.Double(ivf_option_.centroid_option_.centroids_num_ratio_);
+            writer.Key("min_points_per_centroid_");
+            writer.Uint(ivf_option_.centroid_option_.min_points_per_centroid_);
+            writer.Key("max_points_per_centroid_");
+            writer.Uint(ivf_option_.centroid_option_.max_points_per_centroid_);
+        }
+        writer.EndObject();
+
+        writer.Key("storage_option_");
+        writer.StartObject();
+        {
+            writer.Key("type_");
+            writer.Int((i8)ivf_option_.storage_option_.type_);
+            writer.Key("plain_storage_data_type_");
+            writer.Int((i8)ivf_option_.storage_option_.plain_storage_data_type_);
+            writer.Key("scalar_quantization_bits_");
+            writer.Uint(ivf_option_.storage_option_.scalar_quantization_bits_);
+            writer.Key("product_quantization_subspace_num_");
+            writer.Uint(ivf_option_.storage_option_.product_quantization_subspace_num_);
+            writer.Key("product_quantization_subspace_bits_");
+            writer.Uint(ivf_option_.storage_option_.product_quantization_subspace_bits_);
+        }
+        writer.EndObject();
+    }
+    writer.EndObject();
 }
 
 template <typename simdjson_value>

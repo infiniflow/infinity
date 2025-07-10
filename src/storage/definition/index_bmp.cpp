@@ -113,11 +113,12 @@ String IndexBMP::BuildOtherParamsString() const {
     return ss.str();
 }
 
-nlohmann::json IndexBMP::Serialize() const {
-    nlohmann::json res = IndexBase::Serialize();
-    res["block_size"] = block_size_;
-    res["compress_type"] = static_cast<i8>(compress_type_);
-    return res;
+void IndexBMP::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    IndexBase::Serialize(writer);
+    writer.Key("block_size");
+    writer.Uint64(block_size_);
+    writer.Key("compress_type");
+    writer.Int((i8)compress_type_);
 }
 
 } // namespace infinity

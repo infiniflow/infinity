@@ -37,7 +37,7 @@ export struct ChunkIndexMetaInfo {
     SizeT row_cnt_{};
     SizeT index_size_{};
 
-    void ToJson(nlohmann::json &json) const;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer) const;
 
     void FromJson(std::string_view json_str);
 

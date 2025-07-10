@@ -30,7 +30,7 @@ export struct MetaKey {
     virtual ~MetaKey() = default;
 
     virtual String ToString() const = 0;
-    virtual nlohmann::json ToJson() const = 0;
+    virtual void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const = 0;
 };
 class ColumnDef;
 
@@ -45,7 +45,7 @@ export struct DBMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{}; // Commit timestamp of "create database"
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct DBTagMetaKey final : public MetaKey {
@@ -56,7 +56,7 @@ export struct DBTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct TableMetaKey final : public MetaKey {
@@ -69,7 +69,7 @@ export struct TableMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct TableNameMetaKey final : public MetaKey {
@@ -82,7 +82,7 @@ export struct TableNameMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct TableColumnMetaKey final : public MetaKey {
@@ -97,7 +97,7 @@ export struct TableColumnMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct TableTagMetaKey final : public MetaKey {
@@ -110,7 +110,7 @@ export struct TableTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct SegmentMetaKey final : public MetaKey {
@@ -123,7 +123,7 @@ export struct SegmentMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct SegmentTagMetaKey final : public MetaKey {
@@ -138,7 +138,7 @@ export struct SegmentTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct BlockMetaKey final : public MetaKey {
@@ -153,7 +153,7 @@ export struct BlockMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct BlockTagMetaKey final : public MetaKey {
@@ -169,7 +169,7 @@ export struct BlockTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct ColumnMetaKey final : public MetaKey {
@@ -184,7 +184,7 @@ export struct ColumnMetaKey final : public MetaKey {
     SharedPtr<ColumnDef> column_def_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct TableIndexMetaKey final : public MetaKey {
@@ -199,7 +199,7 @@ export struct TableIndexMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct TableIndexTagMetaKey final : public MetaKey {
@@ -214,7 +214,7 @@ export struct TableIndexTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct SegmentIndexMetaKey final : public MetaKey {
@@ -229,7 +229,7 @@ export struct SegmentIndexMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct SegmentIndexTagMetaKey final : public MetaKey {
@@ -245,7 +245,7 @@ export struct SegmentIndexTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct ChunkIndexMetaKey final : public MetaKey {
@@ -261,7 +261,7 @@ export struct ChunkIndexMetaKey final : public MetaKey {
     TxnTimeStamp commit_ts_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct ChunkIndexTagMetaKey final : public MetaKey {
@@ -278,7 +278,7 @@ export struct ChunkIndexTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct PmObjectMetaKey final : public MetaKey {
@@ -288,7 +288,7 @@ export struct PmObjectMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct PmStatMetaKey final : public MetaKey {
@@ -298,7 +298,7 @@ export struct PmStatMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct DropMetaKey final : public MetaKey {
@@ -309,7 +309,7 @@ export struct DropMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export struct SystemTagMetaKey final : public MetaKey {
@@ -319,7 +319,7 @@ export struct SystemTagMetaKey final : public MetaKey {
     String value_{};
 
     String ToString() const final;
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 };
 
 export SharedPtr<MetaKey> MetaParse(const String &key, const String &value);

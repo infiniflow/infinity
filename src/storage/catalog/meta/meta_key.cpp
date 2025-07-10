@@ -118,164 +118,178 @@ String PmStatMetaKey::ToString() const { return fmt::format("pm_object: {}:{}", 
 
 String DropMetaKey::ToString() const { return fmt::format("drop_key: drop|{}|{}:{}", scope_, object_key_, value_); }
 
-nlohmann::json DBMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["db_id"] = std::stoull(db_id_str_);
-    json_res["db_name"] = db_name_;
+void DBMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("db_id");
+    writer.Uint64(std::stoull(db_id_str_));
+    writer.Key("db_name");
+    writer.String(db_name_.c_str());
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-
-    return json_res;
 }
 
-nlohmann::json DBTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = value_;
-    return json_res;
+void DBTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    writer.String(value_.c_str());
 }
 
-nlohmann::json TableMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["table_id"] = std::stoull(table_id_str_);
-    json_res["table_name"] = table_name_;
+void TableMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("table_id");
+    writer.Uint64(std::stoull(table_id_str_));
+    writer.Key("table_name");
+    writer.String(table_name_.c_str());
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json TableNameMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["table_id"] = std::stoull(table_id_str_);
-    json_res["table_name"] = table_name_;
+void TableNameMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("table_id");
+    writer.Uint64(std::stoull(table_id_str_));
+    writer.Key("table_name");
+    writer.String(table_name_.c_str());
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json TableColumnMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["column_definition"] = nlohmann::json::parse(value_);
-    return json_res;
+void TableColumnMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("column_definition");
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json TableTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
-    return json_res;
+void TableTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json SegmentMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["segment_id"] = segment_id_;
+void SegmentMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("segment_id");
+    writer.Uint(segment_id_);
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json SegmentTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["tag_name"] = tag_name_;
+void SegmentTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("tag_name");
+    writer.String(tag_name_.c_str());
     // TODO: fast rough filter isn't deserialized here.
-    //    json_res["tag_value"] = value_;
-    return json_res;
+    //    writer.Key("tag_value");
+    //    writer.String(value_.c_str());
 }
 
-nlohmann::json BlockMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["block_id"] = block_id_;
+void BlockMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("block_id");
+    writer.Uint(block_id_);
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json BlockTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = base64::to_base64(value_);
-    return json_res;
+void BlockTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    writer.String(base64::to_base64(value_).c_str());
 }
 
-nlohmann::json ColumnMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    return json_res;
-}
+void ColumnMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {}
 
-nlohmann::json TableIndexMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["index_id"] = index_id_str_;
-    json_res["index_name"] = index_name_;
+void TableIndexMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("index_id");
+    writer.String(index_id_str_.c_str());
+    writer.Key("index_name");
+    writer.String(index_name_.c_str());
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json TableIndexTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
-    return json_res;
+void TableIndexTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json SegmentIndexMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["segment_id"] = segment_id_;
+void SegmentIndexMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("segment_id");
+    writer.Uint(segment_id_);
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json SegmentIndexTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
-    return json_res;
+void SegmentIndexTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json ChunkIndexMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["chunk_id"] = chunk_id_;
+void ChunkIndexMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("chunk_id");
+    writer.Uint(chunk_id_);
     if (commit_ts_ != UNCOMMIT_TS) {
-        json_res["commit_ts"] = commit_ts_;
+        writer.Key("commit_ts");
+        writer.Uint64(commit_ts_);
     }
-    return json_res;
 }
 
-nlohmann::json ChunkIndexTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
-    return json_res;
+void ChunkIndexTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json SystemTagMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res[tag_name_] = nlohmann::json::parse(value_);
-    return json_res;
+void SystemTagMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key(tag_name_.c_str());
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json PmObjectMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["path"] = path_key_;
-    json_res["description"] = nlohmann::json::parse(value_);
-    return json_res;
+void PmObjectMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("path");
+    writer.String(path_key_.c_str());
+
+    writer.Key("description");
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json PmStatMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["object"] = object_key_;
-    json_res["stat"] = nlohmann::json::parse(value_);
-    return json_res;
+void PmStatMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("object");
+    writer.String(object_key_.c_str());
+
+    writer.Key("stat");
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
-nlohmann::json DropMetaKey::ToJson() const {
-    nlohmann::json json_res;
-    json_res["scope"] = scope_;
-    json_res["key"] = object_key_;
-    json_res["value"] = nlohmann::json::parse(value_);
-    return json_res;
+void DropMetaKey::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("scope");
+    writer.String(scope_.c_str());
+    writer.Key("key");
+    writer.String(object_key_.c_str());
+
+    writer.Key("value");
+    rapidjson::Document doc;
+    doc.Parse(value_.c_str());
+    doc.Accept(writer);
 }
 
 SharedPtr<MetaKey> MetaParse(const String &key, const String &value) {

@@ -86,7 +86,7 @@ public:
 
     virtual String ToString() const;
     virtual String BuildOtherParamsString() const { return ""; }
-    virtual nlohmann::json Serialize() const;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const;
 
     static SharedPtr<IndexBase> Deserialize(std::string_view index_def_str);
 

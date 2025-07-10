@@ -36,7 +36,7 @@ public:
 
     [[nodiscard]] size_t ElemSize() const { return elem_type_.Size(); }
 
-    [[nodiscard]] nlohmann::json Serialize() const override;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const override;
 
     [[nodiscard]] std::string ToString() const override;
 

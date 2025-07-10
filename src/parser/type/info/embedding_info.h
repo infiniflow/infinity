@@ -55,7 +55,7 @@ public:
         return EmbeddingDataTypeToString(embedding_data_type_) + "," + std::to_string(dimension_);
     }
 
-    [[nodiscard]] nlohmann::json Serialize() const override;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const override;
 
     static std::string EmbeddingDataTypeToString(EmbeddingDataType type);
 

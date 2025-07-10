@@ -25,32 +25,36 @@ import third_party;
 
 namespace infinity {
 
-nlohmann::json ObjStat::Serialize() const {
-    nlohmann::json obj;
-    obj["obj_size"] = obj_size_;
-    obj["parts"] = parts_;
-    obj["deleted_ranges"] = nlohmann::json::array();
+void ObjStat::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("obj_size");
+    writer.Uint64(obj_size_);
+    writer.Key("parts");
+    writer.Uint64(parts_);
+
+    writer.Key("deleted_ranges");
+    writer.StartArray();
     for (auto &range : deleted_ranges_) {
-        nlohmann::json range_obj;
-        range_obj["start"] = range.start_;
-        range_obj["end"] = range.end_;
-        obj["deleted_ranges"].emplace_back(range_obj);
+        writer.StartObject();
+
+        writer.Key("start");
+        writer.Uint64(range.start_);
+        writer.Key("end");
+        writer.Uint64(range.end_);
+
+        writer.EndObject();
     }
-    return obj;
+    writer.EndArray();
 }
 
 String ObjStat::ToString() const {
-    nlohmann::json obj;
-    obj["obj_size"] = obj_size_;
-    obj["parts"] = parts_;
-    obj["deleted_ranges"] = nlohmann::json::array();
-    for (auto &range : deleted_ranges_) {
-        nlohmann::json range_obj;
-        range_obj["start"] = range.start_;
-        range_obj["end"] = range.end_;
-        obj["deleted_ranges"].emplace_back(range_obj);
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        Serialize(writer);
+        writer.EndObject();
     }
-    return obj.dump();
+    return sb.GetString();
 }
 
 void ObjStat::Deserialize(std::string_view str) {

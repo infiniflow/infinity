@@ -34,11 +34,11 @@ bool EmbeddingInfo::operator==(const arrow::FixedSizeListType &other) const {
 
 bool EmbeddingInfo::operator==(const arrow::ListType &other) const { return embedding_data_type_ == other.value_type()->id(); }
 
-nlohmann::json EmbeddingInfo::Serialize() const {
-    nlohmann::json res;
-    res["dimension"] = dimension_;
-    res["embedding_type"] = embedding_data_type_;
-    return res;
+void EmbeddingInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    writer.Key("dimension");
+    writer.Uint64(dimension_);
+    writer.Key("embedding_type");
+    writer.Int((int8_t)embedding_data_type_);
 }
 
 std::string EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {

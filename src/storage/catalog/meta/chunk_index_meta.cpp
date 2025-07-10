@@ -52,11 +52,15 @@ String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chun
 
 } // namespace
 
-void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
-    json["base_name"] = base_name_;
-    json["base_row_id"] = base_row_id_.ToUint64();
-    json["row_count"] = row_cnt_;
-    json["index_size"] = index_size_;
+void ChunkIndexMetaInfo::ToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    writer.Key("base_name");
+    writer.String(base_name_.c_str());
+    writer.Key("base_row_id");
+    writer.Uint64(base_row_id_.ToUint64());
+    writer.Key("row_count");
+    writer.Uint64(row_cnt_);
+    writer.Key("index_size");
+    writer.Uint64(index_size_);
 }
 
 void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
@@ -87,9 +91,14 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
-        nlohmann::json chunk_info_json;
-        chunk_info_->ToJson(chunk_info_json);
-        Status status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            chunk_info_->ToJson(writer);
+            writer.EndObject();
+        }
+        Status status = kv_instance_.Put(chunk_info_key, sb.GetString());
         if (!status.ok()) {
             return status;
         }
@@ -495,9 +504,14 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
-        nlohmann::json chunk_info_json;
-        chunk_info_->ToJson(chunk_info_json);
-        Status status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            chunk_info_->ToJson(writer);
+            writer.EndObject();
+        }
+        Status status = kv_instance_.Put(chunk_info_key, sb.GetString());
         if (!status.ok()) {
             return status;
         }

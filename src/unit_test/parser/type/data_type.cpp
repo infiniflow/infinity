@@ -141,8 +141,21 @@ TEST_F(DataTypeTest, Serialize) {
     using namespace infinity;
 
     DataType bool_type(LogicalType::kBoolean);
-    String bool_type_str = bool_type.Serialize().dump();
-    std::cout << bool_type_str << std::endl;
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        {
+            writer.Key("type_info");
+            writer.StartObject();
+            bool_type.Serialize(writer);
+            writer.EndObject();
+        }
+        writer.EndObject();
+    }
+    String json_str = sb.GetString();
+    std::cout << json_str << std::endl;
+    EXPECT_EQ(json_str, "{\"type_info\":{\"data_type\":0}}");
 }
 
 TEST_F(DataTypeTest, ReadWrite) {

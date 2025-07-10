@@ -66,7 +66,7 @@ public:
 
     [[nodiscard]] inline TypeInfoType type() const noexcept { return type_; }
 
-    [[nodiscard]] virtual nlohmann::json Serialize() const = 0;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const = 0;
 
     [[nodiscard]] virtual std::string ToString() const = 0;
 

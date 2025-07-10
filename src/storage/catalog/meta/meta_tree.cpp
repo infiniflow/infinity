@@ -587,19 +587,38 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
     return meta_tree;
 }
 
-nlohmann::json MetaTree::ToJson() const {
-    nlohmann::json json_res;
+void MetaTree::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("system_tags");
+    writer.StartArray();
     for (const auto &tag_pair : system_tag_map_) {
-        json_res["system_tags"].push_back({{"tag_name", tag_pair.first}, {"value", tag_pair.second}});
-    }
+        writer.StartObject();
 
+        writer.Key("tag_name");
+        writer.String(tag_pair.first.c_str());
+        writer.Key("value");
+        writer.String(tag_pair.second.c_str());
+
+        writer.EndObject();
+    }
+    writer.EndArray();
+
+    writer.Key("databases");
+    writer.StartArray();
     for (const auto &db_pair : db_map_) {
-        json_res["databases"].push_back(db_pair.second->ToJson());
+        writer.StartObject();
+        db_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
+
+    writer.Key("objects");
+    writer.StartArray();
     for (const auto &pm : pm_object_map_) {
-        json_res["objects"].push_back(pm.second->ToJson());
+        writer.StartObject();
+        pm.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 Vector<MetaTableObject *> MetaTree::ListTables() const {
@@ -636,15 +655,26 @@ UniquePtr<SystemCache> MetaTree::RestoreSystemCache(Storage *storage_ptr) const 
     return system_cache;
 }
 
-nlohmann::json MetaDBObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaDBObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("tables");
+    writer.StartArray();
     for (const auto &table_pair : table_map_) {
-        json_res["tables"].push_back(table_pair.second->ToJson());
+        writer.StartObject();
+        table_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
+
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
@@ -666,23 +696,44 @@ SharedPtr<DbCache> MetaDBObject::RestoreDbCache(Storage *storage_ptr) const {
     return db_cache;
 }
 
-nlohmann::json MetaTableObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaTableObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("columns");
+    writer.StartArray();
     for (const auto &column_pair : column_map_) {
-        json_res["columns"].push_back(column_pair.second->ToJson());
+        writer.StartObject();
+        column_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
+
+    writer.Key("indexes");
+    writer.StartArray();
     for (const auto &index_pair : index_map_) {
-        json_res["indexes"].push_back(index_pair.second->ToJson());
+        writer.StartObject();
+        index_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
 
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
 
+    writer.Key("segments");
+    writer.StartArray();
     for (const auto &segment_pair : segment_map_) {
-        json_res["segments"].push_back(segment_pair.second->ToJson());
+        writer.StartObject();
+        segment_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 const String &MetaTableObject::GetTableName() const {
@@ -847,15 +898,25 @@ SharedPtr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_ptr) c
     return table_cache;
 }
 
-nlohmann::json MetaSegmentObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaSegmentObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+    writer.Key("blocks");
+    writer.StartArray();
     for (const auto &block_pair : block_map_) {
-        json_res["blocks"].push_back(block_pair.second->ToJson());
+        writer.StartObject();
+        block_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
+
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 BlockID MetaSegmentObject::GetCurrentBlockID() const {
@@ -869,34 +930,61 @@ BlockID MetaSegmentObject::GetCurrentBlockID() const {
     return current_block_id;
 }
 
-nlohmann::json MetaBlockObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaBlockObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("columns");
+    writer.StartArray();
     for (const auto &column_pair : column_map_) {
-        json_res["columns"].push_back(column_pair.second->ToJson());
+        writer.StartObject();
+        column_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
+
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
-nlohmann::json MetaBlockColumnObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaBlockColumnObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
-nlohmann::json MetaTableIndexObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaTableIndexObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
+    writer.EndArray();
+
+    writer.Key("segments");
+    writer.StartArray();
     for (const auto &segment_pair : segment_map_) {
-        json_res["segments"].push_back(segment_pair.second->ToJson());
+        writer.StartObject();
+        segment_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage *storage_ptr) const {
@@ -916,28 +1004,43 @@ SharedPtr<TableIndexCache> MetaTableIndexObject::RestoreTableIndexCache(Storage 
     return table_index_cache;
 }
 
-nlohmann::json MetaSegmentIndexObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaSegmentIndexObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("chunks");
+    writer.StartArray();
     for (const auto &chunk_pair : chunk_map_) {
-        json_res["chunks"].push_back(chunk_pair.second->ToJson());
+        writer.StartObject();
+        chunk_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
-nlohmann::json MetaChunkIndexObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaChunkIndexObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("tags");
+    writer.StartArray();
     for (const auto &tag_pair : tag_map_) {
-        json_res["tags"].push_back(tag_pair.second->ToJson());
+        writer.StartObject();
+        tag_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
-nlohmann::json MetaPmObject::ToJson() const {
-    nlohmann::json json_res = meta_key_->ToJson();
+void MetaPmObject::ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    meta_key_->ToJson(writer);
+
+    writer.Key("paths");
+    writer.StartArray();
     for (const auto &path_pair : path_map_) {
-        json_res["paths"].push_back(path_pair.second->ToJson());
+        writer.StartObject();
+        path_pair.second->ToJson(writer);
+        writer.EndObject();
     }
-    return json_res;
+    writer.EndArray();
 }
 
 bool MetaTree::PathFilter(std::string_view path, CheckStmtType tag, Optional<String> db_table_str) {
@@ -976,7 +1079,14 @@ void MetaTree::Prepare() {
             }
             case MetaType::kTableColumn: {
                 auto *column_meta = static_cast<TableColumnMetaKey *>(meta.get());
-                simdjson::padded_string json_pad(column_meta->ToJson().dump());
+                rapidjson::StringBuffer sb;
+                {
+                    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                    writer.StartObject();
+                    column_meta->ToJson(writer);
+                    writer.EndObject();
+                }
+                simdjson::padded_string json_pad((String)sb.GetString());
                 simdjson::parser parser;
                 simdjson::document doc = parser.iterate(json_pad);
                 auto meta_column_id = (ColumnID)doc["column_definition"]["column_id"].get<ColumnID>();

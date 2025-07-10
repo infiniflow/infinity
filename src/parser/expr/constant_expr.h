@@ -63,7 +63,7 @@ public:
 
     static std::shared_ptr<ParsedExpr> ReadAdv(const char *&ptr, int32_t maxbytes);
 
-    nlohmann::json Serialize() const;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const;
 
     static std::shared_ptr<ParsedExpr> Deserialize(std::string_view constant_expr_str);
 

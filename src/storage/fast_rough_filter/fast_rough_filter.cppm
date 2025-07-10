@@ -66,7 +66,7 @@ public:
 
     bool IsValid() const;
 
-    void SaveToJsonFile(nlohmann::json &entry_json) const;
+    void SaveToJsonFile(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
     bool LoadFromJsonFile(std::string_view json_sv);
 

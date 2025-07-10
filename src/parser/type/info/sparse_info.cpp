@@ -92,13 +92,15 @@ bool SparseInfo::operator==(const arrow::StructType &other) const {
     return data_type_ == value_type->value_type()->id();
 }
 
-nlohmann::json SparseInfo::Serialize() const {
-    nlohmann::json res;
-    res["data_type"] = data_type_;
-    res["index_type"] = index_type_;
-    res["dimension"] = dimension_;
-    res["sort"] = static_cast<int8_t>(store_type_);
-    return res;
+void SparseInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    writer.Key("data_type");
+    writer.Int((int8_t)data_type_);
+    writer.Key("index_type");
+    writer.Int((int8_t)index_type_);
+    writer.Key("dimension");
+    writer.Uint64(dimension_);
+    writer.Key("sort");
+    writer.Int((int8_t)store_type_);
 }
 
 std::unique_ptr<SparseInfo> SparseInfo::Deserialize(std::string_view json_str) {

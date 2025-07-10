@@ -275,18 +275,20 @@ String IndexHnsw::BuildOtherParamsString() const {
     return ss.str();
 }
 
-nlohmann::json IndexHnsw::Serialize() const {
-    nlohmann::json res = IndexBase::Serialize();
-    res["metric_type"] = MetricTypeToString(metric_type_);
-    res["encode_type"] = HnswEncodeTypeToString(encode_type_);
-    res["build_type"] = HnswBuildTypeToString(build_type_);
-    res["M"] = M_;
-    res["ef_construction"] = ef_construction_;
-    res["block_size"] = block_size_;
-    if (lsg_config_) {
-        res["lsg_config"] = lsg_config_->ToString();
-    }
-    return res;
+void IndexHnsw::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    IndexBase::Serialize(writer);
+    writer.Key("metric_type");
+    writer.String(MetricTypeToString(metric_type_).c_str());
+    writer.Key("encode_type");
+    writer.String(HnswEncodeTypeToString(encode_type_).c_str());
+    writer.Key("build_type");
+    writer.String(HnswBuildTypeToString(build_type_).c_str());
+    writer.Key("M");
+    writer.Uint64(M_);
+    writer.Key("ef_construction");
+    writer.Uint64(ef_construction_);
+    writer.Key("block_size");
+    writer.Uint64(block_size_);
 }
 
 void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref,

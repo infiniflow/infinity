@@ -209,14 +209,22 @@ String IndexBase::ToString() const {
     return ss.str();
 }
 
-nlohmann::json IndexBase::Serialize() const {
-    nlohmann::json res;
-    res["index_type"] = IndexInfo::IndexTypeToString(index_type_);
-    res["index_name"] = *index_name_;
-    res["index_comment"] = *index_comment_;
-    res["file_name"] = file_name_;
-    res["column_names"] = column_names_;
-    return res;
+void IndexBase::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    writer.Key("index_type");
+    writer.String(IndexInfo::IndexTypeToString(index_type_).c_str());
+    writer.Key("index_name");
+    writer.String((*index_name_).c_str());
+    writer.Key("index_comment");
+    writer.String((*index_comment_).c_str());
+    writer.Key("file_name");
+    writer.String(file_name_.c_str());
+
+    writer.Key("column_names");
+    writer.StartArray();
+    for (const auto& column_name : column_names_) {
+        writer.String(column_name.c_str());
+    }
+    writer.EndArray();
 }
 
 SharedPtr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str) {

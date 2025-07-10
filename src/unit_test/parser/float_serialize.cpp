@@ -209,42 +209,4 @@ TEST_F(FloatSerializeTest, test_json) {
         assert(recover == f2_f64);
         EXPECT_EQ(f2_f64, recover);
     }
-    nlohmann::json j;
-    j["f1"] = f1;
-    j["f2"] = f2;
-    EXPECT_EQ(j["f1"].get<f32>(), f1);
-    EXPECT_EQ(j["f2"].get<f32>(), f2);
-    // output json
-    //    std::cout << j.dump(4) << std::endl;
-}
-
-TEST_F(FloatSerializeTest, test_json_hex_float) {
-    using namespace infinity;
-    constexpr f32 f1 = 0x1.fffffcp+9;
-    constexpr f32 f2 = 0x1.fffffep+9;
-    const char *hex_float_json_invalid = R"(
-{ "f1": 0x1.fffffcp+9, "f2": 0x1.fffffep+9 }
-)";
-    EXPECT_THROW((void)nlohmann::json::parse(hex_float_json_invalid), nlohmann::json::parse_error);
-    const char *hex_float_json_valid_1 = R"(
-{ "f1": 1023.9999, "f2": 1023.99994 }
-)";
-    nlohmann::json j_1 = nlohmann::json::parse(hex_float_json_valid_1);
-    std::cout << j_1.dump(4) << std::endl;
-    EXPECT_EQ(j_1["f1"].get<f32>(), f1);
-    EXPECT_EQ(j_1["f2"].get<f32>(), f2);
-    const char *hex_float_json_valid_2 = R"(
-{ "f1": 1.0239999e+3, "f2": 1.02399994e+3 }
-)";
-    nlohmann::json j_2 = nlohmann::json::parse(hex_float_json_valid_2);
-    std::cout << j_2.dump(4) << std::endl;
-    EXPECT_EQ(j_2["f1"].get<f32>(), f1);
-    EXPECT_EQ(j_2["f2"].get<f32>(), f2);
-    const char *hex_float_json_valid_3 = R"(
-{ "f1": 1, "f2": 1.0 }
-)";
-    nlohmann::json j_3 = nlohmann::json::parse(hex_float_json_valid_3);
-    std::cout << j_3.dump(4) << std::endl;
-    EXPECT_EQ(j_3["f1"].get<f32>(), 1.0f);
-    EXPECT_EQ(j_3["f2"].get<f32>(), 1.0f);
 }

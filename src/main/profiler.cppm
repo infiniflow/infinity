@@ -200,7 +200,7 @@ public:
 
     static String QueryPhaseToString(QueryPhase phase);
 
-    static nlohmann::json Serialize(const QueryProfiler *profiler);
+    static void Serialize(const QueryProfiler *profiler, rapidjson::Writer<rapidjson::StringBuffer>& writer);
 
     Vector<TaskProfiler> &GetTaskProfile(u64 fragment_id, i64 task_id);
 

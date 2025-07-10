@@ -36,7 +36,7 @@ export struct ObjAddr {
 
     bool Valid() const { return !obj_key_.empty(); }
 
-    nlohmann::json Serialize() const;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
     void Deserialize(std::string_view obj_str);
 

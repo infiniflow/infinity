@@ -124,11 +124,12 @@ String IndexEMVB::ToString() const {
     return std::move(ss).str();
 }
 
-nlohmann::json IndexEMVB::Serialize() const {
-    nlohmann::json res = IndexBase::Serialize();
-    res["pq_subspace_num"] = residual_pq_subspace_num_;
-    res["pq_subspace_bits"] = residual_pq_subspace_bits_;
-    return res;
+void IndexEMVB::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    IndexBase::Serialize(writer);
+    writer.Key("pq_subspace_num");
+    writer.Uint(residual_pq_subspace_num_);
+    writer.Key("pq_subspace_bits");
+    writer.Uint(residual_pq_subspace_bits_);
 }
 
 } // namespace infinity
