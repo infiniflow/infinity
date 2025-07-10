@@ -1411,16 +1411,9 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
     return block_meta.GetBlockColumnInfo(column_id);
 }
 
-// Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
-//     this->CheckTxn(db_name);
-//     return catalog_->GetTableSnapshot(db_name, table_name, nullptr);
-// }
 
-// Status NewTxn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
-//     return catalog_->ApplyTableSnapshot(table_snapshot_info, nullptr);
-// }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshotInfo (const String &db_name, const String &table_name) {
+Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
     // Check if the DB is valid
     this->CheckTxn(db_name);
 
@@ -1434,16 +1427,18 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshotInfo (const 
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
     
     if (!status.ok()) {
-        return {nullptr, status};
+        return status;
     }
 
-    std::tie(table_snapshot_info, status) = table_meta_opt->MapMetaToSnapShotInfo(db_name, table_name);
+   
 
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
+    base_txn_store_ = MakeShared<CreateTableSnapshotTxnStore>();
+    CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_);
+    txn_store->db_name_ = db_name;
+    txn_store->table_name_ = table_name;
+    txn_store->snapshot_name_ = snapshot_name;
 
-    return {std::move(table_snapshot_info), Status::OK()}; // Success
+    return Status::OK(); // Success
 }
 
 Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const String &db_name) {
@@ -2166,6 +2161,18 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::CLEANUP: {
                 break;
             }
+            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+                if (this->IsReplay()) {
+                    // Skip replay of CREATE_TABLE_SNAPSHOT command.
+                    break;
+                }
+                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());
+                Status status = PrepareCommitCreateTableSnapshot(create_table_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
@@ -2280,6 +2287,89 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
     }
     return Status::OK();
 }
+
+// Get indexes for specific table only
+Vector<SharedPtr<MemIndexDetail>> NewTxn::GetTableMemIndexes(const String &db_name, const String &table_name) {
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(
+        MakeUnique<String>("Get table mem indexes"), TransactionType::kNormal
+    );
+    
+    Vector<SharedPtr<MemIndexDetail>> all_details = GetAllMemIndexes(new_txn_shared.get());
+    Vector<SharedPtr<MemIndexDetail>> table_details;
+    
+    for (const auto &detail : all_details) {
+        if (detail->db_name_ == db_name && detail->table_name_ == table_name) {
+            table_details.push_back(detail);
+        }
+    }
+    
+    return table_details;
+}
+
+Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
+    // check the current ckp_ts
+    auto *wal_manager = query_context->storage()->wal_manager();
+    auto *new_txn = query_context->GetNewTxn();
+    TxnTimeStamp ckp_ts = wal_manager->LastCheckpointTS();
+    TxnTimeStamp begin_ts = new_txn->BeginTS();
+    if (ckp_ts + 2 >= begin_ts) {
+        LOG_INFO(fmt::format("Newer data areflushed skip checkpoint directly take snapshot"));
+    } else {
+        LOG_INFO(fmt::format("Older data are not flushed, create a new checkpoint"));
+        // Get current commit state
+        TxnTimeStamp max_commit_ts{};
+        i64 wal_size{};
+        std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+        LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+
+        // Create and configure checkpoint task
+        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+        // Submit to background processor
+        auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+        bg_processor->Submit(checkpoint_task);
+        checkpoint_task->Wait();
+    }
+
+
+    // dump indexes for snapshot
+    Vector<SharedPtr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
+    
+    // Submit all dump tasks in parallel
+    Vector<SharedPtr<DumpMemIndexTask>> dump_tasks;
+    auto *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
+    
+    for (const auto &mem_index_detail : table_mem_indexes) {
+        auto dump_index_task = MakeShared<DumpMemIndexTask>(mem_index_detail->db_name_, mem_index_detail->table_name_, mem_index_detail->index_name_, mem_index_detail->segment_id_, mem_index_detail->begin_row_id_);
+        dump_tasks.push_back(dump_index_task);
+        dump_index_processor->Submit(std::move(dump_index_task));
+    }
+    
+    // Wait for all dumps to complete
+    for (auto &dump_task : dump_tasks) {
+        dump_task->Wait();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    // create a new snapshot
+    SharedPtr<TableSnapshotInfo> table_snapshot_info;
+    std::tie(table_snapshot_info, status) = table_meta_opt->MapMetaToSnapShotInfo(db_name, table_name);
+
+    if (!status.ok()) {
+        return status;
+    }
+    table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
+    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 //
 // Status NewTxn::PrepareCommitCreateDB() {
 //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -5655,7 +5745,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
 
     // check if the data still exist in the system
     String data_dir = InfinityContext::instance().config()->DataDir();
-    String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, db_name), restore_table_cmd->table_name_);
+    String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_), "tbl_" + restore_table_cmd->table_id_);
     if (!VirtualStore::Exists(table_data_dir)) {
         LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
         return Status::OK();
@@ -5669,20 +5759,32 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    u64 next_table_id = std::stoull(restore_table_cmd->table_id_);
-    ++next_table_id;
-    String next_table_id_str = std::to_string(next_table_id);
 
-    status = db_meta->SetNextTableID(next_table_id_str);
+    // Get next table id of the db
+    String next_table_id_key = KeyEncode::CatalogDbTagKey(restore_table_cmd->db_id_, NEXT_TABLE_ID.data());
+    String next_table_id_str;
+    status = kv_instance_->Get(next_table_id_key, next_table_id_str);
     if (!status.ok()) {
         return status;
     }
-
-    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd);
-
-    if (!status.ok()) {
-        return status;
+    u64 next_table_id = std::stoull(next_table_id_str);
+    u64 this_table_id = std::stoull(restore_table_cmd->table_id_);
+    if (this_table_id + 1 > next_table_id) {
+        // Update the next table id
+        String new_next_table_id_str = std::to_string(this_table_id + 1);
+        status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, restore_table_cmd->db_name_));
     }
+
+
+    // status = PrepareCommitRestoreTableSnapshot(restore_table_cmd);
+
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
 
 

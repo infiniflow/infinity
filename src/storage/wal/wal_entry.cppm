@@ -97,8 +97,9 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     // Snapshot
     // -----------------------------
-    RESTORE_TABLE_SNAPSHOT = 110,
-    RESTORE_DATABASE_SNAPSHOT = 111,
+    CREATE_TABLE_SNAPSHOT = 110,
+    RESTORE_TABLE_SNAPSHOT = 111,
+    RESTORE_DATABASE_SNAPSHOT = 112,
     // -----------------------------
     // Other
     // -----------------------------
@@ -1063,6 +1064,24 @@ export struct WalCmdCleanup : public WalCmd {
 
     i64 timestamp_{};
 };
+
+export struct WalCmdCreateTableSnapshot : public WalCmd {
+    WalCmdCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name)
+        : WalCmd(WalCommandType::CREATE_TABLE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+    static WalCmdCreateTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
+
+    String db_name_{};
+    String table_name_{};
+    String snapshot_name_{};
+};
+
+
 
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
     WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files)

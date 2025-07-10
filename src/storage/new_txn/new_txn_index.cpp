@@ -2072,6 +2072,8 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
 }
 
 Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds) {
+    NewTxnManager *new_txn_manager = InfinityContext::instance().storage()->new_txn_manager();
+    new_txn_manager->PrintAllKeyValue();
     u64 max_index_id = 0;
     Status status;
     for (const auto &index_cmd : index_cmds) {
@@ -2089,17 +2091,6 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
             return status;
         }
 
-        if (index_cmd.index_base_->index_type_ == IndexType::kFullText) {
-            auto ft_cache = MakeShared<TableIndexReaderCache>(table_meta.db_id_str(), table_meta.table_id_str());
-            status = table_meta.AddFtIndexCache(ft_cache);
-            if (!status.ok()) {
-                if (status.code() != ErrorCode::kCatalogError) {
-                    return status;
-                }
-            }
-
-            table_index_meta->UpdateFulltextSegmentTS(txn_context_ptr_->commit_ts_);
-        }
         
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
             Optional<SegmentIndexMeta> segment_index_meta;

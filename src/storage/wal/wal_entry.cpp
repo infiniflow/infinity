@@ -908,6 +908,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = MakeShared<WalCmdCleanup>(timestamp);
             break;
         }
+        case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String snapshot_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCreateTableSnapshot>(db_name, table_name, snapshot_name);
+            break;
+        }
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
             String db_name = ReadBufAdv<String>(ptr);
             String db_id = ReadBufAdv<String>(ptr);
@@ -1318,6 +1325,12 @@ bool WalCmdCleanup::operator==(const WalCmd &other) const {
     return other_cmd != nullptr && timestamp_ == other_cmd->timestamp_;
 }
 
+bool WalCmdCreateTableSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCreateTableSnapshot *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && snapshot_name_ == other_cmd->snapshot_name_;
+}
+
+
 bool WalCmdRestoreTableSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdRestoreTableSnapshot *>(&other);
     if (other_cmd == nullptr || db_name_ != other_cmd->db_name_ || db_id_ != other_cmd->db_id_ || table_name_ != other_cmd->table_name_ ||
@@ -1629,6 +1642,10 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
     return size;
 }
 
+i32 WalCmdCreateTableSnapshot::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size();
+}
+
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
     i32 size = sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + db_id_str_.size() + sizeof(i32) + db_comment_.size();
     size += sizeof(i32);
@@ -1779,6 +1796,14 @@ void WalCmdRestoreTableSnapshot::WriteAdv(char *&buf) const {
         WriteBufAdv(buf, file);
     }
 }
+
+void WalCmdCreateTableSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::CREATE_TABLE_SNAPSHOT);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->snapshot_name_);
+}
+
 
 void WalCmdRestoreDatabaseSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::RESTORE_DATABASE_SNAPSHOT);
@@ -2855,6 +2880,14 @@ String WalCmdDropColumnsV2::CompactInfo() const {
 
 String WalCmdCleanup::CompactInfo() const { return fmt::format("{}: timestamp: {}", WalCmd::WalCommandTypeToString(GetType()), timestamp_); }
 
+String WalCmdCreateTableSnapshot::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, snapshot: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       snapshot_name_);
+}
+
 String WalCmdRestoreTableSnapshot::CompactInfo() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_def: {}, segment_count: {}, index_count: {}, files_count: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
@@ -2866,6 +2899,12 @@ String WalCmdRestoreTableSnapshot::CompactInfo() const {
                        segment_infos_.size(),
                        index_cmds_.size(),
                        files_.size());
+}
+
+String WalCmdCreateTableSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << std::endl;
+    return std::move(ss).str();
 }
 
 String WalCmdRestoreTableSnapshot::ToString() const {

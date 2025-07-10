@@ -472,28 +472,28 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     //     checkpoint_task->ExecuteWithNewTxn();
                     // }
 
-                    // check the current ckp_ts
-                    auto *wal_manager = query_context->storage()->wal_manager();
-                    auto *new_txn = query_context->GetNewTxn();
-                    TxnTimeStamp ckp_ts = wal_manager->LastCheckpointTS();
-                    TxnTimeStamp begin_ts = new_txn->BeginTS();
-                    if (ckp_ts + 2 >= begin_ts) {
-                        LOG_INFO(fmt::format("Newer data areflushed skip checkpoint directly take snapshot"));
-                    } else {
-                        LOG_INFO(fmt::format("Older data are not flushed, create a new checkpoint"));
-                        // Get current commit state
-                        TxnTimeStamp max_commit_ts{};
-                        i64 wal_size{};
-                        std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-                        LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+                    // // check the current ckp_ts
+                    // auto *wal_manager = query_context->storage()->wal_manager();
+                    // auto *new_txn = query_context->GetNewTxn();
+                    // TxnTimeStamp ckp_ts = wal_manager->LastCheckpointTS();
+                    // TxnTimeStamp begin_ts = new_txn->BeginTS();
+                    // if (ckp_ts + 2 >= begin_ts) {
+                    //     LOG_INFO(fmt::format("Newer data areflushed skip checkpoint directly take snapshot"));
+                    // } else {
+                    //     LOG_INFO(fmt::format("Older data are not flushed, create a new checkpoint"));
+                    //     // Get current commit state
+                    //     TxnTimeStamp max_commit_ts{};
+                    //     i64 wal_size{};
+                    //     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                    //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
 
-                        // Create and configure checkpoint task
-                        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-                        // Submit to background processor
-                        auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-                        bg_processor->Submit(checkpoint_task);
-                        checkpoint_task->Wait();
-                    }
+                    //     // Create and configure checkpoint task
+                    //     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                    //     // Submit to background processor
+                    //     auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+                    //     bg_processor->Submit(checkpoint_task);
+                    //     checkpoint_task->Wait();
+                    // }
 
                     // // wait for checkpoint to complete
                     // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
@@ -517,7 +517,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kTable: {
                             const String &table_name = snapshot_cmd->object_name();
-                            Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
+                            const String &db_name = query_context->schema_name();
+                            // Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
+                            NewTxn *new_txn = query_context->GetNewTxn();
+                            Status snapshot_status = new_txn->CreateTableSnapshot(db_name, table_name, snapshot_name);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }

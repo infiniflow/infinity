@@ -72,6 +72,20 @@ SharedPtr<WalEntry> CreateTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
     return wal_entry;
 }
 
+String CreateTableSnapshotTxnStore::ToString() const {
+    return fmt::format("{}: database: {}, table: {}, snapshot: {}", TransactionType2Str(type_), db_name_, table_name_, snapshot_name_);
+}
+
+// check if we need it
+SharedPtr<WalEntry> CreateTableSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableSnapshot>(db_name_, table_name_, snapshot_name_);
+    wal_entry->cmds_.push_back(wal_command);
+    return wal_entry;
+}
+
+
 String DropTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, table_id: {}, create_ts: {}",
                        TransactionType2Str(type_),
