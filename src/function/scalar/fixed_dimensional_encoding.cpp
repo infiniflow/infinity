@@ -34,6 +34,9 @@ import value;
 import array_info;
 import third_party;
 import embedding_info;
+import function_set;
+import base_expression;
+import function;
 
 namespace infinity {
 
@@ -311,11 +314,9 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
 
         // Extract tensor data based on the tensor type
         Vector<float> tensor_data;
-        i32 embedding_dim = 0;
 
         if (tensor_value.type().type() == LogicalType::kTensor || tensor_value.type().type() == LogicalType::kEmbedding) {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(tensor_value.type().type_info().get());
-            embedding_dim = embedding_info->Dimension();
 
             // Get tensor data from the value - for tensor values, the data is stored as embedding data
             Span<char> raw_data = tensor_value.GetEmbedding();
@@ -356,7 +357,6 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
                 // Nested array case: [[1.0, 2.0], [3.0, 4.0]]
                 const Vector<Value> &first_sub_array = array_elements[0].GetArray();
                 SizeT sub_array_size = first_sub_array.size();
-                embedding_dim = sub_array_size;
 
                 // Validate all sub-arrays have the same size
                 for (SizeT i = 1; i < array_elements.size(); ++i) {
@@ -372,8 +372,14 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
                 }
 
                 // Flatten nested arrays
+                tensor_data.reserve(array_elements.size() * sub_array_size); // Pre-allocate memory
                 for (SizeT i = 0; i < array_elements.size(); ++i) {
                     const Vector<Value> &sub_array = array_elements[i].GetArray();
+                    if (sub_array.size() != sub_array_size) {
+                        String error_message =
+                            fmt::format("FDE function: sub-array {} has size {}, expected {}", i, sub_array.size(), sub_array_size);
+                        UnrecoverableError(error_message);
+                    }
                     for (SizeT j = 0; j < sub_array.size(); ++j) {
                         const Value &element_value = sub_array[j];
                         if (element_value.type().type() == LogicalType::kFloat) {
@@ -392,7 +398,6 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
                 }
             } else {
                 // Single-level array case: [1.0, 2.0, 3.0, 4.0]
-                embedding_dim = array_elements.size();
                 for (SizeT i = 0; i < array_elements.size(); ++i) {
                     const Value &element_value = array_elements[i];
                     if (element_value.type().type() == LogicalType::kFloat) {
@@ -419,9 +424,25 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
             UnrecoverableError(error_message);
         }
 
+        // Validate input dimensions
+        if (tensor_data.empty()) {
+            String error_message = "FDE function: empty tensor data";
+            UnrecoverableError(error_message);
+        }
+
+        if (tensor_data.size() > 100000) {
+            String error_message = fmt::format("FDE function: input dimension {} is too large (max 100000)", tensor_data.size());
+            UnrecoverableError(error_message);
+        }
+
+        if (target_dimension <= 0 || target_dimension > 10000) {
+            String error_message = fmt::format("FDE function: target dimension {} is invalid (must be 1-10000)", target_dimension);
+            UnrecoverableError(error_message);
+        }
+
         // Create FDE configuration for simple dimensionality reduction
         FixedDimensionalEncodingConfig config;
-        config.dimension = embedding_dim;
+        config.dimension = static_cast<i32>(tensor_data.size()); // Use actual data size
         config.seed = 42; // Default seed
         config.num_repetitions = 1;
         config.num_simhash_projections = 0; // No partitioning - direct projection
@@ -456,42 +477,32 @@ void RegisterFDEFunction(NewCatalog *catalog_ptr) {
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    // Register function overloads for common dimensions
-    // We'll register specific input-output dimension pairs to avoid ambiguity
-    Vector<i32> common_dimensions = {2, 3, 4, 8, 16, 32, 64, 128, 256, 512, 1024};
+    // Use a flexible output type that can be cast to the target dimension during INSERT operations
+    auto result_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 64); // Default dimension for type resolution
+    auto result_type = DataType(LogicalType::kEmbedding, result_info);
+
+    // Register for arrays (multi-dimensional arrays like [[0.0, -10.0], [9.2, 45.6]])
+    // This is the primary interface that works generically with any dimensions
+    auto array_type = DataType(LogicalType::kArray);
+    ScalarFunction fde_array_function(func_name, {array_type, DataType(LogicalType::kBigInt)}, result_type, &FDEFunction);
+    function_set_ptr->AddFunction(fde_array_function);
+
+    // Register representative functions for embedding and tensor types
+    // The special MatchFunctionCost logic will handle dimension flexibility
     Vector<EmbeddingDataType> data_types = {EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemDouble};
 
-    // Register FDE function for each combination of input dimension and target dimension
-    // This allows the function resolver to choose the right overload based on both input and expected output
     for (auto data_type : data_types) {
-        for (auto input_dim : common_dimensions) {
-            // Register for tensor types
-            auto tensor_embedding_info = EmbeddingInfo::Make(data_type, input_dim);
-            auto tensor_type = DataType(LogicalType::kTensor, tensor_embedding_info);
+        // Register one representative function per data type - the matching logic will handle any dimension
+        auto tensor_embedding_info = EmbeddingInfo::Make(data_type, 1); // Use dimension 1 as representative
+        auto tensor_type = DataType(LogicalType::kTensor, tensor_embedding_info);
+        ScalarFunction fde_tensor_function(func_name, {tensor_type, DataType(LogicalType::kBigInt)}, result_type, &FDEFunction);
+        function_set_ptr->AddFunction(fde_tensor_function);
 
-            // Register for embedding types (for single arrays)
-            auto embedding_type = DataType(LogicalType::kEmbedding, tensor_embedding_info);
-
-            // Register one function per input type - the actual output dimension will be determined at runtime
-            // Use a common dimension that will be converted by the INSERT operator if needed
-            auto result_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 64);
-            auto result_type = DataType(LogicalType::kEmbedding, result_info);
-
-            ScalarFunction fde_tensor_function(func_name, {tensor_type, DataType(LogicalType::kBigInt)}, result_type, &FDEFunction);
-            function_set_ptr->AddFunction(fde_tensor_function);
-
-            ScalarFunction fde_embedding_function(func_name, {embedding_type, DataType(LogicalType::kBigInt)}, result_type, &FDEFunction);
-            function_set_ptr->AddFunction(fde_embedding_function);
-        }
+        // Register for embedding types
+        auto embedding_type = DataType(LogicalType::kEmbedding, tensor_embedding_info);
+        ScalarFunction fde_embedding_function(func_name, {embedding_type, DataType(LogicalType::kBigInt)}, result_type, &FDEFunction);
+        function_set_ptr->AddFunction(fde_embedding_function);
     }
-
-    // Register for SubArrayArray (multi-dimensional arrays like [[0.0, -10.0], [9.2, 45.6]])
-    // This handles the case where users pass multiple embeddings to be encoded together
-    auto array_type = DataType(LogicalType::kArray);
-    auto generic_result_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 64); // Default to 64 dimensions
-    auto generic_result_type = DataType(LogicalType::kEmbedding, generic_result_info);
-    ScalarFunction fde_subarray_function(func_name, {array_type, DataType(LogicalType::kBigInt)}, generic_result_type, &FDEFunction);
-    function_set_ptr->AddFunction(fde_subarray_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }

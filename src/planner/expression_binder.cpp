@@ -498,6 +498,16 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 if (arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {
                     continue;
                 }
+
+                // Special handling for FDE function - skip casting for embedding/tensor types with different dimensions
+                if (scalar_function.name() == "FDE" && idx == 0 &&
+                    (arguments[idx]->Type().type() == LogicalType::kEmbedding || arguments[idx]->Type().type() == LogicalType::kTensor) &&
+                    (scalar_function.parameter_types_[idx].type() == LogicalType::kEmbedding ||
+                     scalar_function.parameter_types_[idx].type() == LogicalType::kTensor)) {
+                    // For FDE function, skip casting between embedding/tensor types - let the function handle it at runtime
+                    continue;
+                }
+
                 String name = arguments[idx]->Name();
                 arguments[idx] = CastExpression::AddCastToType(arguments[idx], scalar_function.parameter_types_[idx]);
                 // reset the alias name
