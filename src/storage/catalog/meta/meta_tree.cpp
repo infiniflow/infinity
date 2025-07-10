@@ -976,8 +976,10 @@ void MetaTree::Prepare() {
             }
             case MetaType::kTableColumn: {
                 auto *column_meta = static_cast<TableColumnMetaKey *>(meta.get());
-                auto json = column_meta->ToJson();
-                auto meta_column_id = static_cast<ColumnID>(json[0]["column_id"]);
+                simdjson::padded_string json_pad(column_meta->ToJson().dump());
+                simdjson::parser parser;
+                simdjson::document doc = parser.iterate(json_pad);
+                auto meta_column_id = (ColumnID)doc["column_definition"]["column_id"].get<ColumnID>();
                 column_dic_.emplace(column_meta->db_id_str_, column_meta->table_id_str_, meta_column_id);
                 break;
             }

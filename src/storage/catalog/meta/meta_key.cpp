@@ -157,8 +157,7 @@ nlohmann::json TableNameMetaKey::ToJson() const {
 
 nlohmann::json TableColumnMetaKey::ToJson() const {
     nlohmann::json json_res;
-    // json_res["column_definition"] = nlohmann::json::parse(value_);
-    json_res.push_back(nlohmann::json::parse(value_));
+    json_res["column_definition"] = nlohmann::json::parse(value_);
     return json_res;
 }
 
