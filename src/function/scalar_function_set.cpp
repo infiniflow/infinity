@@ -14,6 +14,7 @@
 
 module;
 
+#include <parser/type/logical_type.h>
 #include <sstream>
 
 module scalar_function_set;
@@ -21,7 +22,7 @@ module scalar_function_set;
 import stl;
 import base_expression;
 import scalar_function;
-
+import embedding_info;
 import infinity_exception;
 import cast_table;
 import logger;
@@ -94,13 +95,39 @@ i64 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction &func, const Vecto
     auto argument_count = arguments.size();
     i64 total_cost = 0;
     for (SizeT i = 0; i < argument_count; ++i) {
-        // Get the cost from argument to parameter
-        i64 type_cast_cost = CastTable::instance().GetCastCost(arguments[i]->Type().type(), func.parameter_types_[i].type());
-        if (type_cast_cost < 0) {
-            // Can't cast the value type;
-            return -1;
+        const auto &arg_type = arguments[i]->Type();
+        const auto &param_type = func.parameter_types_[i];
+
+        // For tensor and embedding types, we need exact type info match, not just logical type match
+        if ((arg_type.type() == LogicalType::kTensor || arg_type.type() == LogicalType::kEmbedding) &&
+            (param_type.type() == LogicalType::kTensor || param_type.type() == LogicalType::kEmbedding)) {
+
+            // Both are tensor/embedding types, check if they match exactly
+            if (arg_type.type() != param_type.type()) {
+                // Different logical types (tensor vs embedding)
+                return -1;
+            }
+
+            // Same logical type, check type info
+            const auto *arg_info = static_cast<const EmbeddingInfo *>(arg_type.type_info().get());
+            const auto *param_info = static_cast<const EmbeddingInfo *>(param_type.type_info().get());
+
+            if (arg_info->Type() != param_info->Type() || arg_info->Dimension() != param_info->Dimension()) {
+                // Different embedding data type or dimension
+                return -1;
+            }
+
+            // Exact match for tensor/embedding types
+            total_cost += 0;
         } else {
-            total_cost += type_cast_cost;
+            // For other types, use the standard cast cost
+            i64 type_cast_cost = CastTable::instance().GetCastCost(arg_type.type(), param_type.type());
+            if (type_cast_cost < 0) {
+                // Can't cast the value type;
+                return -1;
+            } else {
+                total_cost += type_cast_cost;
+            }
         }
     }
 
