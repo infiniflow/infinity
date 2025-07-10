@@ -21,6 +21,19 @@ module;
 module infinity_core;
 
 import :stl;
+import :new_catalog;
+import logical_type;
+import :infinity_exception;
+import :scalar_function;
+import :scalar_function_set;
+import internal_types;
+import data_type;
+import :column_vector;
+import :data_block;
+import :value;
+import array_info;
+import :third_party;
+import embedding_info;
 
 namespace infinity {
 
@@ -277,6 +290,133 @@ namespace internal {
         SparseProjector projector(input_vec.size(), final_dimension, rng);
         return projector.Project(input_vec);
     }
+}
+
+// FDE Scalar Function Implementation
+void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
+    if (input.column_count() != 2) {
+        String error_message = fmt::format("FDE function: input column count is {}, expected 2.", input.column_count());
+        UnrecoverableError(error_message);
+    }
+
+    SizeT row_count = input.row_count();
+
+    for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+        // Get the dimension parameter
+        Value dimension_value = input.GetValue(1, row_idx);
+        BigIntT target_dimension = dimension_value.GetValue<BigIntT>();
+
+        // Get the tensor data
+        Value tensor_value = input.GetValue(0, row_idx);
+
+        // Extract tensor data based on the tensor type
+        Vector<float> tensor_data;
+        i32 embedding_dim = 0;
+
+        if (tensor_value.type().type() == LogicalType::kTensor) {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(tensor_value.type().type_info().get());
+            embedding_dim = embedding_info->Dimension();
+
+            // Get tensor data from the value - for tensor values, the data is stored as embedding data
+            Span<char> raw_data = tensor_value.GetEmbedding();
+
+            // Calculate total elements based on raw data size and element size
+            SizeT element_size = 0;
+            if (embedding_info->Type() == EmbeddingDataType::kElemFloat) {
+                element_size = sizeof(float);
+            } else if (embedding_info->Type() == EmbeddingDataType::kElemDouble) {
+                element_size = sizeof(double);
+            } else {
+                String error_message =
+                    fmt::format("FDE function: unsupported tensor data type: {}", EmbeddingInfo::EmbeddingDataTypeToString(embedding_info->Type()));
+                UnrecoverableError(error_message);
+            }
+
+            SizeT total_elements = raw_data.size() / element_size;
+            tensor_data.reserve(total_elements);
+
+            // Convert raw data to float vector
+            if (embedding_info->Type() == EmbeddingDataType::kElemFloat) {
+                const float *float_ptr = reinterpret_cast<const float *>(raw_data.data());
+                for (SizeT i = 0; i < total_elements; ++i) {
+                    tensor_data.push_back(float_ptr[i]);
+                }
+            } else if (embedding_info->Type() == EmbeddingDataType::kElemDouble) {
+                const double *double_ptr = reinterpret_cast<const double *>(raw_data.data());
+                for (SizeT i = 0; i < total_elements; ++i) {
+                    tensor_data.push_back(static_cast<float>(double_ptr[i]));
+                }
+            }
+        } else {
+            String error_message = fmt::format("FDE function: expected tensor input, got: {}", tensor_value.type().ToString());
+            UnrecoverableError(error_message);
+        }
+
+        // Create FDE configuration for simple dimensionality reduction
+        FixedDimensionalEncodingConfig config;
+        config.dimension = embedding_dim;
+        config.seed = 42; // Default seed
+        config.num_repetitions = 1;
+        config.num_simhash_projections = 0; // No partitioning - direct projection
+        config.projection_type = FixedDimensionalEncodingConfig::ProjectionType::AMS_SKETCH;
+        config.projection_dimension = target_dimension;
+        config.encoding_type = FixedDimensionalEncodingConfig::EncodingType::DEFAULT_SUM;
+        config.fill_empty_partitions = false;
+
+        // Apply FDE encoding
+        Optional<Vector<float>> result = GenerateFixedDimensionalEncoding(tensor_data, config);
+
+        if (!result.has_value()) {
+            String error_message = "FDE function: encoding failed";
+            UnrecoverableError(error_message);
+        }
+
+        // Convert result to Value array
+        Vector<Value> result_values;
+        result_values.reserve(result->size());
+        for (float val : result.value()) {
+            result_values.emplace_back(Value::MakeFloat(val));
+        }
+
+        // Create array type info for float elements
+        auto float_type = MakeShared<DataType>(LogicalType::kFloat);
+        auto array_type_info = ArrayInfo::Make(*float_type);
+
+        Value result_array = Value::MakeArray(std::move(result_values), array_type_info);
+        output->AppendValue(result_array);
+    }
+}
+
+void RegisterFDEFunction(NewCatalog *catalog_ptr) {
+    String func_name = "FDE";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+
+    // Create result array type (array of floats)
+    auto float_type = MakeShared<DataType>(LogicalType::kFloat);
+    auto result_array_type_info = ArrayInfo::Make(*float_type);
+    auto result_array_type = DataType(LogicalType::kArray, result_array_type_info);
+
+    // Register function overloads for common tensor dimensions and data types
+    Vector<i32> common_dimensions = {2, 3, 4, 8, 16, 32, 64, 128, 256, 512, 1024};
+    Vector<EmbeddingDataType> data_types = {EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemDouble};
+
+    for (auto data_type : data_types) {
+        for (auto dim : common_dimensions) {
+            // Register for tensor types
+            auto tensor_embedding_info = EmbeddingInfo::Make(data_type, dim);
+            auto tensor_type = DataType(LogicalType::kTensor, tensor_embedding_info);
+            ScalarFunction fde_tensor_function(func_name, {tensor_type, DataType(LogicalType::kBigInt)}, result_array_type, &FDEFunction);
+            function_set_ptr->AddFunction(fde_tensor_function);
+
+            // Register for embedding types (for single arrays)
+            auto embedding_type = DataType(LogicalType::kEmbedding, tensor_embedding_info);
+            ScalarFunction fde_embedding_function(func_name, {embedding_type, DataType(LogicalType::kBigInt)}, result_array_type, &FDEFunction);
+            function_set_ptr->AddFunction(fde_embedding_function);
+        }
+    }
+
+    NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 
 }  // namespace infinity

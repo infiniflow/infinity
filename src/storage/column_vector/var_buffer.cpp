@@ -117,7 +117,8 @@ SizeT VarBuffer::TotalSize() const {
 }
 
 SizeT VarBufferManager::Append(UniquePtr<char[]> data, SizeT size, bool *free_success) {
-    auto *buffer = GetInnerMut();
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto *buffer = GetInnerMutNoLock();
     SizeT offset = buffer->Append(std::move(data), size, free_success);
     return offset;
 }
@@ -132,6 +133,7 @@ SizeT VarBufferManager::Append(const char *data, SizeT size, bool *free_success)
 }
 
 void VarBufferManager::SetToCatalog(BufferObj *outline_buffer_obj) {
+    std::unique_lock<std::mutex> lock(mutex_);
     if (type_ != BufferType::kBuffer) {
         UnrecoverableError("Cannot convert to new catalog");
     }
@@ -145,42 +147,58 @@ void VarBufferManager::SetToCatalog(BufferObj *outline_buffer_obj) {
     buffer_handle_ = outline_buffer_obj_->Load();
 }
 
-void VarBufferManager::InitBuffer() {
+VarBuffer *VarBufferManager::GetInnerMutNoLock() {
     switch (type_) {
         case BufferType::kBuffer: {
             if (mem_buffer_.get() == nullptr) {
                 mem_buffer_ = MakeUnique<VarBuffer>();
             }
-            break;
+            return mem_buffer_.get();
         }
         case BufferType::kNewCatalog: {
             if (!buffer_handle_.has_value()) {
                 buffer_handle_ = outline_buffer_obj_->Load();
             }
+            return static_cast<VarBuffer *>(buffer_handle_->GetDataMut());
         }
     }
 }
 
-VarBuffer *VarBufferManager::GetInnerMut() {
-    InitBuffer();
-
+const VarBuffer *VarBufferManager::GetInnerNoLock() {
     switch (type_) {
-        case BufferType::kBuffer:
+        case BufferType::kBuffer: {
+            if (mem_buffer_.get() == nullptr) {
+                mem_buffer_ = MakeUnique<VarBuffer>();
+            }
             return mem_buffer_.get();
-        case BufferType::kNewCatalog:
-            return static_cast<VarBuffer *>(buffer_handle_->GetDataMut());
+        }
+        case BufferType::kNewCatalog: {
+            if (!buffer_handle_.has_value()) {
+                buffer_handle_ = outline_buffer_obj_->Load();
+            }
+            return static_cast<const VarBuffer *>(buffer_handle_->GetData());
+        }
     }
 }
 
-const VarBuffer *VarBufferManager::GetInner() {
-    InitBuffer();
+const char *VarBufferManager::Get(SizeT offset, SizeT size) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return GetInnerNoLock()->Get(offset, size);
+}
 
-    switch (type_) {
-        case BufferType::kBuffer:
-            return mem_buffer_.get();
-        case BufferType::kNewCatalog:
-            return static_cast<const VarBuffer *>(buffer_handle_->GetData());
-    }
+SizeT VarBufferManager::Write(char *ptr) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return GetInnerNoLock()->Write(ptr);
+}
+
+SizeT VarBufferManager::Write(char *ptr, SizeT offset, SizeT size) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return GetInnerNoLock()->Write(ptr, offset, size);
+}
+
+SizeT VarBufferManager::TotalSize() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return GetInnerNoLock()->TotalSize();
 }
 
 } // namespace infinity

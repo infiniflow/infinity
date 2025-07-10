@@ -67,7 +67,7 @@ namespace infinity {
 //     }
 //     return memidx;
 // }
-
+//
 // HnswIndexInMem::HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, bool trace)
 //     : begin_row_id_(begin_row_id), hnsw_(InitAbstractIndex(index_base, column_def)), trace_(trace), own_memory_(true) {
 //     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
@@ -208,16 +208,7 @@ namespace infinity {
 //             }
 //         },
 //         hnsw_);
-//     if (trace_) {
-//         auto *storage = InfinityContext::instance().storage();
-//         if (storage == nullptr) {
-//             return;
-//         }
-//         auto *memindex_tracer = storage->memindex_tracer();
-//         if (memindex_tracer != nullptr) {
-//             memindex_tracer->DecreaseMemUsed(mem_usage);
-//         }
-//     }
+//     DecreaseMemoryUsageBase(mem_usage);
 // }
 //
 // SizeT HnswIndexInMem::GetRowCount() const {

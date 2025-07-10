@@ -85,22 +85,20 @@ public:
 
     SizeT Append(const char *data, SizeT size, bool *free_success = nullptr);
 
-    const char *Get(SizeT offset, SizeT size) { return GetInner()->Get(offset, size); }
+    const char *Get(SizeT offset, SizeT size);
 
-    SizeT Write(char *ptr) { return GetInner()->Write(ptr); }
+    SizeT Write(char *ptr);
 
-    SizeT Write(char *ptr, SizeT offset, SizeT size) { return GetInner()->Write(ptr, offset, size); }
+    SizeT Write(char *ptr, SizeT offset, SizeT size);
 
-    SizeT TotalSize() { return GetInner()->TotalSize(); }
+    SizeT TotalSize();
 
     void SetToCatalog(BufferObj *outline_buffer_obj);
 
 private:
-    void InitBuffer();
+    VarBuffer *GetInnerMutNoLock();
 
-    VarBuffer *GetInnerMut();
-
-    const VarBuffer *GetInner();
+    const VarBuffer *GetInnerNoLock();
 
     enum class BufferType {
         kBuffer,
@@ -110,6 +108,8 @@ private:
     UniquePtr<VarBuffer> mem_buffer_;
     Optional<BufferHandle> buffer_handle_;
     BufferObj *outline_buffer_obj_ = nullptr;
+
+    mutable std::mutex mutex_;
 };
 
 } // namespace infinity

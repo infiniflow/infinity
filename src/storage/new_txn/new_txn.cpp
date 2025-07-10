@@ -1428,6 +1428,7 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
+    DeferFn defer1([&] { LOG_FLUSH(); });
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
@@ -1454,6 +1455,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     if (!wal_manager->SetCheckpointing()) {
         // Checkpointing
+        LOG_INFO(fmt::format("checkpoint ts: {} skipped due to the system is checkpointing.", checkpoint_ts));
         return Status::OK();
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
@@ -1465,6 +1467,7 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
         return status;
     }
 
+    LOG_DEBUG(fmt::format("checkpoint ts {}, got {} DBs.", checkpoint_ts, db_id_strs_ptr->size()));
     // Put the data into local txn store
     if (base_txn_store_ != nullptr) {
         return Status::UnexpectedError("txn store is not null");
@@ -1504,6 +1507,8 @@ Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option, Ch
     if (!status.ok()) {
         return status;
     }
+
+    LOG_DEBUG(fmt::format("checkpoint ts {}, db id {}, got {} tables.", option.checkpoint_ts_, db_meta.db_id_str(), table_id_strs_ptr->size()));
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
         status = this->CheckpointTable(table_meta, option, ckp_txn_store);

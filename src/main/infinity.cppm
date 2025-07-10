@@ -65,7 +65,7 @@ public:
 
     QueryResult ShowDatabase(const String &db_name);
 
-    QueryResult Flush(const String &flush_type = "");
+    QueryResult Flush(const String &flush_type = "data");
 
     QueryResult Compact(const String &db_name, const String &table_name);
 

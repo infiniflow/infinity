@@ -109,14 +109,20 @@ void PhysicalCheck::ExecuteCheckSystem(QueryContext *query_context, CheckOperato
 
     output_block_ptr->Init(column_types);
 
-    {
-        for (const auto &data_mismatch_entry : data_mismatch_entries) {
-            Value value = Value::MakeVarchar(data_mismatch_entry);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+    SizeT row_count = 0;
+    for (const auto &data_mismatch_entry : data_mismatch_entries) {
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            check_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+            row_count = 0;
         }
+        Value value = Value::MakeVarchar(data_mismatch_entry);
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        row_count++;
     }
-
     output_block_ptr->Finalize();
     check_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }

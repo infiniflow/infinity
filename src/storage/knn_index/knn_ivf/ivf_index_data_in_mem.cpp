@@ -54,7 +54,6 @@ IVFIndexInMem::IVFIndexInMem(const RowID begin_row_id,
       ivf_index_storage_{new IVF_Index_Storage(ivf_option, column_logical_type, embedding_data_type, embedding_dimension)} {}
 
 IVFIndexInMem::~IVFIndexInMem() {
-    std::unique_lock lock(rw_mutex_);
     if (own_ivf_index_storage_) {
         delete ivf_index_storage_;
     }
@@ -107,11 +106,9 @@ public:
         }
     }
 
-    ~IVFIndexInMemT() {
-        std::unique_lock lock(rw_mutex_);
-        if (own_ivf_index_storage_) {
-            DecreaseMemoryUsageBase(MemoryUsed());
-        }
+    ~IVFIndexInMemT() override {
+        SizeT mem_used = MemoryUsed();
+        DecreaseMemoryUsageBase(mem_used);
     }
 
     MemIndexTracerInfo GetInfo() const override {

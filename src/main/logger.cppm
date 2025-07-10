@@ -100,4 +100,10 @@ export inline void LOG_CRITICAL(const String &msg) {
     }
 }
 
+export inline void LOG_FLUSH() {
+    if (IS_LOGGER_INITIALIZED()) {
+        infinity_logger->flush();
+    }
+}
+
 } // namespace infinity
