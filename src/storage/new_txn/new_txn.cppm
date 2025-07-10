@@ -28,6 +28,7 @@ import snapshot_info;
 import column_def;
 import column_vector;
 import fast_rough_filter;
+import memindex_tracer;
 
 namespace infinity {
 
@@ -262,7 +263,7 @@ public:
     // // Snapshot OPs
     Status CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
 
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
+    // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
 
     Status RestoreTableSnapshot(const String &db_name, const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
@@ -524,6 +525,8 @@ public:
     Status CommitMemIndex(TableIndexMeeta &table_index_meta);
 
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
+
+    Vector<SharedPtr<MemIndexDetail>> GetTableMemIndexes(const String &db_name, const String &table_name);
 
 private:
     Status PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);

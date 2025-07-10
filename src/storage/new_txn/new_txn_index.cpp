@@ -2131,4 +2131,275 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
     return Status::OK();
 }
 
+tatus ManualDumpIndex(NewTxn* txn, 
+                      const String& db_name, 
+                      const String& table_name, 
+                      const String& index_name) {
+    
+    Status status;
+    
+    // 1. Get table and index metadata
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    status = txn->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    if (!status.ok()) {
+        return status;
+    }
+    
+    // 2. Get all segment IDs for this index
+    Vector<SegmentID>* segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_index_meta->GetSegmentIndexIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    
+    // 3. Loop through all segments and dump each one
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+        
+        // 4. Get memory index for this segment
+        SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+        if (mem_index == nullptr || 
+            (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
+            continue;
+        }
+        
+        // 5. Allocate new chunk ID for this dump
+        ChunkID chunk_id = 0;
+        status = segment_index_meta.GetNextChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+        
+        // 6. Get old chunk IDs for cleanup (if any exist)
+        Vector<ChunkID> old_chunk_ids;
+        auto [existing_chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+        if (chunk_status.ok()) {
+            old_chunk_ids = *existing_chunk_ids_ptr;
+        }
+        
+        // 7. Actually dump the memory index to disk
+        status = ManualDumpSegmentMemIndex(txn, segment_index_meta, chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        
+        // 8. Clean up old chunk references
+        TxnTimeStamp commit_ts = txn->CommitTS();
+        for (ChunkID deprecate_id : old_chunk_ids) {
+            auto ts_str = std::to_string(commit_ts);
+            status = txn->kv_instance_->Put(
+                KeyEncode::DropChunkIndexKey(
+                    table_index_meta->table_meta().db_id_str(),
+                    table_index_meta->table_meta().table_id_str(),
+                    table_index_meta->index_id_str(),
+                    segment_id,
+                    deprecate_id
+                ), 
+                ts_str
+            );
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        
+        LOG_INFO(fmt::format("Successfully dumped segment {} to chunk {}", segment_id, chunk_id));
+    }
+    
+    // 9. Update fulltext segment timestamp if needed
+    auto [index_base, index_status] = table_index_meta->GetIndexBase();
+    if (index_status.ok() && index_base->index_type_ == IndexType::kFullText) {
+        TxnTimeStamp commit_ts = txn->CommitTS();
+        status = table_index_meta->UpdateFulltextSegmentTS(commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    
+    return Status::OK();
+}
+
+Status ManualDumpSegmentMemIndex(NewTxn* txn, 
+                                SegmentIndexMeta& segment_index_meta, 
+                                const ChunkID& new_chunk_id) {
+    
+    // 1. Get the memory index (this removes it from memory)
+    SharedPtr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+    if (mem_index == nullptr || 
+        (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        return Status::UnexpectedError("Invalid mem index");
+    }
+    
+    // 2. Get index base information
+    TableIndexMeeta& table_index_meta = segment_index_meta.table_index_meta();
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+    
+    // 3. Get the appropriate memory index based on type
+    SharedPtr<SecondaryIndexInMem> memory_secondary_index = nullptr;
+    SharedPtr<MemoryIndexer> memory_indexer = nullptr;
+    SharedPtr<IVFIndexInMem> memory_ivf_index = nullptr;
+    SharedPtr<HnswIndexInMem> memory_hnsw_index = nullptr;
+    SharedPtr<BMPIndexInMem> memory_bmp_index = nullptr;
+    SharedPtr<EMVBIndexInMem> memory_emvb_index = nullptr;
+    
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            memory_secondary_index = mem_index->GetSecondaryIndex();
+            if (memory_secondary_index == nullptr) {
+                return Status::OK();
+            }
+            break;
+        }
+        case IndexType::kFullText: {
+            memory_indexer = mem_index->GetFulltextIndex();
+            if (memory_indexer == nullptr) {
+                return Status::OK();
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            memory_ivf_index = mem_index->GetIVFIndex();
+            if (memory_ivf_index == nullptr) {
+                return Status::OK();
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            memory_hnsw_index = mem_index->GetHnswIndex();
+            if (memory_hnsw_index == nullptr) {
+                return Status::OK();
+            }
+            break;
+        }
+        case IndexType::kBMP: {
+            memory_bmp_index = mem_index->GetBMPIndex();
+            if (memory_bmp_index == nullptr) {
+                return Status::OK();
+            }
+            break;
+        }
+        case IndexType::kEMVB: {
+            memory_emvb_index = mem_index->GetEMVBIndex();
+            if (memory_emvb_index == nullptr) {
+                return Status::OK();
+            }
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            LOG_WARN("DiskAnn index type not implemented yet");
+            return Status::OK();
+        }
+        default: {
+            return Status::UnexpectedError("Invalid index type");
+        }
+    }
+    
+    // 4. Get chunk index metadata
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    if (mem_index->GetBaseMemIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetEMVBIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else {
+        return Status::UnexpectedError("Invalid mem index");
+    }
+    
+    // 5. Create new chunk index metadata
+    Optional<ChunkIndexMeta> chunk_index_meta;
+    BufferObj* buffer_obj = nullptr;
+    {
+        Status status = NewCatalog::AddNewChunkIndex1(
+            segment_index_meta,
+            txn,
+            new_chunk_id,
+            chunk_index_meta_info.base_row_id_,
+            chunk_index_meta_info.row_cnt_,
+            chunk_index_meta_info.base_name_,
+            chunk_index_meta_info.index_size_,
+            chunk_index_meta
+        );
+        if (!status.ok()) {
+            return status;
+        }
+        
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    
+    // 6. Dump the memory index based on type
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            memory_secondary_index->Dump(buffer_obj);
+            buffer_obj->Save();
+            break;
+        }
+        case IndexType::kFullText: {
+            memory_indexer->Dump(false /*offline*/, false /*spill*/);
+            u64 len_sum = memory_indexer->GetColumnLengthSum();
+            u32 len_cnt = memory_indexer->GetDocCount();
+            Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            memory_ivf_index->Dump(buffer_obj);
+            buffer_obj->Save();
+            break;
+        }
+        case IndexType::kHnsw: {
+            memory_hnsw_index->Dump(buffer_obj);
+            buffer_obj->Save();
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
+            break;
+        }
+        case IndexType::kBMP: {
+            memory_bmp_index->Dump(buffer_obj);
+            buffer_obj->Save();
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
+            break;
+        }
+        case IndexType::kEMVB: {
+            memory_emvb_index->Dump(buffer_obj);
+            buffer_obj->Save();
+            break;
+        }
+        default: {
+            return Status::UnexpectedError("Invalid index type");
+        }
+    }
+    
+    // 7. Clear the memory index
+    mem_index->ClearMemIndex();
+    
+    // 8. Notify memory index tracer if available
+    auto* storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        auto* memindex_tracer = storage->memindex_tracer();
+        if (memindex_tracer != nullptr) {
+            memindex_tracer->DumpDone(mem_index);
+        }
+    }
+    
+    return Status::OK();
+}
+
 } // namespace infinity

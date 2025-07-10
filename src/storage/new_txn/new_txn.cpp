@@ -79,6 +79,12 @@ import virtual_store;
 import config;
 import txn_context;
 import kv_utility;
+import mem_index;
+import memindex_tracer;
+import query_context;
+import bg_task;
+import dump_index_process;
+import base_memindex;
 
 namespace infinity {
 
@@ -1433,7 +1439,7 @@ Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_na
    
 
     base_txn_store_ = MakeShared<CreateTableSnapshotTxnStore>();
-    CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_);
+    CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->table_name_ = table_name;
     txn_store->snapshot_name_ = snapshot_name;
@@ -2290,50 +2296,44 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
 
 // Get indexes for specific table only
 Vector<SharedPtr<MemIndexDetail>> NewTxn::GetTableMemIndexes(const String &db_name, const String &table_name) {
-    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(
-        MakeUnique<String>("Get table mem indexes"), TransactionType::kNormal
-    );
-    
-    Vector<SharedPtr<MemIndexDetail>> all_details = GetAllMemIndexes(new_txn_shared.get());
-    Vector<SharedPtr<MemIndexDetail>> table_details;
-    
-    for (const auto &detail : all_details) {
-        if (detail->db_name_ == db_name && detail->table_name_ == table_name) {
-            table_details.push_back(detail);
+    Vector<SharedPtr<MemIndexDetail>> mem_index_details;
+    Vector<SharedPtr<MemIndex>> mem_indexes;
+    Vector<MemIndexID> mem_index_ids;
+    Status status = NewCatalog::GetAllMemIndexes(this, mem_indexes, mem_index_ids);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    for (SizeT i = 0; i < mem_indexes.size(); ++i) {
+        if (mem_index_ids[i].db_name_ == db_name && mem_index_ids[i].table_name_ == table_name) {
+            SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
+            auto &mem_index = mem_indexes[i];
+            auto &mem_index_id = mem_index_ids[i];
+            const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
+            detail->mem_index_ = mem_index;
+            detail->is_emvb_index_ = base_mem_index == nullptr;
+            detail->db_name_ = mem_index_id.db_name_;
+            detail->table_name_ = mem_index_id.table_name_;
+            detail->index_name_ = mem_index_id.index_name_;
+            detail->segment_id_ = mem_index_id.segment_id_;
+            if (!detail->is_emvb_index_) {
+                MemIndexTracerInfo info = base_mem_index->GetInfo();
+                detail->mem_used_ = info.mem_used_;
+                detail->row_count_ = info.row_count_;
+            }
+            mem_index_details.push_back(detail);
         }
     }
-    
-    return table_details;
+    return mem_index_details;
 }
 
 Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
-    // check the current ckp_ts
-    auto *wal_manager = query_context->storage()->wal_manager();
-    auto *new_txn = query_context->GetNewTxn();
-    TxnTimeStamp ckp_ts = wal_manager->LastCheckpointTS();
-    TxnTimeStamp begin_ts = new_txn->BeginTS();
-    if (ckp_ts + 2 >= begin_ts) {
-        LOG_INFO(fmt::format("Newer data areflushed skip checkpoint directly take snapshot"));
-    } else {
-        LOG_INFO(fmt::format("Older data are not flushed, create a new checkpoint"));
-        // Get current commit state
-        TxnTimeStamp max_commit_ts{};
-        i64 wal_size{};
-        std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-        LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
-
-        // Create and configure checkpoint task
-        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-        // Submit to background processor
-        auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
-        bg_processor->Submit(checkpoint_task);
-        checkpoint_task->Wait();
-    }
-
+    const String &db_name = create_table_snapshot_cmd->db_name_;
+    const String &table_name = create_table_snapshot_cmd->table_name_;
+    
 
     // dump indexes for snapshot
-    Vector<SharedPtr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
+    Vector<SharedPtr<MemIndexDetail>> table_mem_indexes = GetTableMemIndexes(db_name, table_name);
     
     // Submit all dump tasks in parallel
     Vector<SharedPtr<DumpMemIndexTask>> dump_tasks;
@@ -2346,6 +2346,7 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     }
     
     // Wait for all dumps to complete
+    Status status = Status::OK();
     for (auto &dump_task : dump_tasks) {
         dump_task->Wait();
         if (!status.ok()) {
@@ -2354,14 +2355,21 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     }
 
     // create a new snapshot
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    
     SharedPtr<TableSnapshotInfo> table_snapshot_info;
-    std::tie(table_snapshot_info, status) = table_meta_opt->MapMetaToSnapShotInfo(db_name, table_name);
+    std::tie(table_snapshot_info, status) = table_meta->MapMetaToSnapShotInfo(db_name, table_name);
 
     if (!status.ok()) {
         return status;
     }
     table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
     if (!status.ok()) {
         return status;
@@ -2727,7 +2735,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kRestoreDatabase: {
             return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
-        case TransactionType::kNewCheckpoint:
+        case TransactionType::kNewCheckpoint: {
+            return false;
+        }
         default: {
             return false;
         }
