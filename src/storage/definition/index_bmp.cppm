@@ -54,7 +54,7 @@ public:
 
     virtual String BuildOtherParamsString() const override;
 
-    virtual nlohmann::json Serialize() const override;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const override;
 
 public:
     SizeT block_size_{};

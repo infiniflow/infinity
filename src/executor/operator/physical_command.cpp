@@ -379,7 +379,14 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             }
             FileWriter file_writer(export_command->file_name(), 128);
 
-            auto json = QueryProfiler::Serialize(profiler_record).dump();
+            rapidjson::StringBuffer sb;
+            {
+                rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                writer.StartObject();
+                QueryProfiler::Serialize(profiler_record, writer);
+                writer.EndObject();
+            }
+            String json = sb.GetString();
             file_writer.Write(json.c_str(), json.size());
             file_writer.Flush();
             break;

@@ -340,7 +340,14 @@ String KeyEncode::DropBlockColumnKey(const String &db_id_str,
                                      SegmentID segment_id,
                                      BlockID block_id,
                                      const SharedPtr<ColumnDef> &column_def) {
-    return fmt::format("drop|blk_col|{}/{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id, column_def->ToJson().dump());
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        column_def->ToJson(writer);
+        writer.EndObject();
+    }
+    return fmt::format("drop|blk_col|{}/{}/{}/{}/{}", db_id_str, table_id_str, segment_id, block_id, sb.GetString());
 }
 
 String KeyEncode::DropTableIndexKey(const String &db_id_str,

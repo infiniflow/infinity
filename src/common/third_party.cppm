@@ -85,7 +85,7 @@ module;
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
+#include "rapidjson/prettywriter.h"
 
 #pragma clang diagnostic pop
 
@@ -403,6 +403,13 @@ using UTF8 = ::RAPIDJSON_NAMESPACE::UTF8<CharType>;
 using CrtAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator;
 
 using WriteFlag = ::RAPIDJSON_NAMESPACE::WriteFlag;
+
+template <typename OutputStream,
+          typename SourceEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename TargetEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename StackAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator,
+          unsigned writeFlags = ::RAPIDJSON_NAMESPACE::WriteFlag::kWriteDefaultFlags>
+using PrettyWriter = ::RAPIDJSON_NAMESPACE::PrettyWriter<OutputStream, SourceEncoding, TargetEncoding, StackAllocator, writeFlags>;
 
 template <typename OutputStream,
           typename SourceEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,

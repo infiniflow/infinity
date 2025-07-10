@@ -234,7 +234,7 @@ public:
     SharedPtr<AppendPrepareInfo> PrepareAppend(u64 db_id, u64 table_id, SizeT row_count, TransactionID txn_id);
     void CommitAppend(u64 db_id, u64 table_id, const SharedPtr<AppendPrepareInfo> &append_info, TransactionID txn_id);
 
-    nlohmann::json ToJson() const;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
     // Used by restore
     Status AddDbCacheNolock(const SharedPtr<DbCache> &db_cache);

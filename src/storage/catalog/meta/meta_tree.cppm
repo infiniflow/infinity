@@ -37,7 +37,7 @@ class TableIndexCache;
 export struct MetaObject {
     MetaObject(MetaType type, const SharedPtr<MetaKey> &meta_key) : type_(type), meta_key_(meta_key) {}
     virtual ~MetaObject() = default;
-    virtual nlohmann::json ToJson() const = 0;
+    virtual void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const = 0;
 
     MetaType type_{MetaType::kInvalid};
     SharedPtr<MetaKey> meta_key_{nullptr};
@@ -45,7 +45,7 @@ export struct MetaObject {
 
 export struct MetaDBObject final : public MetaObject {
     MetaDBObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kDB, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     SharedPtr<DbCache> RestoreDbCache(Storage *storage_ptr) const;
 
@@ -55,7 +55,7 @@ export struct MetaDBObject final : public MetaObject {
 
 export struct MetaTableObject final : public MetaObject {
     MetaTableObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTable, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     const String &GetTableName() const;
     SegmentID GetNextSegmentID() const;
@@ -71,7 +71,7 @@ export struct MetaTableObject final : public MetaObject {
 
 export struct MetaSegmentObject final : public MetaObject {
     MetaSegmentObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kSegment, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     BlockID GetCurrentBlockID() const;
 
@@ -81,7 +81,7 @@ export struct MetaSegmentObject final : public MetaObject {
 
 export struct MetaBlockObject final : public MetaObject {
     MetaBlockObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kBlock, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     Map<ColumnID, SharedPtr<MetaKey>> column_map_;
     Map<String, SharedPtr<MetaKey>> tag_map_;
@@ -89,14 +89,14 @@ export struct MetaBlockObject final : public MetaObject {
 
 export struct MetaBlockColumnObject final : public MetaObject {
     MetaBlockColumnObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kBlockColumn, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     Map<String, SharedPtr<MetaKey>> tag_map_;
 };
 
 export struct MetaTableIndexObject final : public MetaObject {
     MetaTableIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kTableIndex, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
     SharedPtr<TableIndexCache> RestoreTableIndexCache(Storage *storage_ptr) const;
 
     Map<String, SharedPtr<MetaKey>> tag_map_;
@@ -105,21 +105,21 @@ export struct MetaTableIndexObject final : public MetaObject {
 
 export struct MetaSegmentIndexObject final : public MetaObject {
     MetaSegmentIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kSegmentIndex, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     Map<ChunkID, SharedPtr<MetaKey>> chunk_map_{};
 };
 
 export struct MetaChunkIndexObject final : public MetaObject {
     MetaChunkIndexObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kChunkIndex, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     Map<String, SharedPtr<MetaKey>> tag_map_{};
 };
 
 export struct MetaPmObject final : public MetaObject {
     MetaPmObject(const SharedPtr<MetaKey> &meta_key) : MetaObject(MetaType::kPmStat, meta_key) {}
-    nlohmann::json ToJson() const final;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const final;
 
     SharedPtr<MetaKey> object_{};
     Map<String, SharedPtr<MetaKey>> path_map_{};
@@ -166,7 +166,7 @@ public:
     Vector<MetaTableObject *> ListTables() const;
     UniquePtr<SystemCache> RestoreSystemCache(Storage *storage_ptr) const;
 
-    nlohmann::json ToJson() const;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
     Map<String, String> system_tag_map_{};
     Map<String, SharedPtr<MetaDBObject>> db_map_{};

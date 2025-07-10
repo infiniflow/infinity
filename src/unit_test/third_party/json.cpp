@@ -121,3 +121,223 @@ TEST_F(JsonTest, simdjson_test) {
     }
 }
 
+
+TEST_F(JsonTest, rapidjson_test) {
+    using namespace infinity;
+
+    // test writer
+    String text;
+    {
+        class KVList {
+        public:
+            void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) {
+                for (unsigned i = 0; i < 3; i++) {
+                    String key = "k" + std::to_string(i);
+                    String val = "v" + std::to_string(i);
+                    writer.Key(val.c_str());
+                    writer.String(val.c_str());
+                }
+            }
+        };
+
+        auto fun = [&](rapidjson::Writer<rapidjson::StringBuffer> &writer) -> void {
+            writer.Key("hello");
+            writer.String("world");
+            writer.Key("t");
+            writer.Bool(true);
+            writer.Key("f");
+            writer.Bool(false);
+            writer.Key("n");
+            writer.Null();
+            writer.Key("i");
+            writer.Uint(123);
+            writer.Key("pi");
+            writer.Double(3.1416);
+
+            writer.Key("a");
+            writer.StartArray();
+            for (unsigned i = 0; i < 3; i++) {
+                writer.Uint(i);
+            }
+            writer.EndArray();
+
+            writer.Key("o");
+            writer.StartObject();
+            KVList kvl;
+            kvl.Serialize(writer);
+            writer.EndObject();
+        };
+
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            fun(writer);
+            writer.EndObject();
+        }
+        {
+            rapidjson::Document doc;
+            doc.Parse(sb.GetString());
+            sb.Clear();
+            rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+            doc.Accept(writer);
+            writer.SetIndent(' ', 4);
+        }
+        text = sb.GetString();
+        std::cout << "text: " << text << std::endl;
+    }
+
+    // read writer test
+    {
+        std::function<void(const rapidjson::Value &)> PrintDocument = [&](const rapidjson::Value &val) -> void {
+            switch (val.GetType()) {
+                case rapidjson::Type::kTrueType: {
+                    auto res = val.GetBool();
+                    ASSERT_EQ(res, true);
+                    std::cout << res << std::endl;
+                    break;
+                }
+                case rapidjson::Type::kFalseType: {
+                    auto res = val.GetBool();
+                    ASSERT_EQ(res, false);
+                    std::cout << res << std::endl;
+                    break;
+                }
+                case rapidjson::Type::kStringType: {
+                    auto res = val.GetString();
+                    std::cout << res << std::endl;
+                    break;
+                }
+                case rapidjson::Type::kNumberType: {
+                    if (val.IsInt()) {
+                        auto res = val.GetInt();
+                        std::cout << res << " (int)" << std::endl;
+                    } else if (val.IsFloat()) {
+                        auto res = val.GetFloat();
+                        std::cout << res << " (float)" << std::endl;
+                    } else if (val.IsDouble()) {
+                        auto res = val.GetDouble();
+                        std::cout << res << " (double)" << std::endl;
+                    }
+                    break;
+                }
+                case rapidjson::Type::kNullType: {
+                    std::cout << "null" << std::endl;
+                    break;
+                }
+                case rapidjson::Type::kArrayType: {
+                    rapidjson::StringBuffer sb;
+                    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                    val.Accept(writer);
+                    std::cout << sb.GetString();
+                    int sum = 0;
+                    for (auto &arr_obj : val.GetArray()) {
+                        sum += arr_obj.GetInt();
+                    }
+                    std::cout << ", sum = " << sum << std::endl;
+                    break;
+                }
+                case rapidjson::Type::kObjectType: {
+                    for (auto &obj : val.GetObject()) {
+                        std::cout << obj.name.GetString() << ": ";
+                        PrintDocument(obj.value);
+                    }
+                    break;
+                }
+                default: {
+                    throw std::runtime_error("Unsupported json type");
+                }
+            }
+        };
+
+        rapidjson::Document doc;
+        doc.Parse(text.c_str());
+        ASSERT_EQ(doc.IsObject(), true);
+        if (doc.FindMember("None") == doc.MemberEnd()) {
+            std::cout << "member \"None\" not exists." << std::endl;
+        }
+
+        // Count
+        std::cout << "size(doc): " << doc.MemberCount() << std::endl;
+        std::cout << "size(doc::array): " << doc["a"].Size() << std::endl;
+
+        // Random Access
+        const auto &item = doc["a"][0];
+        std::cout << "array[0]: " << item.GetInt() << std::endl;
+
+        // Print document
+        PrintDocument(doc);
+    }
+
+    // Modify context
+    {
+        rapidjson::Document doc;
+        rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+        doc.Parse("{}");
+        {
+            rapidjson::Document doc_inner;
+            rapidjson::Document::AllocatorType& allocator_inner = doc.GetAllocator();
+            doc_inner.Parse("[]");
+            doc_inner.PushBack(0, allocator_inner);
+            doc_inner.PushBack(1, allocator_inner);
+            doc_inner.PushBack(2, allocator_inner);
+            doc.AddMember("i", doc_inner, allocator);
+        }
+        {
+            rapidjson::Document doc_inner;
+            rapidjson::Document::AllocatorType& allocator_inner = doc.GetAllocator();
+            doc_inner.Parse("[]");
+            doc_inner.PushBack(0.1, allocator_inner);
+            doc_inner.PushBack(1.1, allocator_inner);
+            doc_inner.PushBack(2.1, allocator_inner);
+            doc.AddMember("f", doc_inner, allocator);
+        }
+        {
+            rapidjson::Document doc_inner;
+            rapidjson::Document::AllocatorType& allocator_inner = doc.GetAllocator();
+            doc_inner.Parse("[]");
+            doc_inner.PushBack("a", allocator_inner);
+            doc_inner.PushBack("b", allocator_inner);
+            doc_inner.PushBack("c", allocator_inner);
+            doc.AddMember("s", doc_inner, allocator);
+        }
+
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            doc.Accept(writer);
+        }
+        String json_str = sb.GetString();
+        std::cout << json_str << std::endl;
+        EXPECT_EQ(json_str, "{\"i\":[0,1,2],\"f\":[0.1,1.1,2.1],\"s\":[\"a\",\"b\",\"c\"]}");
+    }
+
+    // read from file
+    {
+        String json_path = String(test_data_path()) + "/json/twitter.json";
+        std::ifstream f(json_path);
+        std::stringstream buffer;
+        buffer << f.rdbuf();
+
+        rapidjson::Document tweets;
+        tweets.Parse(buffer.str().c_str());
+        EXPECT_EQ(tweets["search_metadata"]["count"].GetInt64(), 100);
+    }
+
+    // test mix set
+    {
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                writer.Key("res");
+                rapidjson::Document doc;
+                doc.Parse("{\"name\":\"hello\",\"value\":123}");
+                doc.Accept(writer);
+            }
+            writer.EndObject();
+        }
+        std::cout << sb.GetString() << std::endl;
+    }
+}

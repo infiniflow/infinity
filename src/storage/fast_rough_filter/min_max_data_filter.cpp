@@ -139,7 +139,7 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
     }
 }
 
-void MinMaxDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
+void MinMaxDataFilter::SaveToJsonFile(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
     // step 1. prepare space for binary_fuse_filters_
     u32 total_binary_bytes = GetSerializeSizeInBytes();
     // step 2. encode to binary
@@ -153,7 +153,8 @@ void MinMaxDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
         String error_message = "MinMaxDataFilter::SaveToJsonFile(): save size error";
         UnrecoverableError(error_message);
     }
-    entry_json[JsonTag] = base64::to_base64(result_view);
+    writer.Key(JsonTag.data());
+    writer.String(base64::to_base64(result_view).c_str());
 }
 
 bool MinMaxDataFilter::LoadFromJsonFile(std::string_view json_sv) {
