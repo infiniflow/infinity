@@ -20,7 +20,7 @@ import :stl;
 
 namespace infinity {
 
-class NewCatalog;
+export class NewCatalog;
 
 export void RegisterModuloFunction(NewCatalog *catalog_ptr);
 

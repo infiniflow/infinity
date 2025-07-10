@@ -25,7 +25,7 @@ namespace infinity {
 
 class BufferManager;
 
-class VarBuffer {
+export class VarBuffer {
     friend class VarFileWorker;
 
 public:

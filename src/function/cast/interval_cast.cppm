@@ -32,18 +32,18 @@ namespace infinity {
 
 export struct IntervalTryCastToVarlen;
 
-export inline BoundCastFunc BindTimeCast(DataType &target) {
-    switch (target.type()) {
-        case LogicalType::kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
-        }
-        default: {
-            String error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
-            UnrecoverableError(error_message);
-        }
-    }
-    return BoundCastFunc(nullptr);
-}
+// export inline BoundCastFunc BindTimeCast(DataType &target) {
+//     switch (target.type()) {
+//         case LogicalType::kVarchar: {
+//             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
+//         }
+//         default: {
+//             String error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
+//             UnrecoverableError(error_message);
+//         }
+//     }
+//     return BoundCastFunc(nullptr);
+// }
 
 struct IntervalTryCastToVarlen {
     template <typename SourceType, typename TargetType>

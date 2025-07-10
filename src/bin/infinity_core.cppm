@@ -702,3 +702,4 @@ export import :thrift_server;
 export import :buffer_reader;
 export import :system_info;
 export import :fixed_dimensional_encoding;
+export import :rcu_multimap;

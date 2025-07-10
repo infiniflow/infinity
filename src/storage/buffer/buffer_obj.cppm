@@ -24,7 +24,7 @@ import :file_worker_type;
 namespace infinity {
 
 class BufferManager;
-class VarBuffer;
+export class VarBuffer;
 class KVInstance;
 class Status;
 
