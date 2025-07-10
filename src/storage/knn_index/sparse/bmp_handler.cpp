@@ -243,8 +243,7 @@ void BMPHandler::Load(LocalFileHandle &file_handle) {
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    IndexT::Load(file_handle);
-                    // index = IndexT::Load(file_handle);
+                    index = IndexT::Load(file_handle);
                 }
             }
         },

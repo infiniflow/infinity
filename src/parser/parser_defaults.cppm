@@ -14,13 +14,13 @@
 
 module;
 
-// #include "default_value.h"
+#include "default_value.h"
 
 export module parser_defaults;
 
 namespace infinity {
 
-// export constexpr int64_t EMBEDDING_LIMIT = EMBEDDING_LIMIT_INTERNAL;
-// export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
+export constexpr int64_t PARSER_EMBEDDING_LIMIT = PARSER_EMBEDDING_LIMIT_INTERNAL;
+export constexpr int64_t PARSER_MAX_BITMAP_SIZE = PARSER_MAX_BITMAP_SIZE_INTERNAL;
 
 } // namespace infinity
