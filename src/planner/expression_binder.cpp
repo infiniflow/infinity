@@ -487,7 +487,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
             for (SizeT idx = 0; idx < arguments.size(); ++idx) {
-                if (arguments[idx]->Type().type() == LogicalType::kEmbedding) {
+                // Check if the argument is an embedding type but the function doesn't expect it
+                if (arguments[idx]->Type().type() == LogicalType::kEmbedding &&
+                    scalar_function.parameter_types_[idx].type() != LogicalType::kEmbedding &&
+                    scalar_function.parameter_types_[idx].type() != LogicalType::kArray) {
                     return nullptr;
                 }
                 // check if the argument types are matched to the scalar function parameter types

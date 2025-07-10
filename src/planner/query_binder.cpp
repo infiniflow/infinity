@@ -28,6 +28,7 @@ import base_table_ref;
 import query_context;
 import binding;
 import bound_select_statement;
+import bound_insert_statement;
 import bound_delete_statement;
 import bound_update_statement;
 import bound_compact_statement;
@@ -1113,6 +1114,38 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         }
     }
     return bound_update_statement;
+}
+
+UniquePtr<BoundInsertStatement> QueryBinder::BindInsert(const InsertStatement &statement) {
+    UniquePtr<BoundInsertStatement> bound_insert_statement = BoundInsertStatement::Make(bind_context_ptr_);
+
+    // Get the target table reference
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    if (base_table_ref.get() == nullptr) {
+        Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
+        RecoverableError(status);
+    }
+    bound_insert_statement->table_ref_ptr_ = base_table_ref;
+
+    // Handle column names for SELECT
+    if (!statement.columns_for_select_.empty()) {
+        bound_insert_statement->columns_for_select_ = statement.columns_for_select_;
+    }
+
+    // Handle SELECT statement if present
+    if (statement.select_ != nullptr) {
+        // Create a completely independent binding context for the SELECT statement
+        // This ensures the SELECT gets proper expression binder setup
+        SharedPtr<BindContext> select_bind_context = BindContext::Make(nullptr);
+        QueryBinder select_query_binder(query_context_ptr_, select_bind_context);
+        UniquePtr<BoundSelectStatement> bound_select_statement = select_query_binder.BindSelect(*statement.select_);
+        bound_insert_statement->select_plan_ = bound_select_statement->BuildPlan(query_context_ptr_);
+    } else {
+        // Handle direct value insertion (this should be handled by BuildInsertValue in LogicalPlanner)
+        // For now, we'll leave value_list_ empty as it will be populated by the logical planner
+    }
+
+    return bound_insert_statement;
 }
 
 UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {
