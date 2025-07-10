@@ -40,25 +40,25 @@ public:
                         const String &table_name,
                         const String &input_json,
                         HTTPStatus &http_status,
-                        nlohmann::json &response);
+                        rapidjson::Writer<rapidjson::StringBuffer> &writer);
     static void Explain(Infinity *infinity_ptr,
                         const String &db_name,
                         const String &table_name,
                         const String &input_json,
                         HTTPStatus &http_status,
-                        nlohmann::json &response);
+                        rapidjson::Writer<rapidjson::StringBuffer> &writer);
 
-    static Vector<ParsedExpr *> *ParseOutput(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static Vector<OrderByExpr *> *ParseSort(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<ParsedExpr> ParseFilter(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static SearchExpr *ParseSearchExpr(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<FusionExpr> ParseFusion(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<KnnExpr> ParseMatchDense(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<MatchExpr> ParseMatchText(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<MatchTensorExpr> ParseMatchTensor(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<MatchSparseExpr> ParseMatchSparse(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
-    static Tuple<i64, void *> ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<ConstantExpr> ParseSparseVector(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static Vector<ParsedExpr *> *ParseOutput(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static Vector<OrderByExpr *> *ParseSort(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<ParsedExpr> ParseFilter(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static SearchExpr *ParseSearchExpr(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<FusionExpr> ParseFusion(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<KnnExpr> ParseMatchDense(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<MatchExpr> ParseMatchText(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<MatchTensorExpr> ParseMatchTensor(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<MatchSparseExpr> ParseMatchSparse(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static Tuple<i64, void *> ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
+    static UniquePtr<ConstantExpr> ParseSparseVector(std::string_view json_sv, HTTPStatus &http_status, rapidjson::Writer<rapidjson::StringBuffer> &writer);
 };
 
 } // namespace infinity
