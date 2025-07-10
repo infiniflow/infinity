@@ -1425,6 +1425,7 @@ QueryResult Infinity::ListSnapshots() {
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
+
 QueryResult Infinity::AdminShowLogs() {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(true), query_context_ptr);

@@ -1,0 +1,27 @@
+diff --git a/third_party/pgm/include/pgm/pgm_index.hpp b/third_party/pgm/include/pgm/pgm_index.hpp
+index a2d0163af..399aaf9ed 100644
+--- a/third_party/pgm/include/pgm/pgm_index.hpp
++++ b/third_party/pgm/include/pgm/pgm_index.hpp
+@@ -144,7 +144,9 @@ protected:
+ 
+             static constexpr size_t linear_search_threshold = 8 * 64 / sizeof(Segment);
+             if constexpr (EpsilonRecursive <= linear_search_threshold) {
+-                for (; std::next(lo)->key <= key; ++lo)
++                // Add bounds checking to prevent container overflow
++                auto level_end = segments.begin() + levels_offsets[l + 1] - 1;
++                for (; lo + 1 < level_end && std::next(lo)->key <= key; ++lo)
+                     continue;
+                 it = lo;
+             } else {
+@@ -192,7 +194,10 @@ public:
+     ApproxPos search(const K &key) const {
+         auto k = std::max(first_key, key);
+         auto it = segment_for_key(k);
+-        auto pos = std::min<size_t>((*it)(k), std::next(it)->intercept);
++        // Add bounds checking to prevent accessing beyond segments
++        auto next_it = std::next(it);
++        auto next_intercept = (next_it < segments.end()) ? next_it->intercept : n;
++        auto pos = std::min<size_t>((*it)(k), next_intercept);
+         auto lo = PGM_SUB_EPS(pos, Epsilon);
+         auto hi = PGM_ADD_EPS(pos, Epsilon, n);
+         return {pos, lo, hi};

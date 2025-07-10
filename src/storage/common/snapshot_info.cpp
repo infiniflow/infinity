@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <chrono>
 
 module snapshot_info;
 
@@ -196,6 +197,9 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
     LOG_INFO(fmt::format("Serialize snapshot at {} with txn_id {}", snapshot_name_, txn_id));
+    
+    // Start timing for data copying
+    auto data_copy_start = std::chrono::high_resolution_clock::now();
     // Create temporary directory for atomic operation
     String temp_snapshot_dir = fmt::format("{}/temp_{}_{}", 
                                           save_dir, 
@@ -285,9 +289,22 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
         }
     }
 
+    // End timing for data copying
+    auto data_copy_end = std::chrono::high_resolution_clock::now();
+    auto data_copy_duration = std::chrono::duration_cast<std::chrono::milliseconds>(data_copy_end - data_copy_start);
+    LOG_INFO(fmt::format("Data copying took {} ms", data_copy_duration.count()));
+
+    // Start timing for JSON serialization
+    auto json_start = std::chrono::high_resolution_clock::now();
+    
     // Create metadata JSON
     nlohmann::json json_res = CreateSnapshotMetadataJSON();
     String json_string = json_res.dump();
+
+    // End timing for JSON serialization
+    auto json_end = std::chrono::high_resolution_clock::now();
+    auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end - json_start);
+    LOG_INFO(fmt::format("JSON serialization took {} ms", json_duration.count()));
 
     // Write metadata to temporary location
     String temp_meta_path = fmt::format("{}/{}.json", temp_snapshot_dir, snapshot_name_);
@@ -370,6 +387,9 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
 
     LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
+    // Start timing for JSON deserialization
+    auto json_deserialize_start = std::chrono::high_resolution_clock::now();
+
     String meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
 
     if (!VirtualStore::Exists(meta_path)) {
@@ -392,6 +412,11 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     }
 
     nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+    
+    // End timing for JSON deserialization
+    auto json_deserialize_end = std::chrono::high_resolution_clock::now();
+    auto json_deserialize_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_deserialize_end - json_deserialize_start);
+    LOG_INFO(fmt::format("JSON deserialization took {} ms", json_deserialize_duration.count()));
 
     LOG_INFO(fmt::format("Deserialize snapshot: {}", snapshot_meta_json.dump()));
     return Deserialize(snapshot_meta_json);
@@ -546,6 +571,9 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir,
                            bool ignore_table_id) {
     Config* config = InfinityContext::instance().config();
     
+    // Start timing for file restoration
+    auto file_restore_start = std::chrono::high_resolution_clock::now();
+    
     for (const auto& file : files_to_restore) {
         String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
         
@@ -595,6 +623,12 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir,
             LOG_WARN(fmt::format("Failed to copy file: {}", copy_status.message()));
         }
     }
+    
+    // End timing for file restoration
+    auto file_restore_end = std::chrono::high_resolution_clock::now();
+    auto file_restore_duration = std::chrono::duration_cast<std::chrono::milliseconds>(file_restore_end - file_restore_start);
+    LOG_INFO(fmt::format("File restoration took {} ms", file_restore_duration.count()));
+    
     return Status::OK();
 }
 

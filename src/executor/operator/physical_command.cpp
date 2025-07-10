@@ -477,7 +477,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     auto *new_txn = query_context->GetNewTxn();
                     TxnTimeStamp ckp_ts = wal_manager->LastCheckpointTS();
                     TxnTimeStamp begin_ts = new_txn->BeginTS();
-                    if (ckp_ts > begin_ts) {
+                    if (ckp_ts + 2 >= begin_ts) {
                         LOG_INFO(fmt::format("Newer data areflushed skip checkpoint directly take snapshot"));
                     } else {
                         LOG_INFO(fmt::format("Older data are not flushed, create a new checkpoint"));
@@ -492,12 +492,13 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         // Submit to background processor
                         auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
                         bg_processor->Submit(checkpoint_task);
+                        checkpoint_task->Wait();
                     }
 
-                    // wait for checkpoint to complete
-                    while (wal_manager->LastCheckpointTS() < begin_ts) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                    }
+                    // // wait for checkpoint to complete
+                    // while (wal_manager->LastCheckpointTS() + 2 < begin_ts) {
+                    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    // }
 
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {

@@ -14,6 +14,8 @@
 
 module;
 
+#include <chrono>
+
 module snapshot;
 
 import stl;
@@ -36,6 +38,9 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     auto *txn_ptr = query_context->GetNewTxn();
     const String &db_name = query_context->schema_name();
 
+    // Start timing for overall snapshot creation
+    auto snapshot_creation_start = std::chrono::high_resolution_clock::now();
+
     SharedPtr<TableSnapshotInfo> table_snapshot;
     Status status;
     std::tie(table_snapshot, status) = txn_ptr->GetTableSnapshotInfo(db_name, table_name);
@@ -49,6 +54,11 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
         return status;
     }
 
+    // End timing for overall snapshot creation
+    auto snapshot_creation_end = std::chrono::high_resolution_clock::now();
+    auto snapshot_creation_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_creation_end - snapshot_creation_start);
+    LOG_INFO(fmt::format("Total snapshot creation took {} ms", snapshot_creation_duration.count()));
+
     return Status::OK();
 }
 
@@ -56,6 +66,9 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     auto *txn_ptr = query_context->GetNewTxn();
     // might need to change this
     const String &db_name = query_context->schema_name();
+
+    // Start timing for overall snapshot restoration
+    auto snapshot_restoration_start = std::chrono::high_resolution_clock::now();
 
     Optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
@@ -85,6 +98,11 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     if (!status.ok()) {
         return status;
     }
+
+    // End timing for overall snapshot restoration
+    auto snapshot_restoration_end = std::chrono::high_resolution_clock::now();
+    auto snapshot_restoration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_restoration_end - snapshot_restoration_start);
+    LOG_INFO(fmt::format("Total snapshot restoration took {} ms", snapshot_restoration_duration.count()));
 
     // print txn state
     // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));

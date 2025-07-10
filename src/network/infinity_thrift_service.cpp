@@ -3572,6 +3572,62 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshot
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
         LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        return;
+    }
+    
+    // Extract snapshot data from result table
+    if (result.result_table_ != nullptr) {
+        infinity_thrift_rpc::SnapshotInfo snapshot_info;
+        SizeT blocks_count = result.result_table_->DataBlockCount();
+        
+        // The ShowSnapshot result has key-value pairs in alternating rows
+        // We need to extract the values for each field
+        String snapshot_name, scope, create_time, size;
+        i64 commit_ts = 0;
+        
+        for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+            auto data_block = result.result_table_->GetDataBlockById(block_idx);
+            SizeT row_count = data_block->row_count();
+            
+            for (SizeT row_idx = 0; row_idx < row_count; row_idx += 2) {
+                // Each pair consists of a key row and a value row
+                if (row_idx + 1 < row_count) {
+                    auto &key_column = data_block->column_vectors[0];
+                    auto &value_column = data_block->column_vectors[1];
+                    
+                    if (key_column->data_type()->type() == LogicalType::kVarchar &&
+                        value_column->data_type()->type() == LogicalType::kVarchar) {
+                        
+                        auto key_value = key_column->GetValue(row_idx);
+                        auto value_value = value_column->GetValue(row_idx + 1);
+                        
+                        String key = key_value.GetVarchar();
+                        String value = value_value.GetVarchar();
+                        
+                        if (key == "snapshot_name") {
+                            snapshot_name = value;
+                        } else if (key == "snapshot_scope") {
+                            scope = value;
+                        } else if (key == "create_time") {
+                            create_time = value;
+                        } else if (key == "commit_timestamp") {
+                            commit_ts = std::stoll(value);
+                        } else if (key == "snapshot_size") {
+                            size = value;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Set the snapshot info
+        snapshot_info.__set_name(snapshot_name);
+        snapshot_info.__set_scope(scope);
+        snapshot_info.__set_time(create_time);
+        snapshot_info.__set_commit(commit_ts);
+        snapshot_info.__set_size(size);
+        
+        response.__set_snapshot(snapshot_info);
     }
 }
 
@@ -3582,6 +3638,61 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshot
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
         LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        return;
+    }
+    
+    // Extract snapshot data from result table
+    if (result.result_table_ != nullptr) {
+        Vector<infinity_thrift_rpc::SnapshotInfo> snapshots;
+        SizeT blocks_count = result.result_table_->DataBlockCount();
+        
+        for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+            auto data_block = result.result_table_->GetDataBlockById(block_idx);
+            SizeT row_count = data_block->row_count();
+            
+            for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+                infinity_thrift_rpc::SnapshotInfo snapshot_info;
+                
+                // Extract snapshot name (column 0)
+                auto &name_column = data_block->column_vectors[0];
+                if (name_column->data_type()->type() == LogicalType::kVarchar) {
+                    auto varchar_value = name_column->GetValue(row_idx);
+                    snapshot_info.__set_name(varchar_value.GetVarchar());
+                }
+                
+                // Extract scope (column 1)
+                auto &scope_column = data_block->column_vectors[1];
+                if (scope_column->data_type()->type() == LogicalType::kVarchar) {
+                    auto scope_value = scope_column->GetValue(row_idx);
+                    snapshot_info.__set_scope(scope_value.GetVarchar());
+                }
+                
+                // Extract create time (column 2)
+                auto &time_column = data_block->column_vectors[2];
+                if (time_column->data_type()->type() == LogicalType::kVarchar) {
+                    auto time_value = time_column->GetValue(row_idx);
+                    snapshot_info.__set_time(time_value.GetVarchar());
+                }
+                
+                // Extract commit timestamp (column 3)
+                auto &commit_column = data_block->column_vectors[3];
+                if (commit_column->data_type()->type() == LogicalType::kBigInt) {
+                    auto commit_value = commit_column->GetValue(row_idx);
+                    snapshot_info.__set_commit(commit_value.GetValue<BigIntT>());
+                }
+                
+                // Extract size (column 4)
+                auto &size_column = data_block->column_vectors[4];
+                if (size_column->data_type()->type() == LogicalType::kVarchar) {
+                    auto size_value = size_column->GetValue(row_idx);
+                    snapshot_info.__set_size(size_value.GetVarchar());
+                }
+                
+                snapshots.emplace_back(std::move(snapshot_info));
+            }
+        }
+        
+        response.__set_snapshots(snapshots);
     }
 }
 
@@ -3677,6 +3788,7 @@ void InfinityThriftService::ListSnapshots(infinity_thrift_rpc::ListSnapshotsResp
     auto [infinity, status] = GetInfinityBySessionID(request.session_id);
     if (status.ok()) {
         auto result = infinity->ListSnapshots();
+        
         ProcessQueryResult(response, result, "ListSnapshots");
     } else {
         ProcessStatus(response, status, "ListSnapshots");
@@ -3743,23 +3855,4 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentN
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshotResponse &response,
-                                               const QueryResult &result,
-                                               const std::string_view error_header) {
-    response.__set_error_code((i64)(result.ErrorCode()));
-    if (!result.IsOk()) {
-        response.__set_error_msg(result.ErrorStr());
-        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
-    }
-}
-
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshotsResponse &response,
-                                               const QueryResult &result,
-                                               const std::string_view error_header) {
-    response.__set_error_code((i64)(result.ErrorCode()));
-    if (!result.IsOk()) {
-        response.__set_error_msg(result.ErrorStr());
-        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
-    }
-}
 } // namespace infinity

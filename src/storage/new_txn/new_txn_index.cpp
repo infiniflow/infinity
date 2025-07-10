@@ -2071,4 +2071,73 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     return Status::OK();
 }
 
+Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds) {
+    u64 max_index_id = 0;
+    Status status;
+    for (const auto &index_cmd : index_cmds) {
+        u64 index_id = std::stoull(index_cmd.index_id_);
+        if (index_id > max_index_id) {
+            max_index_id = index_id;
+        }
+        Optional<TableIndexMeeta> table_index_meta;
+        status = new_catalog_->AddNewTableIndex(table_meta, 
+                                                    index_cmd.index_id_, 
+                                                    txn_context_ptr_->commit_ts_, 
+                                                    index_cmd.index_base_, 
+                                                    table_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+
+        if (index_cmd.index_base_->index_type_ == IndexType::kFullText) {
+            auto ft_cache = MakeShared<TableIndexReaderCache>(table_meta.db_id_str(), table_meta.table_id_str());
+            status = table_meta.AddFtIndexCache(ft_cache);
+            if (!status.ok()) {
+                if (status.code() != ErrorCode::kCatalogError) {
+                    return status;
+                }
+            }
+
+            table_index_meta->UpdateFulltextSegmentTS(txn_context_ptr_->commit_ts_);
+        }
+        
+        for (const auto &segment_index : index_cmd.segment_index_infos_) {
+            Optional<SegmentIndexMeta> segment_index_meta;
+            
+            // Calculate next_chunk_id from existing chunk infos
+            ChunkID next_chunk_id = 0;
+            if (!segment_index.chunk_infos_.empty()) {
+                next_chunk_id = std::max_element(segment_index.chunk_infos_.begin(), 
+                                               segment_index.chunk_infos_.end(),
+                                               [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) {
+                                                   return a.chunk_id_ < b.chunk_id_;
+                                               })->chunk_id_ + 1;
+            }
+            
+            status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);
+            if (!status.ok()) {
+                return status;
+            }
+            
+            for (const auto &chunk_index : segment_index.chunk_infos_) {
+                Optional<ChunkIndexMeta> chunk_index_meta;
+                status = new_catalog_->RestoreNewChunkIndex1(*segment_index_meta, this, chunk_index.chunk_id_,
+                                                      chunk_index.base_rowid_,
+                                                      chunk_index.row_count_,
+                                                      chunk_index.base_name_,
+                                                      chunk_index.index_size_,
+                                                      chunk_index_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+    }
+    status = table_meta.SetNextIndexID(std::to_string(max_index_id + 1));
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 } // namespace infinity

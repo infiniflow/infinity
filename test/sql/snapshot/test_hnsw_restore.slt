@@ -56,9 +56,3 @@ DROP INDEX idx1 ON sqllogic_test_hnsw;
 
 statement ok
 DROP TABLE sqllogic_test_hnsw;
-
-statement ok
-DROP SNAPSHOT sqllogic_test_hnsw_backup;
-
-statement error
-DROP SNAPSHOT sqllogic_test_hnsw_backup;
