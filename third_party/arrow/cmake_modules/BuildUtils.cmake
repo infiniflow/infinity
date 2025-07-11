@@ -293,6 +293,9 @@ function(ADD_ARROW_LIB LIB_NAME)
     if(BUILD_STATIC AND ARG_STATIC_LINK_LIBS)
       target_link_libraries(${LIB_NAME}_objlib PRIVATE ${ARG_STATIC_LINK_LIBS})
     endif()
+
+    target_include_directories(${LIB_NAME}_objlib PUBLIC SYSTEM "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
+    target_include_directories(${LIB_NAME}_objlib PUBLIC SYSTEM "${CMAKE_BINARY_DIR}/third_party/thrift/")
   else()
     # Prepare arguments for separate compilation of static and shared libs below
     # TODO: add PCH directives
