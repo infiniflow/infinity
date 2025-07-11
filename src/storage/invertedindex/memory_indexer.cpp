@@ -462,6 +462,8 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         handler.HandleWriteResult(result1);
         handler.HandleWriteResult(result2);
         handler.HandleWriteResult(result3);
+        PersistWriteResult result4 = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result4);
     }
 
     is_spilled_ = spill;
@@ -679,6 +681,8 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
         handler.HandleWriteResult(result1);
         handler.HandleWriteResult(result2);
         handler.HandleWriteResult(result3);
+        PersistWriteResult result4 = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result4);
     }
 }
 
