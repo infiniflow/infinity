@@ -325,6 +325,9 @@ static auto kElementWiseAggregateOptionsType =
         DataMember("skip_nulls", &ElementWiseAggregateOptions::skip_nulls));
 static auto kExtractRegexOptionsType = GetFunctionOptionsType<ExtractRegexOptions>(
     DataMember("pattern", &ExtractRegexOptions::pattern));
+static auto kExtractRegexSpanOptionsType =
+    GetFunctionOptionsType<ExtractRegexSpanOptions>(
+        DataMember("pattern", &ExtractRegexSpanOptions::pattern));
 static auto kJoinOptionsType = GetFunctionOptionsType<JoinOptions>(
     DataMember("null_handling", &JoinOptions::null_handling),
     DataMember("null_replacement", &JoinOptions::null_replacement));
@@ -437,6 +440,12 @@ ExtractRegexOptions::ExtractRegexOptions(std::string pattern)
     : FunctionOptions(internal::kExtractRegexOptionsType), pattern(std::move(pattern)) {}
 ExtractRegexOptions::ExtractRegexOptions() : ExtractRegexOptions("") {}
 constexpr char ExtractRegexOptions::kTypeName[];
+
+ExtractRegexSpanOptions::ExtractRegexSpanOptions(std::string pattern)
+    : FunctionOptions(internal::kExtractRegexSpanOptionsType),
+      pattern(std::move(pattern)) {}
+ExtractRegexSpanOptions::ExtractRegexSpanOptions() : ExtractRegexSpanOptions("") {}
+constexpr char ExtractRegexSpanOptions::kTypeName[];
 
 JoinOptions::JoinOptions(NullHandlingBehavior null_handling, std::string null_replacement)
     : FunctionOptions(internal::kJoinOptionsType),
@@ -684,6 +693,7 @@ void RegisterScalarOptions(FunctionRegistry* registry) {
   DCHECK_OK(registry->AddFunctionOptionsType(kDayOfWeekOptionsType));
   DCHECK_OK(registry->AddFunctionOptionsType(kElementWiseAggregateOptionsType));
   DCHECK_OK(registry->AddFunctionOptionsType(kExtractRegexOptionsType));
+  DCHECK_OK(registry->AddFunctionOptionsType(kExtractRegexSpanOptionsType));
   DCHECK_OK(registry->AddFunctionOptionsType(kJoinOptionsType));
   DCHECK_OK(registry->AddFunctionOptionsType(kListSliceOptionsType));
   DCHECK_OK(registry->AddFunctionOptionsType(kMakeStructOptionsType));
@@ -732,19 +742,26 @@ void RegisterScalarOptions(FunctionRegistry* registry) {
 
 SCALAR_ARITHMETIC_UNARY(AbsoluteValue, "abs", "abs_checked")
 SCALAR_ARITHMETIC_UNARY(Acos, "acos", "acos_checked")
+SCALAR_ARITHMETIC_UNARY(Acosh, "acosh", "acosh_checked")
 SCALAR_ARITHMETIC_UNARY(Asin, "asin", "asin_checked")
+SCALAR_ARITHMETIC_UNARY(Atanh, "atanh", "atanh_checked")
 SCALAR_ARITHMETIC_UNARY(Cos, "cos", "cos_checked")
 SCALAR_ARITHMETIC_UNARY(Ln, "ln", "ln_checked")
 SCALAR_ARITHMETIC_UNARY(Log10, "log10", "log10_checked")
 SCALAR_ARITHMETIC_UNARY(Log1p, "log1p", "log1p_checked")
 SCALAR_ARITHMETIC_UNARY(Log2, "log2", "log2_checked")
-SCALAR_ARITHMETIC_UNARY(Sqrt, "sqrt", "sqrt_checked")
 SCALAR_ARITHMETIC_UNARY(Negate, "negate", "negate_checked")
 SCALAR_ARITHMETIC_UNARY(Sin, "sin", "sin_checked")
+SCALAR_ARITHMETIC_UNARY(Sqrt, "sqrt", "sqrt_checked")
 SCALAR_ARITHMETIC_UNARY(Tan, "tan", "tan_checked")
+SCALAR_EAGER_UNARY(Asinh, "asinh")
 SCALAR_EAGER_UNARY(Atan, "atan")
+SCALAR_EAGER_UNARY(Cosh, "cosh")
 SCALAR_EAGER_UNARY(Exp, "exp")
+SCALAR_EAGER_UNARY(Expm1, "expm1")
 SCALAR_EAGER_UNARY(Sign, "sign")
+SCALAR_EAGER_UNARY(Sinh, "sinh")
+SCALAR_EAGER_UNARY(Tanh, "tanh")
 
 Result<Datum> Round(const Datum& arg, RoundOptions options, ExecContext* ctx) {
   return CallFunction("round", {arg}, &options, ctx);

@@ -232,6 +232,14 @@ class ARROW_EXPORT Array {
   /// \return DeviceAllocationType
   DeviceAllocationType device_type() const { return data_->device_type(); }
 
+  /// \brief Return the statistics of this Array
+  ///
+  /// This just delegates to calling statistics on the underlying ArrayData
+  /// object which backs this Array.
+  ///
+  /// \return const std::shared_ptr<ArrayStatistics>&
+  const std::shared_ptr<ArrayStatistics>& statistics() const { return data_->statistics; }
+
  protected:
   Array() = default;
   ARROW_DEFAULT_MOVE_AND_ASSIGN(Array);
@@ -269,15 +277,15 @@ class ARROW_EXPORT FlatArray : public Array {
 /// Base class for arrays of fixed-size logical types
 class ARROW_EXPORT PrimitiveArray : public FlatArray {
  public:
+  /// Does not account for any slice offset
+  const std::shared_ptr<Buffer>& values() const { return data_->buffers[1]; }
+
+ protected:
   PrimitiveArray(const std::shared_ptr<DataType>& type, int64_t length,
                  const std::shared_ptr<Buffer>& data,
                  const std::shared_ptr<Buffer>& null_bitmap = NULLPTR,
                  int64_t null_count = kUnknownNullCount, int64_t offset = 0);
 
-  /// Does not account for any slice offset
-  const std::shared_ptr<Buffer>& values() const { return data_->buffers[1]; }
-
- protected:
   PrimitiveArray() : raw_values_(NULLPTR) {}
 
   void SetData(const std::shared_ptr<ArrayData>& data) {

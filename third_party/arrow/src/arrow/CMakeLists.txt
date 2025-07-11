@@ -126,9 +126,7 @@ if(ARROW_WITH_RE2)
   endif()
 endif()
 
-# This should be done after if(ARROW_ORC) and if(ARROW_WITH_OPENTELEMETRY)
-# because they depend on Protobuf.
-if(ARROW_WITH_PROTOBUF)
+if(ARROW_PROTOBUF_ARROW_CMAKE_PACKAGE_NAME STREQUAL "Arrow")
   if(Protobuf_SOURCE STREQUAL "SYSTEM")
     list(APPEND ARROW_STATIC_INSTALL_INTERFACE_LIBS ${ARROW_PROTOBUF_LIBPROTOBUF})
   endif()
@@ -166,8 +164,7 @@ if(WIN32)
   list(APPEND ARROW_SYSTEM_LINK_LIBS "ws2_32")
 endif()
 
-if(NOT WIN32 AND NOT APPLE)
-  # Pass -lrt on Linux only
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(APPEND ARROW_SYSTEM_LINK_LIBS rt)
 endif()
 
@@ -373,7 +370,11 @@ set(ARROW_SRCS
     config.cc
     datum.cc
     device.cc
+    device_allocation_type_set.cc
     extension_type.cc
+    extension/bool8.cc
+    extension/json.cc
+    extension/uuid.cc
     pretty_print.cc
     record_batch.cc
     result.cc
@@ -412,6 +413,7 @@ arrow_add_object_library(ARROW_ARRAY
                          array/concatenate.cc
                          array/data.cc
                          array/diff.cc
+                         array/statistics.cc
                          array/util.cc
                          array/validate.cc)
 
@@ -455,7 +457,7 @@ endif()
 
 set(ARROW_VENDORED_SRCS
     vendored/base64.cpp
-    vendored/datetime/tz.cpp
+    vendored/datetime.cpp
     vendored/double-conversion/bignum-dtoa.cc
     vendored/double-conversion/bignum.cc
     vendored/double-conversion/cached-powers.cc
@@ -483,7 +485,7 @@ set(ARROW_VENDORED_SRCS
 if(APPLE)
   list(APPEND ARROW_VENDORED_SRCS vendored/datetime/ios.mm)
 endif()
-set_source_files_properties(vendored/datetime/tz.cpp
+set_source_files_properties(vendored/datetime.cpp
                             PROPERTIES SKIP_PRECOMPILE_HEADERS ON
                                        SKIP_UNITY_BUILD_INCLUSION ON)
 arrow_add_object_library(ARROW_VENDORED ${ARROW_VENDORED_SRCS})
@@ -525,6 +527,7 @@ set(ARROW_UTIL_SRCS
     util/logger.cc
     util/logging.cc
     util/key_value_metadata.cc
+    util/math_internal.cc
     util/memory.cc
     util/mutex.cc
     util/ree_util.cc
@@ -642,12 +645,6 @@ else()
   set(ARROW_TELEMETRY_TARGET_STATIC)
 endif()
 
-set(ARROW_TESTING_SHARED_LINK_LIBS arrow_shared ${ARROW_GTEST_GTEST})
-set(ARROW_TESTING_SHARED_PRIVATE_LINK_LIBS arrow::flatbuffers RapidJSON)
-set(ARROW_TESTING_STATIC_LINK_LIBS arrow::flatbuffers RapidJSON arrow_static
-                                   ${ARROW_GTEST_GTEST})
-set(ARROW_TESTING_SHARED_INSTALL_INTERFACE_LIBS Arrow::arrow_shared)
-set(ARROW_TESTING_STATIC_INSTALL_INTERFACE_LIBS Arrow::arrow_static)
 # that depend on gtest
 if(GTest_SOURCE STREQUAL "SYSTEM")
   list(APPEND ARROW_TESTING_SHARED_INSTALL_INTERFACE_LIBS ${ARROW_GTEST_GTEST})
@@ -666,9 +663,11 @@ set(ARROW_TESTING_SRCS
     io/test_common.cc
     ipc/test_common.cc
     testing/fixed_width_test_util.cc
-    testing/gtest_util.cc
-    testing/random.cc
     testing/generator.cc
+    testing/gtest_util.cc
+    testing/math.cc
+    testing/process.cc
+    testing/random.cc
     testing/util.cc)
 
 #
@@ -719,13 +718,10 @@ set(ARROW_COMPUTE_SRCS
     compute/function.cc
     compute/function_internal.cc
     compute/kernel.cc
-    compute/key_hash_internal.cc
-    compute/key_map_internal.cc
-    compute/light_array_internal.cc
     compute/ordering.cc
     compute/registry.cc
+    compute/kernels/chunked_internal.cc
     compute/kernels/codegen_internal.cc
-    compute/kernels/row_encoder.cc
     compute/kernels/ree_util_internal.cc
     compute/kernels/scalar_cast_boolean.cc
     compute/kernels/scalar_cast_dictionary.cc
@@ -740,19 +736,7 @@ set(ARROW_COMPUTE_SRCS
     compute/kernels/vector_selection.cc
     compute/kernels/vector_selection_filter_internal.cc
     compute/kernels/vector_selection_internal.cc
-    compute/kernels/vector_selection_take_internal.cc
-    compute/row/encode_internal.cc
-    compute/row/compare_internal.cc
-    compute/row/grouper.cc
-    compute/row/row_internal.cc
-    compute/util.cc
-    compute/util_internal.cc)
-
-append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/key_hash_internal_avx2.cc)
-append_runtime_avx2_bmi2_src(ARROW_COMPUTE_SRCS compute/key_map_internal_avx2.cc)
-append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/row/compare_internal_avx2.cc)
-append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/row/encode_internal_avx2.cc)
-append_runtime_avx2_bmi2_src(ARROW_COMPUTE_SRCS compute/util_avx2.cc)
+    compute/kernels/vector_selection_take_internal.cc)
 
 if(ARROW_COMPUTE)
   # Include the remaining kernels
@@ -760,10 +744,14 @@ if(ARROW_COMPUTE)
        ARROW_COMPUTE_SRCS
        compute/kernels/aggregate_basic.cc
        compute/kernels/aggregate_mode.cc
+       compute/kernels/aggregate_pivot.cc
        compute/kernels/aggregate_quantile.cc
        compute/kernels/aggregate_tdigest.cc
        compute/kernels/aggregate_var_std.cc
        compute/kernels/hash_aggregate.cc
+       compute/kernels/hash_aggregate_numeric.cc
+       compute/kernels/hash_aggregate_pivot.cc
+       compute/kernels/pivot_internal.cc
        compute/kernels/scalar_arithmetic.cc
        compute/kernels/scalar_boolean.cc
        compute/kernels/scalar_compare.cc
@@ -779,16 +767,33 @@ if(ARROW_COMPUTE)
        compute/kernels/scalar_validity.cc
        compute/kernels/vector_array_sort.cc
        compute/kernels/vector_cumulative_ops.cc
-       compute/kernels/vector_pairwise.cc
        compute/kernels/vector_nested.cc
+       compute/kernels/vector_pairwise.cc
        compute/kernels/vector_rank.cc
        compute/kernels/vector_replace.cc
        compute/kernels/vector_run_end_encode.cc
        compute/kernels/vector_select_k.cc
-       compute/kernels/vector_sort.cc)
+       compute/kernels/vector_sort.cc
+       compute/kernels/vector_statistics.cc
+       compute/kernels/vector_swizzle.cc
+       compute/key_hash_internal.cc
+       compute/key_map_internal.cc
+       compute/light_array_internal.cc
+       compute/row/encode_internal.cc
+       compute/row/compare_internal.cc
+       compute/row/grouper.cc
+       compute/row/row_encoder_internal.cc
+       compute/row/row_internal.cc
+       compute/util.cc
+       compute/util_internal.cc)
 
   append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/kernels/aggregate_basic_avx2.cc)
   append_runtime_avx512_src(ARROW_COMPUTE_SRCS compute/kernels/aggregate_basic_avx512.cc)
+  append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/key_hash_internal_avx2.cc)
+  append_runtime_avx2_bmi2_src(ARROW_COMPUTE_SRCS compute/key_map_internal_avx2.cc)
+  append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/row/compare_internal_avx2.cc)
+  append_runtime_avx2_src(ARROW_COMPUTE_SRCS compute/row/encode_internal_avx2.cc)
+  append_runtime_avx2_bmi2_src(ARROW_COMPUTE_SRCS compute/util_avx2.cc)
 endif()
 
 arrow_add_object_library(ARROW_COMPUTE ${ARROW_COMPUTE_SRCS})
@@ -904,6 +909,7 @@ endif()
 if(ARROW_JSON)
   arrow_add_object_library(ARROW_JSON
                            extension/fixed_shape_tensor.cc
+                           extension/opaque.cc
                            json/options.cc
                            json/chunked_builder.cc
                            json/chunker.cc
@@ -1016,6 +1022,21 @@ add_arrow_lib(arrow
               SHARED_LINK_FLAGS
               ${ARROW_SHARED_LINK_FLAGS}
               SHARED_PRIVATE_LINK_LIBS
+              ${ARROW_ARRAY_TARGET_SHARED}
+              ${ARROW_COMPUTE_TARGET_SHARED}
+              ${ARROW_CSV_TARGET_SHARED}
+              ${ARROW_FILESYSTEM_TARGET_SHARED}
+              ${ARROW_INTEGRATION_TARGET_SHARED}
+              ${ARROW_IO_TARGET_SHARED}
+              ${ARROW_IPC_TARGET_SHARED}
+              ${ARROW_JSON_TARGET_SHARED}
+              ${ARROW_MEMORY_POOL_TARGET_SHARED}
+              ${ARROW_ORC_TARGET_SHARED}
+              ${ARROW_TELEMETRY_TARGET_SHARED}
+              ${ARROW_UTIL_TARGET_SHARED}
+              ${ARROW_VENDORED_TARGET_SHARED}
+              ${ARROW_SHARED_PRIVATE_LINK_LIBS}
+              ${ARROW_SYSTEM_LINK_LIBS}
               STATIC_LINK_LIBS
               ${ARROW_ARRAY_TARGET_STATIC}
               ${ARROW_COMPUTE_TARGET_STATIC}
@@ -1024,7 +1045,10 @@ add_arrow_lib(arrow
               ${ARROW_INTEGRATION_TARGET_STATIC}
               ${ARROW_IO_TARGET_STATIC}
               ${ARROW_IPC_TARGET_STATIC}
+              ${ARROW_JSON_TARGET_STATIC}
               ${ARROW_MEMORY_POOL_TARGET_STATIC}
+              ${ARROW_ORC_TARGET_STATIC}
+              ${ARROW_TELEMETRY_TARGET_STATIC}
               ${ARROW_UTIL_TARGET_STATIC}
               ${ARROW_VENDORED_TARGET_STATIC}
               ${ARROW_SYSTEM_LINK_LIBS}
@@ -1032,7 +1056,6 @@ add_arrow_lib(arrow
               ${ARROW_STATIC_INSTALL_INTERFACE_LIBS}
               SHARED_INSTALL_INTERFACE_LIBS
               ${ARROW_SHARED_INSTALL_INTERFACE_LIBS})
-
 # The following block includes a code for MSYS2 but GDB on MSYS2 doesn't
 # auto load our plugin. GDB's auto load may not be supported on MSYS2...
 # So it's disabled for now.
@@ -1111,6 +1134,3 @@ add_subdirectory(io)
 add_subdirectory(tensor)
 add_subdirectory(util)
 add_subdirectory(vendored)
-if(ARROW_IPC)
-  add_subdirectory(ipc)
-endif()

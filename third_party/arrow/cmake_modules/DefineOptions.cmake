@@ -133,12 +133,11 @@ macro(resolve_option_dependencies)
 endmacro()
 
 # Top level cmake dir
-#if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
-set(ARROW_DEFINE_OPTIONS_DEFAULT ON)
-set(ARROW_DEFINE_OPTIONS ON)
-#else()
-#  set(ARROW_DEFINE_OPTIONS_DEFAULT OFF)
-#endif()
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
+  set(ARROW_DEFINE_OPTIONS_DEFAULT ON)
+else()
+  set(ARROW_DEFINE_OPTIONS_DEFAULT OFF)
+endif()
 option(ARROW_DEFINE_OPTIONS "Define Arrow options" ${ARROW_DEFINE_OPTIONS_DEFAULT})
 if(ARROW_DEFINE_OPTIONS)
   #----------------------------------------------------------------------
@@ -148,7 +147,7 @@ if(ARROW_DEFINE_OPTIONS)
 
   define_option(ARROW_BUILD_STATIC "Build static libraries" ON)
 
-  define_option(ARROW_BUILD_SHARED "Build shared libraries" OFF)
+  define_option(ARROW_BUILD_SHARED "Build shared libraries" ON)
 
   define_option_string(ARROW_PACKAGE_KIND
                        "Arbitrary string that identifies the kind of package;\
@@ -206,7 +205,7 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_INSTALL_NAME_RPATH
                 "Build Arrow libraries with install_name set to @rpath" ON)
 
-  define_option(ARROW_GGDB_DEBUG "Pass -ggdb flag to debug builds" OFF)
+  define_option(ARROW_GGDB_DEBUG "Pass -ggdb flag to debug builds" ON)
 
   define_option(ARROW_WITH_MUSL "Whether the system libc is musl or not" OFF)
 
@@ -224,7 +223,7 @@ takes precedence over ccache if a storage backend is configured" ON)
                 ARROW_IPC
                 ARROW_TESTING)
 
-  define_option(ARROW_ENABLE_TIMING_TESTS "Enable timing-sensitive tests" OFF)
+  define_option(ARROW_ENABLE_TIMING_TESTS "Enable timing-sensitive tests" ON)
 
   define_option(ARROW_BUILD_INTEGRATION
                 "Build the Arrow integration test executables"
@@ -243,9 +242,6 @@ takes precedence over ccache if a storage backend is configured" ON)
   # discover various hardware limits.
   define_option(ARROW_BUILD_BENCHMARKS_REFERENCE
                 "Build the Arrow micro reference benchmarks" OFF)
-
-  define_option(ARROW_BUILD_OPENMP_BENCHMARKS
-                "Build the Arrow benchmarks that rely on OpenMP" OFF)
 
   define_option(ARROW_BUILD_DETAILED_BENCHMARKS
                 "Build benchmarks that do a longer exploration of performance" OFF)
@@ -304,7 +300,10 @@ takes precedence over ccache if a storage backend is configured" ON)
                 ARROW_IPC)
 
   define_option(ARROW_AZURE
-                "Build Arrow with Azure support (requires the Azure SDK for C++)" OFF)
+                "Build Arrow with Azure support (requires the Azure SDK for C++)"
+                OFF
+                DEPENDS
+                ARROW_FILESYSTEM)
 
   define_option(ARROW_BUILD_UTILITIES "Build Arrow commandline utilities" OFF)
 
@@ -347,38 +346,28 @@ takes precedence over ccache if a storage backend is configured" ON)
                 ARROW_WITH_UTF8PROC)
 
   define_option(ARROW_GCS
-                "Build Arrow with GCS support (requires the GCloud SDK for C++)" OFF)
+                "Build Arrow with GCS support (requires the GCloud SDK for C++)"
+                OFF
+                DEPENDS
+                ARROW_FILESYSTEM)
 
-  define_option(ARROW_HDFS "Build the Arrow HDFS bridge" OFF)
+  define_option(ARROW_HDFS
+                "Build the Arrow HDFS bridge"
+                OFF
+                DEPENDS
+                ARROW_FILESYSTEM)
 
   define_option(ARROW_IPC "Build the Arrow IPC extensions" ON)
 
-  set(ARROW_JEMALLOC_DESCRIPTION "Build the Arrow jemalloc-based allocator")
-  if(WIN32
-     OR APPLE
-     OR "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD"
-     OR NOT ARROW_ENABLE_THREADING)
-    # jemalloc is not supported on Windows.
-    #
-    # jemalloc is the default malloc implementation on FreeBSD and can't
-    # be built with --disable-libdl on FreeBSD. Because lazy-lock feature
-    # is required on FreeBSD. Lazy-lock feature requires libdl.
-    #
-    # jemalloc requires thread.
-    define_option(ARROW_JEMALLOC ${ARROW_JEMALLOC_DESCRIPTION} OFF)
-  else()
-    if (ENABLE_JEMALLOC)
-      define_option(ARROW_JEMALLOC ${ARROW_JEMALLOC_DESCRIPTION} ON)
-    endif ()
-  endif()
+  define_option(ARROW_JEMALLOC "Build the Arrow jemalloc-based allocator" OFF)
 
   define_option(ARROW_JSON "Build Arrow with JSON support (requires RapidJSON)" OFF)
 
-  define_option(ARROW_MIMALLOC "Build the Arrow mimalloc-based allocator" OFF)
+  define_option(ARROW_MIMALLOC "Build the Arrow mimalloc-based allocator" ON)
 
   define_option(ARROW_PARQUET
                 "Build the Parquet libraries"
-                ON
+                OFF
                 DEPENDS
                 ARROW_IPC)
 
@@ -402,7 +391,11 @@ takes precedence over ccache if a storage backend is configured" ON)
                 ARROW_HDFS
                 ARROW_JSON)
 
-  define_option(ARROW_S3 "Build Arrow with S3 support (requires the AWS SDK for C++)" OFF)
+  define_option(ARROW_S3
+                "Build Arrow with S3 support (requires the AWS SDK for C++)"
+                OFF
+                DEPENDS
+                ARROW_FILESYSTEM)
 
   define_option(ARROW_SKYHOOK
                 "Build the Skyhook libraries"
@@ -470,7 +463,7 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_VERBOSE_THIRDPARTY_BUILD
                 "Show output from ExternalProjects rather than just logging to files" OFF)
 
-  define_option(ARROW_DEPENDENCY_USE_SHARED "Link to shared libraries" OFF)
+  define_option(ARROW_DEPENDENCY_USE_SHARED "Link to shared libraries" ON)
 
   define_option(ARROW_BOOST_USE_SHARED "Rely on Boost shared libraries where relevant"
                 ${ARROW_DEPENDENCY_USE_SHARED})
@@ -542,13 +535,9 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_WITH_BROTLI "Build with Brotli compression" OFF)
   define_option(ARROW_WITH_BZ2 "Build with BZ2 compression" OFF)
   define_option(ARROW_WITH_LZ4 "Build with lz4 compression" OFF)
-  define_option(ARROW_WITH_SNAPPY "Build with Snappy compression" ON)
+  define_option(ARROW_WITH_SNAPPY "Build with Snappy compression" OFF)
   define_option(ARROW_WITH_ZLIB "Build with zlib compression" OFF)
   define_option(ARROW_WITH_ZSTD "Build with zstd compression" OFF)
-
-  define_option(ARROW_WITH_UCX
-                "Build with UCX transport for Arrow Flight;(only used if ARROW_FLIGHT is ON)"
-                OFF)
 
   define_option(ARROW_WITH_UTF8PROC
                 "Build with support for Unicode properties using the utf8proc library;(only used if ARROW_COMPUTE is ON or ARROW_GANDIVA is ON)"
@@ -625,6 +614,11 @@ Always OFF if building binaries" OFF)
   define_option_string(ARROW_GANDIVA_PC_CXX_FLAGS
                        "Compiler flags to append when pre-compiling Gandiva operations"
                        "")
+
+  #----------------------------------------------------------------------
+  set_option_category("Cross compiling")
+
+  define_option_string(ARROW_GRPC_CPP_PLUGIN "grpc_cpp_plugin path to be used" "")
 
   #----------------------------------------------------------------------
   set_option_category("Advanced developer")

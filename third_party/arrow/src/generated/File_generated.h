@@ -139,7 +139,7 @@ struct FooterBuilder {
 
 inline ::flatbuffers::Offset<Footer> CreateFooter(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    org::apache::arrow::flatbuf::MetadataVersion version = org::apache::arrow::flatbuf::MetadataVersion::V1,
+    org::apache::arrow::flatbuf::MetadataVersion version = org::apache::arrow::flatbuf::MetadataVersion_V1,
     ::flatbuffers::Offset<org::apache::arrow::flatbuf::Schema> schema = 0,
     ::flatbuffers::Offset<::flatbuffers::Vector<const org::apache::arrow::flatbuf::Block *>> dictionaries = 0,
     ::flatbuffers::Offset<::flatbuffers::Vector<const org::apache::arrow::flatbuf::Block *>> recordBatches = 0,
@@ -155,7 +155,7 @@ inline ::flatbuffers::Offset<Footer> CreateFooter(
 
 inline ::flatbuffers::Offset<Footer> CreateFooterDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    org::apache::arrow::flatbuf::MetadataVersion version = org::apache::arrow::flatbuf::MetadataVersion::V1,
+    org::apache::arrow::flatbuf::MetadataVersion version = org::apache::arrow::flatbuf::MetadataVersion_V1,
     ::flatbuffers::Offset<org::apache::arrow::flatbuf::Schema> schema = 0,
     const std::vector<org::apache::arrow::flatbuf::Block> *dictionaries = nullptr,
     const std::vector<org::apache::arrow::flatbuf::Block> *recordBatches = nullptr,

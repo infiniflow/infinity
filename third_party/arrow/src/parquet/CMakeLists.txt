@@ -140,8 +140,6 @@ set(PARQUET_THRIFT_SOURCE_DIR "${ARROW_SOURCE_DIR}/src/generated/")
 
 set_source_files_properties("${PARQUET_THRIFT_SOURCE_DIR}/parquet_types.cpp"
                             "${PARQUET_THRIFT_SOURCE_DIR}/parquet_types.h"
-                            "${PARQUET_THRIFT_SOURCE_DIR}/parquet_constants.cpp"
-                            "${PARQUET_THRIFT_SOURCE_DIR}/parquet_constants.h"
                             PROPERTIES SKIP_PRECOMPILE_HEADERS ON
                                        SKIP_UNITY_BUILD_INCLUSION ON)
 
@@ -165,7 +163,8 @@ set(PARQUET_SRCS
     column_reader.cc
     column_scanner.cc
     column_writer.cc
-    encoding.cc
+    decoder.cc
+    encoder.cc
     encryption/encryption.cc
     encryption/internal_file_decryptor.cc
     encryption/internal_file_encryptor.cc
@@ -177,12 +176,12 @@ set(PARQUET_SRCS
     metadata.cc
     xxhasher.cc
     page_index.cc
-    "${PARQUET_THRIFT_SOURCE_DIR}/parquet_constants.cpp"
     "${PARQUET_THRIFT_SOURCE_DIR}/parquet_types.cpp"
     platform.cc
     printer.cc
     properties.cc
     schema.cc
+    size_statistics.cc
     statistics.cc
     stream_reader.cc
     stream_writer.cc
@@ -306,20 +305,10 @@ add_arrow_lib(parquet
 
 if(WIN32 AND NOT (ARROW_TEST_LINKAGE STREQUAL "static"))
   add_library(parquet_test_support STATIC
-              "${PARQUET_THRIFT_SOURCE_DIR}/parquet_constants.cpp"
               "${PARQUET_THRIFT_SOURCE_DIR}/parquet_types.cpp")
   target_link_libraries(parquet_test_support thrift::thrift)
   list(PREPEND PARQUET_TEST_LINK_LIBS parquet_test_support)
   list(APPEND PARQUET_LIBRARIES parquet_test_support)
-endif()
-
-if(ARROW_TESTING)
-  add_library(parquet_testing OBJECT test_util.cc)
-  # Even though this is still just an object library we still need to
-  # "link" our dependencies so that include paths are configured
-  # correctly
-  target_link_libraries(parquet_testing PUBLIC ${ARROW_GTEST_GMOCK})
-  list(APPEND PARQUET_TEST_LINK_LIBS parquet_testing)
 endif()
 
 if(NOT ARROW_BUILD_SHARED)
@@ -335,8 +324,6 @@ if(ARROW_BUILD_STATIC AND WIN32)
   target_compile_definitions(parquet_static PUBLIC PARQUET_STATIC)
 endif()
 
-SET (Thrift_VERSION_MAJOR 0)
-SET (Thrift_VERSION_MINOR 16)
 add_definitions(-DPARQUET_THRIFT_VERSION_MAJOR=${Thrift_VERSION_MAJOR})
 add_definitions(-DPARQUET_THRIFT_VERSION_MINOR=${Thrift_VERSION_MINOR})
 
@@ -378,6 +365,7 @@ add_parquet_test(internals-test
                  metadata_test.cc
                  page_index_test.cc
                  public_api_test.cc
+                 size_statistics_test.cc
                  types_test.cc)
 
 set_source_files_properties(public_api_test.cc PROPERTIES SKIP_PRECOMPILE_HEADERS ON
@@ -440,3 +428,4 @@ add_parquet_benchmark(metadata_benchmark)
 add_parquet_benchmark(page_index_benchmark SOURCES page_index_benchmark.cc
                       benchmark_util.cc)
 add_parquet_benchmark(arrow/reader_writer_benchmark PREFIX "parquet-arrow")
+add_parquet_benchmark(arrow/size_stats_benchmark PREFIX "parquet-arrow")
