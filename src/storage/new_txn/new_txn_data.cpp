@@ -842,10 +842,12 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_t
                                       txn_id));
                 return Status::UnexpectedError("Segment already exists with different commit timestamp");
             }
-            skip_cmd = false;
         }
     }
     // TODO: check if the removed segments and segment indexes are created.
+    if(skip_cmd) {
+        return Status::OK();
+    }
 
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 

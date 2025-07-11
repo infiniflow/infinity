@@ -251,6 +251,9 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
         }
     }
 
+    new_txn_mgr->kv_store()->Flush();
+    RestartTxnMgr();
+
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
@@ -325,25 +328,6 @@ TEST_P(TxnReplayExceptionTest, test_replay_import) {
             check_segment(segment_meta);
         }
     }
-
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    {
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
-        Status status = txn1->DropDatabase(*db_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-    }
-
-    new_txn_mgr->kv_store()->Flush();
-    RestartTxnMgr();
 
     {
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
