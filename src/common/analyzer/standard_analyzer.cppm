@@ -28,7 +28,7 @@ export class StandardAnalyzer : public CommonLanguageAnalyzer {
 public:
     StandardAnalyzer() : CommonLanguageAnalyzer() {}
 
-    ~StandardAnalyzer() {}
+    virtual ~StandardAnalyzer() {}
 
     void InitStemmer(Language language) { CommonLanguageAnalyzer::InitStemmer(language); }
 

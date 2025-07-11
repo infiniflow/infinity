@@ -32,7 +32,7 @@ public:
 
     ChineseAnalyzer(const ChineseAnalyzer &other);
 
-    ~ChineseAnalyzer();
+    virtual ~ChineseAnalyzer();
 
     Status Load();
 

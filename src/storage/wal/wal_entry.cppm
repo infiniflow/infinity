@@ -231,6 +231,7 @@ export struct WalCmd {
 
 export struct WalCmdDummy final : public WalCmd {
     WalCmdDummy() : WalCmd(WalCommandType::DUMMY) {}
+    ~WalCmdDummy() override = default;
 
     bool operator==(const WalCmd &other) const final { return typeid(*this) == typeid(other); }
     [[nodiscard]] i32 GetSizeInBytes() const final { return 0; }
@@ -244,6 +245,8 @@ export struct WalCmdCreateDatabase final : public WalCmd {
         : WalCmd(WalCommandType::CREATE_DATABASE), db_name_(db_name), db_dir_tail_(db_dir_tail), db_comment_(db_comment) {
         assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     }
+
+    ~WalCmdCreateDatabase() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -260,6 +263,8 @@ export struct WalCmdCreateDatabaseV2 final : public WalCmd {
     explicit WalCmdCreateDatabaseV2(const String &db_name, const String &db_id, const String &db_comment)
         : WalCmd(WalCommandType::CREATE_DATABASE_V2), db_name_(db_name), db_id_(db_id), db_comment_(db_comment) {}
 
+    ~WalCmdCreateDatabaseV2() override = default;
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -274,6 +279,8 @@ export struct WalCmdCreateDatabaseV2 final : public WalCmd {
 export struct WalCmdDropDatabase final : public WalCmd {
     explicit WalCmdDropDatabase(const String &db_name) : WalCmd(WalCommandType::DROP_DATABASE), db_name_(db_name) {}
 
+    ~WalCmdDropDatabase() override = default;
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -286,6 +293,8 @@ export struct WalCmdDropDatabase final : public WalCmd {
 export struct WalCmdDropDatabaseV2 final : public WalCmd {
     explicit WalCmdDropDatabaseV2(const String &db_name, const String &db_id, TxnTimeStamp create_ts)
         : WalCmd(WalCommandType::DROP_DATABASE_V2), db_name_(db_name), db_id_(db_id), create_ts_(create_ts) {}
+
+    ~WalCmdDropDatabaseV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -302,6 +311,8 @@ export struct WalCmdCreateTable final : public WalCmd {
     WalCmdCreateTable(const String &db_name, const String &table_dir_tail, const SharedPtr<TableDef> &table_def)
         : WalCmd(WalCommandType::CREATE_TABLE), db_name_(db_name), table_dir_tail_(table_dir_tail), table_def_(table_def) {}
 
+    ~WalCmdCreateTable() override = default;
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -316,6 +327,8 @@ export struct WalCmdCreateTable final : public WalCmd {
 export struct WalCmdCreateTableV2 final : public WalCmd {
     WalCmdCreateTableV2(const String &db_name, const String &db_id, const String &table_id, const SharedPtr<TableDef> &table_def)
         : WalCmd(WalCommandType::CREATE_TABLE_V2), db_name_(db_name), db_id_(db_id), table_id_(table_id), table_def_(table_def) {}
+
+    ~WalCmdCreateTableV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -332,6 +345,8 @@ export struct WalCmdCreateTableV2 final : public WalCmd {
 export struct WalCmdDropTable final : public WalCmd {
     WalCmdDropTable(const String &db_name, const String &table_name)
         : WalCmd(WalCommandType::DROP_TABLE), db_name_(db_name), table_name_(table_name) {}
+
+    ~WalCmdDropTable() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -352,6 +367,8 @@ export struct WalCmdDropTableV2 final : public WalCmd {
                       const String &table_key)
         : WalCmd(WalCommandType::DROP_TABLE_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           create_ts_(create_ts), table_key_(table_key) {}
+
+    ~WalCmdDropTableV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -379,6 +396,8 @@ export struct WalCmdCreateIndex final : public WalCmd {
     WalCmdCreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base)
         : WalCmd(WalCommandType::CREATE_INDEX), db_name_(db_name), table_name_(table_name), index_base_(index_base) {}
 
+    ~WalCmdCreateIndex() override = default;
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -402,6 +421,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
                         const String &table_key)
         : WalCmd(WalCommandType::CREATE_INDEX_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           index_id_(index_id), index_base_(index_base), table_key_(table_key) {}
+    ~WalCmdCreateIndexV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -424,6 +444,7 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
 export struct WalCmdDropIndex final : public WalCmd {
     WalCmdDropIndex(const String &db_name, const String &table_name, const String &index_name)
         : WalCmd(WalCommandType::DROP_INDEX), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+    ~WalCmdDropIndex() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -447,6 +468,7 @@ export struct WalCmdDropIndexV2 final : public WalCmd {
                       const String &index_key)
         : WalCmd(WalCommandType::DROP_INDEX_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           index_name_(index_name), index_id_(index_id), create_ts_(create_ts), index_key_(index_key) {}
+    ~WalCmdDropIndexV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -469,6 +491,7 @@ export struct WalCmdDropIndexV2 final : public WalCmd {
 export struct WalCmdImport final : public WalCmd {
     WalCmdImport(const String &db_name, const String &table_name, const WalSegmentInfo &segment_info)
         : WalCmd(WalCommandType::IMPORT), db_name_(db_name), table_name_(table_name), segment_info_(segment_info) {}
+    ~WalCmdImport() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -485,6 +508,7 @@ export struct WalCmdImportV2 final : public WalCmd {
     WalCmdImportV2(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const WalSegmentInfo &segment_info)
         : WalCmd(WalCommandType::IMPORT_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           segment_info_(segment_info) {}
+    ~WalCmdImportV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -502,6 +526,8 @@ export struct WalCmdImportV2 final : public WalCmd {
 export struct WalCmdAppend final : public WalCmd {
     WalCmdAppend(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &block)
         : WalCmd(WalCommandType::APPEND), db_name_(db_name), table_name_(table_name), block_(block) {}
+
+    ~WalCmdAppend() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -524,6 +550,8 @@ export struct WalCmdAppendV2 final : public WalCmd {
         : WalCmd(WalCommandType::APPEND_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id), row_ranges_(row_ranges),
           block_(block) {}
 
+    ~WalCmdAppendV2() override = default;
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -542,6 +570,8 @@ export struct WalCmdDelete final : public WalCmd {
     WalCmdDelete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids)
         : WalCmd(WalCommandType::DELETE), db_name_(db_name), table_name_(table_name), row_ids_(row_ids) {}
 
+    ~WalCmdDelete() override = default;
+
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -556,6 +586,8 @@ export struct WalCmdDelete final : public WalCmd {
 export struct WalCmdDeleteV2 final : public WalCmd {
     WalCmdDeleteV2(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const Vector<RowID> &row_ids)
         : WalCmd(WalCommandType::DELETE_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id), row_ids_(row_ids) {}
+
+    ~WalCmdDeleteV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -582,6 +614,8 @@ export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
         : WalCmd(WalCommandType::SET_SEGMENT_STATUS_SEALED), db_name_(db_name), table_name_(table_name), segment_id_(segment_id),
           segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
 
+    ~WalCmdSetSegmentStatusSealed() override = default;
+
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -607,6 +641,8 @@ export struct WalCmdSetSegmentStatusSealedV2 final : public WalCmd {
                                    const Vector<Pair<BlockID, String>> &block_filter_binary_data)
         : WalCmd(WalCommandType::SET_SEGMENT_STATUS_SEALED_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           segment_id_(segment_id), segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
+
+    ~WalCmdSetSegmentStatusSealedV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -635,6 +671,8 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
         : WalCmd(WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA), db_name_(db_name), table_name_(table_name), segment_id_(segment_id),
           segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
 
+    ~WalCmdUpdateSegmentBloomFilterData() override = default;
+
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -662,6 +700,8 @@ export struct WalCmdUpdateSegmentBloomFilterDataV2 final : public WalCmd {
         : WalCmd(WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           segment_id_(segment_id), segment_filter_binary_data_(segment_filter_binary_data), block_filter_binary_data_(block_filter_binary_data) {}
 
+    ~WalCmdUpdateSegmentBloomFilterDataV2() override = default;
+
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -684,6 +724,9 @@ export struct WalCmdCheckpoint final : public WalCmd {
         : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), catalog_path_(catalog_path), catalog_name_(catalog_name) {
         assert(!std::filesystem::path(catalog_path_).is_absolute());
     }
+
+    ~WalCmdCheckpoint() override = default;
+
     virtual bool operator==(const WalCmd &other) const final;
     virtual i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -697,6 +740,9 @@ export struct WalCmdCheckpoint final : public WalCmd {
 
 export struct WalCmdCheckpointV2 final : public WalCmd {
     WalCmdCheckpointV2(i64 max_commit_ts) : WalCmd(WalCommandType::CHECKPOINT_V2), max_commit_ts_(max_commit_ts) {}
+
+    ~WalCmdCheckpointV2() override = default;
+
     virtual bool operator==(const WalCmd &other) const final;
     virtual i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -713,6 +759,8 @@ export struct WalCmdCompact final : public WalCmd {
                   const Vector<SegmentID> &deprecated_segment_ids)
         : WalCmd(WalCommandType::COMPACT), db_name_(db_name), table_name_(table_name), new_segment_infos_(new_segment_infos),
           deprecated_segment_ids_(deprecated_segment_ids) {}
+
+    ~WalCmdCompact() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -741,6 +789,8 @@ export struct WalCmdCompactV2 final : public WalCmd {
         : WalCmd(WalCommandType::COMPACT_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           new_segment_infos_(new_segment_infos), deprecated_segment_ids_(deprecated_segment_ids) {}
 
+    ~WalCmdCompactV2() override = default;
+
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -758,6 +808,8 @@ export struct WalCmdCompactV2 final : public WalCmd {
 export struct WalCmdOptimize final : public WalCmd {
     WalCmdOptimize(const String &db_name, const String &table_name, const String &index_name, Vector<UniquePtr<InitParameter>> &&params)
         : WalCmd(WalCommandType::OPTIMIZE), db_name_(db_name), table_name_(table_name), index_name_(index_name), params_(std::move(params)) {}
+
+    ~WalCmdOptimize() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -781,6 +833,8 @@ export struct WalCmdOptimizeV2 final : public WalCmd {
                      Vector<UniquePtr<InitParameter>> &&params)
         : WalCmd(WalCommandType::OPTIMIZE_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           index_name_(index_name), index_id_(index_id), params_(std::move(params)) {}
+
+    ~WalCmdOptimizeV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -811,6 +865,8 @@ export struct WalCmdDumpIndex final : public WalCmd {
                     const Vector<ChunkID> &deprecate_ids)
         : WalCmd(WalCommandType::DUMP_INDEX), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
           chunk_infos_(chunk_infos), deprecate_ids_(deprecate_ids) {}
+
+    ~WalCmdDumpIndex() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -852,6 +908,8 @@ export struct WalCmdDumpIndexV2 final : public WalCmd {
           index_name_(index_name), index_id_(index_id), segment_id_(segment_id), chunk_infos_(chunk_infos), deprecate_ids_(deprecate_ids),
           table_key_(table_key) {}
 
+    ~WalCmdDumpIndexV2() override = default;
+
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -876,6 +934,7 @@ export struct WalCmdDumpIndexV2 final : public WalCmd {
 export struct WalCmdRenameTable : public WalCmd {
     WalCmdRenameTable(const String &db_name, const String &table_name, const String &new_table_name)
         : WalCmd(WalCommandType::RENAME_TABLE), db_name_(db_name), table_name_(table_name), new_table_name_(new_table_name) {}
+    ~WalCmdRenameTable() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -897,6 +956,7 @@ export struct WalCmdRenameTableV2 : public WalCmd {
                         const String &old_table_key)
         : WalCmd(WalCommandType::RENAME_TABLE_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           new_table_name_(new_table_name), old_table_key_(old_table_key) {}
+    ~WalCmdRenameTableV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -917,6 +977,7 @@ export struct WalCmdRenameTableV2 : public WalCmd {
 export struct WalCmdAddColumns : public WalCmd {
     WalCmdAddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs)
         : WalCmd(WalCommandType::ADD_COLUMNS), db_name_(db_name), table_name_(table_name), column_defs_(column_defs) {}
+    ~WalCmdAddColumns() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -938,6 +999,7 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
                        const String &table_key)
         : WalCmd(WalCommandType::ADD_COLUMNS_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           column_defs_(column_defs), table_key_(table_key) {}
+    ~WalCmdAddColumnsV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -958,6 +1020,7 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
 export struct WalCmdDropColumns : public WalCmd {
     WalCmdDropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names)
         : WalCmd(WalCommandType::DROP_COLUMNS), db_name_(db_name), table_name_(table_name), column_names_(column_names) {}
+    ~WalCmdDropColumns() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -985,6 +1048,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
                         const Vector<String> &column_keys)
         : WalCmd(WalCommandType::DROP_COLUMNS_V2), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),
           column_names_(column_names), column_ids_(column_ids), table_key_(table_key), column_keys_(column_keys) {}
+    ~WalCmdDropColumnsV2() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
@@ -1006,6 +1070,7 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
 
 export struct WalCmdCleanup : public WalCmd {
     WalCmdCleanup(i64 timestamp) : WalCmd(WalCommandType::CLEANUP), timestamp_(timestamp) {};
+    ~WalCmdCleanup() override = default;
 
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
