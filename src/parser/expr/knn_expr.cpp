@@ -100,12 +100,26 @@ std::string KnnExpr::ToString() const {
         return alias_;
     }
     const auto filter_str = filter_expr_ ? fmt::format(", WHERE {}", filter_expr_->ToString()) : "";
-    auto embedding_data_ptr = static_cast<char *>(embedding_data_ptr_);
-    EmbeddingType tmp_embedding_type(std::move(embedding_data_ptr), false);
+
+    std::string query_embedding_str;
+    std::string data_type_str;
+
+    if (query_embedding_expr_) {
+        // Function expression case (e.g., FDE function)
+        query_embedding_str = query_embedding_expr_->ToString();
+        data_type_str = embedding_data_type_str_.empty() ? "embedding" : embedding_data_type_str_;
+    } else {
+        // Traditional array case
+        auto embedding_data_ptr = static_cast<char *>(embedding_data_ptr_);
+        EmbeddingType tmp_embedding_type(std::move(embedding_data_ptr), false);
+        query_embedding_str = EmbeddingType::Embedding2String(tmp_embedding_type, embedding_data_type_, dimension_);
+        data_type_str = EmbeddingType::EmbeddingDataType2String(embedding_data_type_);
+    }
+
     std::string expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {}{})",
                                        column_expr_->ToString(),
-                                       EmbeddingType::Embedding2String(tmp_embedding_type, embedding_data_type_, dimension_),
-                                       EmbeddingType::EmbeddingDataType2String(embedding_data_type_),
+                                       query_embedding_str,
+                                       data_type_str,
                                        KnnDistanceType2Str(distance_type_),
                                        topn_,
                                        filter_str);
