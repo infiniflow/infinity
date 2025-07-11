@@ -31,7 +31,8 @@ export Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
                                                const String &db_id_str,
                                                const String &table_id_str,
                                                const String &index_id_str,
-                                               TxnTimeStamp begin_ts);
+                                               TxnTimeStamp begin_ts,
+                                               TxnTimeStamp commit_ts);
 
 export Vector<BlockID> GetTableSegmentBlocks(KVInstance *kv_instance,
                                              const String &db_id_str,
