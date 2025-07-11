@@ -44,8 +44,73 @@ import column_def;
 import new_txn;
 import cast_function;
 import bound_cast_func;
+import column_vector;
+import value;
+import embedding_info;
+import logical_type;
 
 namespace infinity {
+
+// Helper function to handle embedding dimension conversion
+void HandleEmbeddingDimensionConversion(SharedPtr<ColumnVector> source_column,
+                                        SharedPtr<ColumnVector> target_column,
+                                        const EmbeddingInfo *source_info,
+                                        const EmbeddingInfo *target_info) {
+    SizeT row_count = source_column->Size();
+    i32 source_dim = source_info->Dimension();
+    i32 target_dim = target_info->Dimension();
+
+    if (source_dim == target_dim) {
+        // Same dimensions, copy directly
+        target_column->AppendWith(*source_column, 0, row_count);
+        return;
+    }
+
+    // Handle dimension conversion
+    for (SizeT row_idx = 0; row_idx < row_count; ++row_idx) {
+        Value source_value = source_column->GetValueByIndex(row_idx);
+        Span<char> source_data = source_value.GetEmbedding();
+
+        if (source_info->Type() == EmbeddingDataType::kElemFloat) {
+            const float *source_ptr = reinterpret_cast<const float *>(source_data.data());
+            Vector<float> target_vector(target_dim);
+
+            if (source_dim <= target_dim) {
+                // Pad with zeros if target dimension is larger
+                std::copy(source_ptr, source_ptr + source_dim, target_vector.begin());
+                std::fill(target_vector.begin() + source_dim, target_vector.end(), 0.0f);
+            } else {
+                // Truncate if target dimension is smaller
+                std::copy(source_ptr, source_ptr + target_dim, target_vector.begin());
+            }
+
+            // Create target embedding value
+            auto target_embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, target_dim);
+            Value target_value = Value::MakeEmbedding(reinterpret_cast<const char *>(target_vector.data()), target_embedding_info);
+            target_column->AppendValue(target_value);
+        } else if (source_info->Type() == EmbeddingDataType::kElemDouble) {
+            const double *source_ptr = reinterpret_cast<const double *>(source_data.data());
+            Vector<double> target_vector(target_dim);
+
+            if (source_dim <= target_dim) {
+                // Pad with zeros if target dimension is larger
+                std::copy(source_ptr, source_ptr + source_dim, target_vector.begin());
+                std::fill(target_vector.begin() + source_dim, target_vector.end(), 0.0);
+            } else {
+                // Truncate if target dimension is smaller
+                std::copy(source_ptr, source_ptr + target_dim, target_vector.begin());
+            }
+
+            // Create target embedding value
+            auto target_embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, target_dim);
+            Value target_value = Value::MakeEmbedding(reinterpret_cast<const char *>(target_vector.data()), target_embedding_info);
+            target_column->AppendValue(target_value);
+        } else {
+            String error_message = fmt::format("Unsupported embedding data type for dimension conversion");
+            UnrecoverableError(error_message);
+        }
+    }
+}
 
 void PhysicalInsert::Init(QueryContext *query_context) {}
 
@@ -119,6 +184,20 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
                     if (*source_column->data_type() == *target_type) {
                         // No casting needed, copy directly
                         target_column->AppendWith(*source_column, 0, source_column->Size());
+                    } else if (source_column->data_type()->type() == LogicalType::kEmbedding && target_type->type() == LogicalType::kEmbedding) {
+                        // Special handling for embedding dimension conversion
+                        auto source_info = static_cast<const EmbeddingInfo *>(source_column->data_type()->type_info().get());
+                        auto target_info = static_cast<const EmbeddingInfo *>(target_type->type_info().get());
+
+                        if (source_info->Type() == target_info->Type()) {
+                            // Same data type (float/double), handle dimension conversion
+                            HandleEmbeddingDimensionConversion(source_column, target_column, source_info, target_info);
+                        } else {
+                            // Different data types, use standard casting
+                            auto cast_func = CastFunction::GetBoundFunc(*source_column->data_type(), *target_type);
+                            CastParameters cast_parameters;
+                            cast_func.function(source_column, target_column, source_column->Size(), cast_parameters);
+                        }
                     } else {
                         // Apply standard casting (this will handle BigInt->Integer, etc.)
                         auto cast_func = CastFunction::GetBoundFunc(*source_column->data_type(), *target_type);

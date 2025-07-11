@@ -435,7 +435,7 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
             UnrecoverableError(error_message);
         }
 
-        if (target_dimension <= 0 || target_dimension > 10000) {
+        if (target_dimension <= 0 || target_dimension > 65536) {
             String error_message = fmt::format("FDE function: target dimension {} is invalid (must be 1-10000)", target_dimension);
             UnrecoverableError(error_message);
         }
@@ -466,8 +466,9 @@ void FDEFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
             result_vector.push_back(val);
         }
 
-        // Create embedding value using the standard method
-        Value result_embedding = Value::MakeEmbedding(result_vector);
+        // Create embedding value with the actual target dimension
+        auto target_embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, target_dimension);
+        Value result_embedding = Value::MakeEmbedding(reinterpret_cast<const char *>(result_vector.data()), target_embedding_info);
         output->AppendValue(result_embedding);
     }
 }
@@ -477,18 +478,17 @@ void RegisterFDEFunction(NewCatalog *catalog_ptr) {
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    // Use a flexible output type that can be cast to the target dimension during INSERT operations
-    auto result_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 64); // Default dimension for type resolution
+    // Use a generic output type that will be resolved at runtime
+    // We'll register with dimension 1 as a placeholder - the actual dimension will be determined by the target_dimension parameter
+    auto result_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 1); // Placeholder dimension
     auto result_type = DataType(LogicalType::kEmbedding, result_info);
 
     // Register for arrays (multi-dimensional arrays like [[0.0, -10.0], [9.2, 45.6]])
-    // This is the primary interface that works generically with any dimensions
     auto array_type = DataType(LogicalType::kArray);
     ScalarFunction fde_array_function(func_name, {array_type, DataType(LogicalType::kBigInt)}, result_type, &FDEFunction);
     function_set_ptr->AddFunction(fde_array_function);
 
     // Register representative functions for embedding and tensor types
-    // The special MatchFunctionCost logic will handle dimension flexibility
     Vector<EmbeddingDataType> data_types = {EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemDouble};
 
     for (auto data_type : data_types) {
