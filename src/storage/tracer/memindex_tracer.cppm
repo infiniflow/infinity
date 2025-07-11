@@ -63,9 +63,9 @@ public:
 
     virtual ~MemIndexTracer() = default;
 
-    void DecreaseMemUsed(SizeT mem_used);
+    void DecreaseMemUsed(SizeT mem_dec);
 
-    void IncreaseMemoryUsage(SizeT usage);
+    void IncreaseMemoryUsage(SizeT mem_inc);
 
 private:
     bool TryTriggerDump();
@@ -99,21 +99,29 @@ protected:
     SizeT proposed_dump_size_ = 0;
 };
 
-inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
-    // LOG_TRACE(fmt::format("Add mem used: {}, mem index limit: {}", add, index_memory_limit_));
-    if (add == 0 || index_memory_limit_ == 0) {
+inline void MemIndexTracer::IncreaseMemoryUsage(SizeT mem_inc) {
+    SizeT proposed_dump_size = 0;
+    {
+        std::lock_guard lck(mtx_);
+        proposed_dump_size = proposed_dump_size_;
+    }
+    LOG_TRACE(fmt::format("IncreaseMemoryUsage mem_inc {}, cur_index_memory_ {}, proposed_dump_size {}",
+                          mem_inc,
+                          cur_index_memory_.load(),
+                          proposed_dump_size));
+    if (mem_inc == 0 || index_memory_limit_ == 0) {
         return;
     }
     bool need_trigger_dump = false;
     {
         std::lock_guard lck(mtx_);
-        SizeT old_index_memory = cur_index_memory_.fetch_add(add);
-        if (old_index_memory + add > index_memory_limit_ + proposed_dump_size_) {
+        SizeT old_index_memory = cur_index_memory_.fetch_add(mem_inc);
+        if (old_index_memory + mem_inc > index_memory_limit_ + proposed_dump_size) {
             need_trigger_dump = true;
             LOG_TRACE(fmt::format("mem index limit: {}, current index memory: {}, proposed dump size: {}, trigger dump index due to memory limit.",
                                   index_memory_limit_,
-                                  old_index_memory + add,
-                                  proposed_dump_size_));
+                                  old_index_memory + mem_inc,
+                                  proposed_dump_size));
         }
     }
     if (need_trigger_dump) {

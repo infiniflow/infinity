@@ -41,10 +41,11 @@ import defer_op;
 
 namespace infinity {
 
-void MemIndexTracer::DecreaseMemUsed(SizeT mem_used) {
-    SizeT old_index_memory = cur_index_memory_.fetch_sub(mem_used);
-    if (old_index_memory < mem_used) {
-        UnrecoverableException(fmt::format("Memindex memory {} is larger than current index memory {}", mem_used, old_index_memory));
+void MemIndexTracer::DecreaseMemUsed(SizeT mem_dec) {
+    LOG_TRACE(fmt::format("DecreaseMemUsed mem_dec {}, cur_index_memory_ {}", mem_dec, cur_index_memory_.load()));
+    SizeT old_index_memory = cur_index_memory_.fetch_sub(mem_dec);
+    if (old_index_memory < mem_dec) {
+        UnrecoverableError(fmt::format("Memindex memory {} is larger than current index memory {}", mem_dec, old_index_memory));
     }
 }
 
@@ -68,8 +69,15 @@ void MemIndexTracer::DumpDone(SharedPtr<MemIndex> mem_index) {
         return;
     }
     SizeT dump_size = iter->second;
-    proposed_dump_size_ -= dump_size;
     proposed_dump_.erase(iter);
+    if (proposed_dump_size_ >= dump_size) {
+        proposed_dump_size_ -= dump_size;
+    } else {
+        proposed_dump_size_ = 0;
+    }
+    if (proposed_dump_.empty()) {
+        proposed_dump_size_ = 0;
+    }
 }
 
 Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
