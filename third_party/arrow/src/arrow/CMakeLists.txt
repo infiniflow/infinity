@@ -879,6 +879,7 @@ else()
   set(ARROW_FILESYSTEM_TARGET_STATIC)
 endif()
 
+SET(ARROW_IPC ON)
 if(ARROW_IPC)
   list(APPEND
        ARROW_IPC_SRCS
