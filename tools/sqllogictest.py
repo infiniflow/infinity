@@ -54,33 +54,40 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
+def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str, test_file_name: str = None,
+                 loop: int = 1):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
     print("slt_dir path is {}".format(slt_dir))
     print("data_dir path is {}".format(data_dir))
 
     test_cnt = 0
     skipped_files = {}
-    for dirpath, dirnames, filenames in os.walk(slt_dir):
-        for filename in filenames:
-            file = os.path.join(dirpath, filename)
+    for i in range(loop):
+        print("Start running test loop: {}".format(i + 1))
+        for dirpath, dirnames, filenames in os.walk(slt_dir):
+            for filename in filenames:
+                file = os.path.join(dirpath, filename)
 
-            filename = os.path.basename(file)
-            if filename in skipped_files:
-                continue
+                filename = os.path.basename(file)
+                if filename in skipped_files:
+                    continue
 
-            print("Start running test file: " + file)
-            process = subprocess.run(
-                [sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            output, error = process.stdout, process.stderr
-            print(f"Output: {output.decode()}")  # Prints the output.
-            if process.returncode != 0:
-                raise Exception(
-                    f"An error occurred: {error.decode()}"
-                )  # Prints the error message.
-            print("=" * 99)
-            test_cnt += 1
+                if test_file_name is not None and filename != test_file_name:
+                    continue
+
+                print("Start running test file: " + file)
+                process = subprocess.run(
+                    [sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+                output, error = process.stdout, process.stderr
+                print(f"Output: {output.decode()}")  # Prints the output.
+                if process.returncode != 0:
+                    raise Exception(
+                        f"An error occurred: {error.decode()}"
+                    )  # Prints the error message.
+                print("=" * 99)
+                test_cnt += 1
+        print("Finish running test loop: {}".format(i + 1))
 
     print("Finished {} tests.".format(test_cnt))
 
@@ -131,6 +138,18 @@ if __name__ == "__main__":
         type=str,
         default=test_dir,
         dest="test",
+    )
+    parser.add_argument(
+        "--test_case",
+        help="test_case",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--loop",
+        type=int,
+        required=False,
+        default=1,
     )
     parser.add_argument(
         "-d",
@@ -205,7 +224,7 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            process_test(args.path, args.test, args.data, args.copy)
+            process_test(args.path, args.test, args.data, args.copy, args.test_case, args.loop)
         except Exception as e:
             print(e)
             sys.exit(-1)
