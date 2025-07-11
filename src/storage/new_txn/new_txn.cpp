@@ -1960,7 +1960,7 @@ Status NewTxn::PrepareCommit() {
                 auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
                 Status status = PrepareCommitCheckpoint(checkpoint_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to checkpoint");
+                    UnrecoverableError(fmt::format("Fail to checkpoint: {}", status.message()));
                 }
                 break;
             }
@@ -2264,7 +2264,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
-         status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
+        status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
         }
