@@ -422,7 +422,9 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBa
     auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+        if (memindex_tracer != nullptr) {
+            memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+        }
     }
     return memidx;
 }
@@ -432,7 +434,9 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, cons
     auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, trace);
     if (trace) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+        if (memindex_tracer != nullptr) {
+            memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+        }
     }
     return memidx;
 }
