@@ -60,7 +60,7 @@ CAN_PASS_EMPTY_ENV = False
 if sys.executable:
   os.environ['EMPTY_VAR'] = ''
   child = gtest_test_utils.Subprocess(
-      [sys.executable, '-c', 'import :os; print(\'EMPTY_VAR\' in os.environ)'])
+      [sys.executable, '-c', 'import os; print(\'EMPTY_VAR\' in os.environ)'])
   CAN_PASS_EMPTY_ENV = eval(child.output)
 
 
@@ -75,7 +75,7 @@ if sys.executable:
   os.environ['UNSET_VAR'] = 'X'
   del os.environ['UNSET_VAR']
   child = gtest_test_utils.Subprocess(
-      [sys.executable, '-c', 'import :os; print(\'UNSET_VAR\' not in os.environ)'
+      [sys.executable, '-c', 'import os; print(\'UNSET_VAR\' not in os.environ)'
       ])
   CAN_UNSET_ENV = eval(child.output)
 
