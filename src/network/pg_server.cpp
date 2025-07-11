@@ -17,17 +17,17 @@ module;
 #include <boost/bind.hpp>
 #include <thread>
 
-module pg_server;
+module infinity_core;
 
-import thrift_server;
-import infinity_context;
-import stl;
-import boost;
-import third_party;
-import infinity_exception;
+import :thrift_server;
+import :infinity_context;
+import :stl;
+import :boost;
+import :third_party;
+import :infinity_exception;
 
-import connection;
-import logger;
+import :connection;
+import :logger;
 
 namespace infinity {
 

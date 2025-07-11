@@ -1,14 +1,15 @@
 module;
 
-import stl;
-import byte_slice;
-import byte_slice_reader;
-import file_reader;
-import file_writer;
-import posting_list_format;
-import vbyte_compressor;
-import index_defines;
-module term_meta;
+module infinity_core;
+
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :file_reader;
+import :file_writer;
+import :posting_list_format;
+import :vbyte_compressor;
+import :index_defines;
 
 namespace infinity {
 

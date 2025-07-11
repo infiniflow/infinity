@@ -16,7 +16,7 @@ module;
 
 #include "infinity_thrift/InfinityService.h"
 
-export module infinity_thrift_types;
+export module infinity_core:infinity_thrift_types;
 
 namespace infinity_thrift_rpc {
 

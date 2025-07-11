@@ -14,12 +14,12 @@
 
 module;
 
-export module blockmax_wand_iterator;
-import stl;
-import index_defines;
-import doc_iterator;
-import blockmax_leaf_iterator;
-import multi_doc_iterator;
+export module infinity_core:blockmax_wand_iterator;
+import :stl;
+import :index_defines;
+import :doc_iterator;
+import :blockmax_leaf_iterator;
+import :multi_doc_iterator;
 import internal_types;
 
 namespace infinity {

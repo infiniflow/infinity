@@ -15,26 +15,28 @@
 module;
 
 #include <string>
-import stl;
-import query_context;
-import table_def;
-import data_table;
 
-import operator_state;
-import expression_evaluator;
-import expression_state;
-import data_block;
-import column_vector;
+module infinity_core;
 
-import infinity_exception;
-import analyzer_pool;
-import value;
-
-module physical_project;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
+import :operator_state;
+import :expression_evaluator;
+import :expression_state;
+import :data_block;
+import :column_vector;
+import :infinity_exception;
+import :analyzer_pool;
+import :value;
+import :physical_project;
+import :highlighter;
+import data_type;;
 
 namespace infinity {
 
-void PhysicalProject::Init(QueryContext* query_context) {
+void PhysicalProject::Init(QueryContext *query_context) {
     //    executor.Init(expressions_);
     //
     //    Vector<SharedPtr<ColumnDef>> columns;

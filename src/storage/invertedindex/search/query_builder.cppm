@@ -14,17 +14,17 @@
 
 module;
 
-export module query_builder;
+export module infinity_core:query_builder;
 
-import stl;
-import doc_iterator;
-import column_index_reader;
-import meta_info;
+import :stl;
+import :doc_iterator;
+import :column_index_reader;
+import :meta_info;
 import internal_types;
-import default_values;
-import base_table_ref;
-import parse_fulltext_options;
-import query_node;
+import :default_values;
+import :base_table_ref;
+import :parse_fulltext_options;
+import :query_node;
 
 namespace infinity {
 

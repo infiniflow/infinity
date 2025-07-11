@@ -21,14 +21,14 @@
 
 import compilation_config;
 
-import stl;
-import infinity;
+import :stl;
+import :infinity;
 
-import profiler;
-import third_party;
+import :profiler;
+import :third_party;
 
-import query_options;
-import query_result;
+import :query_options;
+import :query_result;
 import embedding_info;
 import logical_type;
 import internal_types;
@@ -42,7 +42,7 @@ import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
-import virtual_store;
+import :virtual_store;
 import insert_row_expr;
 
 using namespace infinity;

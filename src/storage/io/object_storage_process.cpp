@@ -17,15 +17,15 @@ module;
 #include <cassert>
 #include <filesystem>
 
-module object_storage_process;
+module infinity_core;
 
-import stl;
-import object_storage_task;
-import logger;
-import blocking_queue;
-import infinity_exception;
-import third_party;
-import virtual_store;
+import :stl;
+import :object_storage_task;
+import :logger;
+import :blocking_queue;
+import :infinity_exception;
+import :third_party;
+import :virtual_store;
 
 namespace fs = std::filesystem;
 

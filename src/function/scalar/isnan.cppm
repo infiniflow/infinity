@@ -1,6 +1,6 @@
 module;
 
-export module isnan;
+export module infinity_core:isnan;
 
 namespace infinity {
 

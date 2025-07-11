@@ -4,34 +4,34 @@ module;
 #include <chrono>
 #include <cmath>
 
-module query_node;
+module infinity_core;
 
-import stl;
-import third_party;
-import status;
-import meta_info;
-import column_index_reader;
-import posting_iterator;
-import index_defines;
-import column_length_io;
-import infinity_exception;
-import logger;
+import :stl;
+import :third_party;
+import :status;
+import :meta_info;
+import :column_index_reader;
+import :posting_iterator;
+import :index_defines;
+import :column_length_io;
+import :infinity_exception;
+import :logger;
 
-import doc_iterator;
-import and_iterator;
-import and_not_iterator;
-import or_iterator;
-import term_doc_iterator;
-import phrase_doc_iterator;
-import blockmax_wand_iterator;
-import minimum_should_match_iterator;
-import parse_fulltext_options;
-import keyword_iterator;
-import must_first_iterator;
-import batch_or_iterator;
-import blockmax_leaf_iterator;
-import rank_feature_doc_iterator;
-import rank_features_doc_iterator;
+import :doc_iterator;
+import :and_iterator;
+import :and_not_iterator;
+import :or_iterator;
+import :term_doc_iterator;
+import :phrase_doc_iterator;
+import :blockmax_wand_iterator;
+import :minimum_should_match_iterator;
+import :parse_fulltext_options;
+import :keyword_iterator;
+import :must_first_iterator;
+import :batch_or_iterator;
+import :blockmax_leaf_iterator;
+import :rank_feature_doc_iterator;
+import :rank_features_doc_iterator;
 
 namespace infinity {
 

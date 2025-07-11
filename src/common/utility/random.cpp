@@ -17,15 +17,15 @@ module;
 #include <cassert>
 #include <cstdlib>
 
-module random;
+module infinity_core;
 
-import stl;
-import third_party;
-import logger;
-import virtual_store;
-import default_values;
-import infinity_context;
-import status;
+import :stl;
+import :third_party;
+import :logger;
+import :virtual_store;
+import :default_values;
+import :infinity_context;
+import :status;
 
 namespace infinity {
 

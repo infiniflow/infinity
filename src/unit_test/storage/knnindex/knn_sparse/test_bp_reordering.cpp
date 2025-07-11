@@ -14,16 +14,10 @@
 
 #include "gtest/gtest.h"
 #include <cassert>
-import base_test;
 
-import stl;
-import bp_reordering;
-import third_party;
-import infinity_exception;
-import virtual_store;
+import base_test;
+import infinity_core;
 import compilation_config;
-import sparse_util;
-import local_file_handle;
 
 using namespace infinity;
 

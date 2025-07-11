@@ -1,16 +1,16 @@
 module;
 
-export module phrase_doc_iterator;
+export module infinity_core:phrase_doc_iterator;
 
-import stl;
-import doc_iterator;
+import :stl;
+import :doc_iterator;
 import internal_types;
-import third_party;
-import posting_iterator;
-import index_defines;
-import column_length_io;
-import parse_fulltext_options;
-import blockmax_leaf_iterator;
+import :third_party;
+import :posting_iterator;
+import :index_defines;
+import :column_length_io;
+import :parse_fulltext_options;
+import :blockmax_leaf_iterator;
 
 namespace infinity {
 

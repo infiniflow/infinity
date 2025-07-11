@@ -19,15 +19,15 @@ module;
 #include <ctime>
 #include <sys/stat.h>
 
-module snapshot_brief;
+module infinity_core;
 
-import stl;
-import status;
-import virtual_store;
-import local_file_handle;
-import infinity_exception;
-import third_party;
-import logger;
+import :stl;
+import :status;
+import :virtual_store;
+import :local_file_handle;
+import :infinity_exception;
+import :third_party;
+import :logger;
 
 namespace infinity {
 

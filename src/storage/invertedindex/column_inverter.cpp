@@ -21,24 +21,24 @@ module;
 #include <iostream>
 #include <vector>
 
-module column_inverter;
+module infinity_core;
 
-import stl;
-import analyzer;
-import analyzer_pool;
-import string_ref;
-import term;
-import radix_sort;
-import index_defines;
-import posting_writer;
-import vector_with_lock;
-import infinity_exception;
-import third_party;
-import status;
-import logger;
-import buf_writer;
-import profiler;
-import third_party;
+import :stl;
+import :analyzer;
+import :analyzer_pool;
+import :string_ref;
+import :term;
+import :radix_sort;
+import :index_defines;
+import :posting_writer;
+import :vector_with_lock;
+import :infinity_exception;
+import :third_party;
+import :status;
+import :logger;
+import :buf_writer;
+import :profiler;
+import :third_party;
 
 namespace infinity {
 

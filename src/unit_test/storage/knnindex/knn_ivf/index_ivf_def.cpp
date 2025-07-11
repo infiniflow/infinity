@@ -14,21 +14,15 @@
 
 #include "gtest/gtest.h"
 #include <vector>
+
 import base_test;
-import infinity_exception;
-import stl;
-import index_ivf;
+import infinity_core;
 import internal_types;
-import infinity_context;
 import global_resource_usage;
 import statement_common;
-import defer_op;
-import base_table_ref;
 import data_type;
 import logical_type;
 import embedding_info;
-import meta_info;
-import block_index;
 
 using namespace infinity;
 

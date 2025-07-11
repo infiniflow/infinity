@@ -16,9 +16,10 @@ module;
 
 #include <sstream>
 
-module txn_context;
+module infinity_core;
 
-import stl;
+import :stl;
+import :txn_context;
 
 namespace infinity {
 

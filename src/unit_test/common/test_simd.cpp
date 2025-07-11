@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import simd_init;
+import infinity_core;
 
 using namespace infinity;
 

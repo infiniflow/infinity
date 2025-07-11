@@ -15,16 +15,18 @@
 module;
 
 #include <string>
-import stl;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_nested_loop_join;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_nested_loop_join;
+import data_type;;
 
 namespace infinity {
 
-void PhysicalNestedLoopJoin::Init(QueryContext* query_context) {}
+void PhysicalNestedLoopJoin::Init(QueryContext *query_context) {}
 
 bool PhysicalNestedLoopJoin::Execute(QueryContext *, OperatorState *) { return true; }
 

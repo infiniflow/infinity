@@ -14,20 +14,20 @@
 
 module;
 
-module min;
+module infinity_core;
 
-import stl;
-import new_catalog;
+import :stl;
+import :new_catalog;
 import logical_type;
-import infinity_exception;
-import aggregate_function;
-import aggregate_function_set;
+import :infinity_exception;
+import :aggregate_function;
+import :aggregate_function_set;
 
-import third_party;
-import status;
+import :third_party;
+import :status;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

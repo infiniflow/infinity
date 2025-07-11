@@ -1,8 +1,9 @@
 module;
 
-import lexeme;
+module infinity_core;
 
-module quick_sort_set;
+import :lexeme;
+import :quick_sort_set;
 
 namespace infinity {
 

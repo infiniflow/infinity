@@ -16,13 +16,13 @@ module;
 
 #include "rocksdb/utilities/transaction_db.h"
 
-module kv_store;
+module infinity_core;
 
-import stl;
-import status;
-import third_party;
-import rocksdb_merge_operator;
-import logger;
+import :stl;
+import :status;
+import :third_party;
+import :rocksdb_merge_operator;
+import :logger;
 
 namespace infinity {
 

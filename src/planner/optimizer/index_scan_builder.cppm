@@ -14,12 +14,12 @@
 
 module;
 
-export module index_scan_builder;
+export module infinity_core:index_scan_builder;
 
-import stl;
-import logical_node;
-import query_context;
-import optimizer_rule;
+import :stl;
+import :logical_node;
+// import :query_context;
+import :optimizer_rule;
 
 namespace infinity {
 

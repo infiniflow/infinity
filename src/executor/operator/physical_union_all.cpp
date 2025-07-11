@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_union_all;
+import :query_context;
+import :operator_state;
+import :physical_union_all;
 
 namespace infinity {
 
-void PhysicalUnionAll::Init(QueryContext* query_context) {}
+void PhysicalUnionAll::Init(QueryContext *query_context) {}
 
 bool PhysicalUnionAll::Execute(QueryContext *, OperatorState *) { return true; }
 

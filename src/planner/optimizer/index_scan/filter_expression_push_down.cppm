@@ -14,15 +14,15 @@
 
 module;
 
-export module filter_expression_push_down;
+export module infinity_core:filter_expression_push_down;
 
-import stl;
-import query_context;
-import base_expression;
-import base_table_ref;
-import index_base;
-import fast_rough_filter;
-import roaring_bitmap;
+import :stl;
+// import :query_context;
+import :base_expression;
+import :base_table_ref;
+import :index_base;
+import :fast_rough_filter;
+import :roaring_bitmap;
 
 namespace infinity {
 

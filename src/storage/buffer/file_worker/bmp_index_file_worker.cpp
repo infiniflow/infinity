@@ -16,23 +16,24 @@ module;
 
 #include <set>
 
-module bmp_index_file_worker;
+module infinity_core;
 
-import index_bmp;
-import logger;
-import infinity_exception;
-import third_party;
+import :index_bmp;
+import :logger;
+import :infinity_exception;
+import :third_party;
 import internal_types;
-import bmp_util;
-import bmp_alg;
+import :bmp_util;
+import :bmp_alg;
 #ifdef INDEX_HANDLER
-import bmp_handler;
+import :bmp_handler;
 #else
-import abstract_bmp;
+import :abstract_bmp;
 #endif
-import virtual_store;
-import persistence_manager;
-import local_file_handle;
+import :virtual_store;
+import :persistence_manager;
+import :local_file_handle;
+import column_def;
 
 namespace infinity {
 

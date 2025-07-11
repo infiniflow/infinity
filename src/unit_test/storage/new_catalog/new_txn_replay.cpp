@@ -16,52 +16,16 @@
 
 import base_test;
 import replay_test;
-
-import stl;
-import third_party;
-import status;
-import new_txn_manager;
-import new_txn;
+import infinity_core;
 import column_def;
 import data_type;
-import table_def;
-import index_base;
-import infinity_context;
 import logical_type;
-import txn_state;
 import extra_ddl_info;
-import data_block;
-import column_vector;
-import value;
-import new_catalog;
 import internal_types;
-
-import db_meeta;
-import table_meeta;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import catalog_meta;
-
-import index_secondary;
-import index_ivf;
-import index_full_text;
-import index_hnsw;
-import index_emvb;
 import embedding_info;
 import sparse_info;
-import index_bmp;
-import defer_op;
 import statement_common;
-import mem_index;
-
-import buffer_obj;
-import buffer_handle;
 import constant_expr;
-import logger;
 
 using namespace infinity;
 

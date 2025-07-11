@@ -14,10 +14,10 @@
 
 module;
 
-export module hash_table;
+export module infinity_core:hash_table;
 
-import stl;
-import column_vector;
+import :stl;
+import :column_vector;
 import internal_types;
 import data_type;
 

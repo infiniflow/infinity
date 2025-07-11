@@ -19,18 +19,18 @@ module;
 #include <tuple>
 #include <vector>
 
-module rank_features_doc_iterator;
+module infinity_core;
 
-import stl;
-import third_party;
-import index_defines;
-import rank_feature_doc_iterator;
-import multi_doc_iterator;
+import :stl;
+import :third_party;
+import :index_defines;
+import :rank_feature_doc_iterator;
+import :multi_doc_iterator;
 import internal_types;
-import logger;
-import infinity_exception;
-import simd_functions;
-import smallfloat;
+import :logger;
+import :infinity_exception;
+import :simd_functions;
+import :smallfloat;
 
 namespace infinity {
 

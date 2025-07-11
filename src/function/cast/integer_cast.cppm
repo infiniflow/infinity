@@ -14,20 +14,20 @@
 
 module;
 
-export module integer_cast;
+export module infinity_core:integer_cast;
 
-import stl;
-import bound_cast_func;
-import column_vector_cast;
+import :stl;
+import :bound_cast_func;
+import :column_vector_cast;
 import logical_type;
-import infinity_exception;
-import third_party;
-import column_vector;
-import vector_buffer;
+import :infinity_exception;
+import :third_party;
+import :column_vector;
+import :vector_buffer;
 import internal_types;
 import data_type;
-import status;
-import logger;
+import :status;
+import :logger;
 
 namespace infinity {
 

@@ -17,13 +17,13 @@ module;
 #include <cassert>
 #include <iostream>
 #include <vector>
-module minimum_should_match_iterator;
-import stl;
-import index_defines;
-import multi_doc_iterator;
+module infinity_core;
+import :stl;
+import :index_defines;
+import :multi_doc_iterator;
 import internal_types;
-import logger;
-import infinity_exception;
+import :logger;
+import :infinity_exception;
 
 namespace infinity {
 

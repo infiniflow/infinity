@@ -14,7 +14,7 @@
 
 module;
 
-module python_instance;
+module infinity_core;
 #if 0
 #include "Python.h"
 namespace infinity {

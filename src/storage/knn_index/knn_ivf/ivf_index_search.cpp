@@ -15,21 +15,21 @@
 module;
 
 #include <string>
-module ivf_index_search;
+module infinity_core;
 
-import stl;
-import index_ivf;
+import :stl;
+import :index_ivf;
 import internal_types;
 import logical_type;
 import data_type;
 import knn_expr;
-import knn_scan_data;
-import infinity_exception;
-import status;
-import third_party;
-import ivf_index_data;
-import ivf_index_data_in_mem;
-import ivf_index_storage;
+import :knn_scan_data;
+import :infinity_exception;
+import :status;
+import :third_party;
+import :ivf_index_data;
+import :ivf_index_data_in_mem;
+import :ivf_index_storage;
 
 namespace infinity {
 

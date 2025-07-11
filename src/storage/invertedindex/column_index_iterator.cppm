@@ -1,17 +1,17 @@
 module;
 
-export module column_index_iterator;
+export module infinity_core:column_index_iterator;
 
-import stl;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :file_reader;
+import :posting_decoder;
+import :posting_list_format;
+import :index_defines;
+import :term_meta;
+import :dict_reader;
 
-import byte_slice;
-import byte_slice_reader;
-import file_reader;
-import posting_decoder;
-import posting_list_format;
-import index_defines;
-import term_meta;
-import dict_reader;
 namespace infinity {
 
 export class ColumnIndexIterator {

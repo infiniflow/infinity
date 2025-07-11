@@ -14,22 +14,23 @@
 
 module;
 
-module physical_drop_table;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
-import result_cache_manager;
-import physical_operator_type;
-import operator_state;
-import status;
-import infinity_exception;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
+import :result_cache_manager;
+import :physical_operator_type;
+import :operator_state;
+import :status;
+import :infinity_exception;
 import logical_type;
 import column_def;
-import wal_manager;
-import infinity_context;
-import new_txn;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
+import data_type;
 
 namespace infinity {
 

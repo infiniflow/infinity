@@ -16,16 +16,16 @@ module;
 
 #include <tuple>
 
-module data_file_worker;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import third_party;
-import status;
-import logger;
-import persistence_manager;
+import :stl;
+import :infinity_exception;
+import :third_party;
+import :status;
+import :logger;
+import :persistence_manager;
 import serialize;
-import local_file_handle;
+import :local_file_handle;
 
 namespace infinity {
 

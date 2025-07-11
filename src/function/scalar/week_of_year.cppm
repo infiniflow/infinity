@@ -12,9 +12,9 @@
 
 module;
 
-export module week_of_year;
+export module infinity_core:week_of_year;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

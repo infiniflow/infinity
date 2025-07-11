@@ -2,12 +2,12 @@ module;
 
 #include <algorithm>
 
-module ik_dict_segment;
+module infinity_core;
 
-import stl;
-import hit;
-import character_util;
-import third_party;
+import :stl;
+import :hit;
+import :character_util;
+import :third_party;
 
 namespace infinity {
 

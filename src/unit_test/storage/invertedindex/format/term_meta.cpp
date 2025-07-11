@@ -1,19 +1,10 @@
 #include <cassert>
 
 #include "gtest/gtest.h"
-import base_test;
-import stl;
 
-import posting_byte_slice;
-import posting_byte_slice_reader;
-import term_meta;
-import file_writer;
-import file_reader;
-import index_defines;
-import posting_list_format;
-import virtual_store;
+import base_test;
+import infinity_core;
 import global_resource_usage;
-import infinity_context;
 
 using namespace infinity;
 

@@ -15,33 +15,33 @@
 module;
 
 #include <vector>
-module ivf_index_data_in_mem;
+module infinity_core;
 
-import stl;
-import ivf_index_storage;
+import :stl;
+import :ivf_index_storage;
 import internal_types;
-import buffer_manager;
+import :buffer_manager;
 import column_def;
-import index_base;
-import index_ivf;
+import :index_base;
+import :index_ivf;
 import embedding_info;
 import logical_type;
 import data_type;
-import infinity_exception;
-import status;
-import logger;
-import kmeans_partition;
-import search_top_1;
-import column_vector;
-import ivf_index_data;
-import buffer_handle;
-import knn_scan_data;
-import ivf_index_util_func;
-import base_memindex;
-import memindex_tracer;
-import infinity_context;
-import third_party;
-import buffer_obj;
+import :infinity_exception;
+import :status;
+import :logger;
+import :kmeans_partition;
+import :search_top_1;
+import :column_vector;
+import :ivf_index_data;
+import :buffer_handle;
+import :knn_scan_data;
+import :ivf_index_util_func;
+import :base_memindex;
+import :memindex_tracer;
+import :infinity_context;
+import :third_party;
+import :buffer_obj;
 
 namespace infinity {
 

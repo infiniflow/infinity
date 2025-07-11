@@ -22,9 +22,10 @@ module;
 #include <sys/sysctl.h>
 #endif
 
-import stl;
+module infinity_core;
 
-module threadutil;
+import :stl;
+import :threadutil;
 
 namespace infinity {
 

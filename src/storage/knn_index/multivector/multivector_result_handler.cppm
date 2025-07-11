@@ -14,12 +14,12 @@
 
 module;
 
-export module multivector_result_handler;
+export module infinity_core:multivector_result_handler;
 
-import stl;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
 import internal_types;
-import third_party;
+import :third_party;
 
 namespace infinity {
 

@@ -14,14 +14,14 @@
 
 module;
 
-module merge_knn_data;
-import stl;
-import base_table_ref;
-import infinity_exception;
-import merge_knn;
-import knn_result_handler;
-import status;
-import logger;
+module infinity_core;
+import :stl;
+import :base_table_ref;
+import :infinity_exception;
+import :merge_knn;
+import :knn_result_handler;
+import :status;
+import :logger;
 import internal_types;
 import knn_expr;
 import statement_common;

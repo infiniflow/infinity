@@ -15,15 +15,9 @@
 #include "gtest/gtest.h"
 
 import base_test;
-
-import infinity_exception;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import third_party;
-import logger;
 import compilation_config;
-import infinity_context;
 
 using namespace infinity;
 

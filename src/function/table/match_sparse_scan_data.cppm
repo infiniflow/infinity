@@ -14,24 +14,28 @@
 
 module;
 
-export module match_sparse_scan_function_data;
+export module infinity_core:match_sparse_scan_function_data;
 
-import stl;
-import table_function;
-import global_block_id;
-import merge_knn;
-import data_block;
+import :stl;
+import :table_function;
+import :global_block_id;
+import :merge_knn;
+import :data_block;
 import match_sparse_expr;
-import match_sparse_expression;
-import infinity_exception;
-import third_party;
-import knn_result_handler;
-import sparse_vector_distance;
-import sparse_util;
+import :match_sparse_expression;
+import :infinity_exception;
+import :third_party;
+import :knn_result_handler;
+import :sparse_vector_distance;
+import :sparse_util;
 
 namespace infinity {
 
-export class SparseDistanceBase {};
+export class SparseDistanceBase {
+public:
+    // other
+    virtual ~SparseDistanceBase() = default;
+};
 
 export template <typename DataType, typename IndexType, typename ResultType = DataType>
 class SparseDistance : public SparseDistanceBase {

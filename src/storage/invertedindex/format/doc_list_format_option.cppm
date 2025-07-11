@@ -14,12 +14,12 @@
 
 module;
 
-export module doc_list_format_option;
+export module infinity_core:doc_list_format_option;
 
-import stl;
-import posting_field;
-import index_defines;
-import infinity_exception;
+import :stl;
+import :posting_field;
+import :index_defines;
+import :infinity_exception;
 
 namespace infinity {
 

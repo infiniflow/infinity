@@ -15,54 +15,45 @@
 module;
 
 #include <iostream>
-module infinity;
 
-import stl;
-import logger;
-import config;
-import resource_manager;
-import task_scheduler;
-import storage;
-import virtual_store;
-import third_party;
-import query_options;
-import query_result;
-import infinity_context;
-import session;
-import session_manager;
-import query_context;
-import parsed_expr;
-import search_expr;
-import statement_common;
-import status;
+module infinity_core;
+
+import :stl;
 import create_statement;
-import show_statement;
+// import extra_ddl_info;
 import drop_statement;
-import command_statement;
-import select_statement;
-import flush_statement;
-import table_reference;
-import insert_statement;
-import copy_statement;
-import delete_statement;
-import optimize_statement;
-import alter_statement;
-import statement_common;
-import admin_statement;
-import compact_statement;
-
 import create_schema_info;
 import drop_schema_info;
 import create_table_info;
 import drop_table_info;
-import query_options;
-import extra_ddl_info;
+import show_statement;
+import command_statement;
+import flush_statement;
+import compact_statement;
+import column_def;
+import statement_common;
+import create_index_info;
 import drop_index_info;
-import drop_table_info;
-import third_party;
-import defer_op;
+import insert_row_expr;
+import insert_statement;
+import copy_statement;
+import parsed_expr;
+import delete_statement;
+import update_statement;
+import explain_statement;
+import search_expr;
+import select_statement;
+import table_reference;
+import optimize_statement;
+import alter_statement;
+import admin_statement;
+// import query_options;
+// import extra_ddl_info;
 
-import infinity_exception;
+// import drop_table_info;
+// import third_party;
+// import defer_op;
+// import infinity_exception;
 
 namespace infinity {
 

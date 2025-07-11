@@ -16,13 +16,13 @@ module;
 
 #include <ostream>
 
-import stl;
-import hnsw_common;
-import plain_vec_store;
-import lvq_vec_store;
-import simd_functions;
+export module infinity_core:dist_func_l2;
 
-export module dist_func_l2;
+import :stl;
+import :hnsw_common;
+import :plain_vec_store;
+import :lvq_vec_store;
+import :simd_functions;
 
 namespace infinity {
 

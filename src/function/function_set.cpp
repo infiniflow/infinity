@@ -16,11 +16,12 @@ module;
 
 #include <sstream>
 
-module function_set;
+module infinity_core;
 
-import stl;
-import new_catalog;
-import base_expression;
+import :stl;
+import :new_catalog;
+import :base_expression;
+import function_expr;
 
 namespace infinity {
 

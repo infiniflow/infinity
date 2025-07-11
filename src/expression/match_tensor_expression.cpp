@@ -15,19 +15,21 @@
 module;
 #include <vector>
 
-module match_tensor_expression;
+module infinity_core;
 
-import stl;
-import expression_type;
+import :stl;
+import :expression_type;
 import internal_types;
-import third_party;
-import base_expression;
-import column_expression;
+import :third_party;
+import :base_expression;
+import :column_expression;
 import embedding_info;
-import infinity_exception;
-import status;
-import logger;
+import :infinity_exception;
+import :status;
+import :logger;
 import logical_type;
+import match_tensor_expr;
+import data_type;
 
 namespace infinity {
 

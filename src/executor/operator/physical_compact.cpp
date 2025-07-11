@@ -16,30 +16,28 @@ module;
 
 #include <vector>
 
-module physical_compact;
+module infinity_core;
 
-import stl;
+import :stl;
 import internal_types;
-import operator_state;
-import base_table_ref;
-import block_index;
-import column_vector;
-import compact_state_data;
-import default_values;
-import logger;
-import infinity_exception;
-import third_party;
-import status;
-import wal_entry;
-import wal_manager;
-import infinity_context;
+import :operator_state;
+import :base_table_ref;
+import :block_index;
+import :column_vector;
+import :compact_state_data;
+import :default_values;
+import :infinity_exception;
+import :third_party;
+import :status;
+import :wal_entry;
+import :wal_manager;
 
-import new_txn;
-import db_meeta;
-import table_meeta;
-import segment_meta;
-import bg_task;
-import compaction_process;
+import :new_txn;
+import :db_meeta;
+import :table_meeta;
+import :segment_meta;
+import :bg_task;
+import :compaction_process;
 
 namespace infinity {
 

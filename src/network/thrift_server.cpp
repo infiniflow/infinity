@@ -34,14 +34,14 @@ module;
 // #include "statement/extra/extra_ddl_info.h"
 // #include "statement/statement_common.h"
 
-module thrift_server;
+module infinity_core;
 
-import infinity_thrift_service;
-import infinity_thrift_types;
-import logger;
-import third_party;
-import stl;
-import infinity_exception;
+import :infinity_thrift_service;
+import :infinity_thrift_types;
+import :logger;
+import :third_party;
+import :stl;
+import :infinity_exception;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

@@ -14,14 +14,14 @@
 
 module;
 
-export module vector_heap_chunk;
+export module infinity_core:vector_heap_chunk;
 
-import stl;
+import :stl;
 import global_resource_usage;
-import allocator;
-import buffer_obj;
-import buffer_handle;
-import infinity_exception;
+import :allocator;
+import :buffer_obj;
+import :buffer_handle;
+import :infinity_exception;
 
 namespace infinity {
 

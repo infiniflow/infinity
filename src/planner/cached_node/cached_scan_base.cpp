@@ -16,10 +16,11 @@ module;
 
 #include <vector>
 
-module cached_scan_base;
+module infinity_core;
 
-import base_table_ref;
-import physical_scan_base;
+import :base_table_ref;
+import :physical_scan_base;
+import :logical_node_type;
 
 namespace infinity {
 

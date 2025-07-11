@@ -16,11 +16,13 @@ module;
 
 #include "base64.hpp"
 #include <vector>
-module probabilistic_data_filter;
-import stl;
+
+module infinity_core;
+import :stl;
 import logical_type;
-import binary_fuse_filter;
-import infinity_exception;
+import :binary_fuse_filter;
+import :infinity_exception;
+import internal_types;
 
 namespace infinity {
 

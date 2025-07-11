@@ -14,10 +14,11 @@
 
 module;
 
-module bg_task_type;
+module infinity_core;
 
-import stl;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
+import :bg_task_type;
 
 namespace infinity {
 

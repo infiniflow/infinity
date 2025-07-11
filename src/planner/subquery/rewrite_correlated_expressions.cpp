@@ -14,16 +14,16 @@
 
 module;
 
-module rewrite_correlated_expression;
+module infinity_core;
 
-import stl;
-import logical_node;
-import base_expression;
-import column_expression;
-import status;
-import infinity_exception;
-import subquery_expression;
-import logger;
+import :stl;
+import :logical_node;
+import :base_expression;
+import :column_expression;
+import :status;
+import :infinity_exception;
+import :subquery_expression;
+import :logger;
 
 namespace infinity {
 

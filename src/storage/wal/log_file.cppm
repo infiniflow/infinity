@@ -14,9 +14,9 @@
 
 module;
 
-export module log_file;
+export module infinity_core:log_file;
 
-import stl;
+import :stl;
 
 // responsible for parsing and generating filenames for catalog files and wal files
 

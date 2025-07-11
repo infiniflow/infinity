@@ -19,11 +19,11 @@ module;
 #include <vector>
 
 #include "string_utils.h"
-module darts_trie;
+module infinity_core;
 
-import stl;
-import darts;
-import status;
+import :stl;
+import :darts;
+import :status;
 
 namespace infinity {
 

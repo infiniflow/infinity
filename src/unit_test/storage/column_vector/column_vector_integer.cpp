@@ -13,22 +13,12 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import infinity_exception;
+import base_test;
+import infinity_core;
 import internal_types;
 import logical_type;
-import logger;
-import column_vector;
-import value;
-
-import default_values;
-import third_party;
-import stl;
-import selection;
-import vector_buffer;
 import global_resource_usage;
-import infinity_context;
 import data_type;
 import compilation_config;
 

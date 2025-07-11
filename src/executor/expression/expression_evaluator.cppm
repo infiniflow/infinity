@@ -14,24 +14,24 @@
 
 module;
 
-export module expression_evaluator;
+export module infinity_core:expression_evaluator;
 
-import stl;
-import base_expression;
-import aggregate_expression;
-import case_expression;
-import cast_expression;
-import column_expression;
-import function_expression;
-import reference_expression;
-import value_expression;
-import in_expression;
-import filter_fulltext_expression;
-import data_block;
-import column_vector;
-import expression_state;
+import :stl;
+import :data_block;
+import :column_vector;
 
 namespace infinity {
+export class FilterFulltextExpression;
+export class InExpression;
+export class ReferenceExpression;
+export class ValueExpression;
+export class FunctionExpression;
+export class ColumnExpression;
+export class CaseExpression;
+export class CastExpression;
+export class AggregateExpression;
+export class ExpressionState;
+export class BaseExpression;
 
 export class ExpressionEvaluator {
 public:

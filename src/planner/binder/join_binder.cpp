@@ -14,17 +14,18 @@
 
 module;
 
-module join_binder;
+module infinity_core;
 
-import stl;
-import base_expression;
+import :stl;
+import :base_expression;
 
-import bind_context;
-import status;
-import infinity_exception;
+import :bind_context;
+import :status;
+import :infinity_exception;
 import parsed_expr;
 import knn_expr;
-import logger;
+import :logger;
+import :join_binder;
 
 namespace infinity {
 

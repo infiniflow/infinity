@@ -15,16 +15,11 @@
 #include "base_statement.h"
 #include "statement/show_statement.h"
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
 import sql_parser;
-import logger;
-import stl;
-import infinity_context;
 import base_statement;
 import create_statement;
 import drop_statement;

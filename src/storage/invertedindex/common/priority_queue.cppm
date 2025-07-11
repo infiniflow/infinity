@@ -14,9 +14,9 @@
 
 module;
 
-export module priority_queue;
+export module infinity_core:priority_queue;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -17,13 +17,13 @@ module;
 
 #include <vector>
 
-module physical_filter_scan_base;
+module infinity_core;
 
-import stl;
-import common_query_filter;
-import base_table_ref;
-import roaring_bitmap;
-import default_values;
+import :stl;
+import :common_query_filter;
+import :base_table_ref;
+import :roaring_bitmap;
+import :default_values;
 
 namespace infinity {
 

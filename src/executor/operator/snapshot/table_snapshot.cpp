@@ -14,15 +14,15 @@
 
 module;
 
-module snapshot;
+module infinity_core;
 
-import stl;
-import query_context;
-import status;
-import third_party;
-import config;
-import infinity_exception;
-import snapshot_info;
+import :stl;
+import :query_context;
+import :status;
+import :third_party;
+import :config;
+import :infinity_exception;
+import :snapshot_info;
 
 namespace infinity {
 

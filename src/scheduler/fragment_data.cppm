@@ -14,11 +14,11 @@
 
 module;
 
-export module fragment_data;
+export module infinity_core:fragment_data;
 
-import stl;
-import data_block;
-import status;
+import :stl;
+import :data_block;
+import :status;
 
 namespace infinity {
 

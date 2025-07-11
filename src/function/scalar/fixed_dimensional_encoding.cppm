@@ -16,12 +16,12 @@ module;
 
 #include <random>
 
-export module fixed_dimensional_encoding;
+export module infinity_core:fixed_dimensional_encoding;
 
-import stl;
-import new_catalog;
-import data_block;
-import column_vector;
+import :stl;
+import :new_catalog;
+import :data_block;
+import :column_vector;
 
 namespace infinity {
 

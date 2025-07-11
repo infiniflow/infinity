@@ -1,14 +1,14 @@
 module;
 
-import stl;
-import int_encoder;
-import fastpfor;
-import byte_slice_reader;
-import byte_slice_writer;
-import no_compress_encoder;
-import vbyte_compress_encoder;
+export module infinity_core:posting_field;
 
-export module posting_field;
+import :stl;
+import :int_encoder;
+import :fastpfor;
+import :byte_slice_reader;
+import :byte_slice_writer;
+import :no_compress_encoder;
+import :vbyte_compress_encoder;
 
 namespace infinity {
 

@@ -14,9 +14,9 @@
 
 module;
 
-export module parse_fulltext_options;
+export module infinity_core:parse_fulltext_options;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

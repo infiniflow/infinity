@@ -14,11 +14,11 @@
 
 module;
 
-export module task_result;
+export module infinity_core:task_result;
 
-import stl;
+import :stl;
 import data_type;
-import data_block;
+import :data_block;
 import internal_types;
 
 namespace infinity {

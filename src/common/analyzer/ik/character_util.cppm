@@ -4,9 +4,9 @@ module;
 // #include <locale>
 #include <string>
 
-export module character_util;
+export module infinity_core:character_util;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -1,17 +1,17 @@
 module;
 
-export module posting_byte_slice;
+export module infinity_core:posting_byte_slice;
 
-import stl;
+import :stl;
 
-import byte_slice;
-import byte_slice_writer;
-import file_writer;
-import file_reader;
-import flush_info;
-import posting_field;
-import index_defines;
-import posting_buffer;
+import :byte_slice;
+import :byte_slice_writer;
+import :file_writer;
+import :file_reader;
+import :flush_info;
+import :posting_field;
+import :index_defines;
+import :posting_buffer;
 
 namespace infinity {
 

@@ -20,12 +20,12 @@ module;
 
 #include "common/analyzer/string_utils.h"
 
-module highlighter;
+module infinity_core;
 
-import stl;
-import aho_corasick;
-import analyzer;
-import term;
+import :stl;
+import :aho_corasick;
+import :analyzer;
+import :term;
 
 namespace infinity {
 

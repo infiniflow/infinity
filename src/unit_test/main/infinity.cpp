@@ -14,15 +14,9 @@
 
 #include "statement/command_statement.h"
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-import infinity;
-import query_result;
-import data_block;
-import value;
-import query_options;
-
+import infinity_core;
 import logical_type;
 import internal_types;
 import parsed_expr;

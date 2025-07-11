@@ -14,15 +14,14 @@
 
 module;
 
-#include "type/complex/row_id.h"
+export module infinity_core:bg_task;
 
-export module bg_task;
-
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 import global_resource_usage;
-import status;
-import bg_task_type;
+import :status;
+import :bg_task_type;
+import row_id;
 
 namespace infinity {
 

@@ -16,10 +16,11 @@ module;
 
 #include "simd_common_intrin_include.h"
 
-module simd_common_tools;
+module infinity_core;
 
-import stl;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
+import :simd_common_tools;
 
 namespace infinity {
 

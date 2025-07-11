@@ -14,19 +14,18 @@
 
 module;
 
-export module physical_sort_merge_join;
+export module infinity_core:physical_sort_merge_join;
 
-import stl;
-
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import load_meta;
-import infinity_exception;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

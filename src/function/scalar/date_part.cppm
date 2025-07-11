@@ -12,9 +12,9 @@
 
 module;
 
-export module date_part;
+export module infinity_core:date_part;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

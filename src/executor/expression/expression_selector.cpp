@@ -14,23 +14,23 @@
 
 module;
 
-module expression_selector;
+module infinity_core;
 
-import stl;
-import data_block;
-import base_expression;
-import expression_state;
-import selection;
-import roaring_bitmap;
+import :stl;
+import :data_block;
+import :base_expression;
+import :expression_state;
+import :selection;
+import :roaring_bitmap;
 import logical_type;
-import column_vector;
-import expression_evaluator;
+import :column_vector;
+import :expression_evaluator;
 import internal_types;
-import third_party;
+import :third_party;
 import data_type;
-import logger;
+import :logger;
 
-import infinity_exception;
+import :infinity_exception;
 
 namespace infinity {
 

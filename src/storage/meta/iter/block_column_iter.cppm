@@ -16,16 +16,16 @@ module;
 
 #include <utility>
 
-export module block_column_iter;
+export module infinity_core:block_column_iter;
 
-import stl;
-import buffer_handle;
-import buffer_manager;
-import column_vector;
-import sparse_util;
-import multivector_util;
+import :stl;
+import :buffer_handle;
+import :buffer_manager;
+import :column_vector;
+import :sparse_util;
+import :multivector_util;
 import internal_types;
-import column_vector;
+import :column_vector;
 
 namespace infinity {
 export template <typename DataType>

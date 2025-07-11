@@ -14,18 +14,18 @@
 
 module;
 
-module cached_match_scan;
+module infinity_core;
 
-import logical_match_sparse_scan;
-import logical_match_tensor_scan;
-import logical_node_type;
-import physical_scan_base;
-import physical_knn_scan;
-import physical_match_sparse_scan;
-import physical_match_tensor_scan;
-import physical_merge_knn;
-import physical_merge_match_sparse;
-import physical_merge_match_tensor;
+import :logical_match_sparse_scan;
+import :logical_match_tensor_scan;
+import :logical_node_type;
+import :physical_scan_base;
+import :physical_knn_scan;
+import :physical_match_sparse_scan;
+import :physical_match_tensor_scan;
+import :physical_merge_knn;
+import :physical_merge_match_sparse;
+import :physical_merge_match_tensor;
 
 namespace infinity {
 

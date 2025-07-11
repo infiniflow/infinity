@@ -4,15 +4,15 @@ module;
 #include <iostream>
 #include <vector>
 
-module phrase_doc_iterator;
+module infinity_core;
 
-import stl;
-import doc_iterator;
+import :stl;
+import :doc_iterator;
 import internal_types;
-import third_party;
-import posting_iterator;
-import column_length_io;
-import logger;
+import :third_party;
+import :posting_iterator;
+import :column_length_io;
+import :logger;
 
 namespace infinity {
 

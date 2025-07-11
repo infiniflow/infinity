@@ -14,23 +14,23 @@
 
 module;
 
-module physical_create_collection;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+// import :query_context;
+import :table_def;
+import :data_table;
 
-import physical_operator_type;
-import operator_state;
-import load_meta;
+import :physical_operator_type;
+import :operator_state;
+import :load_meta;
 import internal_types;
 import extra_ddl_info;
 import data_type;
-import wal_manager;
-import infinity_context;
-import status;
-import infinity_exception;
+import :wal_manager;
+import :infinity_context;
+import :status;
+import :infinity_exception;
 
 namespace infinity {
 

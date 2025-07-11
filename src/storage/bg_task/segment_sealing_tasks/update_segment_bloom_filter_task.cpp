@@ -14,17 +14,17 @@
 
 module;
 
-module update_segment_bloom_filter_task;
+module infinity_core;
 
-import stl;
-import bg_task;
-import background_process;
-import buffer_manager;
-import infinity_exception;
-import logger;
-import third_party;
-import build_fast_rough_filter_task;
-import infinity_context;
+import :stl;
+import :bg_task;
+import :background_process;
+import :buffer_manager;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :build_fast_rough_filter_task;
+import :infinity_context;
 
 namespace infinity {
 

@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
-module between_expression;
+module infinity_core;
 
-import stl;
-import expression_type;
-
+import :stl;
+import :expression_type;
 import logical_type;
+import :between_expression;
+import data_type;
 
 namespace infinity {
 

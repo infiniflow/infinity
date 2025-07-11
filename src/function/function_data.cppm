@@ -14,7 +14,7 @@
 
 module;
 
-export module function_data;
+export module infinity_core:function_data;
 
 namespace infinity {
 

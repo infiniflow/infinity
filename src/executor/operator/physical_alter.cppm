@@ -14,20 +14,20 @@
 
 module;
 
-export module physical_alter;
+export module infinity_core:physical_alter;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import load_meta;
-import infinity_exception;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import data_type;
-import logger;
-import meta_info;
+import :logger;
+import :meta_info;
 import alter_statement;
 import column_def;
 import constant_expr;

@@ -21,7 +21,7 @@ module;
 #include <mecab_wrapper.h>
 #pragma clang diagnostic pop
 
-export module ijma;
+export module infinity_core:ijma;
 
 export namespace jma {
 

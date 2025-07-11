@@ -23,28 +23,28 @@
 #include <jemalloc/jemalloc.h>
 #endif
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 import compilation_config;
-import profiler;
-import infinity;
+import :profiler;
+import :infinity;
 
 import internal_types;
 import logical_type;
 import create_index_info;
 import column_def;
 import data_type;
-import query_options;
+import :query_options;
 import extra_ddl_info;
 import statement_common;
 import parsed_expr;
 import constant_expr;
-import logger;
+import :logger;
 import match_expr;
 import function_expr;
 import search_expr;
 import column_expr;
-import virtual_store;
+import :virtual_store;
 import insert_row_expr;
 
 using namespace infinity;

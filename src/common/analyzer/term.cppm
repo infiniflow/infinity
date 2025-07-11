@@ -14,10 +14,10 @@
 
 module;
 
-import stl;
-import jieba;
+export module infinity_core:term;
 
-export module term;
+import :stl;
+import :jieba;
 
 namespace infinity {
 export class Term {

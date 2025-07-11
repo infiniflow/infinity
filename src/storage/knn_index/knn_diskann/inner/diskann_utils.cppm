@@ -18,18 +18,17 @@ module;
 #include <cassert>
 #include <cstdlib>
 
-import stl;
-import third_party;
-import default_values;
-import infinity_exception;
-import logger;
-import status;
-import third_party;
-import local_file_handle;
-import virtual_store;
-import diskann_dist_func;
+export module infinity_core:diskann_utils;
 
-export module diskann_utils;
+import :stl;
+import :third_party;
+import :default_values;
+import :status;
+import :third_party;
+import :local_file_handle;
+import :virtual_store;
+import :diskann_dist_func;
+import :infinity_exception;
 
 namespace infinity {
 export struct QueryStats {

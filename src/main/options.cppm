@@ -14,14 +14,13 @@
 
 module;
 
-export module options;
+export module infinity_core:options;
 
-import stl;
-import third_party;
-import status;
-import global_resource_usage;
+import :stl;
+import :status;
 
 namespace infinity {
+enum class LogLevel;
 
 export enum class BaseOptionDataType {
     kInteger,

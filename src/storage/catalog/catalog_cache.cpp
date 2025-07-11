@@ -16,15 +16,16 @@ module;
 
 #include <vector>
 
-module catalog_cache;
+module infinity_core;
 
-import stl;
+import :stl;
 import internal_types;
-import default_values;
-import infinity_exception;
-import third_party;
-import logger;
-import index_base;
+import :default_values;
+import :infinity_exception;
+import :third_party;
+import :logger;
+import :index_base;
+import :catalog_cache;
 
 namespace infinity {
 

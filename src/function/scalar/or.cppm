@@ -14,9 +14,9 @@
 
 module;
 
-export module or_func;
+export module infinity_core:or_func;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -17,15 +17,15 @@
 #include <iostream>
 #include <stdexcept>
 
-import stl;
-import virtual_store;
-import infinity_exception;
+import :stl;
+import :virtual_store;
+import :infinity_exception;
 import compilation_config;
-import third_party;
-import profiler;
-import linscan_alg;
-import bmp_alg;
-import bmp_util;
+import :third_party;
+import :profiler;
+import :linscan_alg;
+import :bmp_alg;
+import :bmp_util;
 
 using namespace infinity;
 using namespace benchmark;

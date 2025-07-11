@@ -3,10 +3,10 @@ module;
 #include <sstream>
 #include <stdexcept>
 
-module lexeme_path;
+module infinity_core;
 
-import lexeme;
-import quick_sort_set;
+import :lexeme;
+import :quick_sort_set;
 
 namespace infinity {
 

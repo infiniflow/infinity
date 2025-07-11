@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_except;
+import :query_context;
+import :operator_state;
+import :physical_except;
 
 namespace infinity {
 
-void PhysicalExcept::Init(QueryContext* query_context) {}
+void PhysicalExcept::Init(QueryContext *query_context) {}
 
 bool PhysicalExcept::Execute(QueryContext *, OperatorState *) { return true; }
 

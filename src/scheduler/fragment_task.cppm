@@ -14,16 +14,16 @@
 
 module;
 
-export module fragment_task;
+export module infinity_core:fragment_task;
 
-import stl;
-import profiler;
-import operator_state;
+import :stl;
+import :profiler;
+import :operator_state;
 import global_resource_usage;
 
 namespace infinity {
 
-class FragmentContext;
+export class FragmentContext;
 
 export enum class FragmentTaskStatus : i8 {
     kPending,

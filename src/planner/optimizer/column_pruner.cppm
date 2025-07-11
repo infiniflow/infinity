@@ -14,20 +14,13 @@
 
 module;
 
-export module column_pruner;
+export module infinity_core:column_pruner;
 
-import stl;
-import logical_node_visitor;
-import reference_expression;
-import base_expression;
-import column_expression;
-import function_expression;
-import column_binding;
-import bind_context;
-import optimizer_rule;
-import logical_node;
-import query_context;
-import logical_node_type;
+import :stl;
+import :logical_node_visitor;
+import :optimizer_rule;
+import :logical_node;
+import :column_binding;
 
 namespace infinity {
 

@@ -40,10 +40,10 @@ float fvec_L2sqr(const float *x, const float *y, const size_t d) {
 IMPRECISE_FUNCTION_END
 */
 
-module distance_simd_functions;
+module infinity_core;
 
-import stl;
-import simd_common_tools;
+import :stl;
+import :simd_common_tools;
 
 namespace infinity {
 

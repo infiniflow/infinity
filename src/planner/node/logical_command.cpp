@@ -16,16 +16,19 @@ module;
 
 #include <sstream>
 
-module logical_command;
+module infinity_core;
 
-import stl;
-import column_binding;
-import logical_node_type;
+import :stl;
+import :column_binding;
+import :logical_node_type;
 
 import logical_type;
-import infinity_exception;
+import :infinity_exception;
 import internal_types;
-import logger;
+import :logger;
+import :logical_command;
+import data_type;
+import command_statement;
 
 namespace infinity {
 

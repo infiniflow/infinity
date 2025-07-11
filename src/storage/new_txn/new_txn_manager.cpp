@@ -17,29 +17,29 @@ module;
 #include <functional>
 #include <memory>
 
-module new_txn_manager;
+module infinity_core;
 
-import new_txn;
-import txn_state;
-import stl;
-import third_party;
-import wal_entry;
-import infinity_exception;
-import logger;
-import buffer_manager;
-import default_values;
-import wal_manager;
-import defer_op;
-import infinity_context;
+import :new_txn;
+import :txn_state;
+import :stl;
+import :third_party;
+import :wal_entry;
+import :infinity_exception;
+import :logger;
+import :buffer_manager;
+import :default_values;
+import :wal_manager;
+import :defer_op;
+import :infinity_context;
 import global_resource_usage;
-import bg_task;
-import kv_store;
-import new_catalog;
-import txn_allocator;
-import txn_allocator_task;
-import storage;
-import catalog_cache;
-import base_txn_store;
+import :bg_task;
+import :kv_store;
+import :new_catalog;
+import :txn_allocator;
+import :txn_allocator_task;
+import :storage;
+import :catalog_cache;
+import :base_txn_store;
 
 namespace infinity {
 

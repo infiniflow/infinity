@@ -14,20 +14,21 @@
 
 module;
 
-export module bmp_alg;
+export module infinity_core:bmp_alg;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import bmp_util;
-import hnsw_common;
-import knn_result_handler;
-import bmp_ivt;
-import bmp_fwd;
-import bp_reordering;
+import :stl;
+import :sparse_util;
+import :local_file_handle;
+import :bmp_util;
+import :hnsw_common;
+import :knn_result_handler;
+import :bmp_ivt;
+import :bmp_fwd;
+import :bp_reordering;
 import serialize;
-import third_party;
-import infinity_exception;
+import :third_party;
+import :infinity_exception;
+import :sparse_vec_store;
 
 namespace infinity {
 
@@ -248,8 +249,7 @@ public:
         mem_usage_.fetch_add(sizeof(BMPDocID) + mem_usage);
     }
 
-    template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
-    SizeT AddDocs(Iterator iter) {
+    SizeT AddDocs(DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> auto iter) {
         SizeT cnt = 0;
         while (true) {
             auto ret = iter.Next();

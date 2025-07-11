@@ -16,45 +16,45 @@ module;
 
 #include <string>
 
-module query_binder;
+module infinity_core;
 
-import stl;
+import :stl;
 import internal_types;
-import infinity_exception;
+import :infinity_exception;
 
-import bind_context;
-import join_table_ref;
-import base_table_ref;
-import query_context;
-import binding;
-import bound_select_statement;
-import bound_delete_statement;
-import bound_update_statement;
-import bound_compact_statement;
-import table_ref;
-import bind_alias_proxy;
-import base_expression;
-import conjunction_expression;
-import column_expression;
-import expression_transformer;
-import third_party;
-import logger;
-import expression_binder;
-import where_binder;
-import join_binder;
-import group_binder;
-import having_binder;
-import order_binder;
-import project_binder;
-import limit_binder;
-import subquery_table_ref;
-import cross_product_table_ref;
+import :bind_context;
+import :join_table_ref;
+import :base_table_ref;
+import :query_context;
+import :binding;
+import :bound_select_statement;
+import :bound_delete_statement;
+import :bound_update_statement;
+import :bound_compact_statement;
+import :table_ref;
+import :bind_alias_proxy;
+import :base_expression;
+import :conjunction_expression;
+import :column_expression;
+import :expression_transformer;
+import :third_party;
+import :logger;
+import :expression_binder;
+import :where_binder;
+import :join_binder;
+import :group_binder;
+import :having_binder;
+import :order_binder;
+import :project_binder;
+import :limit_binder;
+import :subquery_table_ref;
+import :cross_product_table_ref;
 
-import block_index;
-import cast_expression;
-import search_expression;
-import status;
-import default_values;
+import :block_index;
+import :cast_expression;
+import :search_expression;
+import :status;
+import :default_values;
 import base_statement;
 import select_statement;
 import delete_statement;
@@ -71,16 +71,16 @@ import join_reference;
 import cross_product_reference;
 import data_type;
 import logical_type;
-import logger;
-import defer_op;
-import highlighter;
+import :logger;
+import :defer_op;
+import :highlighter;
 
-import meta_info;
-import new_txn;
-import db_meeta;
-import table_meeta;
-import new_catalog;
-import kv_store;
+import :meta_info;
+import :new_txn;
+import :db_meeta;
+import :table_meeta;
+import :new_catalog;
+import :kv_store;
 
 namespace infinity {
 

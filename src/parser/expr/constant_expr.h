@@ -18,6 +18,7 @@
 #include "parsed_expr.h"
 #include "type/data_type.h"
 #include "type/datetime/interval_type.h"
+// #include "definition/column_def.h"
 
 #include <cstdint>
 #include <memory>

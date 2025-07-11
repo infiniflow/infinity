@@ -14,10 +14,12 @@
 
 module;
 
-module peer_task;
+module infinity_core;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
+import :peer_task;
+import admin_statement;
 
 namespace infinity {
 

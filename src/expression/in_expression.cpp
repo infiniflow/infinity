@@ -16,12 +16,12 @@ module;
 
 #include <sstream>
 
-import infinity_exception;
-import stl;
-import expression_type;
-import logger;
+module infinity_core;
 
-module in_expression;
+import :infinity_exception;
+import :stl;
+import :expression_type;
+import :logger;
 
 namespace infinity {
 

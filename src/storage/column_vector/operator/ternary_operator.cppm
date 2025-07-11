@@ -14,13 +14,13 @@
 
 module;
 
-export module ternary_operator;
+export module infinity_core:ternary_operator;
 
-import stl;
-import column_vector;
-import logger;
-import infinity_exception;
-import roaring_bitmap;
+import :stl;
+import :column_vector;
+import :logger;
+import :infinity_exception;
+import :roaring_bitmap;
 
 namespace infinity {
 

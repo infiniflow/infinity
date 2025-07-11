@@ -1,15 +1,15 @@
 module;
 
-module skiplist_reader;
+module infinity_core;
 
-import stl;
-import byte_slice;
-import status;
-import posting_field;
-import flush_info;
-import infinity_exception;
-import logger;
-import third_party;
+import :stl;
+import :byte_slice;
+import :status;
+import :posting_field;
+import :flush_info;
+import :infinity_exception;
+import :logger;
+import :third_party;
 
 namespace infinity {
 

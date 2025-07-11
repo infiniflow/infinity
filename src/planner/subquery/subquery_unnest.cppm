@@ -14,14 +14,14 @@
 
 module;
 
-export module subquery_unnest;
+export module infinity_core:subquery_unnest;
 
-import stl;
-import column_binding;
-import logical_node;
-import base_expression;
-import subquery_expression;
-import column_expression;
+import :stl;
+import :column_binding;
+import :logical_node;
+import :base_expression;
+import :subquery_expression;
+import :column_expression;
 
 namespace infinity {
 

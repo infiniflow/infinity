@@ -25,19 +25,19 @@ module;
 #include <sys/stat.h>
 #include <unistd.h>
 
-module virtual_store;
+module infinity_core;
 
-import stl;
-import third_party;
-import logger;
-import infinity_exception;
-import default_values;
-import stream_reader;
-import s3_client_minio;
-import infinity_context;
-import object_storage_task;
+import :stl;
+import :third_party;
+import :logger;
+import :infinity_exception;
+import :default_values;
+import :stream_reader;
+import :s3_client_minio;
+import :infinity_context;
+import :object_storage_task;
 import admin_statement;
-import utility;
+import :utility;
 
 namespace fs = std::filesystem;
 

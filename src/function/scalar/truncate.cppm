@@ -1,8 +1,8 @@
 module;
 
-export module trunc;
+export module infinity_core:trunc;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

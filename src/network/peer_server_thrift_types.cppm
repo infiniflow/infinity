@@ -16,7 +16,7 @@ module;
 
 #include "peer_server_thrift/PeerService.h"
 
-export module peer_server_thrift_types;
+export module infinity_core:peer_server_thrift_types;
 
 namespace infinity_peer_server {
 

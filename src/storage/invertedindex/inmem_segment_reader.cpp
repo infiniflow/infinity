@@ -14,16 +14,16 @@
 
 module;
 
-module inmem_index_segment_reader;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import segment_posting;
-import index_segment_reader;
-import index_defines;
-import posting_writer;
-import memory_indexer;
-import third_party;
+import :segment_posting;
+import :index_segment_reader;
+import :index_defines;
+import :posting_writer;
+import :memory_indexer;
+import :third_party;
 
 namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(SegmentID segment_id, MemoryIndexer *memory_indexer)

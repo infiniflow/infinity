@@ -2,9 +2,9 @@ module;
 
 #include <cassert>
 
-export module mem_usage_change;
+export module infinity_core:mem_usage_change;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

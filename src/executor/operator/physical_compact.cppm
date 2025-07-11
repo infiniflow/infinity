@@ -14,15 +14,15 @@
 
 module;
 
-export module physical_compact;
+export module infinity_core:physical_compact;
 
-import stl;
-import physical_operator;
-import physical_operator_type;
-import base_table_ref;
-import query_context;
-import operator_state;
-import load_meta;
+import :stl;
+import :physical_operator;
+import :physical_operator_type;
+import :base_table_ref;
+import :query_context;
+import :operator_state;
+import :load_meta;
 import data_type;
 import compact_statement;
 

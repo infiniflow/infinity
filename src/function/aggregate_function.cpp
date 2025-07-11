@@ -16,12 +16,12 @@ module;
 
 #include <sstream>
 
-module aggregate_function;
+module infinity_core;
 
-import base_expression;
-import infinity_exception;
-import status;
-import logger;
+import :base_expression;
+import :infinity_exception;
+import :status;
+import :logger;
 
 namespace infinity {
 

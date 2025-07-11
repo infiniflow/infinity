@@ -18,23 +18,23 @@ module;
 #include <string>
 #include <vector>
 
-module index_hnsw;
+module infinity_core;
 
-import stl;
-import status;
-import index_base;
-import third_party;
-import infinity_exception;
+import :stl;
+import :status;
+import :index_base;
+import :third_party;
+import :infinity_exception;
 import serialize;
-import default_values;
-import index_base;
+import :default_values;
+import :index_base;
 import logical_type;
 import statement_common;
-import logger;
+import :logger;
 import data_type;
 import embedding_info;
 import internal_types;
-import hnsw_lsg_builder;
+import :hnsw_lsg_builder;
 
 namespace infinity {
 

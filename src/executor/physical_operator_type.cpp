@@ -14,12 +14,13 @@
 
 module;
 
-module physical_operator_type;
+module infinity_core;
 
-import stl;
-import status;
-import infinity_exception;
-import logger;
+import :stl;
+import :status;
+import :infinity_exception;
+import :logger;
+import :physical_operator_type;
 
 namespace infinity {
 String PhysicalOperatorToString(PhysicalOperatorType type) {

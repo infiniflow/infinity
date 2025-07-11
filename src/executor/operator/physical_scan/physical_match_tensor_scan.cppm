@@ -14,21 +14,21 @@
 
 module;
 
-export module physical_match_tensor_scan;
+export module infinity_core:physical_match_tensor_scan;
 
-import stl;
-import query_context;
-import operator_state;
-import physical_operator;
-import match_tensor_expression;
-import base_table_ref;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :match_tensor_expression;
+import :base_table_ref;
 import data_type;
-import common_query_filter;
-import physical_filter_scan_base;
-import global_block_id;
-import logical_match_tensor_scan;
+import :common_query_filter;
+import :physical_filter_scan_base;
+import :global_block_id;
+import :logical_match_tensor_scan;
 import internal_types;
-import meta_info;
+import :meta_info;
 
 namespace infinity {
 struct LoadMeta;

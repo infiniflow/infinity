@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_hash;
+import :query_context;
+import :operator_state;
+import :physical_hash;
 
 namespace infinity {
 
-void PhysicalHash::Init(QueryContext* query_context) {}
+void PhysicalHash::Init(QueryContext *query_context) {}
 
 bool PhysicalHash::Execute(QueryContext *, OperatorState *) { return true; }
 

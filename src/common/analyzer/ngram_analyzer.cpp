@@ -16,12 +16,13 @@ module;
 
 #include "string_utils.h"
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-module ngram_analyzer;
+module infinity_core;
+
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
 
 namespace infinity {
 

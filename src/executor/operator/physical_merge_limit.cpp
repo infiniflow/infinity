@@ -14,16 +14,16 @@
 
 module;
 
-module physical_merge_limit;
+module infinity_core;
 
-import stl;
-import query_context;
-import base_expression;
-import load_meta;
-import physical_operator_type;
-import value_expression;
-import physical_limit;
-import operator_state;
+import :stl;
+import :query_context;
+import :base_expression;
+import :load_meta;
+import :physical_operator_type;
+import :value_expression;
+import :physical_limit;
+import :operator_state;
 
 namespace infinity {
 

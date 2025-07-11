@@ -13,7 +13,9 @@
 //  limitations under the License.
 module;
 
-module doc_iterator;
+module infinity_core;
+
+import :doc_iterator;
 
 namespace infinity {
 

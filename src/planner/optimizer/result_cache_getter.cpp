@@ -16,25 +16,25 @@ module;
 
 #include <vector>
 
-module result_cache_getter;
+module infinity_core;
 
-import logical_match;
-import result_cache_manager;
-import logical_node_type;
-import logical_read_cache;
-import logical_fusion;
-import logical_match_tensor_scan;
-import logical_match_sparse_scan;
-import logical_knn_scan;
-import logical_index_scan;
-import cached_match;
-import cached_match_scan;
-import cached_index_scan;
-import third_party;
-import logger;
-import base_table_ref;
-import knn_expression;
-import new_txn;
+import :logical_match;
+import :result_cache_manager;
+import :logical_node_type;
+import :logical_read_cache;
+import :logical_fusion;
+import :logical_match_tensor_scan;
+import :logical_match_sparse_scan;
+import :logical_knn_scan;
+import :logical_index_scan;
+import :cached_match;
+import :cached_match_scan;
+import :cached_index_scan;
+import :third_party;
+import :logger;
+import :base_table_ref;
+import :knn_expression;
+import :new_txn;
 
 namespace infinity {
 

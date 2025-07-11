@@ -16,14 +16,15 @@ module;
 
 #include <sstream>
 
-module logical_drop_schema;
+module infinity_core;
 
-import stl;
-import column_binding;
-import logical_node_type;
+import :stl;
+import :column_binding;
+import :logical_node_type;
 
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

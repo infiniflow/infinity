@@ -1,13 +1,13 @@
 module;
 
 #include <cstdlib>
-module posting_buffer;
-import stl;
+module infinity_core;
+import :stl;
 
-import index_defines;
-import posting_field;
-import file_writer;
-import file_reader;
+import :index_defines;
+import :posting_field;
+import :file_writer;
+import :file_reader;
 
 namespace infinity {
 

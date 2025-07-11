@@ -14,20 +14,20 @@
 
 module;
 
-export module physical_delete;
+export module infinity_core:physical_delete;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import meta_info;
-import load_meta;
-import infinity_exception;
+// import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :meta_info;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

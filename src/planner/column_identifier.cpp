@@ -14,16 +14,16 @@
 
 module;
 
-module column_identifer;
+module infinity_core;
 
-import stl;
+import :stl;
 
 import column_expr;
-import infinity_exception;
-import status;
-import third_party;
-import query_context;
-import logger;
+import :infinity_exception;
+import :status;
+import :third_party;
+import :query_context;
+import :logger;
 
 namespace infinity {
 

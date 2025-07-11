@@ -16,12 +16,12 @@ module;
 
 #include <string>
 
-module explain_ast;
+module infinity_core;
 
-import stl;
-import third_party;
-import status;
-import infinity_exception;
+import :stl;
+import :third_party;
+import :status;
+import :infinity_exception;
 import base_statement;
 import select_statement;
 import copy_statement;
@@ -48,7 +48,7 @@ import join_reference;
 import subquery_reference;
 import table_reference;
 import statement_common;
-import logger;
+import :logger;
 
 namespace infinity {
 

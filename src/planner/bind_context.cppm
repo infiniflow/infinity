@@ -14,19 +14,19 @@
 
 module;
 
-export module bind_context;
+export module infinity_core:bind_context;
 
-import stl;
+import :stl;
 
-import column_binding;
-import third_party;
+import :column_binding;
+import :third_party;
 
-import infinity_exception;
-import column_expression;
-import column_identifer;
-import binding;
-import base_expression;
-import meta_info;
+import :infinity_exception;
+import :column_expression;
+import :column_identifer;
+import :binding;
+import :base_expression;
+import :meta_info;
 import internal_types;
 import select_statement;
 import parsed_expr;
@@ -37,7 +37,7 @@ import global_resource_usage;
 namespace infinity {
 
 struct BlockIndex;
-class ExpressionBinder;
+export class ExpressionBinder;
 
 export struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement *select_stmt, HashSet<String> masked_name_set)

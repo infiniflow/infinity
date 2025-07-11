@@ -1,13 +1,13 @@
 module;
 
 #include <cassert>
-module inmem_doc_list_decoder;
-import stl;
+module infinity_core;
+import :stl;
 
-import posting_byte_slice;
-import posting_byte_slice_reader;
-import index_decoder;
-import index_defines;
+import :posting_byte_slice;
+import :posting_byte_slice_reader;
+import :index_decoder;
+import :index_defines;
 
 namespace infinity {
 

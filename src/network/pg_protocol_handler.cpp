@@ -14,11 +14,13 @@
 
 module;
 
-import boost;
-import stl;
-import pg_message;
-module pg_protocol_handler;
+module infinity_core;
+
 import global_resource_usage;
+import :boost;
+import :stl;
+import :pg_message;
+import :pg_protocol_handler;
 
 namespace infinity {
 

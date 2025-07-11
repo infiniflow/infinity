@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_knn_scan;
+export module infinity_core:logical_knn_scan;
 
-import stl;
-import logical_node;
-import logical_node_type;
-import base_expression;
-import knn_expression;
-import base_table_ref;
-import logical_match_scan_base;
+import :stl;
+import :logical_node;
+import :logical_node_type;
+import :base_expression;
+import :knn_expression;
+import :base_table_ref;
+import :logical_match_scan_base;
 
 namespace infinity {
 

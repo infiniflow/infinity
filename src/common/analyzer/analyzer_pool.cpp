@@ -16,26 +16,26 @@ module;
 
 #include <cstring>
 
-module analyzer_pool;
+module infinity_core;
 
-import stl;
-import third_party;
-import config;
-import infinity_context;
-import analyzer;
-import tokenizer;
-import stemmer;
-import chinese_analyzer;
-import traditional_chinese_analyzer;
-import japanese_analyzer;
-import korean_analyzer;
-import standard_analyzer;
-import ngram_analyzer;
-import rag_analyzer;
-import whitespace_analyzer;
-import ik_analyzer;
-import rank_features_analyzer;
-import logger;
+import :stl;
+import :third_party;
+import :config;
+import :infinity_context;
+import :analyzer;
+import :tokenizer;
+import :stemmer;
+import :chinese_analyzer;
+import :traditional_chinese_analyzer;
+import :japanese_analyzer;
+import :korean_analyzer;
+import :standard_analyzer;
+import :ngram_analyzer;
+import :rag_analyzer;
+import :whitespace_analyzer;
+import :ik_analyzer;
+import :rank_features_analyzer;
+import :logger;
 
 namespace infinity {
 

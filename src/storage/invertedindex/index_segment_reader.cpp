@@ -14,12 +14,12 @@
 
 module;
 
-module index_segment_reader;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import segment_posting;
-import index_defines;
+import :segment_posting;
+import :index_defines;
 
 namespace infinity {
 IndexSegmentReader::IndexSegmentReader(SegmentID segment_id, ChunkID chunk_id) : segment_id_(segment_id), chunk_id_(chunk_id) {}

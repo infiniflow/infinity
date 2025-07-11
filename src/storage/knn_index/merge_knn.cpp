@@ -16,14 +16,16 @@ module;
 
 #include <string>
 #include <vector>
-module merge_knn;
 
-import stl;
+module infinity_core;
+
+import :stl;
 import statement_common;
-import knn_scan_data;
-import status;
+import :knn_scan_data;
+import :status;
 import knn_expr;
-import third_party;
+import :third_party;
+import embedding_type;
 
 namespace infinity {
 

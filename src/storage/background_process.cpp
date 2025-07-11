@@ -17,24 +17,24 @@ module;
 #include <tuple>
 #include <unistd.h>
 
-module background_process;
+module infinity_core;
 
-import stl;
-import bg_task;
-import update_segment_bloom_filter_task;
-import logger;
-import blocking_queue;
-import infinity_exception;
-import third_party;
-import infinity_context;
-import status;
-import new_txn;
-import bg_task_type;
+import :stl;
+import :bg_task;
+import :update_segment_bloom_filter_task;
+import :logger;
+import :blocking_queue;
+import :infinity_exception;
+import :third_party;
+import :infinity_context;
+import :status;
+import :new_txn;
+import :bg_task_type;
 import global_resource_usage;
-import wal_manager;
-import new_txn_manager;
-import base_txn_store;
-import txn_state;
+import :wal_manager;
+import :new_txn_manager;
+import :base_txn_store;
+import :txn_state;
 
 namespace infinity {
 

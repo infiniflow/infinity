@@ -16,11 +16,10 @@ module;
 
 #include <sstream>
 
-import stl;
-import logical_node_type;
-import data_block;
+module infinity_core;
 
-module query_result;
+import :logical_node_type;
+import :data_block;
 
 namespace infinity {
 

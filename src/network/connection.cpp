@@ -16,24 +16,24 @@ module;
 
 #include <boost/asio/ip/tcp.hpp>
 
-module connection;
+module infinity_core;
 
-import pg_protocol_handler;
-import boost;
-import stl;
-import session;
-import infinity_exception;
+import :pg_protocol_handler;
+import :boost;
+import :stl;
+// import :session;
+import :infinity_exception;
 import internal_types;
-import pg_message;
-import logger;
-import query_context;
-import infinity_context;
-import third_party;
-import data_table;
+import :pg_message;
+import :logger;
+// import :query_context;
+import :infinity_context;
+import :third_party;
+import :data_table;
 
-import logical_node_type;
-import query_result;
-import session_manager;
+import :logical_node_type;
+// import query_result;
+// import session_manager;
 import type_info;
 import logical_type;
 import embedding_info;

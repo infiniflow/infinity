@@ -14,9 +14,9 @@
 
 module;
 
-export module like;
+export module infinity_core:like;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -16,20 +16,22 @@ module;
 
 #include <sstream>
 
-module data_block;
+module infinity_core;
 
-import stl;
-import selection;
-import status;
-import infinity_exception;
-import column_vector;
+import :stl;
+import :selection;
+import :status;
+import :infinity_exception;
+import :column_vector;
 
-import value;
-import third_party;
-import default_values;
+import :value;
+import :third_party;
+import :default_values;
 import serialize;
 import logical_type;
-import logger;
+import :logger;
+import data_type;
+import row_id;
 
 namespace infinity {
 

@@ -16,24 +16,24 @@ module;
 
 #include <vector>
 
-module fragment_builder;
+module infinity_core;
 
-import stl;
-import plan_fragment;
-import physical_operator;
-import physical_operator_type;
-import physical_sink;
-import physical_source;
-import physical_explain;
-import physical_knn_scan;
-import physical_fusion;
-import status;
-import infinity_exception;
+import :stl;
+import :plan_fragment;
+import :physical_operator;
+import :physical_operator_type;
+import :physical_sink;
+import :physical_source;
+import :physical_explain;
+import :physical_knn_scan;
+import :physical_fusion;
+import :status;
+import :infinity_exception;
 
-import explain_fragment;
-import fragment_context;
-import logger;
-import third_party;
+import :explain_fragment;
+import :fragment_context;
+import :logger;
+import :third_party;
 import explain_statement;
 
 namespace infinity {

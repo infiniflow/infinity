@@ -2,20 +2,20 @@ module;
 
 #include <vector>
 
-module ik_analyzer;
+module infinity_core;
 
-import stl;
-import segmenter;
-import cjk_segmenter;
-import cn_quantifier_segmenter;
-import letter_segmenter;
-import analyze_context;
-import lexeme;
-import arbitrator;
-import term;
-import status;
-import character_util;
-import third_party;
+import :stl;
+import :segmenter;
+import :cjk_segmenter;
+import :cn_quantifier_segmenter;
+import :letter_segmenter;
+import :analyze_context;
+import :lexeme;
+import :arbitrator;
+import :term;
+import :status;
+import :character_util;
+import :third_party;
 
 namespace infinity {
 

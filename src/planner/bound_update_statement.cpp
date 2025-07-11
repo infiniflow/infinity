@@ -16,29 +16,29 @@ module;
 
 #include <vector>
 
-module bound_update_statement;
+module infinity_core;
 
-import bound_statement;
-import table_ref;
-import base_expression;
-import bind_context;
-import logical_node;
-import query_context;
-import stl;
-import infinity_exception;
-import status;
-import base_table_ref;
-import subquery_table_ref;
-import expression_transformer;
-import expression_type;
-import subquery_expression;
-import query_context;
-import logical_table_scan;
-import logical_filter;
-import logical_update;
-import subquery_unnest;
-import logger;
-import conjunction_expression;
+import :bound_statement;
+import :table_ref;
+import :base_expression;
+import :bind_context;
+import :logical_node;
+import :query_context;
+import :stl;
+import :infinity_exception;
+import :status;
+import :base_table_ref;
+import :subquery_table_ref;
+import :expression_transformer;
+import :expression_type;
+import :subquery_expression;
+import :query_context;
+import :logical_table_scan;
+import :logical_filter;
+import :logical_update;
+import :subquery_unnest;
+import :logger;
+import :conjunction_expression;
 import table_reference;
 
 namespace infinity {

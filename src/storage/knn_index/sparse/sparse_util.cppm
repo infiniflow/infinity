@@ -17,14 +17,14 @@ module;
 #include <cassert>
 #include <vector>
 
-export module sparse_util;
+export module infinity_core:sparse_util;
 
-import stl;
-import sparse_vector_distance;
-import knn_result_handler;
-import infinity_exception;
-import third_party;
-import local_file_handle;
+import :stl;
+import :sparse_vector_distance;
+import :knn_result_handler;
+import :infinity_exception;
+import :third_party;
+import :local_file_handle;
 
 namespace infinity {
 

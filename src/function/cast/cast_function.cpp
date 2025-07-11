@@ -14,26 +14,28 @@
 
 module;
 
-module cast_function;
+module infinity_core;
 
-import third_party;
-import infinity_exception;
-import bound_cast_func;
-import bool_cast;
-import integer_cast;
-import float_cast;
-import embedding_cast;
-import varchar_cast;
-import tensor_cast;
-import tensor_array_cast;
-import multi_vector_cast;
-import empty_array_cast;
-import array_cast;
-import logger;
-import stl;
-import sparse_cast;
-import third_party;
+import :third_party;
+import :infinity_exception;
+import :bound_cast_func;
+import :bool_cast;
+import :integer_cast;
+import :float_cast;
+import :embedding_cast;
+import :varchar_cast;
+import :tensor_cast;
+import :tensor_array_cast;
+import :multi_vector_cast;
+import :empty_array_cast;
+import :array_cast;
+import :logger;
+import :stl;
+import :sparse_cast;
+import :third_party;
 import logical_type;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
-module logical_optimize;
+module infinity_core;
 
-import stl;
-
-import column_binding;
+import :stl;
+import :column_binding;
 import internal_types;
+import :logical_optimize;
+import data_type;
 
 namespace infinity {
 

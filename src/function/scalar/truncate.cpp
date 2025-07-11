@@ -14,18 +14,18 @@
 
 module;
 #include <cstdio>
-module trunc;
-import stl;
-import new_catalog;
-import status;
+module infinity_core;
+import :stl;
+import :new_catalog;
+import :status;
 import logical_type;
-import infinity_exception;
-import scalar_function;
-import scalar_function_set;
-import third_party;
+import :infinity_exception;
+import :scalar_function;
+import :scalar_function_set;
+import :third_party;
 import internal_types;
 import data_type;
-import column_vector;
+import :column_vector;
 
 namespace infinity {
 

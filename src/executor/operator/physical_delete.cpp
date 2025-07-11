@@ -16,27 +16,27 @@ module;
 
 #include <string>
 
-module physical_delete;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import query_context;
-// import data_table;
-import operator_state;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+// import :query_context;
+// import :data_table;
+import :operator_state;
 import logical_type;
-import data_block;
-import column_vector;
+import :data_block;
+import :column_vector;
 import internal_types;
-import third_party;
-import wal_manager;
-import infinity_context;
-import status;
+import :third_party;
+import :wal_manager;
+import :infinity_context;
+import :status;
 
-import new_txn;
+import :new_txn;
 
 namespace infinity {
 

@@ -14,11 +14,11 @@
 
 module;
 
-export module traditional_chinese_analyzer;
+export module infinity_core:traditional_chinese_analyzer;
 
-import stl;
-import status;
-import chinese_analyzer;
+import :stl;
+import :status;
+import :chinese_analyzer;
 
 class OpenCC;
 

@@ -14,16 +14,16 @@
 
 module;
 
-import stl;
-import byte_slice;
-import posting_list_format;
-import posting_writer;
-import term_meta;
-import index_defines;
-import internal_types;
-import file_reader;
+export module infinity_core:segment_posting;
 
-export module segment_posting;
+import :stl;
+import :byte_slice;
+import :posting_list_format;
+import :posting_writer;
+import :term_meta;
+import :index_defines;
+import internal_types;
+import :file_reader;
 
 namespace infinity {
 

@@ -16,11 +16,11 @@ module;
 
 #include <cmath>
 
-module bm25_ranker;
+module infinity_core;
 
-import stl;
-import index_defines;
-import third_party;
+import :stl;
+import :index_defines;
+import :third_party;
 
 namespace infinity {
 

@@ -17,12 +17,13 @@ module;
 #include <cassert>
 #include <cstdlib>
 
-module rocksdb_merge_operator;
+module infinity_core;
 
-import stl;
-import third_party;
-import logger;
-import infinity_exception;
+import :stl;
+import :third_party;
+import :logger;
+import :infinity_exception;
+import :rocksdb_merge_operator;
 
 namespace infinity {
 

@@ -16,16 +16,17 @@ module;
 
 #include <sstream>
 
-module logical_top;
+module infinity_core;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 
-import base_expression;
+import :base_expression;
 import internal_types;
 import select_statement;
+import data_type;
 
 namespace infinity {
 

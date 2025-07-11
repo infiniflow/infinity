@@ -1,8 +1,8 @@
 module;
 
-module hit;
+module infinity_core;
 
-import ik_dict_segment;
+import :ik_dict_segment;
 
 namespace infinity {
 

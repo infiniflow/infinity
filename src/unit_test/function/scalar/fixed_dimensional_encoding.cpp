@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import fixed_dimensional_encoding;
+import infinity_core;
 
 using namespace infinity;
 

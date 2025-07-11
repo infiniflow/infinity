@@ -14,16 +14,16 @@
 
 module;
 
-export module logical_limit;
+export module infinity_core:logical_limit;
 
-import stl;
-import logical_node_type;
-import column_binding;
-import logical_node;
+import :stl;
+import :logical_node_type;
+import :column_binding;
+import :logical_node;
 import data_type;
-import base_expression;
+import :base_expression;
 import internal_types;
-import base_table_ref;
+import :base_table_ref;
 
 namespace infinity {
 

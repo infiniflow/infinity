@@ -1,15 +1,15 @@
 module;
 
-export module inmem_doc_list_decoder;
+export module infinity_core:inmem_doc_list_decoder;
 
-import stl;
+import :stl;
 
-import posting_byte_slice;
-import posting_byte_slice_reader;
-import index_decoder;
-import skiplist_reader;
-import index_defines;
-import doc_list_format_option;
+import :posting_byte_slice;
+import :posting_byte_slice_reader;
+import :index_decoder;
+import :skiplist_reader;
+import :index_defines;
+import :doc_list_format_option;
 
 namespace infinity {
 

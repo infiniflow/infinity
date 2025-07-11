@@ -14,20 +14,20 @@
 
 module;
 
-module filter_fulltext_expression;
+module infinity_core;
 
-import base_expression;
-import expression_type;
+import :base_expression;
+import :expression_type;
 import data_type;
-import stl;
+import :stl;
 import logical_type;
-import third_party;
-import infinity_exception;
-import status;
+import :third_party;
+import :infinity_exception;
+import :status;
 import parsed_expr;
 import function_expr;
 import constant_expr;
-import block_index;
+import :block_index;
 
 namespace infinity {
 

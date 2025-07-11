@@ -17,9 +17,11 @@ module;
 #include <cctype>
 #include <cstring>
 
-import stl;
-import term;
-module tokenizer;
+module infinity_core;
+
+import :stl;
+import :term;
+import :tokenizer;
 
 namespace infinity {
 

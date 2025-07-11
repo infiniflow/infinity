@@ -16,22 +16,22 @@ module;
 
 #include <vector>
 
-module expression_transformer;
+module infinity_core;
 
-import stl;
-import base_expression;
-import aggregate_expression;
-import between_expression;
-import cast_expression;
-import case_expression;
-import function_expression;
-import in_expression;
-import conjunction_expression;
-import expression_type;
+import :stl;
+import :base_expression;
+import :aggregate_expression;
+import :between_expression;
+import :cast_expression;
+import :case_expression;
+import :function_expression;
+import :in_expression;
+import :conjunction_expression;
+import :expression_type;
 
-import infinity_exception;
-import third_party;
-import logger;
+import :infinity_exception;
+import :third_party;
+import :logger;
 
 namespace infinity {
 

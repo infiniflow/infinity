@@ -14,7 +14,7 @@
 
 module;
 
-export module expression_type;
+export module infinity_core:expression_type;
 
 namespace infinity {
 

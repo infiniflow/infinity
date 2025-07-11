@@ -16,22 +16,22 @@ module;
 
 #include <string>
 
-module segment_meta;
+module infinity_core;
 
-import kv_store;
-import kv_code;
-import third_party;
-import default_values;
-import table_meeta;
-import logger;
-import infinity_exception;
+import :kv_store;
+import :kv_code;
+import :third_party;
+import :default_values;
+import :table_meeta;
+import :logger;
+import :infinity_exception;
 
-import block_meta;
-import meta_info;
-import new_catalog;
-import fast_rough_filter;
+import :block_meta;
+import :meta_info;
+import :new_catalog;
+import :fast_rough_filter;
 import column_def;
-import kv_utility;
+import :kv_utility;
 
 namespace infinity {
 

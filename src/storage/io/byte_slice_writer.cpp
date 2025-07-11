@@ -1,13 +1,13 @@
 module;
 
-module byte_slice_writer;
+module infinity_core;
 
-import logger;
-import stl;
-import byte_slice;
-import file_writer;
-import file_reader;
-import infinity_exception;
+import :logger;
+import :stl;
+import :byte_slice;
+import :file_writer;
+import :file_reader;
+import :infinity_exception;
 
 namespace infinity {
 

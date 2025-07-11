@@ -14,16 +14,16 @@
 
 module;
 
-module corrlated_expr_detector;
+module infinity_core;
 
-import stl;
-import logical_node;
-import base_expression;
-import column_expression;
-import subquery_expression;
-import status;
-import infinity_exception;
-import logger;
+import :stl;
+import :logical_node;
+import :base_expression;
+import :column_expression;
+import :subquery_expression;
+import :status;
+import :infinity_exception;
+import :logger;
 
 namespace infinity {
 

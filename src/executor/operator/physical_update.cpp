@@ -16,32 +16,33 @@ module;
 
 #include <string>
 
-module physical_update;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import query_context;
-// import data_table;
-import operator_state;
-import data_block;
-import column_vector;
-import expression_evaluator;
-import expression_state;
-import expression_type;
-import base_expression;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :query_context;
+// import :data_table;
+import :operator_state;
+import :data_block;
+import :column_vector;
+import :expression_evaluator;
+import :expression_state;
+import :expression_type;
+import :base_expression;
 import logical_type;
 import internal_types;
-import value;
+import :value;
 
-import wal_manager;
-import infinity_context;
-import status;
-import new_txn;
-import txn_state;
+import :wal_manager;
+import :infinity_context;
+import :status;
+import :new_txn;
+import :txn_state;
+import data_type;
 
 namespace infinity {
 

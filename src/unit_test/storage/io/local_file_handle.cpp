@@ -15,9 +15,7 @@
 #include <gtest/gtest.h>
 
 import base_test;
-import stl;
-import virtual_store;
-import local_file_handle;
+import infinity_core;
 
 using namespace infinity;
 

@@ -14,24 +14,24 @@
 
 module;
 
-export module physical_show;
+export module infinity_core:physical_show;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import logical_show;
-import load_meta;
-import infinity_exception;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :logical_show;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import column_def;
 import data_type;
-import variables;
-import data_block;
-import logger;
+import :variables;
+import :data_block;
+import :logger;
 import show_statement;
 
 namespace infinity {

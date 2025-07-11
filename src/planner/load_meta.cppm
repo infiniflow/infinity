@@ -14,11 +14,11 @@
 
 module;
 
-export module load_meta;
+export module infinity_core:load_meta;
 
-import stl;
+import :stl;
 
-import column_binding;
+import :column_binding;
 import internal_types;
 import data_type;
 

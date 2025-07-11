@@ -18,14 +18,14 @@ module;
 #include <execinfo.h>
 #include <iostream>
 
-module infinity_exception;
+module infinity_core;
 
-import stl;
-import logger;
-import third_party;
-import infinity_context;
-import new_txn_manager;
-import txn_context;
+import :stl;
+import :logger;
+import :third_party;
+import :infinity_context;
+import :new_txn_manager;
+import :txn_context;
 
 namespace infinity {
 

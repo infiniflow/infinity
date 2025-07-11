@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
-module logical_filter;
+module infinity_core;
 
-import stl;
-import column_binding;
-import logical_node;
+import :stl;
+import :column_binding;
+import :logical_node;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

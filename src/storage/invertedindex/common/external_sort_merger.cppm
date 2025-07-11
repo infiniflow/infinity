@@ -20,13 +20,13 @@ module;
 #include <unistd.h>
 #include <vector>
 
-export module external_sort_merger;
+export module infinity_core:external_sort_merger;
 
-import stl;
-import loser_tree;
-import infinity_exception;
-import third_party;
-import blocking_queue;
+import :stl;
+import :loser_tree;
+import :infinity_exception;
+import :third_party;
+import :blocking_queue;
 
 namespace infinity {
 

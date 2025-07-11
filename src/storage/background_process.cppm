@@ -14,10 +14,10 @@
 
 module;
 
-export module background_process;
+export module infinity_core:background_process;
 
-import blocking_queue;
-import stl;
+import :blocking_queue;
+import :stl;
 
 namespace infinity {
 

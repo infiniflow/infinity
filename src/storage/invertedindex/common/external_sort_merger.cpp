@@ -23,14 +23,14 @@ module;
 #include <sys/mman.h>
 #include <unistd.h>
 
-module external_sort_merger;
+module infinity_core;
 
-import stl;
-import third_party;
-import file_writer;
-import profiler;
-import logger;
-import blocking_queue;
+import :stl;
+import :third_party;
+import :file_writer;
+import :profiler;
+import :logger;
+import :blocking_queue;
 
 namespace infinity {
 

@@ -14,11 +14,11 @@
 
 module;
 
-export module update_segment_bloom_filter_task;
+export module infinity_core:update_segment_bloom_filter_task;
 
-import stl;
-import bg_task;
-import bg_task_type;
+import :stl;
+import :bg_task;
+import :bg_task_type;
 
 namespace infinity {
 

@@ -14,7 +14,7 @@
 
 module;
 
-export module eigen_svd;
+export module infinity_core:eigen_svd;
 
 namespace infinity {
 

@@ -14,15 +14,15 @@
 
 module;
 
-module bottom_executor;
+module infinity_core;
 
-import stl;
-import third_party;
-import crc;
-import blocking_queue;
-import new_txn;
-import txn_state;
-import logger;
+import :stl;
+import :third_party;
+import :crc;
+import :blocking_queue;
+import :new_txn;
+import :txn_state;
+import :logger;
 
 namespace infinity {
 

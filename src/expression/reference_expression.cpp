@@ -15,11 +15,13 @@
 module;
 
 #include <cctype>
+#include <string>
 
-import stl;
-import third_party;
+module infinity_core;
 
-module reference_expression;
+import :stl;
+import :third_party;
+import :reference_expression;
 
 namespace infinity {
 

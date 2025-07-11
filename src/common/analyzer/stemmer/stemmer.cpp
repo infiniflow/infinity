@@ -14,8 +14,6 @@
 
 module;
 
-import stl;
-
 #include <cstring>
 
 #include "api.h"
@@ -36,7 +34,10 @@ import stl;
 #include "stem_UTF_8_swedish.h"
 #include "stem_UTF_8_turkish.h"
 
-module stemmer;
+module infinity_core;
+
+import :stl;
+import :stemmer;
 
 namespace infinity {
 

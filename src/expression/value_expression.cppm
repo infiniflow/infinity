@@ -14,15 +14,15 @@
 
 module;
 
-export module value_expression;
+export module infinity_core:value_expression;
 
-import base_expression;
-import bound_select_statement;
+import :base_expression;
+import :bound_select_statement;
 
-import column_vector;
-import expression_type;
-import value;
-import stl;
+import :column_vector;
+import :expression_type;
+import :value;
+import :stl;
 import internal_types;
 import data_type;
 

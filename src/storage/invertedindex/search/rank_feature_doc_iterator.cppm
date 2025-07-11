@@ -14,16 +14,16 @@
 
 module;
 
-export module rank_feature_doc_iterator;
+export module infinity_core:rank_feature_doc_iterator;
 
-import stl;
+import :stl;
 
-import posting_iterator;
-import index_defines;
-import doc_iterator;
+import :posting_iterator;
+import :index_defines;
+import :doc_iterator;
 import internal_types;
-import doc_iterator;
-import third_party;
+import :doc_iterator;
+import :third_party;
 
 namespace infinity {
 

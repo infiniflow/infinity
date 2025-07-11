@@ -14,14 +14,14 @@
 
 module;
 
-export module limit_binder;
+export module infinity_core:limit_binder;
 
-import stl;
+import :stl;
 
-import base_expression;
-import bind_context;
-import expression_binder;
-import query_context;
+import :base_expression;
+import :bind_context;
+import :expression_binder;
+// import :query_context;
 import parsed_expr;
 import function_expr;
 import column_expr;

@@ -14,12 +14,10 @@
 
 #include "gtest/gtest.h"
 #include <filesystem>
-import base_test;
 
-import stl;
-import term;
-import analyzer;
-import chinese_analyzer;
+import base_test;
+import infinity_core;
+
 using namespace infinity;
 
 namespace fs = std::filesystem;

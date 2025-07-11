@@ -23,18 +23,18 @@ module;
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
 
-module search_driver;
+module infinity_core;
 
-import stl;
-import term;
-import infinity_exception;
-import status;
-import logger;
-import third_party;
-import analyzer;
-import analyzer_pool;
+import :stl;
+import :term;
+import :infinity_exception;
+import :status;
+import :logger;
+import :third_party;
+import :analyzer;
+import :analyzer_pool;
 import search_scanner;
-import query_node;
+import :query_node;
 
 namespace infinity {
 

@@ -1,20 +1,20 @@
 module;
 
-module position;
+module infinity_core;
 
-import stl;
-import new_catalog;
-import status;
-import infinity_exception;
-import scalar_function;
-import scalar_function_set;
-import column_vector;
+import :stl;
+import :new_catalog;
+import :status;
+import :infinity_exception;
+import :scalar_function;
+import :scalar_function_set;
+import :column_vector;
 
-import third_party;
+import :third_party;
 import logical_type;
 import internal_types;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

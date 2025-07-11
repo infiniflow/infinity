@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_compact;
+export module infinity_core:logical_compact;
 
-import stl;
-import logical_node;
-import logical_node_type;
-import column_binding;
+import :stl;
+import :logical_node;
+import :logical_node_type;
+import :column_binding;
 import data_type;
-import base_table_ref;
-import query_context;
+import :base_table_ref;
+// import :query_context;
 import compact_statement;
 
 namespace infinity {

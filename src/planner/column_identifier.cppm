@@ -14,14 +14,14 @@
 
 module;
 
-export module column_identifer;
+export module infinity_core:column_identifer;
 
-import stl;
-
-import query_context;
+import :stl;
+// import query_context
 import column_expr;
 
 namespace infinity {
+class QueryContext;
 
 export struct ColumnIdentifier {
 public:

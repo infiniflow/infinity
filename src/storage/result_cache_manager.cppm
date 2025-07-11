@@ -16,12 +16,12 @@ module;
 
 #include <type_traits>
 
-export module result_cache_manager;
+export module infinity_core:result_cache_manager;
 
-import stl;
-import cached_node_base;
-import data_block;
-import logical_read_cache;
+import :stl;
+import :cached_node_base;
+import :data_block;
+import :logical_read_cache;
 import global_resource_usage;
 
 namespace infinity {

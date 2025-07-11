@@ -14,17 +14,17 @@
 
 module;
 
-export module base_table_ref;
+export module infinity_core:base_table_ref;
 
-import stl;
-import table_ref;
-import table_function;
+import :stl;
+import :table_ref;
+import :table_function;
 import internal_types;
-import infinity_exception;
+import :infinity_exception;
 import table_reference;
 import data_type;
-import meta_info;
-import status;
+import :meta_info;
+import :status;
 
 namespace infinity {
 

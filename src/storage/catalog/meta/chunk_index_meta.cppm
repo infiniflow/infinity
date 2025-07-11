@@ -14,13 +14,13 @@
 
 module;
 
-export module chunk_index_meta;
+export module infinity_core:chunk_index_meta;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import internal_types;
-import third_party;
-import new_catalog;
+import :third_party;
+import :new_catalog;
 
 namespace infinity {
 

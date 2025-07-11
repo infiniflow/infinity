@@ -14,25 +14,25 @@
 
 module;
 
-module physical_limit;
+module infinity_core;
 
-import stl;
-import base_expression;
-import default_values;
-import load_meta;
-import query_context;
-import table_def;
-import data_table;
-import default_values;
+import :stl;
+import :base_expression;
+import :default_values;
+import :load_meta;
+import :query_context;
+import :table_def;
+import :data_table;
+import :default_values;
 
-import physical_operator_type;
-import operator_state;
-import data_block;
-import status;
-import infinity_exception;
-import expression_type;
-import value_expression;
-import logger;
+import :physical_operator_type;
+import :operator_state;
+import :data_block;
+import :status;
+import :infinity_exception;
+import :expression_type;
+import :value_expression;
+import :logger;
 
 namespace infinity {
 

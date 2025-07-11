@@ -14,10 +14,10 @@
 
 module;
 
-export module lemmatizer;
+export module infinity_core:lemmatizer;
 
-import stl;
-import status;
+import :stl;
+import :status;
 
 namespace infinity {
 

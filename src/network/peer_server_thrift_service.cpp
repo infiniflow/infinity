@@ -14,19 +14,19 @@
 
 module;
 
-module peer_server_thrift_service;
+module infinity_core;
 
-import stl;
-import third_party;
-import logger;
-import peer_server_thrift_types;
-import infinity_context;
-import peer_task;
-import status;
-import infinity_exception;
-import cluster_manager;
+import :stl;
+import :third_party;
+import :logger;
+import :peer_server_thrift_types;
+import :infinity_context;
+import :peer_task;
+import :status;
+import :infinity_exception;
+import :cluster_manager;
 import admin_statement;
-import node_info;
+import :node_info;
 
 namespace infinity {
 

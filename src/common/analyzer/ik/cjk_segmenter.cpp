@@ -2,16 +2,16 @@ module;
 
 #include <string>
 
-module cjk_segmenter;
+module infinity_core;
 
-import stl;
-import hit;
-import segmenter;
-import analyze_context;
-import lexeme;
-import character_util;
-import ik_dict;
-import third_party;
+import :stl;
+import :hit;
+import :segmenter;
+import :analyze_context;
+import :lexeme;
+import :character_util;
+import :ik_dict;
+import :third_party;
 
 namespace infinity {
 const std::wstring CJKSegmenter::SEGMENTER_NAME = L"CJK_SEGMENTER";

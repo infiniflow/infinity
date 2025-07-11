@@ -1,8 +1,9 @@
 module;
 
-module memory_chunk;
+module infinity_core;
 
-import stl;
+import :stl;
+import :memory_chunk;
 
 namespace infinity {
 

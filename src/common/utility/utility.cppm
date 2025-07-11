@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
+export module infinity_core:utility;
 
-export module utility;
+import :stl;
 
 export namespace infinity::Utility {
 

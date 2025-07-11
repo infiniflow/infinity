@@ -15,16 +15,8 @@ module;
 
 #include "magic_enum.hpp"
 #include <chrono>
-module profiler;
 
-import stl;
-import third_party;
-import physical_operator;
-import plan_fragment;
-import operator_state;
-import data_block;
-import logger;
-import infinity_exception;
+module infinity_core;
 
 namespace infinity {
 

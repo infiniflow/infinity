@@ -14,14 +14,14 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_dummy_scan;
+import :query_context;
+import :operator_state;
 
 namespace infinity {
 
-void PhysicalDummyScan::Init(QueryContext* query_context) {}
+void PhysicalDummyScan::Init(QueryContext *query_context) {}
 
 bool PhysicalDummyScan::Execute(QueryContext *, OperatorState *) { return true; }
 

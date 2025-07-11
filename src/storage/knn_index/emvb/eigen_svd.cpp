@@ -15,7 +15,7 @@
 module;
 
 #include "JacobiSVD.h"
-module eigen_svd;
+module infinity_core;
 
 namespace infinity {
 

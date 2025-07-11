@@ -14,8 +14,8 @@
 
 module;
 
-export module vector_with_lock;
-import stl;
+export module infinity_core:vector_with_lock;
+import :stl;
 
 namespace infinity {
 

@@ -14,15 +14,15 @@
 
 module;
 
-export module ivf_index_file_worker;
+export module infinity_core:ivf_index_file_worker;
 
-import stl;
-import index_file_worker;
-import file_worker;
-import index_base;
+import :stl;
+import :index_file_worker;
+import :file_worker;
+import :index_base;
 import column_def;
-import file_worker_type;
-import persistence_manager;
+import :file_worker_type;
+import :persistence_manager;
 
 namespace infinity {
 

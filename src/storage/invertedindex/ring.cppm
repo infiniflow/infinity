@@ -3,9 +3,9 @@ module;
 #include <cassert>
 #include <cstdio>
 
-export module ring;
+export module infinity_core:ring;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

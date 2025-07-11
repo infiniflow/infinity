@@ -18,37 +18,39 @@ module;
 #include <cstring>
 #include <sstream>
 
-module column_vector;
+module infinity_core;
 
-import stl;
-import selection;
+import :stl;
+import :selection;
 
 import type_info;
-import infinity_exception;
-import default_values;
-import roaring_bitmap;
-import vector_buffer;
+import :infinity_exception;
+import :default_values;
+import :roaring_bitmap;
+import :vector_buffer;
 import serialize;
-import third_party;
-import logger;
-import value;
+import :third_party;
+import :logger;
+import :value;
 import internal_types;
 import logical_type;
-import buffer_manager;
-import status;
+import :buffer_manager;
+import :status;
 import logical_type;
 import embedding_info;
 import array_info;
-import base_expression;
-import value_expression;
-import expression_binder;
-import cast_function;
-import bound_cast_func;
-import cast_expression;
-import expression_evaluator;
-import expression_state;
+import :base_expression;
+import :value_expression;
+import :expression_binder;
+import :cast_function;
+import :bound_cast_func;
+import :cast_expression;
+import :expression_evaluator;
+import :expression_state;
 import sparse_info;
 import constant_expr;
+import data_type;
+import global_resource_usage;
 
 namespace infinity {
 
@@ -392,10 +394,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
-            case LogicalType::kTuple: {
-                CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
-                break;
-            }
+            // case LogicalType::kTuple: {
+            //    CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+            //    break;
+            // }
             case LogicalType::kPoint: {
                 CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
@@ -452,6 +454,9 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             case LogicalType::kInvalid: {
                 String error_message = "Invalid data type";
                 UnrecoverableError(error_message);
+            }
+            default: {
+                UnrecoverableError("Tuple is not implement.");
             }
         }
     }
@@ -559,10 +564,10 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
-            case LogicalType::kTuple: {
-                CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
-                break;
-            }
+            // case LogicalType::kTuple: {
+            //     CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+            //     break;
+            // }
             case LogicalType::kPoint: {
                 CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
@@ -625,6 +630,9 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             case LogicalType::kInvalid: {
                 String error_message = "Invalid data type";
                 UnrecoverableError(error_message);
+            }
+            default: {
+                UnrecoverableError("Tuple is not implement.");
             }
         }
     }
@@ -753,10 +761,10 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             CopyRowFrom<ArrayT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
-        case LogicalType::kTuple: {
-            CopyRowFrom<TupleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
-            break;
-        }
+        // case LogicalType::kTuple: {
+        //     CopyRowFrom<TupleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+        //     break;
+        // }
         case LogicalType::kPoint: {
             CopyRowFrom<PointT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
@@ -813,6 +821,9 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
         case LogicalType::kInvalid: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
+        }
+        default: {
+            UnrecoverableError("Tuple is not implement.");
         }
     }
 }

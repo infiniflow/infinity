@@ -14,31 +14,31 @@
 
 module;
 
-module column_pruner;
+module infinity_core;
 
-import stl;
-import logical_node;
-import logical_node_type;
-import base_expression;
-import column_expression;
-import function_expression;
-import expression_type;
-import logical_join;
-import logical_aggregate;
-import logical_project;
-import logical_filter;
-import logical_table_scan;
-import logical_index_scan;
-import logical_match;
-import logical_match_scan_base;
-import logical_knn_scan;
-import logical_match_tensor_scan;
-import base_table_ref;
-import function;
-import column_binding;
-import logger;
-import third_party;
-import infinity_exception;
+// import :stl;
+// import :logical_node;
+// import :logical_node_type;
+// import :base_expression;
+// import :column_expression;
+// import :function_expression;
+// import :expression_type;
+// import :logical_join;
+// import :logical_aggregate;
+// import :logical_project;
+// import :logical_filter;
+// import :logical_table_scan;
+// import :logical_index_scan;
+// import :logical_match;
+// import :logical_match_scan_base;
+// import :logical_knn_scan;
+// import :logical_match_tensor_scan;
+// import :base_table_ref;
+// import :function;
+// import :column_binding;
+// import :logger;
+// import :third_party;
+// import :infinity_exception;
 
 namespace infinity {
 

@@ -17,18 +17,18 @@ module;
 #include <__iterator/prev.h>
 #include <cassert>
 
-module obj_stat_accessor;
+module infinity_core;
 
-import infinity_exception;
-import logger;
-import third_party;
-import obj_status;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :obj_status;
 
-import kv_store;
-import storage;
-import kv_code;
-import status;
-import infinity_context;
+import :kv_store;
+import :storage;
+import :kv_code;
+import :status;
+import :infinity_context;
 
 namespace infinity {
 

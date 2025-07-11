@@ -1,19 +1,19 @@
 module;
 
-export module multi_posting_decoder;
+export module infinity_core:multi_posting_decoder;
 
-import stl;
-import byte_slice_reader;
+import :stl;
+import :byte_slice_reader;
 
-import index_decoder;
-import in_doc_pos_iterator;
-import in_doc_pos_state;
-import in_doc_state_keeper;
-import segment_posting;
-import index_defines;
-import posting_list_format;
+import :index_decoder;
+import :in_doc_pos_iterator;
+import :in_doc_pos_state;
+import :in_doc_state_keeper;
+import :segment_posting;
+import :index_defines;
+import :posting_list_format;
 import internal_types;
-import posting_writer;
+import :posting_writer;
 
 namespace infinity {
 export class MultiPostingDecoder {

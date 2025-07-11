@@ -13,12 +13,12 @@
 // limitations under the License.
 
 module;
-export module common_query_filter;
-import stl;
-import roaring_bitmap;
+export module infinity_core:common_query_filter;
+import :stl;
+import :roaring_bitmap;
 import internal_types;
-import default_values;
-import filter_expression_push_down;
+import :default_values;
+import :filter_expression_push_down;
 
 namespace infinity {
 class FastRoughFilterEvaluator;

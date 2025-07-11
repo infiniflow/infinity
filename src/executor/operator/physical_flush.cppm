@@ -14,21 +14,21 @@
 
 module;
 
-export module physical_flush;
+export module infinity_core:physical_flush;
 
-import stl;
+import :stl;
 
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import base_expression;
-import load_meta;
-import infinity_exception;
+// import :query_context;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
+import :base_expression;
+import :load_meta;
+import :infinity_exception;
 import internal_types;
 import flush_statement;
 import data_type;
-import logger;
+import :logger;
 
 namespace infinity {
 

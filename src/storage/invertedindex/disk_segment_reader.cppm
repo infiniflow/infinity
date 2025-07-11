@@ -14,17 +14,17 @@
 
 module;
 
-export module disk_index_segment_reader;
-import stl;
+export module infinity_core:disk_index_segment_reader;
+import :stl;
 
-import segment_posting;
-import index_defines;
-import index_segment_reader;
-import dict_reader;
-import file_reader;
-import posting_list_format;
+import :segment_posting;
+import :index_defines;
+import :index_segment_reader;
+import :dict_reader;
+import :file_reader;
+import :posting_list_format;
 import internal_types;
-import term_meta;
+import :term_meta;
 
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {

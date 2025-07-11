@@ -19,12 +19,12 @@ module;
 
 #include <openccxx.h>
 
-import stl;
-import logger;
-import third_party;
-import chinese_analyzer;
+module infinity_core;
 
-module traditional_chinese_analyzer;
+import :stl;
+import :logger;
+import :third_party;
+import :chinese_analyzer;
 
 namespace fs = std::filesystem;
 

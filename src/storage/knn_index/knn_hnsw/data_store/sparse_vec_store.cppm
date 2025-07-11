@@ -21,12 +21,12 @@ module;
 #include <simde/x86/sse.h>
 #endif
 
-export module sparse_vec_store;
+export module infinity_core:sparse_vec_store;
 
-import stl;
-import local_file_handle;
-import hnsw_common;
-import sparse_util;
+import :stl;
+import :local_file_handle;
+import :hnsw_common;
+import :sparse_util;
 
 namespace infinity {
 

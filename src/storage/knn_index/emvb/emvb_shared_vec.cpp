@@ -14,8 +14,10 @@
 
 module;
 
-module emvb_shared_vec;
-import stl;
+module infinity_core;
+
+import :stl;
+import :emvb_shared_vec;
 
 namespace infinity {
 

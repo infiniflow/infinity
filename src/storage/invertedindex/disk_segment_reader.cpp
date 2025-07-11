@@ -16,28 +16,28 @@ module;
 #include <cassert>
 #include <sys/mman.h>
 
-module disk_index_segment_reader;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import segment_posting;
-import index_defines;
-import index_segment_reader;
-import file_reader;
-import dict_reader;
-import term_meta;
-import byte_slice;
-import posting_list_format;
+import :segment_posting;
+import :index_defines;
+import :index_segment_reader;
+import :file_reader;
+import :dict_reader;
+import :term_meta;
+import :byte_slice;
+import :posting_list_format;
 import internal_types;
-import third_party;
-import byte_slice_reader;
-import infinity_exception;
-import status;
-import logger;
-import persistence_manager;
-import infinity_context;
-import persist_result_handler;
-import virtual_store;
+import :third_party;
+import :byte_slice_reader;
+import :infinity_exception;
+import :status;
+import :logger;
+import :persistence_manager;
+import :infinity_context;
+import :persist_result_handler;
+import :virtual_store;
 
 namespace infinity {
 

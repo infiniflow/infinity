@@ -19,13 +19,7 @@ module;
 export module request_test;
 
 import base_test;
-import stl;
-import infinity_context;
-import session;
-import session_manager;
-import query_context;
-import query_result;
-import data_table;
+import infinity_core;
 
 using namespace infinity;
 

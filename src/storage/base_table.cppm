@@ -14,11 +14,10 @@
 
 module;
 
-export module base_table;
+export module infinity_core:base_table;
 
-import stl;
-import logger;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
 import global_resource_usage;
 
 namespace infinity {

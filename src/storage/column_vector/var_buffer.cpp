@@ -16,15 +16,15 @@ module;
 
 #include <vector>
 
-module var_buffer;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import third_party;
-import buffer_manager;
-import var_file_worker;
-import logger;
-import infinity_context;
+import :stl;
+import :infinity_exception;
+import :third_party;
+import :buffer_manager;
+import :var_file_worker;
+import :logger;
+import :infinity_context;
 
 namespace infinity {
 

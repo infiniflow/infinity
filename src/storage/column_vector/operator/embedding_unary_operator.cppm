@@ -14,14 +14,14 @@
 
 module;
 
-export module embedding_unary_operator;
+export module infinity_core:embedding_unary_operator;
 
-import stl;
-import roaring_bitmap;
-import column_vector;
-import infinity_exception;
+import :stl;
+import :roaring_bitmap;
+import :column_vector;
+import :infinity_exception;
 import embedding_info;
-import logger;
+import :logger;
 
 namespace infinity {
 

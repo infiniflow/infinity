@@ -11,18 +11,18 @@
 
 module;
 
-export module physical_read_cache;
+export module infinity_core:physical_read_cache;
 
-import stl;
-import physical_operator;
-import query_context;
-import operator_state;
-import base_table_ref;
+import :stl;
+import :physical_operator;
+import :query_context;
+import :operator_state;
+import :base_table_ref;
 import data_type;
-import result_cache_manager;
-import physical_operator_type;
-import load_meta;
-import logical_node_type;
+import :result_cache_manager;
+import :physical_operator_type;
+import :load_meta;
+import :logical_node_type;
 
 namespace infinity {
 

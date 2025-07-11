@@ -13,13 +13,15 @@
 // limitations under the License.
 
 module;
-import infinity_exception;
-import third_party;
-export module fst:fst;
-import stl;
-import crc;
-import :bytes;
-import :node;
+
+export module infinity_core:fst.fst;
+
+import :infinity_exception;
+import :third_party;
+import :stl;
+import :crc;
+import :fst.bytes;
+import :fst.node;
 
 /// An acyclic deterministic finite state transducer.
 ///

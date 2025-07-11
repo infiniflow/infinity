@@ -14,6 +14,7 @@
 
 #include "sparse_info.h"
 #include <arrow/type.h>
+#include "simdjson.h"
 #include <limits>
 
 namespace infinity {

@@ -16,16 +16,16 @@ module;
 
 #include <vector>
 
-module log_file;
+module infinity_core;
 
-import stl;
-import virtual_store;
-import third_party;
-import infinity_exception;
-import logger;
-import default_values;
-import infinity_context;
-import status;
+import :stl;
+import :virtual_store;
+import :third_party;
+import :infinity_exception;
+import :logger;
+import :default_values;
+import :infinity_context;
+import :status;
 import admin_statement;
 
 namespace infinity {

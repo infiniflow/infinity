@@ -16,11 +16,12 @@ module;
 
 #include <cassert>
 #include <iostream>
-module rank_feature_doc_iterator;
+module infinity_core;
 
-import stl;
-import logger;
-import smallfloat;
+import :stl;
+// import :logger;
+import :smallfloat;
+import row_id;
 
 namespace infinity {
 

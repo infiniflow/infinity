@@ -17,15 +17,15 @@ module;
 #include <algorithm>
 #include <vector>
 
-export module linscan_alg;
+export module infinity_core:linscan_alg;
 
-import stl;
-import sparse_util;
-import local_file_handle;
-import knn_result_handler;
+import :stl;
+import :sparse_util;
+import :local_file_handle;
+import :knn_result_handler;
 import serialize;
-import infinity_exception;
-import third_party;
+import :infinity_exception;
+import :third_party;
 
 namespace infinity {
 

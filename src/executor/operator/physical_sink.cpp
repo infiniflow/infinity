@@ -16,22 +16,23 @@ module;
 
 #include <string>
 
-module physical_sink;
+module infinity_core;
 
-import stl;
-import query_context;
+import :stl;
+import :query_context;
 
-import operator_state;
-import physical_operator_type;
-import fragment_context;
-import third_party;
-import fragment_data;
-import data_block;
-import status;
-import infinity_exception;
-import logger;
+import :operator_state;
+import :physical_operator_type;
+import :fragment_context;
+import :third_party;
+import :fragment_data;
+import :data_block;
+import :status;
+import :infinity_exception;
+import :logger;
 import logical_type;
 import column_def;
+import data_type;
 
 namespace infinity {
 

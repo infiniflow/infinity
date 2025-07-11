@@ -14,26 +14,26 @@
 
 module;
 
-import stl;
-import logical_node_type;
-import logical_explain;
-import column_remapper;
-import column_pruner;
-import lazy_load;
-import index_scan_builder;
-import apply_fast_rough_filter;
-import explain_logical_plan;
-import optimizer_rule;
-import bound_delete_statement;
-import bound_update_statement;
-import logical_node;
-import explain_statement;
-import logical_node_type;
-import base_statement;
-import result_cache_getter;
-import global_resource_usage;
+module infinity_core;
 
-module optimizer;
+import :stl;
+import :logical_node_type;
+import :logical_explain;
+import :column_remapper;
+import :column_pruner;
+import :lazy_load;
+import :index_scan_builder;
+import :apply_fast_rough_filter;
+import :explain_logical_plan;
+import :optimizer_rule;
+import :bound_delete_statement;
+import :bound_update_statement;
+import :logical_node;
+import explain_statement;
+import :logical_node_type;
+import base_statement;
+import :result_cache_getter;
+import global_resource_usage;
 
 namespace infinity {
 

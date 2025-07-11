@@ -1,19 +1,19 @@
 module;
 
-module posting_decoder;
+module infinity_core;
 
-import stl;
-import byte_slice_reader;
-import posting_list_format;
-import term_meta;
-import index_defines;
-import posting_field;
-import position_list_format_option;
-import doc_list_format_option;
+import :stl;
+import :byte_slice_reader;
+import :posting_list_format;
+import :term_meta;
+import :index_defines;
+import :posting_field;
+import :position_list_format_option;
+import :doc_list_format_option;
 
-import infinity_exception;
-import third_party;
-import logger;
+import :infinity_exception;
+import :third_party;
+import :logger;
 
 namespace infinity {
 

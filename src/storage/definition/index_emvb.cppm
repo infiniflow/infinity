@@ -14,14 +14,14 @@
 
 module;
 
-export module index_emvb;
+export module infinity_core:index_emvb;
 
-import stl;
+import :stl;
 
-import index_base;
-import base_table_ref;
+import :index_base;
+import :base_table_ref;
 import create_index_info;
-import third_party;
+import :third_party;
 import statement_common;
 
 namespace infinity {

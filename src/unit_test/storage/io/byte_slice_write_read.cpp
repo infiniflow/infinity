@@ -1,15 +1,8 @@
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import file_writer;
-import file_reader;
-import byte_slice;
-import byte_slice_reader;
-import byte_slice_writer;
 
 using namespace infinity;
 

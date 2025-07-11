@@ -1,12 +1,12 @@
 module;
 
-module posting_byte_slice;
-import stl;
+module infinity_core;
+import :stl;
 
-import posting_field;
-import flush_info;
-import file_writer;
-import file_reader;
+import :posting_field;
+import :flush_info;
+import :file_writer;
+import :file_reader;
 
 namespace infinity {
 

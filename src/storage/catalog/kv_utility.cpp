@@ -17,24 +17,24 @@ module;
 #include <tuple>
 #include <vector>
 
-module kv_utility;
+module infinity_core;
 
-import stl;
-import kv_code;
-import kv_store;
-// import status;
-import index_base;
-import third_party;
-import utility;
-// import rocksdb_merge_operator;
-import logger;
-import new_catalog;
-import infinity_context;
-import buffer_handle;
-import buffer_obj;
-import block_version;
-import buffer_manager;
-import infinity_exception;
+import :stl;
+import :kv_code;
+import :kv_store;
+// import :status;
+import :index_base;
+import :third_party;
+import :utility;
+// import :rocksdb_merge_operator;
+import :logger;
+import :new_catalog;
+import :infinity_context;
+import :buffer_handle;
+import :buffer_obj;
+import :block_version;
+import :buffer_manager;
+import :infinity_exception;
 
 namespace infinity {
 

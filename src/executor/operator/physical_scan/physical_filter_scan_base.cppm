@@ -14,15 +14,15 @@
 
 module;
 
-export module physical_filter_scan_base;
+export module infinity_core:physical_filter_scan_base;
 
-import stl;
-import physical_scan_base;
-import common_query_filter;
-import physical_operator_type;
-import base_table_ref;
-import load_meta;
-import roaring_bitmap;
+import :stl;
+import :physical_scan_base;
+import :common_query_filter;
+import :physical_operator_type;
+import :base_table_ref;
+import :load_meta;
+import :roaring_bitmap;
 
 namespace infinity {
 

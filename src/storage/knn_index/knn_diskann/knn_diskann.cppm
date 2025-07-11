@@ -14,24 +14,24 @@
 
 module;
 
-export module knn_diskann;
+export module infinity_core:knn_diskann;
 
-import stl;
-import deprecated_knn_distance;
-import infinity_exception;
-import index_base;
-import kmeans_partition;
-import search_top_1;
-import search_top_k;
-import knn_result_handler;
+import :stl;
+import :deprecated_knn_distance;
+import :infinity_exception;
+import :index_base;
+import :kmeans_partition;
+import :search_top_1;
+import :search_top_k;
+import :knn_result_handler;
 import knn_expr;
 import internal_types;
-import logger;
-import diskann_index_data;
-import diskann_dist_func;
+import :logger;
+import :diskann_index_data;
+import :diskann_dist_func;
 
 namespace infinity {
-template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
+export template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
 class KnnDiskAnn {
     using DistType = typename Compare::DistanceType;
     using ResultHandler = ReservoirResultHandler<Compare>;
@@ -115,6 +115,10 @@ private:
     UniquePtr<ResultHandler> result_handler_{};
 
     const DistType *queries_{};
+
+    SizeT query_count_{}; // maybe unused
+    SizeT top_k_{}; // maybe unused
+
     bool begin_{false};
 };
 

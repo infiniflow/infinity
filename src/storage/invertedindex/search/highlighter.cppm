@@ -14,12 +14,12 @@
 
 module;
 
-export module highlighter;
+export module infinity_core:highlighter;
 
-import stl;
-import singleton;
-import aho_corasick;
-import analyzer;
+import :stl;
+import :singleton;
+import :aho_corasick;
+import :analyzer;
 
 namespace infinity {
 

@@ -14,24 +14,16 @@
 
 module;
 
-export module physical_explain;
+export module infinity_core:physical_explain;
 
-import stl;
-
-import query_context;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
-import load_meta;
-import infinity_exception;
-import internal_types;
+import :stl;
+import :physical_operator;
 import explain_statement;
-import data_type;
-import logger;
-import plan_fragment;
-import profiler;
+import :physical_operator_type;
 
 namespace infinity {
+class QueryProfiler;
+class PlanFragment;
 
 export class PhysicalExplain final : public PhysicalOperator {
 public:

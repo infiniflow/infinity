@@ -17,27 +17,29 @@ module;
 #include <map>
 #include <string>
 
-module physical_check;
+module infinity_core;
 
-import stl;
-import new_txn;
-import query_context;
-import third_party;
+import :stl;
+import :new_txn;
+import :query_context;
+import :third_party;
 
-import profiler;
-import operator_state;
-import data_block;
+import :profiler;
+import :operator_state;
+import :data_block;
 
-import infinity_exception;
-import value_expression;
+import :infinity_exception;
+import :value_expression;
 
-import defer_op;
-import new_catalog;
-import status;
-import value;
+import :defer_op;
+import :new_catalog;
+import :status;
+import :value;
 import logical_type;
-import meta_tree;
-import db_meeta;
+import :meta_tree;
+import :db_meeta;
+import check_statement;
+import data_type;
 
 namespace infinity {
 

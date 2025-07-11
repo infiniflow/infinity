@@ -17,10 +17,11 @@ module;
 #include <thread>
 #include <vector>
 
-module periodic_trigger_thread;
+module infinity_core;
 
-import stl;
-import logger;
+import :stl;
+import :logger;
+import :periodic_trigger_thread;
 
 namespace infinity {
 

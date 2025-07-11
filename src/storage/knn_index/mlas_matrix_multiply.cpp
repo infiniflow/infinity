@@ -14,8 +14,8 @@
 
 module;
 #include "inc/mlas.h"
-module mlas_matrix_multiply;
-import stl;
+module infinity_core;
+import :stl;
 
 namespace infinity {
 

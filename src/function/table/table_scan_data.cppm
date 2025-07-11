@@ -14,14 +14,14 @@
 
 module;
 
-import stl;
-import function_data;
-import table_function;
-import global_block_id;
+export module infinity_core:table_scan_function_data;
 
-import new_catalog;
+import :stl;
+import :function_data;
+import :table_function;
+import :global_block_id;
 
-export module table_scan_function_data;
+import :new_catalog;
 
 namespace infinity {
 

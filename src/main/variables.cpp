@@ -14,10 +14,7 @@
 
 module;
 
-module variables;
-
-import stl;
-import default_values;
+module infinity_core;
 
 namespace infinity {
 

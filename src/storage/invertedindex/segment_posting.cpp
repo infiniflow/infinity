@@ -14,19 +14,18 @@
 
 module;
 
-import stl;
-import byte_slice;
-import posting_list_format;
-import posting_writer;
-import term_meta;
-import byte_slice_reader;
-import index_defines;
+module infinity_core;
+
+import :stl;
+import :byte_slice;
+import :posting_list_format;
+import :posting_writer;
+import :term_meta;
+import :byte_slice_reader;
+import :index_defines;
 import internal_types;
-import file_reader;
-
-import third_party;
-
-module segment_posting;
+import :file_reader;
+import :third_party;
 
 namespace infinity {
 void SegmentPosting::Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta) {

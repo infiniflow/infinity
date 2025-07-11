@@ -16,54 +16,15 @@
 
 import replay_test;
 import base_test;
-import stl;
-import third_party;
-import status;
-import new_catalog;
-import new_txn_manager;
-import infinity_context;
-import txn_state;
+import infinity_core;
 import extra_ddl_info;
-import infinity_exception;
 import column_def;
 import data_type;
 import logical_type;
-import table_def;
-import index_base;
-import index_secondary;
-import index_ivf;
-import index_full_text;
-import index_hnsw;
 import embedding_info;
 import sparse_info;
-import index_bmp;
 import internal_types;
-import defer_op;
 import statement_common;
-import meta_info;
-import data_block;
-import column_vector;
-import value;
-import kv_code;
-import kv_store;
-import new_txn;
-import buffer_obj;
-import buffer_handle;
-import secondary_index_in_mem;
-import secondary_index_data;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import db_meeta;
-import catalog_meta;
-import mem_index;
-import roaring_bitmap;
-import index_filter_evaluators;
-import index_emvb;
 import constant_expr;
 
 using namespace infinity;
@@ -96,7 +57,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
 
-    auto make_input_block = [&](Vector<SharedPtr<ColumnDef>> column_defs, Vector<const Value> values, SizeT row_cnt) {
+    auto make_input_block = [&](Vector<SharedPtr<ColumnDef>> column_defs, Vector<Value> values, SizeT row_cnt) {
         auto make_column = [&](SharedPtr<ColumnDef> &column_def, const Value &v) {
             auto col = ColumnVector::Make(column_def->type());
             col->Initialize();
@@ -123,7 +84,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     EXPECT_TRUE(status.ok());
 
     SharedPtr<DataBlock> input_block = make_input_block(Vector<SharedPtr<ColumnDef>>{column_def1, column_def2},
-                                                        Vector<const Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")},
+                                                        Vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde")},
                                                         10);
     txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
     status = txn->Append(*db_name, *table_name, input_block);
@@ -148,7 +109,7 @@ TEST_P(TestTxnCheckpointAddColumnTest, addcol_checkpoint_insert) {
     EXPECT_TRUE(status.ok());
 
     input_block = make_input_block(Vector<SharedPtr<ColumnDef>>{column_def1, column_def2, column_def3},
-                                   Vector<const Value>{Value::MakeInt(1), Value::MakeVarchar("abcde"), Value::MakeVarchar("abcde")},
+                                   Vector<Value>{Value::MakeInt(1), Value::MakeVarchar("abcde"), Value::MakeVarchar("abcde")},
                                    10);
     txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
     status = txn->Append(*db_name, *table_name, input_block);

@@ -14,30 +14,31 @@
 
 module;
 
-module physical_merge_match_sparse;
+module infinity_core;
 
-import stl;
-import query_context;
-import physical_operator_type;
-import operator_state;
-import logger;
-import status;
-import infinity_exception;
-import buffer_manager;
-import third_party;
-import default_values;
-import data_block;
-import value;
-import column_vector;
-import physical_scan_base;
+import :stl;
+import :query_context;
+import :physical_operator_type;
+import :operator_state;
+import :logger;
+import :status;
+import :infinity_exception;
+import :buffer_manager;
+import :third_party;
+import :default_values;
+import :data_block;
+import :value;
+import :column_vector;
+import :physical_scan_base;
 import sparse_info;
 import match_sparse_expr;
 import internal_types;
 import logical_type;
-import knn_result_handler;
-import merge_knn;
-import match_sparse_scan_function_data;
-import result_cache_manager;
+import :knn_result_handler;
+import :merge_knn;
+import :match_sparse_scan_function_data;
+import :result_cache_manager;
+import data_type;
 
 namespace infinity {
 

@@ -14,9 +14,9 @@
 
 module;
 
-export module new_compaction_alg;
+export module infinity_core:new_compaction_alg;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -14,12 +14,12 @@
 
 module;
 
-export module peer_task;
+export module infinity_core:peer_task;
 
-import stl;
+import :stl;
 import admin_statement;
 import global_resource_usage;
-import node_info;
+import :node_info;
 
 namespace infinity {
 

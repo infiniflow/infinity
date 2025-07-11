@@ -14,8 +14,9 @@
 
 module;
 
-export module emvb_product_quantization;
-import stl;
+export module infinity_core:emvb_product_quantization;
+
+import :stl;
 
 namespace infinity {
 class LocalFileHandle;
@@ -33,7 +34,7 @@ public:
     virtual void Load(LocalFileHandle &file_handle) = 0;
 };
 
-template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
+export template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 class PQ : public EMVBProductQuantizer {
 protected:
     static constexpr u32 subspace_centroid_num_ = std::numeric_limits<SUBSPACE_CENTROID_TAG>::max() + 1;

@@ -25,7 +25,7 @@ endif()
 if(NOT Python_INCLUDE_DIRS)
     message(STATUS "Getting python include directory from sysconfig..")
     execute_process(
-            COMMAND ${Python_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_paths()['include'])"
+            COMMAND ${Python_EXECUTABLE} -c "import :sysconfig; print(sysconfig.get_paths()['include'])"
             OUTPUT_VARIABLE Python_INCLUDE_DIRS RESULT_VARIABLE ret_code)
     string(STRIP "${Python_INCLUDE_DIRS}" Python_INCLUDE_DIRS)
     if((NOT (ret_code EQUAL "0")) OR (NOT IS_DIRECTORY ${Python_INCLUDE_DIRS})

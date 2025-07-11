@@ -17,18 +17,18 @@ module;
 #include <concepts>
 #include <type_traits>
 
-export module binary_operator;
+export module infinity_core:binary_operator;
 
-import stl;
-import column_vector;
-import vector_buffer;
+import :stl;
+import :column_vector;
+import :vector_buffer;
 
-import infinity_exception;
-import roaring_bitmap;
-import third_party;
+import :infinity_exception;
+import :roaring_bitmap;
+import :third_party;
 import internal_types;
-import status;
-import logger;
+import :status;
+import :logger;
 
 namespace infinity {
 
@@ -61,7 +61,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
-                Operator::template Execute(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                Operator::Execute(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 result_null->SetAllTrue();
             } else {
                 result_null->SetAllFalse();
@@ -74,7 +74,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right, result, count, state_ptr);
@@ -89,7 +89,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left_c, right, result, count, state_ptr);
@@ -104,7 +104,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right_c, result, count, state_ptr);
@@ -131,14 +131,14 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_ptr[row_index],
-                                       right_ptr[row_index],
-                                       result_ptr[row_index],
-                                       result_null.get(),
-                                       row_index,
-                                       nullptr,
-                                       nullptr,
-                                       state_ptr);
+            Operator::Execute(left_ptr[row_index],
+                              right_ptr[row_index],
+                              result_ptr[row_index],
+                              result_null.get(),
+                              row_index,
+                              nullptr,
+                              nullptr,
+                              state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -157,14 +157,7 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_constant,
-                                       right_ptr[row_index],
-                                       result_ptr[row_index],
-                                       result_null.get(),
-                                       row_index,
-                                       nullptr,
-                                       nullptr,
-                                       state_ptr);
+            Operator::Execute(left_constant, right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -183,14 +176,7 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_ptr[row_index],
-                                       right_constant,
-                                       result_ptr[row_index],
-                                       result_null.get(),
-                                       row_index,
-                                       nullptr,
-                                       nullptr,
-                                       state_ptr);
+            Operator::Execute(left_ptr[row_index], right_constant, result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -215,14 +201,14 @@ public:
         if (left_vector_type == ColumnVectorType::kConstant && right_vector_type == ColumnVectorType::kConstant) {
             if (!nullable || (left_null->IsAllTrue() && right_null->IsAllTrue())) {
                 bool answer;
-                Operator::template Execute(left->buffer_->GetCompactBit(0),
-                                           right->buffer_->GetCompactBit(0),
-                                           answer,
-                                           result_null.get(),
-                                           0,
-                                           nullptr,
-                                           nullptr,
-                                           state_ptr);
+                Operator::Execute(left->buffer_->GetCompactBit(0),
+                                  right->buffer_->GetCompactBit(0),
+                                  answer,
+                                  result_null.get(),
+                                  0,
+                                  nullptr,
+                                  nullptr,
+                                  state_ptr);
                 result->buffer_->SetCompactBit(0, answer);
                 result_null->SetAllTrue();
             } else {
@@ -238,12 +224,12 @@ public:
                 auto right_u8 = reinterpret_cast<const u8 *>(right->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
                 for (SizeT i = 0; i < count_bytes; ++i) {
-                    Operator::template Execute(left_u8[i], right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_u8[i], right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
-                    Operator::template Execute(left_u8[count_bytes], right_u8[count_bytes], ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_u8[count_bytes], right_u8[count_bytes], ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
                     u8 keep_mask = u8(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
@@ -263,12 +249,12 @@ public:
                 auto right_u8 = reinterpret_cast<const u8 *>(right->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
                 for (SizeT i = 0; i < count_bytes; ++i) {
-                    Operator::template Execute(left_u8, right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_u8, right_u8[i], result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
-                    Operator::template Execute(left_u8, right_u8[count_bytes], ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_u8, right_u8[count_bytes], ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
                     u8 keep_mask = u8(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
@@ -288,12 +274,12 @@ public:
                 auto left_u8 = reinterpret_cast<const u8 *>(left->data());
                 auto result_u8 = reinterpret_cast<u8 *>(result->data());
                 for (SizeT i = 0; i < count_bytes; ++i) {
-                    Operator::template Execute(left_u8[i], right_u8, result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_u8[i], right_u8, result_u8[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
                 if (count_tail > 0) {
                     u8 &tail_u8 = result_u8[count_bytes];
                     u8 ans;
-                    Operator::template Execute(left_u8[count_bytes], right_u8, ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    Operator::Execute(left_u8[count_bytes], right_u8, ans, result_null.get(), 0, nullptr, nullptr, state_ptr);
                     u8 keep_mask = u8(0xff) << count_tail;
                     tail_u8 = (tail_u8 & keep_mask) | (ans & ~keep_mask);
                 }
@@ -323,14 +309,14 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left->buffer_->GetCompactBit(row_index),
-                                       right->buffer_->GetCompactBit(row_index),
-                                       answer,
-                                       result_null.get(),
-                                       row_index,
-                                       nullptr,
-                                       nullptr,
-                                       state_ptr);
+            Operator::Execute(left->buffer_->GetCompactBit(row_index),
+                              right->buffer_->GetCompactBit(row_index),
+                              answer,
+                              result_null.get(),
+                              row_index,
+                              nullptr,
+                              nullptr,
+                              state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -350,14 +336,14 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left->buffer_->GetCompactBit(row_index),
-                                       right_boolean,
-                                       answer,
-                                       result_null.get(),
-                                       row_index,
-                                       nullptr,
-                                       nullptr,
-                                       state_ptr);
+            Operator::Execute(left->buffer_->GetCompactBit(row_index),
+                              right_boolean,
+                              answer,
+                              result_null.get(),
+                              row_index,
+                              nullptr,
+                              nullptr,
+                              state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -377,14 +363,14 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left_boolean,
-                                       right->buffer_->GetCompactBit(row_index),
-                                       answer,
-                                       result_null.get(),
-                                       row_index,
-                                       nullptr,
-                                       nullptr,
-                                       state_ptr);
+            Operator::Execute(left_boolean,
+                              right->buffer_->GetCompactBit(row_index),
+                              answer,
+                              result_null.get(),
+                              row_index,
+                              nullptr,
+                              nullptr,
+                              state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });

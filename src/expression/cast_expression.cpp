@@ -14,17 +14,18 @@
 
 module;
 
-module cast_expression;
+module infinity_core;
 
-import base_expression;
+import :base_expression;
 import logical_type;
-import infinity_exception;
-import bound_cast_func;
-import stl;
-import third_party;
-import cast_function;
-import status;
-import logger;
+import :infinity_exception;
+import :bound_cast_func;
+import :stl;
+import :third_party;
+import :cast_function;
+import :status;
+import :logger;
+import data_type;
 
 namespace infinity {
 

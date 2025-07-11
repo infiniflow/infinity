@@ -1,8 +1,8 @@
 module;
 
-export module position;
+export module infinity_core:position;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -18,21 +18,21 @@ module;
 #include <limits>
 #include <random>
 
-module fixed_dimensional_encoding;
+module infinity_core;
 
-import stl;
-import new_catalog;
+import :stl;
+import :new_catalog;
 import logical_type;
-import infinity_exception;
-import scalar_function;
-import scalar_function_set;
+import :infinity_exception;
+import :scalar_function;
+import :scalar_function_set;
 import internal_types;
 import data_type;
-import column_vector;
-import data_block;
-import value;
+import :column_vector;
+import :data_block;
+import :value;
 import array_info;
-import third_party;
+import :third_party;
 import embedding_info;
 
 namespace infinity {

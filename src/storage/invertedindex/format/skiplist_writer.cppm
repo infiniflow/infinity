@@ -1,12 +1,12 @@
 module;
 
-import stl;
-import file_writer;
-import file_reader;
-import posting_byte_slice;
-import short_list_optimize_util;
+export module infinity_core:skiplist_writer;
 
-export module skiplist_writer;
+import :stl;
+import :file_writer;
+import :file_reader;
+import :posting_byte_slice;
+import :short_list_optimize_util;
 
 namespace infinity {
 

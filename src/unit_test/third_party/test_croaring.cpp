@@ -13,8 +13,9 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-import croaring;
+import infinity_core;
 
 class CRoaringTest : public infinity::BaseTest {};
 

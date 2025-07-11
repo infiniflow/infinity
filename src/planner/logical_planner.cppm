@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_planner;
+export module infinity_core:logical_planner;
 
-import stl;
+import :stl;
 
-import query_context;
-import bind_context;
-import load_meta;
-import logical_node;
-import status;
+// import :query_context;
+import :bind_context;
+import :load_meta;
+import :logical_node;
+import :status;
 import internal_types;
 import base_statement;
 import select_statement;

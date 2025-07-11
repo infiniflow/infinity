@@ -15,16 +15,20 @@
 module;
 
 #include <sstream>
-import stl;
-import expression_type;
 
-import scalar_function;
-import logger;
-import infinity_exception;
-import third_party;
+module infinity_core;
+
+import :stl;
+import :expression_type;
+
+import :scalar_function;
+import :logger;
+import :infinity_exception;
+import :third_party;
 import statement_common;
-
-module knn_expression;
+import :knn_expression;
+import knn_expr;
+import internal_types;
 
 namespace infinity {
 

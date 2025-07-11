@@ -14,9 +14,9 @@
 
 module;
 
-export module multiply;
+export module infinity_core:multiply;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

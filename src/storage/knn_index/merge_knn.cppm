@@ -14,21 +14,21 @@
 
 module;
 
-export module merge_knn;
+export module infinity_core:merge_knn;
 
-import stl;
+import :stl;
 
-import knn_result_handler;
+import :knn_result_handler;
 
-import infinity_exception;
-import roaring_bitmap;
-import default_values;
+import :infinity_exception;
+import :roaring_bitmap;
+import :default_values;
 import internal_types;
 import statement_common;
 
 namespace infinity {
 
-class KnnScanSharedData;
+export class KnnScanSharedData;
 
 export class MergeKnnBase {
 public:

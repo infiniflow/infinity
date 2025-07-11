@@ -14,11 +14,11 @@
 
 module;
 
-export module doc_iterator;
+export module infinity_core:doc_iterator;
 
-import stl;
+import :stl;
 
-import index_defines;
+import :index_defines;
 import internal_types;
 
 namespace infinity {

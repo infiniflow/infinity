@@ -15,23 +15,25 @@
 module;
 
 #include <string>
-import stl;
-import query_context;
-import table_def;
-import data_table;
 
-import physical_operator_type;
-import operator_state;
+module infinity_core;
 
-import infinity_exception;
-import data_block;
-import column_vector;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-module physical_cross_product;
+import :physical_operator_type;
+import :operator_state;
+
+import :infinity_exception;
+import :data_block;
+import :column_vector;
+import data_type;
 
 namespace infinity {
 
-void PhysicalCrossProduct::Init(QueryContext* query_context) {}
+void PhysicalCrossProduct::Init(QueryContext *query_context) {}
 
 bool PhysicalCrossProduct::Execute(QueryContext *, OperatorState *) {
 #if 0

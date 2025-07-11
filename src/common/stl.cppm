@@ -60,7 +60,7 @@ module;
 #include <variant>
 #include <vector>
 
-export module stl;
+export module infinity_core:stl;
 
 export namespace std {
 

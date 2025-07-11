@@ -13,8 +13,10 @@
 // limitations under the License.
 
 module;
-export module fst:common_inputs;
-import stl;
+
+export module infinity_core:fst.common_inputs;
+
+import :stl;
 
 namespace infinity {
 

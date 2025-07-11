@@ -16,14 +16,14 @@ module;
 
 #include <string>
 
-module meta_info;
+module infinity_core;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import column_def;
-import infinity_exception;
-import wal_entry;
-import third_party;
+import :infinity_exception;
+import :wal_entry;
+import :third_party;
 import internal_types;
 
 namespace infinity {

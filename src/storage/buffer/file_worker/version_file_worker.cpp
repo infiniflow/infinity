@@ -14,15 +14,15 @@
 
 module;
 
-module version_file_worker;
+module infinity_core;
 
-import stl;
-import file_worker;
-import block_version;
-import infinity_exception;
-import logger;
-import third_party;
-import persistence_manager;
+import :stl;
+import :file_worker;
+import :block_version;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :persistence_manager;
 
 namespace infinity {
 

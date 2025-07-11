@@ -16,26 +16,26 @@ module;
 
 #include <sstream>
 
-module fragment_task;
+module infinity_core;
 
-import profiler;
-import plan_fragment;
-import stl;
-import third_party;
-import logger;
-import physical_source;
-import physical_sink;
-import physical_operator;
-import infinity_exception;
-import operator_state;
-import physical_operator_type;
-import query_context;
-import base_table_ref;
-import defer_op;
-import fragment_context;
-import status;
+import :profiler;
+import :plan_fragment;
+import :stl;
+import :third_party;
+import :logger;
+import :physical_source;
+import :physical_sink;
+import :physical_operator;
+import :infinity_exception;
+import :operator_state;
+import :physical_operator_type;
+import :query_context;
+import :base_table_ref;
+import :defer_op;
+import :fragment_context;
+import :status;
 import parser_assert;
-import infinity_context;
+import :infinity_context;
 
 namespace infinity {
 

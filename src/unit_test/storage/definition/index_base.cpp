@@ -12,16 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "statement/statement_common.h"
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-import index_base;
-import index_ivf;
-import index_hnsw;
-import index_full_text;
-
+import infinity_core;
 import statement_common;
 
 using namespace infinity;

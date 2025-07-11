@@ -14,15 +14,15 @@
 
 module;
 
-export module logical_update;
+export module infinity_core:logical_update;
 
-import stl;
+import :stl;
 
-import logical_node;
-import logical_node_type;
-import column_binding;
-import meta_info;
-import base_expression;
+import :logical_node;
+import :logical_node_type;
+import :column_binding;
+import :meta_info;
+import :base_expression;
 import internal_types;
 import data_type;
 

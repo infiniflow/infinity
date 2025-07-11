@@ -1,21 +1,20 @@
 module;
 
-import stl;
+module infinity_core;
 
-import file_writer;
-import file_reader;
-import doc_list_encoder;
-import inmem_posting_decoder;
-import inmem_position_list_decoder;
-import inmem_doc_list_decoder;
-import position_list_encoder;
-import posting_list_format;
-import index_defines;
-import term_meta;
-import vector_with_lock;
-import mem_usage_change;
-
-module posting_writer;
+import :stl;
+import :file_writer;
+import :file_reader;
+import :doc_list_encoder;
+import :inmem_posting_decoder;
+import :inmem_position_list_decoder;
+import :inmem_doc_list_decoder;
+import :position_list_encoder;
+import :posting_list_format;
+import :index_defines;
+import :term_meta;
+import :vector_with_lock;
+import :mem_usage_change;
 
 namespace infinity {
 

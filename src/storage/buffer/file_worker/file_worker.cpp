@@ -19,24 +19,23 @@ module;
 #include <filesystem>
 #include <tuple>
 
-module file_worker;
+module infinity_core;
 
-import stl;
-import utility;
-import infinity_exception;
-import local_file_handle;
-import third_party;
-import defer_op;
-import status;
-import virtual_store;
-import persistence_manager;
-import infinity_context;
-import logger;
-import persist_result_handler;
+import :stl;
+import :utility;
+import :infinity_exception;
+import :local_file_handle;
+import :third_party;
+import :defer_op;
+import :status;
+import :virtual_store;
+import :persistence_manager;
+import :infinity_context;
+import :logger;
+import :persist_result_handler;
 import global_resource_usage;
-import kv_code;
-import kv_store;
-import status;
+import :kv_code;
+import :kv_store;
 
 namespace infinity {
 

@@ -2,13 +2,14 @@ module;
 
 #include <cassert>
 
-module byte_slice_reader;
+module infinity_core;
 
-import stl;
-import byte_slice;
-import status;
-import infinity_exception;
-import logger;
+import :stl;
+import :byte_slice;
+import :status;
+import :infinity_exception;
+import :logger;
+import :byte_slice_reader;
 
 namespace infinity {
 

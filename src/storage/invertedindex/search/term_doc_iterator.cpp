@@ -16,12 +16,13 @@ module;
 
 #include <cassert>
 #include <iostream>
-module term_doc_iterator;
+module infinity_core;
 
-import stl;
-import column_length_io;
-import logger;
-import infinity_exception;
+import :stl;
+import :column_length_io;
+import :logger;
+import :infinity_exception;
+import row_id;
 
 namespace infinity {
 

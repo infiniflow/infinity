@@ -1,11 +1,11 @@
 module;
 
-export module s3_client_minio;
+export module infinity_core:s3_client_minio;
 
-import stl;
-import s3_client;
-import status;
-import third_party;
+import :stl;
+import :s3_client;
+import :status;
+import :third_party;
 import global_resource_usage;
 
 namespace infinity {

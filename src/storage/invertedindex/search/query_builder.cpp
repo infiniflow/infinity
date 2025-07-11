@@ -16,23 +16,24 @@ module;
 
 #include <iostream>
 #include <vector>
+// #include "storage/invertedindex/search/query_node.h"
 
-module query_builder;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import doc_iterator;
-import column_index_reader;
+import :doc_iterator;
+import :column_index_reader;
 import internal_types;
-import index_base;
-import infinity_exception;
-import query_node;
-import base_table_ref;
-import term_doc_iterator;
-import logger;
-import third_party;
-import parse_fulltext_options;
-import query_node;
+import :index_base;
+import :infinity_exception;
+import :query_node;
+import :base_table_ref;
+import :term_doc_iterator;
+import :logger;
+import :third_party;
+import :parse_fulltext_options;
+import :query_node;
 
 namespace infinity {
 

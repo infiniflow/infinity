@@ -14,9 +14,12 @@
 
 module;
 
-import stl;
+module infinity_core;
 
-module cast_table;
+import :stl;
+import :cast_table;
+import logical_type;
+import embedding_type;
 
 namespace infinity {
 
