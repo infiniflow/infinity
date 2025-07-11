@@ -93,7 +93,7 @@ class DataStore : public DataStoreBase<VecStoreT, LabelType, OwnMem> {
 public:
     using This = DataStore<VecStoreT, LabelType, OwnMem>;
     using Base = DataStoreBase<VecStoreT, LabelType, OwnMem>;
-    using JustMoreMisleadingName = typename VecStoreT::JustMoreMisleadingName;
+    using DataType = typename VecStoreT::DataType;
     using QueryVecType = typename VecStoreT::QueryVecType;
     using Inner = DataStoreInner<VecStoreT, LabelType, OwnMem>;
     using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
@@ -311,7 +311,7 @@ public:
         if constexpr (!VecStoreT::HasOptimize) {
             return;
         }
-        DenseVectorIter<JustMoreMisleadingName, LabelType> empty_iter(nullptr, this->dim(), 0);
+        DenseVectorIter<DataType, LabelType> empty_iter(nullptr, this->dim(), 0);
         AddVec(std::move(empty_iter));
     }
 
@@ -511,7 +511,7 @@ template <typename VecStoreT, typename LabelType, bool OwnMem>
 class DataStoreInnerBase {
 public:
     using This = DataStoreInner<VecStoreT, LabelType, OwnMem>;
-    using JustMoreMisleadingName = typename VecStoreT::JustMoreMisleadingName;
+    using DataType = typename VecStoreT::DataType;
     using VecStoreInner = typename VecStoreT::template Inner<OwnMem>;
     using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
     using GraphStoreInner = GraphStoreInner<OwnMem>;

@@ -185,7 +185,7 @@ public:
                 using T = std::decay_t<decltype(index)>;
                 if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                     using IndexT = std::decay_t<decltype(*index)>;
-                    if constexpr (!std::is_same_v<const typename IndexT::JustMoreMisleadingName *, typename Iter::ValueType>) {
+                    if constexpr (!std::is_same_v<const typename IndexT::DataType *, typename Iter::ValueType>) {
                         UnrecoverableError("Data type mismatch.");
                     } else if constexpr (IndexT::kOwnMem) {
                         HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
@@ -209,9 +209,9 @@ public:
                 } else {
                     using IndexT = std::decay_t<decltype(*index)>;
                     if constexpr (IndexT::kOwnMem) {
-                        using JustMoreMisleadingName = typename IndexT::JustMoreMisleadingName;
+                        using DataType = typename IndexT::DataType;
                         using QueryVecType = typename IndexT::QueryVecType;
-                        auto iter = DenseVectorIter<JustMoreMisleadingName, LabelT>(reinterpret_cast<QueryVecType>(data), dim, vec_num);
+                        auto iter = DenseVectorIter<DataType, LabelT>(reinterpret_cast<QueryVecType>(data), dim, vec_num);
                         res = index->StoreData(std::move(iter), option);
                     } else {
                         UnrecoverableError("Invalid index type.");

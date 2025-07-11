@@ -172,15 +172,15 @@ SizeT HnswHandler::InsertVecs(SegmentOffset block_offset,
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    using JustMoreMisleadingName = typename IndexT::JustMoreMisleadingName;
+                    using DataType = typename IndexT::DataType;
                     switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
                         case LogicalType::kEmbedding: {
-                            MemIndexInserterIter1<JustMoreMisleadingName> iter(block_offset, col, offset, row_count);
+                            MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
                             HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
                             break;
                         }
                         case LogicalType::kMultiVector: {
-                            MemIndexInserterIter1<MultiVectorRef<JustMoreMisleadingName>> iter(block_offset, col, offset, row_count);
+                            MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
                             HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
                             break;
                         }
@@ -392,7 +392,7 @@ void HnswHandler::CompressToLVQ() {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    using HnswIndexDataType = IndexT::JustMoreMisleadingName;
+                    using HnswIndexDataType = IndexT::DataType;
                     if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
                         UnrecoverableError("Invalid index type.");
                     } else {

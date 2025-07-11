@@ -196,12 +196,12 @@ public:
     }
 };
 
-export template <typename OtherDataType1111, typename CompressType, typename LVQCache, bool OwnMem>
-class LVQVecStoreMeta : public LVQVecStoreMetaBase<OtherDataType1111, CompressType, LVQCache, OwnMem> {
-    using This = LVQVecStoreMeta<OtherDataType1111, CompressType, LVQCache, OwnMem>;
-    using Inner = LVQVecStoreInner<OtherDataType1111, CompressType, LVQCache, OwnMem>;
+export template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
+class LVQVecStoreMeta : public LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem> {
+    using This = LVQVecStoreMeta<DataType, CompressType, LVQCache, OwnMem>;
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCache, OwnMem>;
     using LocalCacheType = LVQCache::LocalCacheType;
-    using LVQData = LVQData<OtherDataType1111, LocalCacheType, CompressType>;
+    using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
     using GlobalCacheType = LVQCache::GlobalCacheType;
 
 private:
@@ -245,10 +245,10 @@ public:
         return meta;
     }
 
-    template <typename LabelType, DataIteratorConcept<const OtherDataType1111 *, LabelType> Iterator>
+    template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
     void Optimize(Iterator &&query_iter, const Vector<Pair<Inner *, SizeT>> &inners, SizeT &mem_usage) {
         auto new_mean = MakeUnique<MeanType[]>(this->dim_);
-        auto temp_decompress = MakeUnique<OtherDataType1111[]>(this->dim_);
+        auto temp_decompress = MakeUnique<DataType[]>(this->dim_);
         SizeT cur_vec_num = 0;
         for (const auto [inner, size] : inners) {
             for (SizeT i = 0; i < size; ++i) {
@@ -285,11 +285,11 @@ public:
     }
 };
 
-export template <typename DataType11111, typename CompressType, typename LVQCache>
-class LVQVecStoreMeta<DataType11111, CompressType, LVQCache, false> : public LVQVecStoreMetaBase<DataType11111, CompressType, LVQCache, false> {
-    using This = LVQVecStoreMeta<DataType11111, CompressType, LVQCache, false>;
+export template <typename DataType, typename CompressType, typename LVQCache>
+class LVQVecStoreMeta<DataType, CompressType, LVQCache, false> : public LVQVecStoreMetaBase<DataType, CompressType, LVQCache, false> {
+    using This = LVQVecStoreMeta<DataType, CompressType, LVQCache, false>;
     using LocalCacheType = LVQCache::LocalCacheType;
-    using LVQData = LVQData<DataType11111, LocalCacheType, CompressType>;
+    using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
     using GlobalCacheType = LVQCache::GlobalCacheType;
 
 private:

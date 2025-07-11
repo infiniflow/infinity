@@ -50,7 +50,7 @@ export template <typename VecStoreType, typename LabelType, bool OwnMem>
 class KnnHnswBase {
 public:
     using This = KnnHnswBase<VecStoreType, LabelType, OwnMem>;
-    using JustMoreMisleadingName = typename VecStoreType::JustMoreMisleadingName;
+    using DataType = typename VecStoreType::DataType;
     using QueryVecType = typename VecStoreType::QueryVecType;
     using StoreType = typename VecStoreType::StoreType;
     using QueryType = typename VecStoreType::QueryType;
