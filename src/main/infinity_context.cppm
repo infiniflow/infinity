@@ -80,7 +80,7 @@ private:
     friend class Singleton;
 
     InfinityContext();
-    ~InfinityContext();
+    virtual ~InfinityContext();
 
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};
