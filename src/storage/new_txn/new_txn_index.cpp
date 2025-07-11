@@ -74,6 +74,8 @@ import mem_index_appender;
 import txn_context;
 import kv_utility;
 import dump_index_process;
+import persistence_manager;
+import persist_result_handler;
 
 namespace infinity {
 
