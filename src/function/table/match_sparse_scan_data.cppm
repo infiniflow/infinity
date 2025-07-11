@@ -31,7 +31,11 @@ import :sparse_util;
 
 namespace infinity {
 
-export class SparseDistanceBase {};
+export class SparseDistanceBase {
+public:
+    // other
+    virtual ~SparseDistanceBase() = default;
+};
 
 export template <typename DataType, typename IndexType, typename ResultType = DataType>
 class SparseDistance : public SparseDistanceBase {
