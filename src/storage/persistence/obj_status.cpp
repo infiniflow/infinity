@@ -57,12 +57,12 @@ String ObjStat::ToString() const {
 
 void ObjStat::Deserialize(std::string_view str) {
     simdjson::padded_string obj_json(str);
-    simdjson::ondemand::parser parser;
-    simdjson::ondemand::document doc = parser.iterate(obj_json);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(obj_json);
     ref_count_ = 0;
     obj_size_ = doc["obj_size"];
     parts_ = doc["parts"];
-    if (simdjson::ondemand::array array; doc["deleted_ranges"].get(array) == simdjson::SUCCESS) {
+    if (simdjson::array array; doc["deleted_ranges"].get(array) == simdjson::SUCCESS) {
         SizeT start = 0;
         SizeT end = 0;
         for (auto range_obj : array) {

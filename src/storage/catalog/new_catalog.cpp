@@ -17,8 +17,6 @@ module;
 #include <filesystem>
 #include <string>
 
-#include "simdjson.h"
-
 module infinity_core;
 
 import :stl;
@@ -407,8 +405,8 @@ Vector<SharedPtr<MetaKey>> NewCatalog::MakeMetaKeys() const {
         if (meta_key->type_ == MetaType::kPmObject) {
             auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
             simdjson::padded_string json(pm_path_key->value_);
-            simdjson::ondemand::parser parser;
-            simdjson::ondemand::document doc = parser.iterate(json);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json);
         }
         return false;
     });

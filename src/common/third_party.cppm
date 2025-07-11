@@ -26,20 +26,16 @@ module;
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
 #include "spdlog/fmt/ranges.h"
-#include "spdlog/logger.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
 #include "json.hpp"
-// #include "simdjson.h"
+#include "simdjson.h"
 
 #include "toml.hpp"
 
 #include "magic_enum.hpp"
-
-#include "blockingconcurrentqueue.h"
-#include "concurrentqueue.h"
 
 #include "parallel_hashmap/phmap.h"
 #include "pgm/pgm_index.hpp"
@@ -50,12 +46,9 @@ module;
 
 #include "Python.h"
 #include "arrow/api.h"
-#include "arrow/array.h"
 #include "arrow/array/array_base.h"
 #include "arrow/array/builder_primitive.h"
 #include "arrow/chunked_array.h"
-#include "arrow/io/api.h"
-#include "arrow/io/caching.h"
 #include "arrow/io/file.h"
 #include "arrow/memory_pool.h"
 #include "arrow/record_batch.h"
@@ -70,7 +63,6 @@ module;
 #include <arrow/array/array_primitive.h>
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
-#include <miniocpp/client.h>
 
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
@@ -170,20 +162,20 @@ namespace nlohmann {
 export using nlohmann::json;
 }
 
-// namespace simdjson {
-// export using simdjson::padded_string;
-// export using simdjson::simdjson_result;
-// export using simdjson::deserialize_tag;
-// export using simdjson::error_code;
-// export using ondemand::parser;
-// export using ondemand::document;
-// export using ondemand::object;
-// export using ondemand::array;
-// export using ondemand::value;
-// export using ondemand::number;
-// export using ondemand::json_type;
-// export using ondemand::number_type;
-// }
+namespace simdjson {
+export using simdjson::padded_string;
+export using simdjson::simdjson_result;
+export using simdjson::deserialize_tag;
+export using simdjson::error_code;
+export using ondemand::parser;
+export using ondemand::document;
+export using ondemand::object;
+export using ondemand::array;
+export using ondemand::value;
+export using ondemand::number;
+export using ondemand::json_type;
+export using ondemand::number_type;
+}
 
 namespace magic_enum {
 export using magic_enum::underlying_type_t;

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "simdjson.h"
 #include "gtest/gtest.h"
 
 import base_test;
@@ -43,8 +42,8 @@ TEST_F(JsonTest, test2) {
 
     String json_path = String(test_data_path()) + "/json/twitter.json";
     //    LOG_TRACE("JSON Path: {}", json_path);
-    simdjson::ondemand::parser parser;
+    simdjson::parser parser;
     simdjson::padded_string json = simdjson::padded_string::load(json_path);
-    simdjson::ondemand::document tweets = parser.iterate(json);
+    simdjson::document tweets = parser.iterate(json);
     EXPECT_EQ((uint64_t)tweets["search_metadata"]["count"].get<uint64_t>(), 100);
 }

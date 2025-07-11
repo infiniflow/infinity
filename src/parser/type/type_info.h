@@ -15,7 +15,6 @@
 #pragma once
 
 #include "json.hpp"
-// #include "simdjson.h"
 #include <cstdint>
 #include <string>
 

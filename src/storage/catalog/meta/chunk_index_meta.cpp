@@ -16,8 +16,6 @@ module;
 
 #include <vector>
 
-#include "simdjson.h"
-
 module infinity_core;
 
 import :kv_code;
@@ -64,8 +62,8 @@ void ChunkIndexMetaInfo::ToJson(nlohmann::json &json) const {
 
 void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
     simdjson::padded_string json(json_str);
-    simdjson::ondemand::parser parser;
-    simdjson::ondemand::document doc = parser.iterate(json);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json);
     base_name_ = doc["base_name"].get<String>();
     base_row_id_ = RowID::FromUint64(doc["base_row_id"].get<u64>());
     row_cnt_ = doc["row_count"].get<u64>();

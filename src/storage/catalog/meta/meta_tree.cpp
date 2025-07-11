@@ -15,7 +15,6 @@
 module;
 
 #include <re2/re2.h>
-#include "simdjson.h"
 
 #include <filesystem>
 #include <ranges>
@@ -565,8 +564,8 @@ SharedPtr<MetaTree> MetaTree::MakeMetaTree(const Vector<SharedPtr<MetaKey>> &met
             case MetaType::kPmObject: {
                 auto pm_path_key = static_cast<PmObjectMetaKey *>(meta_key.get());
                 simdjson::padded_string json(pm_path_key->value_);
-                simdjson::ondemand::parser parser;
-                simdjson::ondemand::document doc = parser.iterate(json);
+                simdjson::parser parser;
+                simdjson::document doc = parser.iterate(json);
                 String object_key = doc["obj_key"].get<String>();
                 if (object_key == "KEY_EMPTY") {
                     continue;

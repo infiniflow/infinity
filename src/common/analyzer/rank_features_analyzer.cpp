@@ -16,8 +16,6 @@ module;
 
 #include <string>
 
-#include "simdjson.h"
-
 module infinity_core;
 import :stl;
 import :term;
@@ -29,12 +27,12 @@ namespace infinity {
 
 int RankFeaturesAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     simdjson::padded_string json(input.text_);
-    simdjson::ondemand::parser parser;
-    simdjson::ondemand::document doc = parser.iterate(json);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json);
     u32 offset = 0;
     for (auto element : doc.get_array()) {
         auto item = element.value();
-        if (item.type() == simdjson::ondemand::json_type::object) {
+        if (item.type() == simdjson::json_type::object) {
             for (auto field : item.get_object()) {
                 std::string_view key = field.unescaped_key();
                 float value = field.value().get<float>();
