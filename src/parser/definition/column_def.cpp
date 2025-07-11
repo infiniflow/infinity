@@ -217,26 +217,36 @@ std::string ColumnDef::ToString() const {
     return ss.str();
 }
 
-nlohmann::json ColumnDef::ToJson() const {
-    nlohmann::json column_def_json;
-    column_def_json["column_type"] = this->type()->Serialize();
-    column_def_json["column_id"] = this->id();
-    column_def_json["column_name"] = this->name();
+void ColumnDef::ToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    writer.Key("column_type");
+    writer.StartObject();
+    this->type()->Serialize(writer);
+    writer.EndObject();
 
+    writer.Key("column_id");
+    writer.Int64(this->id());
+    writer.Key("column_name");
+    writer.String(this->name().c_str());
+
+    writer.Key("constraints");
+    writer.StartArray();
     for (const auto &column_constraint : this->constraints_) {
-        column_def_json["constraints"].emplace_back(column_constraint);
+        writer.Int((int32_t)column_constraint);
     }
+    writer.EndArray();
 
     if (!(this->comment().empty())) {
-        column_def_json["column_comment"] = this->comment();
+        writer.Key("column_comment");
+        writer.String(this->comment().c_str());
     }
 
     if (this->has_default_value()) {
+        writer.Key("default");
         auto default_expr = dynamic_pointer_cast<ConstantExpr>(this->default_expr_);
-        column_def_json["default"] = default_expr->Serialize();
+        writer.StartObject();
+        default_expr->Serialize(writer);
+        writer.EndObject();
     }
-
-    return column_def_json;
 }
 
 std::shared_ptr<ColumnDef> ColumnDef::FromJson(std::string_view col_def_str) {

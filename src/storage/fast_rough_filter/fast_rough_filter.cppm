@@ -66,9 +66,9 @@ public:
 
     bool IsValid() const;
 
-    void SaveToJsonFile(nlohmann::json &entry_json) const;
+    void SaveToJsonFile(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
-    bool LoadFromJsonFile(const nlohmann::json &entry_json);
+    bool LoadFromJsonFile(std::string_view json_sv);
 
 private:
     inline bool HaveMinMaxFilter() const { return finished_build_minmax_filter_.test(std::memory_order_acquire); }

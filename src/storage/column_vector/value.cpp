@@ -38,18 +38,22 @@ namespace infinity {
 
 namespace {
 template <typename T>
-void Embedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json &embedding_json) {
+void Embedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     for (size_t i = 0; i < dimension; ++i) {
         auto data = ((T *)(embedding.ptr))[i];
         if constexpr (std::is_same_v<decltype(data), Float16T> || std::is_same_v<decltype(data), BFloat16T>) {
-            embedding_json.push_back(static_cast<f32>(data));
+            writer.Double(static_cast<f32>(data));
+        } else if (std::is_integral_v<decltype(data)> && std::is_signed_v<decltype(data)>) {
+            writer.Int64(data);
+        } else if (std::is_integral_v<decltype(data)> && std::is_unsigned_v<decltype(data)>) {
+            writer.Uint64(data);
         } else {
-            embedding_json.push_back(data);
+            writer.Double(data);
         }
     }
 }
 
-void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json &embedding_json) {
+void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     if (dimension % 8 != 0) {
         Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
         RecoverableError(status);
@@ -60,51 +64,51 @@ void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimensi
         const u8 byte = array[i];
         for (size_t j = 0; j < 8; ++j) {
             int8_t elem = (byte & (1 << j)) ? 1 : 0;
-            embedding_json.push_back(elem);
+            writer.Int(elem);
         }
     }
 }
 
-void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, nlohmann::json &embedding_json) {
+void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     switch (type) {
         case EmbeddingDataType::kElemBit: {
-            BitmapEmbedding2JsonInternal(embedding, dimension, embedding_json);
+            BitmapEmbedding2JsonInternal(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemInt8: {
-            Embedding2JsonInternal<int8_t>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<int8_t>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemInt16: {
-            Embedding2JsonInternal<int16_t>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<int16_t>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemInt32: {
-            Embedding2JsonInternal<int32_t>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<int32_t>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemInt64: {
-            Embedding2JsonInternal<int64_t>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<int64_t>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemFloat: {
-            Embedding2JsonInternal<float>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<float>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemDouble: {
-            Embedding2JsonInternal<double>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<double>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemUInt8: {
-            Embedding2JsonInternal<uint8_t>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<uint8_t>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemFloat16: {
-            Embedding2JsonInternal<Float16T>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<Float16T>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemBFloat16: {
-            Embedding2JsonInternal<BFloat16T>(embedding, dimension, embedding_json);
+            Embedding2JsonInternal<BFloat16T>(embedding, dimension, writer);
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
@@ -114,7 +118,10 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
     }
 }
 
-void Tensor2Json(Span<char> data_span, const EmbeddingDataType type, const size_t embedding_dimension, nlohmann::json &tensor_json) {
+void Tensor2Json(Span<char> data_span,
+                 const EmbeddingDataType type,
+                 const size_t embedding_dimension,
+                 rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     const size_t data_bytes = data_span.size();
     const size_t basic_embedding_bytes = EmbeddingT::EmbeddingSize(type, embedding_dimension);
     if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
@@ -124,74 +131,79 @@ void Tensor2Json(Span<char> data_span, const EmbeddingDataType type, const size_
     EmbeddingT embedding(nullptr, false);
     for (size_t i = 0; i < embedding_num; ++i) {
         embedding.ptr = data_span.data() + i * basic_embedding_bytes;
-        nlohmann::json embedding_json;
-        Embedding2Json(embedding, type, embedding_dimension, embedding_json);
-        tensor_json.emplace_back(std::move(embedding_json));
+        writer.StartArray();
+        Embedding2Json(embedding, type, embedding_dimension, writer);
+        writer.EndArray();
     }
 }
 
 void TensorArray2Json(const Vector<Span<char>> &tensor_array,
                       const EmbeddingDataType type,
                       const size_t embedding_dimension,
-                      nlohmann::json &tensorarray_json) {
+                      rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     for (const auto tensor_span : tensor_array) {
-        nlohmann::json tensor_json;
-        Tensor2Json(tensor_span, type, embedding_dimension, tensor_json);
-        tensorarray_json.emplace_back(std::move(tensor_json));
+        writer.StartArray();
+        Tensor2Json(tensor_span, type, embedding_dimension, writer);
+        writer.EndArray();
     }
 }
 
 template <typename IndexT, typename DataType>
-void Sparse2JsonInternal1(const SparseValueInfo &sparse_value_info, nlohmann::json &sparse_json) {
+void Sparse2JsonInternal1(const SparseValueInfo &sparse_value_info, rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     auto [nnz, indice_span, data_span] = sparse_value_info.GetData();
     for (SizeT i = 0; i < nnz; ++i) {
         auto index = reinterpret_cast<IndexT *>(indice_span.data())[i];
         auto data = reinterpret_cast<DataType *>(data_span.data())[i];
+        writer.Key(std::to_string(index).c_str());
         if constexpr (std::is_same_v<decltype(data), Float16T> || std::is_same_v<decltype(data), BFloat16T>) {
-            sparse_json[std::to_string(index)] = static_cast<f32>(data);
+            writer.Double(static_cast<f32>(data));
+        } else if (std::is_integral_v<decltype(data)> && std::is_signed_v<decltype(data)>) {
+            writer.Int64(data);
+        } else if (std::is_integral_v<decltype(data)> && std::is_unsigned_v<decltype(data)>) {
+            writer.Uint64(data);
         } else {
-            sparse_json[std::to_string(index)] = data;
+            writer.Double(data);
         }
     }
 }
 
 template <typename IndexT>
-void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
+void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     switch (sparse_info->DataType()) {
         case EmbeddingDataType::kElemInt8: {
-            Sparse2JsonInternal1<IndexT, i8>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, i8>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemInt16: {
-            Sparse2JsonInternal1<IndexT, i16>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, i16>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemInt32: {
-            Sparse2JsonInternal1<IndexT, i32>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, i32>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemInt64: {
-            Sparse2JsonInternal1<IndexT, i64>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, i64>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemFloat: {
-            Sparse2JsonInternal1<IndexT, f32>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, f32>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemDouble: {
-            Sparse2JsonInternal1<IndexT, f64>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, f64>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemUInt8: {
-            Sparse2JsonInternal1<IndexT, u8>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, u8>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemFloat16: {
-            Sparse2JsonInternal1<IndexT, Float16T>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, Float16T>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemBFloat16: {
-            Sparse2JsonInternal1<IndexT, BFloat16T>(sparse_value_info, sparse_json);
+            Sparse2JsonInternal1<IndexT, BFloat16T>(sparse_value_info, writer);
             break;
         }
         case EmbeddingDataType::kElemBit:
@@ -201,22 +213,22 @@ void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseI
     }
 }
 
-void Sparse2Json(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
+void Sparse2Json(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, rapidjson::Writer<rapidjson::StringBuffer> &writer) {
     switch (sparse_info->IndexType()) {
         case EmbeddingDataType::kElemInt8: {
-            Sparse2JsonInternal<i8>(sparse_value_info, sparse_info, sparse_json);
+            Sparse2JsonInternal<i8>(sparse_value_info, sparse_info, writer);
             break;
         }
         case EmbeddingDataType::kElemInt16: {
-            Sparse2JsonInternal<i16>(sparse_value_info, sparse_info, sparse_json);
+            Sparse2JsonInternal<i16>(sparse_value_info, sparse_info, writer);
             break;
         }
         case EmbeddingDataType::kElemInt32: {
-            Sparse2JsonInternal<i32>(sparse_value_info, sparse_info, sparse_json);
+            Sparse2JsonInternal<i32>(sparse_value_info, sparse_info, writer);
             break;
         }
         case EmbeddingDataType::kElemInt64: {
-            Sparse2JsonInternal<i64>(sparse_value_info, sparse_info, sparse_json);
+            Sparse2JsonInternal<i64>(sparse_value_info, sparse_info, writer);
             break;
         }
         default: {
@@ -1518,70 +1530,70 @@ String Value::ToString() const {
     return {};
 }
 
-void Value::AppendToJson(const String &name, nlohmann::json &json) const {
+void Value::AppendToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {
-            json[name] = value_.boolean;
+            writer.Bool(value_.boolean);
             return;
         }
         case LogicalType::kTinyInt: {
-            json[name] = value_.tiny_int;
+            writer.Int(value_.tiny_int);
             return;
         }
         case LogicalType::kSmallInt: {
-            json[name] = value_.small_int;
+            writer.Int(value_.small_int);
             return;
         }
         case LogicalType::kInteger: {
-            json[name] = value_.integer;
+            writer.Int(value_.integer);
             return;
         }
         case LogicalType::kBigInt: {
-            json[name] = value_.big_int;
+            writer.Int64(value_.big_int);
             return;
         }
         case LogicalType::kFloat: {
-            json[name] = value_.float32;
+            writer.Double(value_.float32);
             return;
         }
         case LogicalType::kDouble: {
-            json[name] = value_.float64;
+            writer.Double(value_.float64);
             return;
         }
         case LogicalType::kFloat16: {
-            json[name] = static_cast<float>(value_.float16);
+            writer.Double(static_cast<float>(value_.float16));
             return;
         }
         case LogicalType::kBFloat16: {
-            json[name] = static_cast<float>(value_.bfloat16);
+            writer.Double(static_cast<float>(value_.bfloat16));
             return;
         }
         case LogicalType::kDate: {
-            json[name] = value_.date.ToString();
+            writer.String(value_.date.ToString().c_str());
             return;
         }
         case LogicalType::kTime: {
-            json[name] = value_.time.ToString();
+            writer.String(value_.time.ToString().c_str());
             return;
         }
         case LogicalType::kDateTime: {
-            json[name] = value_.datetime.ToString();
+            writer.String(value_.datetime.ToString().c_str());
             return;
         }
         case LogicalType::kTimestamp: {
-            json[name] = value_.timestamp.ToString();
+            writer.String(value_.timestamp.ToString().c_str());
             return;
         }
         case LogicalType::kInterval: {
-            json[name] = value_.interval.ToString();
+            writer.String(value_.interval.ToString().c_str());
             return;
         }
         case LogicalType::kRowID: {
-            json[name] = value_.row.ToString();
+            writer.String(value_.row.ToString().c_str());
             return;
         }
         case LogicalType::kVarchar: {
-            json[name] = value_info_->Get<StringValueInfo>().GetString();
+            writer.String(value_info_->Get<StringValueInfo>().GetString().c_str());
             return;
         }
         case LogicalType::kEmbedding: {
@@ -1591,13 +1603,17 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
                 UnrecoverableError("Embedding data size mismatch.");
             }
             const EmbeddingT embedding(data_span.data(), false);
-            Embedding2Json(embedding, embedding_info->Type(), embedding_info->Dimension(), json[name]);
+            writer.StartArray();
+            Embedding2Json(embedding, embedding_info->Type(), embedding_info->Dimension(), writer);
+            writer.EndArray();
             return;
         }
         case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
-            Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), json[name]);
+            writer.StartArray();
+            Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), writer);
+            writer.EndArray();
             return;
         }
         case LogicalType::kTensorArray: {
@@ -1608,30 +1624,31 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) const {
             for (const auto &embedding_value_info : embedding_value_infos) {
                 tensor_array.emplace_back(embedding_value_info->GetData());
             }
-            TensorArray2Json(tensor_array, embedding_info->Type(), embedding_info->Dimension(), json[name]);
+            writer.StartArray();
+            TensorArray2Json(tensor_array, embedding_info->Type(), embedding_info->Dimension(), writer);
+            writer.EndArray();
             return;
         }
         case LogicalType::kEmptyArray: {
-            json[name] = "[]";
+            writer.StartArray();
+            writer.EndArray();
             return;
         }
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<const SparseInfo *>(type_.type_info().get());
             const auto &sparse_value_info = static_cast<const SparseValueInfo &>(*value_info_);
 
-            nlohmann::json sparse_json;
-            Sparse2Json(sparse_value_info, sparse_info, sparse_json);
-            json[name] = sparse_json;
+            writer.StartObject();
+            Sparse2Json(sparse_value_info, sparse_info, writer);
+            writer.EndObject();
             return;
         }
         case LogicalType::kArray: {
-            auto &array_json = json[name];
-            array_json = nlohmann::json::array();
+            writer.StartArray();
             for (const auto &array_elements = this->GetArray(); const auto &v : array_elements) {
-                nlohmann::json v_json;
-                v.AppendToJson("v", v_json);
-                array_json.push_back(std::move(v_json["v"]));
+                v.AppendToJson(writer);
             }
+            writer.EndArray();
             return;
         }
         case LogicalType::kHugeInt:

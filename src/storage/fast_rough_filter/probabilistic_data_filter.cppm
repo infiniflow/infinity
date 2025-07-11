@@ -61,9 +61,9 @@ public:
 
     void DeserializeFromStringStream(IStringStream &is);
 
-    void SaveToJsonFile(nlohmann::json &entry_json) const;
+    void SaveToJsonFile(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
-    bool LoadFromJsonFile(const nlohmann::json &entry_json);
+    bool LoadFromJsonFile(std::string_view json_sv);
 };
 
 export template <typename ValueType>

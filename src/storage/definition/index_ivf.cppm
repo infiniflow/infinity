@@ -87,7 +87,7 @@ public:
 
     String BuildOtherParamsString() const override;
 
-    nlohmann::json Serialize() const override;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const override;
 
     static IndexIVFOption DeserializeIndexIVFOption(std::string_view ivf_option_str);
 

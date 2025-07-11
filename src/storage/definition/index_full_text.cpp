@@ -113,11 +113,12 @@ String IndexFullText::BuildOtherParamsString() const {
     return ss.str();
 }
 
-nlohmann::json IndexFullText::Serialize() const {
-    nlohmann::json res = IndexBase::Serialize();
-    res["analyzer"] = analyzer_;
-    res["flag"] = flag_;
-    return res;
+void IndexFullText::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    IndexBase::Serialize(writer);
+    writer.Key("analyzer");
+    writer.String(analyzer_.c_str());
+    writer.Key("flag");
+    writer.Uint(flag_);
 }
 
 SharedPtr<IndexFullText> IndexFullText::Deserialize(std::string_view index_def_str) {

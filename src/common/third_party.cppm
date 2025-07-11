@@ -83,6 +83,10 @@ module;
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/prettywriter.h"
+
 #pragma clang diagnostic pop
 
 export module third_party;
@@ -175,10 +179,12 @@ export using simdjson::padded_string;
 export using simdjson::simdjson_result;
 export using simdjson::deserialize_tag;
 export using simdjson::error_code;
+export using simdjson::simdjson_error;
 export using ondemand::parser;
 export using ondemand::document;
 export using ondemand::object;
 export using ondemand::array;
+export using ondemand::field;
 export using ondemand::value;
 export using ondemand::number;
 export using ondemand::json_type;
@@ -383,5 +389,35 @@ using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
 using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
 using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
+
+export namespace rapidjson {
+
+using Document = ::RAPIDJSON_NAMESPACE::Document;
+using Value = ::RAPIDJSON_NAMESPACE::Value;
+using StringBuffer = ::RAPIDJSON_NAMESPACE::StringBuffer;
+using Type = ::RAPIDJSON_NAMESPACE::Type;
+
+template <typename CharType = char>
+using UTF8 = ::RAPIDJSON_NAMESPACE::UTF8<CharType>;
+
+using CrtAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator;
+
+using WriteFlag = ::RAPIDJSON_NAMESPACE::WriteFlag;
+
+template <typename OutputStream,
+          typename SourceEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename TargetEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename StackAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator,
+          unsigned writeFlags = ::RAPIDJSON_NAMESPACE::WriteFlag::kWriteDefaultFlags>
+using PrettyWriter = ::RAPIDJSON_NAMESPACE::PrettyWriter<OutputStream, SourceEncoding, TargetEncoding, StackAllocator, writeFlags>;
+
+template <typename OutputStream,
+          typename SourceEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename TargetEncoding = ::RAPIDJSON_NAMESPACE::UTF8<>,
+          typename StackAllocator = ::RAPIDJSON_NAMESPACE::CrtAllocator,
+          unsigned writeFlags = ::RAPIDJSON_NAMESPACE::WriteFlag::kWriteDefaultFlags>
+using Writer = ::RAPIDJSON_NAMESPACE::Writer<OutputStream, SourceEncoding, TargetEncoding, StackAllocator, writeFlags>;
+
+} // namespace rapidjson
 
 } // namespace infinity

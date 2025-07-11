@@ -100,7 +100,16 @@ Status SegmentIndexMeta::GetFtInfo(SharedPtr<SegmentIndexFtInfo> &ft_info) {
 Status SegmentIndexMeta::SetChunkIDs(const Vector<ChunkID> &chunk_ids) {
     chunk_ids_ = chunk_ids;
     String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
-    String chunk_ids_str = nlohmann::json(chunk_ids).dump();
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartArray();
+        for (const auto &id : chunk_ids) {
+            writer.Uint(id);
+        }
+        writer.EndArray();
+    }
+    String chunk_ids_str = sb.GetString();
     Status status = kv_instance_.Put(chunk_ids_key, chunk_ids_str);
     if (!status.ok()) {
         return status;
@@ -194,7 +203,16 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
 
     String ft_info_key = GetSegmentIndexTag("ft_info");
     Vector<u64> sum_cnt = {ft_info_->ft_column_len_sum_, ft_info_->ft_column_len_cnt_};
-    String ft_info_str = nlohmann::json(sum_cnt).dump();
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartArray();
+        for (const auto &num : sum_cnt) {
+            writer.Uint64(num);
+        }
+        writer.EndArray();
+    }
+    String ft_info_str = sb.GetString();
     Status status = kv_instance_.Put(ft_info_key, ft_info_str);
     LOG_INFO(fmt::format("UpdateFtInfo: column_len_sum={}, column_len_cnt={}, ft_info_key={}, ft_info_str={}",
                          column_len_sum,
@@ -393,7 +411,10 @@ Status SegmentIndexMeta::LoadChunkIDs() {
     if (!status.ok()) {
         return status;
     }
-    chunk_ids_ = nlohmann::json::parse(chunk_ids_str).get<Vector<ChunkID>>();
+    simdjson::padded_string json_str(chunk_ids_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    chunk_ids_ = doc.get<Vector<ChunkID>>();
     return Status::OK();
 }
 
@@ -451,7 +472,10 @@ Status SegmentIndexMeta::LoadFtInfo() {
         }
         return status;
     }
-    Vector<u64> sum_cnt = nlohmann::json::parse(ft_info_str).get<Vector<u64>>();
+    simdjson::padded_string json_str(ft_info_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    Vector<u64> sum_cnt = doc.get<Vector<u64>>();
     ft_info_->ft_column_len_sum_ = sum_cnt[0];
     ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();

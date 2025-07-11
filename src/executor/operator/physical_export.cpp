@@ -155,33 +155,42 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     }
 
     return ExportToFileInner(query_context, export_op_state, [&](const Vector<ColumnVector> &column_vectors, SizeT row_idx) {
-        nlohmann::json line_json;
-        for (ColumnID block_column_idx = 0; block_column_idx < column_vectors.size(); ++block_column_idx) {
-            ColumnID select_column_idx = select_columns[block_column_idx];
-            switch (select_column_idx) {
-                case COLUMN_IDENTIFIER_ROW_ID: {
-                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
-                    v.AppendToJson("_row_id", line_json);
-                    break;
-                }
-                case COLUMN_IDENTIFIER_CREATE: {
-                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
-                    v.AppendToJson("_create_timestamp", line_json);
-                    break;
-                }
-                case COLUMN_IDENTIFIER_DELETE: {
-                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
-                    v.AppendToJson("_delete_timestamp", line_json);
-                    break;
-                }
-                default: {
-                    ColumnDef *column_def = column_defs[select_column_idx].get();
-                    Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
-                    v.AppendToJson(column_def->name(), line_json);
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            for (ColumnID block_column_idx = 0; block_column_idx < column_vectors.size(); ++block_column_idx) {
+                ColumnID select_column_idx = select_columns[block_column_idx];
+                switch (select_column_idx) {
+                    case COLUMN_IDENTIFIER_ROW_ID: {
+                        Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
+                        writer.Key("_row_id");
+                        v.AppendToJson(writer);
+                        break;
+                    }
+                    case COLUMN_IDENTIFIER_CREATE: {
+                        Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
+                        writer.Key("_create_timestamp");
+                        v.AppendToJson(writer);
+                        break;
+                    }
+                    case COLUMN_IDENTIFIER_DELETE: {
+                        Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
+                        writer.Key("_delete_timestamp");
+                        v.AppendToJson(writer);
+                        break;
+                    }
+                    default: {
+                        ColumnDef *column_def = column_defs[select_column_idx].get();
+                        Value v = column_vectors[block_column_idx].GetValueByIndex(row_idx);
+                        writer.Key(column_def->name().c_str());
+                        v.AppendToJson(writer);
+                    }
                 }
             }
+            writer.EndObject();
         }
-        String to_write = line_json.dump() + "\n";
+        String to_write = (String)sb.GetString() + "\n";
         return to_write;
     });
 }

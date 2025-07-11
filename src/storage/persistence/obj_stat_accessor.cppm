@@ -95,7 +95,7 @@ public:
 
     virtual void CheckValid(SizeT current_object_size) = 0;
 
-    virtual nlohmann::json Serialize() = 0;
+    virtual void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) = 0;
 
     virtual void Deserialize(std::string_view obj_str) = 0;
 
@@ -127,7 +127,7 @@ public:
 
     void CheckValid(SizeT current_object_size) override;
 
-    nlohmann::json Serialize() override;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) override;
 
     void Deserialize(std::string_view obj_str) override;
 
@@ -161,7 +161,7 @@ public:
 
     void CheckValid(SizeT current_object_size) override;
 
-    nlohmann::json Serialize() override;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) override;
 
     void Deserialize(std::string_view obj_str) override;
 

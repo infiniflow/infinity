@@ -35,12 +35,13 @@ namespace fs = std::filesystem;
 namespace infinity {
 constexpr SizeT BUFFER_SIZE = 1024 * 1024; // 1 MB
 
-nlohmann::json ObjAddr::Serialize() const {
-    nlohmann::json obj;
-    obj["obj_key"] = obj_key_;
-    obj["part_offset"] = part_offset_;
-    obj["part_size"] = part_size_;
-    return obj;
+void ObjAddr::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("obj_key");
+    writer.String(obj_key_.c_str());
+    writer.Key("part_offset");
+    writer.Uint64(part_offset_);
+    writer.Key("part_size");
+    writer.Uint64(part_size_);
 }
 
 void ObjAddr::Deserialize(std::string_view obj_str) {
@@ -139,7 +140,14 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
             String error_message = fmt::format("Failed to remove {}", tmp_file_path);
             UnrecoverableError(error_message);
         }
-        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            obj_addr.Serialize(writer);
+            writer.EndObject();
+        }
+        status = kv_store_->Put(pm_fp_key, sb.GetString());
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -160,8 +168,14 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         std::lock_guard<std::mutex> lock(mtx_);
         objects_->PutNew(obj_key, ObjStat(src_size, 1, 0), result.drop_keys_);
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
-
-        status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            obj_addr.Serialize(writer);
+            writer.EndObject();
+        }
+        status = kv_store_->Put(pm_fp_key, sb.GetString());
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
@@ -187,8 +201,14 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         String error_message = fmt::format("Failed to remove {}", tmp_file_path);
         UnrecoverableError(error_message);
     }
-
-    status = kv_store_->Put(pm_fp_key, obj_addr.Serialize().dump());
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        obj_addr.Serialize(writer);
+        writer.EndObject();
+    }
+    status = kv_store_->Put(pm_fp_key, sb.GetString());
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
@@ -576,7 +596,14 @@ void PersistenceManager::SaveObjStat(const String &obj_key, const ObjStat &obj_s
 
 void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr) {
     String key = KeyEncode::PMObjectKey(RemovePrefix(path));
-    String value = obj_addr.Serialize().dump();
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        obj_addr.Serialize(writer);
+        writer.EndObject();
+    }
+    String value = sb.GetString();
     Status status = kv_store_->Put(key, value);
     if (!status.ok()) {
         UnrecoverableError(status.message());

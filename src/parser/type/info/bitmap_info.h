@@ -35,7 +35,7 @@ public:
 
     [[nodiscard]] size_t length_limit() const { return length_limit_; }
 
-    [[nodiscard]] nlohmann::json Serialize() const override;
+    void Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const override;
 
     [[nodiscard]] inline std::string ToString() const override { return "bitmap(" + std::to_string(length_limit_) + ")"; }
 

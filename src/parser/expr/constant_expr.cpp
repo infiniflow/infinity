@@ -421,24 +421,29 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(const char *&ptr, int32_t maxb
     return std::shared_ptr<ParsedExpr>(const_expr);
 }
 
-nlohmann::json ConstantExpr::Serialize() const {
-    nlohmann::json j;
-    j["type"] = static_cast<int32_t>(literal_type_);
+void ConstantExpr::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
+    writer.Key("type");
+    writer.Int((int32_t)literal_type_);
+
     switch (literal_type_) {
         case LiteralType::kBoolean: {
-            j["value"] = bool_value_;
+            writer.Key("value");
+            writer.Bool(bool_value_);
             break;
         }
         case LiteralType::kDouble: {
-            j["value"] = double_value_;
+            writer.Key("value");
+            writer.Double(double_value_);
             break;
         }
         case LiteralType::kString: {
-            j["value"] = str_value_;
+            writer.Key("value");
+            writer.String(str_value_);
             break;
         }
         case LiteralType::kInteger: {
-            j["value"] = integer_value_;
+            writer.Key("value");
+            writer.Int64(integer_value_);
             break;
         }
         case LiteralType::kEmptyArray:
@@ -449,52 +454,96 @@ nlohmann::json ConstantExpr::Serialize() const {
         case LiteralType::kTime:
         case LiteralType::kDateTime:
         case LiteralType::kTimestamp: {
-            j["value"] = date_value_;
+            writer.Key("value");
+            writer.String(date_value_);
             break;
         }
         case LiteralType::kIntegerArray: {
-            j["value"] = long_array_;
+            writer.Key("value");
+            writer.StartArray();
+            for (const auto &item : long_array_) {
+                writer.Int64(item);
+            }
+            writer.EndArray();
             break;
         }
         case LiteralType::kDoubleArray: {
-            j["value"] = double_array_;
+            writer.Key("value");
+            writer.StartArray();
+            for (const auto &item : double_array_) {
+                writer.Double(item);
+            }
+            writer.EndArray();
             break;
         }
         case LiteralType::kSubArrayArray: {
-            nlohmann::json sub_array_j(nlohmann::detail::value_t::array);
+            writer.Key("value");
+            writer.StartArray();
             for (const auto &val : sub_array_array_) {
-                sub_array_j.emplace_back(val->Serialize());
+                writer.StartObject();
+                val->Serialize(writer);
+                writer.EndObject();
             }
-            j["value"] = std::move(sub_array_j);
+            writer.EndArray();
             break;
         }
         case LiteralType::kInterval: {
             ParserError("Interval type is not supported in JSON serialization");
         }
         case LiteralType::kLongSparseArray: {
-            nlohmann::json sub_array_j;
-            sub_array_j["indices"] = long_sparse_array_.first;
-            sub_array_j["data"] = long_sparse_array_.second;
-            j["value"] = std::move(sub_array_j);
+            writer.Key("value");
+            writer.StartObject();
+            {
+                writer.Key("indices");
+                writer.StartArray();
+                for (const auto &val : long_sparse_array_.first) {
+                    writer.Int64(val);
+                }
+                writer.EndArray();
+
+                writer.Key("data");
+                writer.StartArray();
+                for (const auto &val : long_sparse_array_.second) {
+                    writer.Int64(val);
+                }
+                writer.EndArray();
+            }
+            writer.EndObject();
             break;
         }
         case LiteralType::kDoubleSparseArray: {
-            nlohmann::json sub_array_j;
-            sub_array_j["indices"] = double_sparse_array_.first;
-            sub_array_j["data"] = double_sparse_array_.second;
-            j["value"] = std::move(sub_array_j);
+            writer.Key("value");
+            writer.StartObject();
+            {
+                writer.Key("indices");
+                writer.StartArray();
+                for (const auto &val : double_sparse_array_.first) {
+                    writer.Int64(val);
+                }
+                writer.EndArray();
+
+                writer.Key("data");
+                writer.StartArray();
+                for (const auto &val : double_sparse_array_.second) {
+                    writer.Double(val);
+                }
+                writer.EndArray();
+            }
+            writer.EndObject();
             break;
         }
         case LiteralType::kCurlyBracketsArray: {
-            nlohmann::json sub_array_j(nlohmann::detail::value_t::array);
+            writer.Key("value");
+            writer.StartArray();
             for (const auto &val : curly_brackets_array_) {
-                sub_array_j.emplace_back(val->Serialize());
+                writer.StartObject();
+                val->Serialize(writer);
+                writer.EndObject();
             }
-            j["value"] = std::move(sub_array_j);
+            writer.EndArray();
             break;
         }
     }
-    return j;
 }
 
 std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_expr_str) {

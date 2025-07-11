@@ -2882,9 +2882,17 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
     }
 
     if (result.result_table_->total_hits_count_flag_) {
-        nlohmann::json json_response;
-        json_response["total_hits_count"] = result.result_table_->total_hits_count_;
-        response.extra_result = json_response.dump();
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                writer.Key("total_hits_count");
+                writer.Uint64(result.result_table_->total_hits_count_);
+            }
+            writer.EndObject();
+        }
+        response.extra_result = sb.GetString();
     }
 
     HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);

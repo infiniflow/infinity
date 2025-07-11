@@ -127,7 +127,7 @@ public:
 
     const std::shared_ptr<ConstantExpr> default_value() const { return std::dynamic_pointer_cast<ConstantExpr>(default_expr_); }
 
-    nlohmann::json ToJson() const;
+    void ToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer) const;
     static std::shared_ptr<ColumnDef> FromJson(std::string_view col_def_str);
 
 public:

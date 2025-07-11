@@ -51,7 +51,14 @@ Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
 
 Status TableIndexMeeta::SetIndexBase(const SharedPtr<IndexBase> &index_base) {
     String index_def_key = GetTableIndexTag("index_base");
-    Status status = kv_instance_.Put(index_def_key, index_base->Serialize().dump());
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        index_base->Serialize(writer);
+        writer.EndObject();
+    }
+    Status status = kv_instance_.Put(index_def_key, sb.GetString());
     if (!status.ok()) {
         return status;
     }
@@ -97,7 +104,16 @@ bool TableIndexMeeta::HasSegmentIndexID(SegmentID segment_id) {
 
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
     String segment_ids_key = GetTableIndexTag("segment_ids");
-    String segment_ids_str = nlohmann::json(segment_ids).dump();
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartArray();
+        for (const auto &id: segment_ids) {
+            writer.Uint(id);
+        }
+        writer.EndArray();
+    }
+    String segment_ids_str = sb.GetString();
     Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
     if (!status.ok()) {
         return status;
@@ -251,7 +267,10 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     if (!status.ok()) {
         return status;
     }
-    Vector<SegmentID> segment_ids = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
+    simdjson::padded_string json_pad(segment_ids_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
+    Vector<SegmentID> segment_ids = doc.get<Vector<SegmentID>>();
     segment_ids_ = segment_ids;
     return Status::OK();
 }

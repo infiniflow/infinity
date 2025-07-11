@@ -365,7 +365,7 @@ public:
 
     void Reset();
 
-    void AppendToJson(const String &name, nlohmann::json &json) const;
+    void AppendToJson(rapidjson::Writer<rapidjson::StringBuffer> &writer) const;
 
     void AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *array_builder) const;
 
