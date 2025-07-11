@@ -238,18 +238,19 @@ function(ADD_ARROW_LIB LIB_NAME)
     set(OUTPUT_PATH ${BUILD_OUTPUT_ROOT_DIRECTORY})
   endif()
 
-  if(WIN32
-     OR CMAKE_GENERATOR STREQUAL Xcode
-     OR NOT ARROW_POSITION_INDEPENDENT_CODE)
-    # We need to compile C++ separately for each library kind (shared and static)
-    # because of dllexport declarations on Windows.
-    # The Xcode generator doesn't reliably work with Xcode as target names are not
-    # guessed correctly.
-    set(USE_OBJLIB OFF)
-  else()
-    set(USE_OBJLIB ON)
-  endif()
+#  if(WIN32
+#     OR CMAKE_GENERATOR STREQUAL Xcode
+#     OR NOT ARROW_POSITION_INDEPENDENT_CODE)
+#    # We need to compile C++ separately for each library kind (shared and static)
+#    # because of dllexport declarations on Windows.
+#    # The Xcode generator doesn't reliably work with Xcode as target names are not
+#    # guessed correctly.
+#    set(USE_OBJLIB OFF)
+#  else()
+#    set(USE_OBJLIB ON)
+#  endif()
 
+  set(USE_OBJLIB ON)
   if(USE_OBJLIB)
     # Generate a single "objlib" from all C++ modules and link
     # that "objlib" into each library kind, to avoid compiling twice
@@ -415,6 +416,7 @@ function(ADD_ARROW_LIB LIB_NAME)
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
   endif()
 
+  set(BUILD_STATIC ON)
   if(BUILD_STATIC)
     add_library(${LIB_NAME}_static STATIC ${LIB_DEPS})
     if(EXTRA_DEPS)
