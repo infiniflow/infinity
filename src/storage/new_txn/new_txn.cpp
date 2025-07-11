@@ -1425,7 +1425,6 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
-    DeferFn defer1([&] { LOG_FLUSH(); });
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
