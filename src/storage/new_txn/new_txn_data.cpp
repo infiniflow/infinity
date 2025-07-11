@@ -64,6 +64,8 @@ import mem_index;
 import base_memindex;
 import emvb_index_in_mem;
 import txn_context;
+import persistence_manager;
+import persist_result_handler;
 
 namespace infinity {
 
@@ -1410,6 +1412,14 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        // When all data and index is write to disk, try to finalize the
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
+
     return Status::OK();
 }
 
@@ -1692,6 +1702,15 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
             //  }
         }
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        // When all data and index is write to disk, try to finalize the
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
+
     return Status::OK();
 }
 
