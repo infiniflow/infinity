@@ -57,13 +57,13 @@ inline bool operator!=(const Segment& segment1, const Segment& segment2) {
 
 /// \brief a helper class to divide a batch into segments of equal values
 ///
-/// For example, given a batch with two rows:
+/// For example, given a batch with two columns specifed as segment keys:
 ///
-/// A A
-/// A A
-/// A B
-/// A B
-/// A A
+/// A A [other columns]...
+/// A A ...
+/// A B ...
+/// A B ...
+/// A A ...
 ///
 /// Then the batch could be divided into 3 segments.  The first would be rows 0 & 1,
 /// the second would be rows 2 & 3, and the third would be row 4.
@@ -96,8 +96,8 @@ class ARROW_EXPORT RowSegmenter {
   /// independently, then `Reset` should be invoked before processing the next batch.
   virtual Status Reset() = 0;
 
-  /// \brief Get the next segment for the given batch starting from the given offset
-  virtual Result<Segment> GetNextSegment(const ExecSpan& batch, int64_t offset) = 0;
+  /// \brief Get all segments for the given batch
+  virtual Result<std::vector<Segment>> GetSegments(const ExecSpan& batch) = 0;
 };
 
 /// Consumes batches of keys and yields batches of the group ids.
@@ -119,6 +119,15 @@ class ARROW_EXPORT Grouper {
   /// be as wide as necessary.
   virtual Result<Datum> Consume(const ExecSpan& batch, int64_t offset = 0,
                                 int64_t length = -1) = 0;
+
+  /// Like Consume, but groups not already encountered emit null instead of
+  /// generating a new group id.
+  virtual Result<Datum> Lookup(const ExecSpan& batch, int64_t offset = 0,
+                               int64_t length = -1) = 0;
+
+  /// Like Consume, but only populates the Grouper without returning the group ids.
+  virtual Status Populate(const ExecSpan& batch, int64_t offset = 0,
+                          int64_t length = -1) = 0;
 
   /// Get current unique keys. May be called multiple times.
   virtual Result<ExecBatch> GetUniques() = 0;

@@ -97,23 +97,27 @@ function(arrow_create_merged_static_lib output_target)
   endforeach()
 
   if(APPLE)
-    # The apple-distributed libtool is what we want for bundling, but there is
-    # a GNU libtool that has a namecollision (and happens to be bundled with R, too).
-    # We are not compatible with GNU libtool, so we need to avoid it.
+    if(CMAKE_LIBTOOL)
+      set(LIBTOOL_MACOS ${CMAKE_LIBTOOL})
+    else()
+      # The apple-distributed libtool is what we want for bundling, but there is
+      # a GNU libtool that has a namecollision (and happens to be bundled with R, too).
+      # We are not compatible with GNU libtool, so we need to avoid it.
 
-    # check in the obvious places first to find Apple's libtool
-    # HINTS is used before system paths and before PATHS, so we use that
-    # even though hard coded paths should go in PATHS
-    # TODO: use a VALIDATOR when we require cmake >= 3.25
-    find_program(LIBTOOL_MACOS libtool HINTS /usr/bin
-                                             /Library/Developer/CommandLineTools/usr/bin)
+      # check in the obvious places first to find Apple's libtool
+      # HINTS is used before system paths and before PATHS, so we use that
+      # even though hard coded paths should go in PATHS
+      # TODO: use a VALIDATOR when we require cmake >= 3.25
+      find_program(LIBTOOL_MACOS libtool
+                   HINTS /usr/bin /Library/Developer/CommandLineTools/usr/bin)
+    endif()
 
-    # confirm that the libtool we found is not GNU libtool
+    # confirm that the libtool we found is Apple's libtool
     execute_process(COMMAND ${LIBTOOL_MACOS} -V
                     OUTPUT_VARIABLE LIBTOOL_V_OUTPUT
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
     if(NOT "${LIBTOOL_V_OUTPUT}" MATCHES ".*cctools-([0-9.]+).*")
-      message(FATAL_ERROR "libtool found appears to be the incompatible GNU libtool: ${LIBTOOL_MACOS}"
+      message(FATAL_ERROR "libtool found appears not to be Apple's libtool: ${LIBTOOL_MACOS}"
       )
     endif()
 
@@ -140,18 +144,6 @@ function(arrow_create_merged_static_lib output_target)
     endif()
 
     set(BUNDLE_COMMAND ${ar_tool} -M < ${ar_script_path})
-
-  elseif(MSVC)
-    if(CMAKE_LIBTOOL)
-      set(BUNDLE_TOOL ${CMAKE_LIBTOOL})
-    else()
-      find_program(BUNDLE_TOOL lib HINTS "${CMAKE_CXX_COMPILER}/..")
-      if(NOT BUNDLE_TOOL)
-        message(FATAL_ERROR "Cannot locate lib.exe to bundle libraries")
-      endif()
-    endif()
-    set(BUNDLE_COMMAND ${BUNDLE_TOOL} /NOLOGO /OUT:${output_lib_path}
-                       ${all_library_paths})
   else()
     message(FATAL_ERROR "Unknown bundle scenario!")
   endif()
@@ -246,18 +238,19 @@ function(ADD_ARROW_LIB LIB_NAME)
     set(OUTPUT_PATH ${BUILD_OUTPUT_ROOT_DIRECTORY})
   endif()
 
-  if(WIN32
-     OR CMAKE_GENERATOR STREQUAL Xcode
-     OR NOT ARROW_POSITION_INDEPENDENT_CODE)
-    # We need to compile C++ separately for each library kind (shared and static)
-    # because of dllexport declarations on Windows.
-    # The Xcode generator doesn't reliably work with Xcode as target names are not
-    # guessed correctly.
-    set(USE_OBJLIB OFF)
-  else()
-    set(USE_OBJLIB ON)
-  endif()
+#  if(WIN32
+#     OR CMAKE_GENERATOR STREQUAL Xcode
+#     OR NOT ARROW_POSITION_INDEPENDENT_CODE)
+#    # We need to compile C++ separately for each library kind (shared and static)
+#    # because of dllexport declarations on Windows.
+#    # The Xcode generator doesn't reliably work with Xcode as target names are not
+#    # guessed correctly.
+#    set(USE_OBJLIB OFF)
+#  else()
+#    set(USE_OBJLIB ON)
+#  endif()
 
+  set(USE_OBJLIB ON)
   if(USE_OBJLIB)
     # Generate a single "objlib" from all C++ modules and link
     # that "objlib" into each library kind, to avoid compiling twice
@@ -300,6 +293,9 @@ function(ADD_ARROW_LIB LIB_NAME)
     if(BUILD_STATIC AND ARG_STATIC_LINK_LIBS)
       target_link_libraries(${LIB_NAME}_objlib PRIVATE ${ARG_STATIC_LINK_LIBS})
     endif()
+
+    target_include_directories(${LIB_NAME}_objlib PUBLIC SYSTEM "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
+    target_include_directories(${LIB_NAME}_objlib PUBLIC SYSTEM "${CMAKE_BINARY_DIR}/third_party/thrift/")
   else()
     # Prepare arguments for separate compilation of static and shared libs below
     # TODO: add PCH directives
@@ -423,6 +419,7 @@ function(ADD_ARROW_LIB LIB_NAME)
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
   endif()
 
+  set(BUILD_STATIC ON)
   if(BUILD_STATIC)
     add_library(${LIB_NAME}_static STATIC ${LIB_DEPS})
     if(EXTRA_DEPS)

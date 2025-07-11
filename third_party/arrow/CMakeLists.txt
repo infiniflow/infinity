@@ -731,10 +731,7 @@ add_link_options($<$<COMPILE_LANGUAGE:CXX>:-L${LLVM_LIBRARY_DIRS}>)
 add_link_options($<$<COMPILE_LANGUAGE:CXX>:-Wl,-rpath,${LLVM_LIBRARY_DIRS}>)
 
 add_subdirectory(src/arrow)
-
-if(ARROW_PARQUET)
-  add_subdirectory(src/parquet)
-endif()
+add_subdirectory(src/parquet)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE.txt
               ${CMAKE_CURRENT_SOURCE_DIR}/../NOTICE.txt
