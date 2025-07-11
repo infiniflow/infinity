@@ -75,6 +75,8 @@ import :txn_context;
 import :kv_utility;
 import statement_common;
 import :dump_index_process;
+import :persistence_manager;
+import :persist_result_handler;
 
 namespace infinity {
 
@@ -266,6 +268,14 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     }
     if (index_base->index_type_ == IndexType::kFullText) {
         table_index_meta->UpdateFulltextSegmentTS(commit_ts);
+    }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        // When all data and index is write to disk, try to finalize the
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
     }
 
     return Status::OK();
@@ -659,6 +669,14 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
                                                                  std::move(raw_params));
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        // When all data and index is write to disk, try to finalize the
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
 
     return Status::OK();
 }
