@@ -204,7 +204,7 @@ public:
 
     void SaveToJsonFile(nlohmann::json &entry_json) const;
 
-    bool LoadFromJsonFile(const nlohmann::json &entry_json);
+    bool LoadFromJsonFile(std::string_view json_sv);
 };
 
 } // namespace infinity

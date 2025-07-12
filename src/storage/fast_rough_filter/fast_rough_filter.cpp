@@ -98,24 +98,26 @@ void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
 
 // will throw in caller function if return false
 // called in deserialize, remove unnecessary lock
-bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
+bool FastRoughFilter::LoadFromJsonFile(std::string_view json_sv) {
+    simdjson::padded_string json_pad(json_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
     if (HaveMinMaxFilter()) [[unlikely]] {
         String error_message = "FastRoughFilter::LoadFromJsonFile(): Already have data.";
         UnrecoverableError(error_message);
     }
     // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): try to load filter data from json.");
     // try load JsonTagBuildTime first
-    if (!entry_json.contains(JsonTagBuildTime)) {
+    if (doc[JsonTagBuildTime].get<TxnTimeStamp>(build_time_) != simdjson::SUCCESS) {
         LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): found no save data in json, stop loading.");
         return false;
     }
     // can load from json
     bool load_success = true;
-    build_time_ = entry_json[JsonTagBuildTime];
     {
         // load ProbabilisticDataFilter
         auto load_probabilistic_data_filter = MakeUnique<ProbabilisticDataFilter>();
-        if (load_probabilistic_data_filter->LoadFromJsonFile(entry_json)) {
+        if (load_probabilistic_data_filter->LoadFromJsonFile(json_sv)) {
             probabilistic_data_filter_ = std::move(load_probabilistic_data_filter);
             // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): Finish load ProbabilisticDataFilter data from json.");
         } else {
@@ -126,7 +128,7 @@ bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
     {
         // load MinMaxDataFilter
         auto load_min_max_data_filter = MakeUnique<MinMaxDataFilter>();
-        if (load_min_max_data_filter->LoadFromJsonFile(entry_json)) {
+        if (load_min_max_data_filter->LoadFromJsonFile(json_sv)) {
             min_max_data_filter_ = std::move(load_min_max_data_filter);
             // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): Finish load MinMaxDataFilter data from json.");
         } else {

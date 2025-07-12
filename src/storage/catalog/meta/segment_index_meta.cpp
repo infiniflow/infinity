@@ -393,7 +393,10 @@ Status SegmentIndexMeta::LoadChunkIDs() {
     if (!status.ok()) {
         return status;
     }
-    chunk_ids_ = nlohmann::json::parse(chunk_ids_str).get<Vector<ChunkID>>();
+    simdjson::padded_string json_str(chunk_ids_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    chunk_ids_ = doc.get<Vector<ChunkID>>();
     return Status::OK();
 }
 
@@ -451,7 +454,10 @@ Status SegmentIndexMeta::LoadFtInfo() {
         }
         return status;
     }
-    Vector<u64> sum_cnt = nlohmann::json::parse(ft_info_str).get<Vector<u64>>();
+    simdjson::padded_string json_str(ft_info_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    Vector<u64> sum_cnt = doc.get<Vector<u64>>();
     ft_info_->ft_column_len_sum_ = sum_cnt[0];
     ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();
