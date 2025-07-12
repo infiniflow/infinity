@@ -38,6 +38,7 @@ import case_expression;
 import function_expression;
 import value_expression;
 import fusion_expression;
+import embedding_info;
 import search_expression;
 import match_expression;
 import match_tensor_expression;
@@ -487,7 +488,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
             for (SizeT idx = 0; idx < arguments.size(); ++idx) {
-                if (arguments[idx]->Type().type() == LogicalType::kEmbedding) {
+                // Check if the argument is an embedding type but the function doesn't expect it
+                if (arguments[idx]->Type().type() == LogicalType::kEmbedding &&
+                    scalar_function.parameter_types_[idx].type() != LogicalType::kEmbedding &&
+                    scalar_function.parameter_types_[idx].type() != LogicalType::kArray) {
                     return nullptr;
                 }
                 // check if the argument types are matched to the scalar function parameter types
@@ -495,6 +499,16 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 if (arguments[idx]->Type() == scalar_function.parameter_types_[idx]) {
                     continue;
                 }
+
+                // Special handling for FDE function - skip casting for embedding/tensor types with different dimensions
+                if (scalar_function.name() == "FDE" && idx == 0 &&
+                    (arguments[idx]->Type().type() == LogicalType::kEmbedding || arguments[idx]->Type().type() == LogicalType::kTensor) &&
+                    (scalar_function.parameter_types_[idx].type() == LogicalType::kEmbedding ||
+                     scalar_function.parameter_types_[idx].type() == LogicalType::kTensor)) {
+                    // For FDE function, skip casting between embedding/tensor types - let the function handle it at runtime
+                    continue;
+                }
+
                 String name = arguments[idx]->Name();
                 arguments[idx] = CastExpression::AddCastToType(arguments[idx], scalar_function.parameter_types_[idx]);
                 // reset the alias name
@@ -502,6 +516,24 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             }
 
             SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(scalar_function, arguments);
+
+            // Special handling for FDE function - adjust return type based on target dimension parameter
+            if (scalar_function.name() == "FDE" && arguments.size() >= 2) {
+                // Extract target dimension from the second argument if it's a constant
+                if (arguments[1]->type() == ExpressionType::kValue) {
+                    auto value_expr = std::static_pointer_cast<ValueExpression>(arguments[1]);
+                    Value target_dim_value = value_expr->GetValue();
+                    if (target_dim_value.type().type() == LogicalType::kBigInt) {
+                        i32 target_dimension = static_cast<i32>(target_dim_value.GetValue<BigIntT>());
+                        // Create the correct return type with the target dimension
+                        auto target_embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, target_dimension);
+                        auto target_return_type = DataType(LogicalType::kEmbedding, target_embedding_info);
+                        // Update the scalar function's return type
+                        function_expr_ptr->func_.return_type_ = target_return_type;
+                    }
+                }
+            }
+
             return function_expr_ptr;
         }
         case FunctionType::kAggregate: {
