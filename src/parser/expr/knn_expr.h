@@ -59,10 +59,6 @@ public:
     std::string index_name_;
 
     std::unique_ptr<ParsedExpr> filter_expr_;
-
-    // Support for function expressions as query embeddings (e.g., FDE function)
-    std::unique_ptr<ParsedExpr> query_embedding_expr_;
-    std::string embedding_data_type_str_;
 };
 
 } // namespace infinity
