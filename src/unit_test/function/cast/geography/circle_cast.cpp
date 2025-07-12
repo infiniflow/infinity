@@ -42,11 +42,7 @@ import data_type;
 
 using namespace infinity;
 
-class CircleCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class CircleCastTest : public BaseTest {};
 
 TEST_F(CircleCastTest, circle_cast0) {
     using namespace infinity;

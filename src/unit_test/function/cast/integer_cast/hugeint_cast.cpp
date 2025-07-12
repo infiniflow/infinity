@@ -42,11 +42,7 @@ import data_type;
 import infinity_exception;
 
 using namespace infinity;
-class HugeIntCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class HugeIntCastTest : public BaseTest {};
 
 TEST_F(HugeIntCastTest, hugeint_cast0) {
     using namespace infinity;
