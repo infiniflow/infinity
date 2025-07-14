@@ -175,6 +175,7 @@ private:
 public:
     SharedPtr<MemIndex> GetMemIndex(const String &mem_index_key);
     SharedPtr<MemIndex> PopMemIndex(const String &mem_index_key);
+    bool HasMemIndex(const String &mem_index_key);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
