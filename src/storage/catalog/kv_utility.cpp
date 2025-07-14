@@ -70,7 +70,8 @@ Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
                                         const String &db_id_str,
                                         const String &table_id_str,
                                         const String &index_id_str,
-                                        TxnTimeStamp begin_ts) {
+                                        TxnTimeStamp begin_ts,
+                                        TxnTimeStamp commit_ts) {
     Vector<SegmentID> segment_ids;
 
     String segment_id_prefix = KeyEncode::CatalogIdxSegmentKeyPrefix(db_id_str, table_id_str, index_id_str);
@@ -80,8 +81,8 @@ Vector<SegmentID> GetTableIndexSegments(KVInstance *kv_instance,
         String key = iter->Key().ToString();
         auto [segment_id, is_segment_id] = ExtractU64FromStringSuffix(key, segment_id_prefix.size());
         if (is_segment_id) {
-            TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            TxnTimeStamp segment_commit_ts = std::stoull(iter->Value().ToString());
+            if (segment_commit_ts > begin_ts && segment_commit_ts != commit_ts && segment_commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 LOG_DEBUG(fmt::format("SKIP SEGMENT INDEX: {} {} {}", iter->Key().ToString(), commit_ts, begin_ts));
                 iter->Next();
                 continue;

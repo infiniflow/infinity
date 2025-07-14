@@ -78,6 +78,7 @@ public:
 
     SharedPtr<MemIndex> GetMemIndex();
     SharedPtr<MemIndex> PopMemIndex();
+    bool HasMemIndex();
 
     SharedPtr<String> GetSegmentIndexDir() const;
 

@@ -1118,39 +1118,20 @@ Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, c
 
 Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
     Status status;
-    ChunkID next_chunk_id = 0;
-    status = segment_index_meta.GetNextChunkID(next_chunk_id);
-    if (!status.ok()) {
-        return status;
-    }
-    if (next_chunk_id <= chunk_info.chunk_id_) {
-        status = segment_index_meta.SetNextChunkID(chunk_info.chunk_id_ + 1);
-        if (!status.ok()) {
-            return status;
-        }
-    }
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
     if (!status.ok()) {
         return status;
     }
-    auto iter = std::find(chunk_ids_ptr->begin(), chunk_ids_ptr->end(), chunk_info.chunk_id_);
-    if (iter != chunk_ids_ptr->end()) {
-        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-        LOG_WARN(fmt::format("Chunk index {}/{}/{}/{} already exists in KV",
-                             table_meta.db_id_str(),
-                             table_meta.table_id_str(),
-                             segment_index_meta.segment_id(),
-                             chunk_info.chunk_id_));
-        return Status::OK();
+
+    if (std::find(chunk_ids_ptr->begin(), chunk_ids_ptr->end(), chunk_info.chunk_id_) == chunk_ids_ptr->end()) {
+        status = segment_index_meta.AddChunkIndexID1(chunk_info.chunk_id_, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
-    status = segment_index_meta.AddChunkIndexID1(chunk_info.chunk_id_, new_txn);
-    if (!status.ok()) {
-        return status;
-    }
     ChunkIndexMeta chunk_index_meta(chunk_info.chunk_id_, segment_index_meta);
-
     ChunkIndexMetaInfo chunk_meta_info;
     {
         chunk_meta_info.base_name_ = chunk_info.base_name_;

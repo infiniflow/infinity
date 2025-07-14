@@ -78,7 +78,8 @@ Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts());
+                                                       table_meta_.begin_ts(),
+                                                       table_meta_.commit_ts());
     }
     return {&*segment_ids_, Status::OK()};
 }
@@ -269,7 +270,8 @@ Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts());
+                                                       table_meta_.begin_ts(),
+                                                       table_meta_.commit_ts());
     }
     if (!index_def_) {
         index_def_ =

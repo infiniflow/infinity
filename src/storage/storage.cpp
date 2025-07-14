@@ -282,6 +282,12 @@ Status Storage::AdminToWriter() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    if (mem_index_appender_ != nullptr) {
+        UnrecoverableError("mem index appender was initialized before.");
+    }
+    mem_index_appender_ = MakeUnique<MemIndexAppender>();
+    mem_index_appender_->Start();
+
     // Replay wal
     if (config_ptr_->ReplayWal() && !replay_entries.empty()) {
         auto [wal_max_txn_id, wal_system_start_ts] = wal_mgr_->ReplayWalEntries(replay_entries);
@@ -303,6 +309,7 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+    memory_index_tracer_->InitMemUsed();
 
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
@@ -333,12 +340,6 @@ Status Storage::AdminToWriter() {
     }
     dump_index_processor_ = MakeUnique<DumpIndexProcessor>();
     dump_index_processor_->Start();
-
-    if (mem_index_appender_ != nullptr) {
-        UnrecoverableError("mem index appender was initialized before.");
-    }
-    mem_index_appender_ = MakeUnique<MemIndexAppender>();
-    mem_index_appender_->Start();
 
     this->RecoverMemIndex();
 
@@ -798,6 +799,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+    memory_index_tracer_->InitMemUsed();
 
     bg_processor_->Start();
 

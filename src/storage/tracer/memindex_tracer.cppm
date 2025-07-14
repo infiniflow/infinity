@@ -61,6 +61,9 @@ public:
 
     virtual ~MemIndexTracer() = default;
 
+    // Need call only once after construction.
+    void InitMemUsed();
+
     void DecreaseMemUsed(SizeT mem_dec);
 
     void IncreaseMemoryUsage(SizeT mem_inc);
@@ -75,8 +78,6 @@ public:
 
     virtual void TriggerDump(SharedPtr<DumpMemIndexTask> task) = 0;
 
-    SizeT cur_index_memory() const { return cur_index_memory_.load(); }
-
 protected:
     virtual NewTxn *GetTxn() = 0;
 
@@ -90,36 +91,31 @@ protected:
 
 protected:
     const SizeT index_memory_limit_;
-    Atomic<SizeT> cur_index_memory_ = 0;
 
-    std::mutex mtx_; // protect proposed_dump_ and proposed_dump_size_
+    mutable std::mutex mtx_; // protect cur_index_memory_, proposed_dump_ and proposed_dump_size_
+    SizeT cur_index_memory_ = 0;
     HashMap<SharedPtr<MemIndex>, SizeT> proposed_dump_{};
     SizeT proposed_dump_size_ = 0;
 };
 
 inline void MemIndexTracer::IncreaseMemoryUsage(SizeT mem_inc) {
-    SizeT proposed_dump_size = 0;
-    {
-        std::lock_guard lck(mtx_);
-        proposed_dump_size = proposed_dump_size_;
-    }
-    LOG_TRACE(fmt::format("IncreaseMemoryUsage mem_inc {}, cur_index_memory_ {}, proposed_dump_size {}",
-                          mem_inc,
-                          cur_index_memory_.load(),
-                          proposed_dump_size));
-    if (mem_inc == 0 || index_memory_limit_ == 0) {
-        return;
-    }
     bool need_trigger_dump = false;
     {
         std::lock_guard lck(mtx_);
-        SizeT old_index_memory = cur_index_memory_.fetch_add(mem_inc);
-        if (old_index_memory + mem_inc > index_memory_limit_ + proposed_dump_size) {
+        LOG_TRACE(fmt::format("IncreaseMemoryUsage mem_inc {}, cur_index_memory_ {}, proposed_dump_size_ {}",
+                              mem_inc,
+                              cur_index_memory_,
+                              proposed_dump_size_));
+        if (mem_inc == 0 || index_memory_limit_ == 0) {
+            return;
+        }
+        cur_index_memory_ += mem_inc;
+        if (cur_index_memory_ > index_memory_limit_ + proposed_dump_size_) {
             need_trigger_dump = true;
             LOG_TRACE(fmt::format("mem index limit: {}, current index memory: {}, proposed dump size: {}, trigger dump index due to memory limit.",
                                   index_memory_limit_,
-                                  old_index_memory + mem_inc,
-                                  proposed_dump_size));
+                                  cur_index_memory_,
+                                  proposed_dump_size_));
         }
     }
     if (need_trigger_dump) {
