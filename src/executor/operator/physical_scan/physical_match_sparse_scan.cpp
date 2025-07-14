@@ -45,7 +45,7 @@ import :data_block;
 import sparse_info;
 import internal_types;
 import :knn_result_handler;
-import :merge_knn;
+// import :merge_knn;
 import :match_sparse_scan_function_data;
 import :global_block_id;
 import :roaring_bitmap;
