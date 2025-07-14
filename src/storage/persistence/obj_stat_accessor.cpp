@@ -186,7 +186,7 @@ LRUListEntry *ObjectStatMap::EnvictLast() {
 // ObjectStatAccessor_LocalStorage
 
 ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     [[maybe_unused]] SizeT sum_ref_count = 0;
     for (const auto &[key, obj_stat] : obj_map_) {
         if (obj_stat.ref_count_ > 0) {
@@ -198,7 +198,7 @@ ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
 }
 
 ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
         return nullptr;
@@ -209,7 +209,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
 }
 
 ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
         return nullptr;
@@ -219,7 +219,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
 }
 
 ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<String> &drop_keys) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
         return nullptr;
@@ -235,7 +235,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<Stri
 void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
     this->AddObjStatToKVStore(key, obj_stat);
 
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter != obj_map_.end()) {
         UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
@@ -249,7 +249,7 @@ void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_
 
     this->AddObjStatToKVStore(key, obj_stat);
 
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
     if (!insert_ok) {
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
@@ -257,7 +257,7 @@ void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_
 }
 
 Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     auto iter = obj_map_.find(key);
     if (iter == obj_map_.end()) {
         return None;
@@ -270,14 +270,14 @@ Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key)
 }
 
 void ObjectStatAccessor_LocalStorage::CheckValid(SizeT current_object_size) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     for (auto &[obj_key, obj_stat] : obj_map_) {
         obj_stat.CheckValid(obj_key, current_object_size);
     }
 }
 
 nlohmann::json ObjectStatAccessor_LocalStorage::Serialize() {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     nlohmann::json json_obj;
     json_obj["obj_stat_size"] = obj_map_.size();
     json_obj["obj_stat_array"] = nlohmann::json::array();
@@ -294,7 +294,7 @@ void ObjectStatAccessor_LocalStorage::Deserialize(std::string_view obj_str) {
     simdjson::padded_string obj_json(obj_str);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(obj_json);
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     // SizeT len = 0;
     // if (SizeT len_json; doc["obj_stat_size"].get<SizeT>(len_json) == simdjson::SUCCESS) {
     //     len = len_json;
@@ -315,7 +315,7 @@ void ObjectStatAccessor_LocalStorage::Deserialize(KVInstance *kv_instance) {
 
     auto iter = kv_instance->GetIterator();
     iter->Seek(obj_stat_prefix);
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
         String obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
         String obj_value = iter->Value().ToString();
@@ -329,7 +329,7 @@ void ObjectStatAccessor_LocalStorage::Deserialize(KVInstance *kv_instance) {
 }
 
 HashMap<String, ObjStat> ObjectStatAccessor_LocalStorage::GetAllObjects() const {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     return obj_map_;
 }
 
