@@ -85,6 +85,7 @@ ObjStat *ObjectStatMap::Get(const String &key) {
     if (obj_stat->ref_count_ == 0) {
         using_list_.splice(using_list_.begin(), lru_list_, lru_iter);
     }
+    LOG_INFO(fmt::format("Abc ObjectStatMap::Get Get object {} ref count {}", key, obj_stat->ref_count_));
     ++obj_stat->ref_count_;
     return obj_stat;
 }
@@ -104,6 +105,7 @@ Pair<bool, ObjStat *> ObjectStatMap::Release(const String &key) {
     }
     LRUListIter lru_iter = map_iter->second;
     ObjStat *obj_stat = &lru_iter->obj_stat_;
+    LOG_INFO(fmt::format("Abc ObjectStatMap::Release Release object {} ref count {}", key, obj_stat->ref_count_));
     if (obj_stat->ref_count_ <= 0) {
         UnrecoverableError(fmt::format("Release object {} ref count is {}", key, obj_stat->ref_count_));
     }
@@ -204,6 +206,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
         return nullptr;
     }
     ObjStat *obj_stat = &map_iter->second;
+    LOG_INFO(fmt::format("Abc ObjectStatAccessor_LocalStorage::Get Get object {} ref count {}", key, obj_stat->ref_count_));
     ++obj_stat->ref_count_;
     return obj_stat;
 }
@@ -225,6 +228,7 @@ ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<Stri
         return nullptr;
     }
     ObjStat *obj_stat = &map_iter->second;
+    LOG_INFO(fmt::format("Abc ObjectStatAccessor_LocalStorage::Release Release object {} ref count {}", key, obj_stat->ref_count_));
     if (obj_stat->ref_count_ <= 0) {
         UnrecoverableError(fmt::format("Release object {} ref count is {}", key, obj_stat->ref_count_));
     }

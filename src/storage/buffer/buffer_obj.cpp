@@ -190,9 +190,10 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
             }
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
-                LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
+                LOG_TRACE(fmt::format("Abc BufferObj::Save file: {}", GetFilename()));
                 bool all_save = file_worker_->WriteToFile(false, ctx);
                 if (all_save) {
+                    LOG_TRACE("Abc BufferObj::Save file all_save");
                     type_ = BufferType::kPersistent;
                 }
                 write = true;

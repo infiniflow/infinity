@@ -81,6 +81,8 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     } else {
         const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
         data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
+        LOG_INFO(fmt::format("Abc VersionFileWorker::WriteToFileImpl: checkpoint_ts: {}, latest_change_ts: {}",
+                             ctx.checkpoint_ts_, latest_change_ts));
         return ctx.checkpoint_ts_ >= latest_change_ts;
     }
 }
