@@ -28,6 +28,7 @@ import :local_file_handle;
 import :infinity_exception;
 import :third_party;
 import :logger;
+import command_statement;
 
 namespace infinity {
 
