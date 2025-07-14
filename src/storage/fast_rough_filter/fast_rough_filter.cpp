@@ -85,12 +85,13 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
     FinishBuildMinMaxFilterTask();
 }
 
-void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
+void FastRoughFilter::SaveToJsonFile(rapidjson::Writer<rapidjson::StringBuffer> &writer) const {
     if (HaveMinMaxFilter()) {
         //  LOG_TRACE("FastRoughFilter::SaveToJsonFile(): have FastRoughFilter, save now.");
-        entry_json[JsonTagBuildTime] = build_time_;
-        probabilistic_data_filter_->SaveToJsonFile(entry_json);
-        min_max_data_filter_->SaveToJsonFile(entry_json);
+        writer.Key(JsonTagBuildTime.data());
+        writer.Uint64(build_time_);
+        probabilistic_data_filter_->SaveToJsonFile(writer);
+        min_max_data_filter_->SaveToJsonFile(writer);
     } else {
         LOG_TRACE("FastRoughFilter::SaveToJsonFile(): No MinMax data.");
     }

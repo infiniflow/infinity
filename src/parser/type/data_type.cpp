@@ -420,15 +420,16 @@ std::shared_ptr<DataType> DataType::ReadAdv(const char *&ptr, int32_t maxbytes) 
     return data_type;
 }
 
-nlohmann::json DataType::Serialize() const {
-    nlohmann::json json_res;
-    json_res["data_type"] = this->type_;
+void DataType::Serialize(rapidjson::Writer<rapidjson::StringBuffer>& writer) const {
+    writer.Key("data_type");
+    writer.Int((int8_t)this->type_);
 
     if (this->type_info_ != nullptr) {
-        json_res["type_info"] = this->type_info_->Serialize();
+        writer.Key("type_info");
+        writer.StartObject();
+        this->type_info_->Serialize(writer);
+        writer.EndObject();
     }
-
-    return json_res;
 }
 
 std::shared_ptr<DataType> DataType::Deserialize(std::string_view data_type_str) {

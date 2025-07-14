@@ -310,7 +310,14 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
 
     for (const auto &column : table_def->columns()) {
         String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name(), commit_ts_);
-        status = kv_instance_->Put(column_key, column->ToJson().dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            column->ToJson(writer);
+            writer.EndObject();
+        }
+        status = kv_instance_->Put(column_key, sb.GetString());
         if (!status.ok()) {
             return status;
         }
@@ -512,7 +519,14 @@ Status TableMeeta::GetTableDetail(TableDetail &table_detail) {
 Status TableMeeta::AddColumn(const ColumnDef &column_def) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name(), commit_ts_);
     String column_name_value;
-    Status status = kv_instance_->Put(column_key, column_def.ToJson().dump());
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        column_def.ToJson(writer);
+        writer.EndObject();
+    }
+    Status status = kv_instance_->Put(column_key, sb.GetString());
     return status;
 }
 

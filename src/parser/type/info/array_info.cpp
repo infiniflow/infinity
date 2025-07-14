@@ -29,6 +29,6 @@ size_t ArrayInfo::Size() const { return sizeof(ArrayType); }
 
 std::string ArrayInfo::ToString() const { return elem_type_.ToString(); }
 
-nlohmann::json ArrayInfo::Serialize() const { return elem_type_.Serialize(); }
+void ArrayInfo::Serialize(rapidjson::Writer<rapidjson::StringBuffer> &writer) const { elem_type_.Serialize(writer); }
 
 } // namespace infinity
