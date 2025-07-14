@@ -1,45 +1,23 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You can use the download_deps_infinity_builder_centos7.sh script to download dependencies.
+# NOTICE: You can use the download_deps_infinity_builder_rocky8.sh script to download dependencies.
 
-FROM centos:7.9.2009
+FROM rockylinux:8
 
-RUN rm -f /etc/yum.repos.d/* && sed -i 's/^enabled=1/enabled=0/' /etc/yum/pluginconf.d/fastestmirror.conf
-# https://www.getpagespeed.com/server-setup/how-to-fix-yum-after-centos-6-went-eol
-COPY centos7-vault.repo /etc/yum.repos.d/
-
-RUN yum -y install git make wget which vim file gcc-c++ \
-        python3 python3-devel gettext-devel openssl-devel \
-        unzip bzip2 libtool m4 tree rpm-build postgresql graphviz\
-    && yum clean all \
+# Configure DNF to use Chinese mirrors
+RUN --mount=type=bind,source=scripts/rocky8-china-mirrors.repo,target=/tmp/rocky8-china-mirrors.repo \
+    --mount=type=bind,source=scripts/epel8-china-mirrors.repo,target=/tmp/epel8-china-mirrors.repo \
+    rm -f /etc/yum.repos.d/* \
+    && cp /tmp/rocky8-china-mirrors.repo /etc/yum.repos.d/Rocky-China.repo \
+    && dnf -y update && dnf -y install epel-release \
+    && rm -f /etc/yum.repos.d/epel*.repo \
+    && cp /tmp/epel8-china-mirrors.repo /etc/yum.repos.d/epel-china.repo \
+    && dnf -y install git make wget which vim file gcc-c++ \
+        python3.11 python3.11-devel python3.11-pip gettext-devel openssl-devel \
+        unzip bzip2 libtool m4 tree rpm-build postgresql graphviz \
+        autoconf automake \
+    && dnf clean all \
     && echo '/usr/local/lib' >> /etc/ld.so.conf.d/local.conf \
     && echo '/usr/local/lib64' >> /etc/ld.so.conf.d/local.conf
-
-# Install bison-3.8.2
-RUN --mount=type=bind,source=bison-3.8.2.tar.xz,target=/root/bison-3.8.2.tar.xz \
-    cd /root && tar xf bison-3.8.2.tar.xz && cd bison-3.8.2 \
-    && ./configure && make -j && make install \
-    && ldconfig && cd /root && rm -rf bison-3.8.2
-
-# Install binutils-2.41
-# Failed to build binutils-2.42
-RUN --mount=type=bind,source=binutils-2.41.tar.xz,target=/root/binutils-2.41.tar.xz \
-    cd /root && tar xf binutils-2.41.tar.xz && cd binutils-2.41 \
-    && ./configure --enable-gold \
-    && make -j && make install-strip \
-    && ldconfig && cd /root && rm -rf binutils-2.41
-
-# Install gcc-13.2.0
-RUN --mount=type=bind,source=gcc-13.2.0.tar.xz,target=/root/gcc-13.2.0.tar.xz \
-    cd /root && tar xf gcc-13.2.0.tar.xz \
-    && cd gcc-13.2.0 && ./contrib/download_prerequisites \
-    && cd /root && mkdir build-gcc && cd build-gcc \
-    && ../gcc-13.2.0/configure --enable-languages=c,c++ \
-        --disable-multilib --with-pic \
-    && make -j16 && make install-strip \
-    && cd /root && rm -rf build-gcc && rm -rf gcc-13.2.0 \
-    && ln -s gcc /usr/local/bin/cc && ldconfig
-
-ENV LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
 
 # Install cmake-3.31.7
 RUN --mount=type=bind,source=cmake-3.31.7-linux-x86_64.tar.gz,target=/root/cmake-3.31.7-linux-x86_64.tar.gz \
@@ -53,22 +31,47 @@ RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin && rm ninja
 
-# Install clang-18.1.8
+# Install clang-20.1.8
 # Add -DCLANG_DEFAULT_LINKER=lld to use lld by default
 # infinity seems to be incompatible with the lld linker
-RUN --mount=type=bind,source=llvm-project-18.1.8.src.tar.xz,target=/root/llvm-project-18.1.8.src.tar.xz \
-    cd /root && tar xf llvm-project-18.1.8.src.tar.xz \
-    && cd llvm-project-18.1.8.src && mkdir build && cd build \
+RUN --mount=type=bind,source=llvm-project-20.1.8.src.tar.xz,target=/root/llvm-project-20.1.8.src.tar.xz \
+    cd /root && tar xf llvm-project-20.1.8.src.tar.xz \
+    && cd llvm-project-20.1.8.src && mkdir build && cd build \
     && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_JOB_POOLS:STRING=link_pool=3 \
         -DCMAKE_JOB_POOL_LINK:STRING=link_pool \
-        -DGCC_INSTALL_PREFIX=/usr/local \
         -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;lldb" \
         -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
         -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
-        -DLLVM_TARGETS_TO_BUILD=X86 ../llvm \
+        -DLIBCXX_ENABLE_INCOMPLETE_FEATURES=ON \
+        -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=ON \
+        -DLIBCXX_INCLUDE_TESTS=OFF \
+        -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
+        -DLLVM_TARGETS_TO_BUILD=X86 \
+        -DPython3_EXECUTABLE=/usr/bin/python3.11 ../llvm \
     && ninja install/strip \
-    && ldconfig && cd /root && rm -rf llvm-project-18.1.8.src
+    && ldconfig && cd /root && rm -rf llvm-project-20.1.8.src
+
+# Fix missing __config_site file for libc++
+RUN echo '#ifndef _LIBCPP_CONFIG_SITE' > /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_CONFIG_SITE' >> /usr/local/include/c++/v1/__config_site && \
+    echo '' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_ABI_VERSION 1' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_ABI_NAMESPACE __1' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_HARDENING_MODE_DEFAULT _LIBCPP_HARDENING_MODE_NONE' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_ENABLE_NODISCARD' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_ENABLE_CXX17_REMOVED_FEATURES' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#define _LIBCPP_ENABLE_CXX20_REMOVED_FEATURES' >> /usr/local/include/c++/v1/__config_site && \
+    echo '' >> /usr/local/include/c++/v1/__config_site && \
+    echo '#endif // _LIBCPP_CONFIG_SITE' >> /usr/local/include/c++/v1/__config_site
+
+# Install bison-3.8.2
+RUN --mount=type=bind,source=bison-3.8.2.tar.xz,target=/root/bison-3.8.2.tar.xz \
+    cd /root && tar xf bison-3.8.2.tar.xz && cd bison-3.8.2 \
+    && ./configure && make -j && make install \
+    && ldconfig && cd /root && rm -rf bison-3.8.2
 
 # Install boost-1.86.0
 RUN --mount=type=bind,source=boost-1.86.0-cmake.tar.xz,target=/root/boost-1.86.0-cmake.tar.xz \
@@ -124,12 +127,6 @@ RUN --mount=type=bind,source=v1.1.0.tar.gz,target=/root/v1.1.0.tar.gz  \
     && cd brotli-1.1.0 && mkdir out && cd out && cmake -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --config Release --target install \
     && ldconfig && cd /root && rm -rf brotli-1.1.0
 
-# Install libbacktrace
-RUN --mount=type=bind,source=libbacktrace-master.zip,target=/root/libbacktrace-master.zip \
-    cd /root && unzip libbacktrace-master.zip \
-    && cd libbacktrace-master && CFLAGS="-fPIC" ./configure && make -j && make install \
-    && ldconfig && cd /root && rm -rf libbacktrace-master
-
 # Install jemalloc-5.3.0
 # Known issue: Composition of `-fsanitize=address`, staticly linked jemalloc and `mallctl` cause crash at initialization.
 # Refers to https://github.com/jemalloc/jemalloc/issues/2454
@@ -144,44 +141,9 @@ RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15
     && cd gperftools-2.15 && ./configure && make -j && make install \
     && ldconfig && cd /root && rm -rf gperftools-2.15
 
-# download https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.2/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz
+# Install sqllogictest
 RUN --mount=type=bind,source=sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz \
     cd /tmp && tar xzf /root/sqllogictest-bin-v0.28.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
-
-# OpenSSL
-# pyhton 3.6+ ssl module requires openssl 1.1.1+
-# "OpenSSL 1.1.x is not fully source compatible with OpenSSL 1.0.2." refers to https://github.com/openssl/openssl/issues/9772.
-# This means installing to /usr/local/lib may break app compilation.
-RUN --mount=type=bind,source=openssl-1.1.1w.tar.gz,target=/root/openssl-1.1.1w.tar.gz  \
-    cd /root && tar xzf openssl-1.1.1w.tar.gz \
-    && cd openssl-1.1.1w && ./config --prefix=/usr/local/openssl11 --openssldir=/usr/local/openssl11 shared \
-    && make -j && make install \
-    && ldconfig && cd /root && rm -rf openssl-1.1.1w
-
-# packages need by python optional modules: _dbm _gdbm _lzma _sqlite3 _tkinter _uuid
-# Too old: ncurses-devel sqlite-devel
-# TODO: failed to build ncurses 5.4, 5.7, 5.9
-RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel bzip2-devel readline-devel tk-devel \
-    && yum clean all
-
-# We need build a wheel for each supported Python minor version. Refers to https://github.com/wjakob/nanobind/pull/561.
-# Install Python 3.10
-RUN --mount=type=bind,source=Python-3.10.17.tar.xz,target=/root/Python-3.10.17.tar.xz  \
-    cd /root && tar xJf Python-3.10.17.tar.xz \
-    && cd Python-3.10.17 && ./configure --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto --enable-shared && make -j && make altinstall \
-    && ldconfig && cd /root && rm -rf Python-3.10.17
-
-RUN /usr/local/bin/pip3.10 config set global.index-url https://mirrors.aliyun.com/pypi/simple && /usr/local/bin/pip3.10 config set global.trusted-host mirrors.aliyun.com
-
-# Install tools for building and uploading a python wheel.
-RUN /usr/local/bin/pip3.10 install wheel auditwheel patchelf twine
-
-# Create a python virtual environment for each python version. Set PATH so that the shell activate a virtual environment automatically when entering a container from this image.
-RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
-
-# https://github.com/llvm/llvm-project/issues/96210
-# https://github.com/llvm/llvm-project/issues/57276
-RUN cp /usr/local/include/x86_64-unknown-linux-gnu/c++/v1/__config_site /usr/local/include/c++/v1
 
 # Install thrift 0.22.0
 RUN --mount=type=bind,source=thrift-0.22.0.tar.gz,target=/root/thrift-0.22.0.tar.gz  \
@@ -190,9 +152,13 @@ RUN --mount=type=bind,source=thrift-0.22.0.tar.gz,target=/root/thrift-0.22.0.tar
     && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
     && cd /root && rm -rf thrift-0.22.0
 
-RUN yum -y install expat-static perl-core libpcap-devel \
-    && yum clean all
+# Install Perl dependencies for OpenSSL and enable PowerTools for additional packages
+# Install pcre, libpcap and etc. for vectorscan.
+RUN dnf config-manager --set-enabled powertools \
+    && dnf -y install perl-core perl-IPC-Cmd expat libpcap-devel pcre-devel sqlite-devel \
+    && dnf clean all
 
+# Install OpenSSL
 RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.tar.gz  \
     cd /root && tar xzf openssl-3.0.15.tar.gz \
     && cd openssl-3.0.15 && ./config --prefix=/usr/local/openssl30 --openssldir=/usr/local/openssl30 shared zlib \
@@ -200,13 +166,14 @@ RUN --mount=type=bind,source=openssl-3.0.15.tar.gz,target=/root/openssl-3.0.15.t
     && ldconfig && cd /root && rm -rf openssl-3.0.15
 
 # Install colm
-RUN --mount=type=bind,source=colm-master.zip,target=/root/colm-master.zip  \
-    cd /root && unzip colm-master.zip \
-    && cd colm-master \
+RUN --mount=type=bind,source=colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip,target=/root/colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip  \
+    cd /root && unzip colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977.zip \
+    && cd colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977 \
     && ./autogen.sh \
     && ./configure --prefix=/usr/local/colm \
-    && make -j 12 install \
-    && rm -rf ../colm-master
+    && make -j 4 \
+    && make install \
+    && rm -rf ../colm-bd19b1ab7c0bcdba2772061bc38f6bca5cbba977
 
 # Install ragel
 RUN --mount=type=bind,source=ragel-master.zip,target=/root/ragel-master.zip  \
@@ -217,9 +184,18 @@ RUN --mount=type=bind,source=ragel-master.zip,target=/root/ragel-master.zip  \
     && make -j 12 install \
     && rm -rf ../ragel-master
 
-ENV PATH="/usr/local/venv310/bin:/usr/local/ragel/bin:$PATH"
+# Create symlinks to make Python 3.11 the default python/python3 while keeping system python3.6
+RUN ln -sf /usr/bin/python3.11 /usr/local/bin/python && \
+    ln -sf /usr/bin/python3.11 /usr/local/bin/python3 && \
+    ln -sf /usr/bin/pip3.11 /usr/local/bin/pip && \
+    ln -sf /usr/bin/pip3.11 /usr/local/bin/pip3
 
-ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
+ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local PATH=/usr/local/bin:/usr/local/ragel/bin:$PATH
+
+# Set Python paths for CMake to find the correct Python installation
+ENV Python3_EXECUTABLE=/usr/bin/python3.11
+ENV Python3_INCLUDE_DIR=/usr/include/python3.11
+ENV Python3_LIBRARY=/usr/lib64/libpython3.11.so
 
 # Install vectorscan
 RUN --mount=type=bind,source=vectorscan-master.zip,target=/root/vectorscan-master.zip \
@@ -231,6 +207,12 @@ RUN --mount=type=bind,source=vectorscan-master.zip,target=/root/vectorscan-maste
     && make -j 12 install \
     && rm -rf ../../vectorscan-master
 
+
+RUN /usr/bin/pip3.11 config set global.index-url https://mirrors.aliyun.com/pypi/simple && /usr/bin/pip3.11 config set global.trusted-host mirrors.aliyun.com
+
+# Create a python virtual environment for 3.11
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements_1.txt --mount=type=bind,source=python/benchmark/requirements.txt,target=/root/requirements_2.txt  --mount=type=bind,source=python/restart_test/requirements.txt,target=/root/requirements_3.txt --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements_4.txt python3.11 -m venv /usr/local/venv311 && source /usr/local/venv311/bin/activate && pip3 install --no-input wheel auditwheel patchelf twine && pip3 install --no-input -r /root/requirements_1.txt -r /root/requirements_2.txt -r /root/requirements_3.txt -r /root/requirements_4.txt
+
 # Install iproute2
 RUN --mount=type=bind,source=iproute2-6.9.0.tar.gz,target=/root/iproute2-6.9.0.tar.gz \
 cd /root \
@@ -239,21 +221,15 @@ cd /root \
 && make && make install \
 && ip -V
 
-# test requirements
-RUN --mount=type=bind,source=python/test_cluster/requirements.txt,target=/root/requirements1.txt \
-    cd /root \
-    && /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate \
-    && pip3 install -r requirements1.txt
-
-RUN yum install -y sudo bridge-utils iptables
+RUN dnf install -y sudo bridge-utils iptables && dnf clean all
 
 # Install Docker
 # https://docs.docker.com/engine/install/centos/#install-using-the-convenience-script
 # RUN --mount=type=bind,source=get-docker.sh,target=/root/get-docker.sh \
 #     cd /root && sh get-docker.sh
-RUN --mount=type=bind,source=docker-27.3.1.tgz,target=/root/docker-27.3.1.tgz \
+RUN --mount=type=bind,source=docker-27.4.1.tgz,target=/root/docker-27.4.1.tgz \
     cd /root \
-    && tar zxf docker-27.3.1.tgz \
+    && tar zxf docker-27.4.1.tgz \
     && sudo cp docker/* /usr/bin
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
