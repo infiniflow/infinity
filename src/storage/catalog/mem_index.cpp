@@ -15,6 +15,7 @@
 module;
 
 #include <chrono>
+#include <memory>
 
 module infinity_core;
 

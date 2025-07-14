@@ -16,6 +16,7 @@ module;
 
 #include <cmath>
 #include <tuple>
+#include <concepts>
 
 module infinity_core;
 

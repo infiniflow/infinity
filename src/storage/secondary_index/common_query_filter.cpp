@@ -13,9 +13,12 @@
 // limitations under the License.
 
 module;
+
 #include <bit>
 #include <cassert>
 #include <vector>
+#include <memory>
+
 module infinity_core;
 import :stl;
 import :roaring_bitmap;

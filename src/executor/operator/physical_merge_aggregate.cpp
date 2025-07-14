@@ -16,8 +16,10 @@ module;
 
 #include <string>
 #include <vector>
+#include <memory>
 
 module infinity_core;
+
 import :stl;
 import :third_party;
 import :query_context;

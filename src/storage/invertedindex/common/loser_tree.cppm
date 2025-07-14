@@ -4,6 +4,7 @@ module;
 
 #include <cassert>
 #include <vector>
+
 export module infinity_core:loser_tree;
 
 import :stl;

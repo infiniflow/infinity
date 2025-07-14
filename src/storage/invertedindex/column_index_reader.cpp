@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <vector>
+#include <memory>
 
 module infinity_core;
 

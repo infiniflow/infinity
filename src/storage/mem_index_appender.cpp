@@ -15,6 +15,7 @@
 module;
 
 #include <thread>
+#include <memory>
 
 module infinity_core;
 

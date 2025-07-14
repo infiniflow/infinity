@@ -341,6 +341,11 @@ using std::put_time;
 
 using std::views::keys;
 using std::views::values;
+
+using std::greater;
+using std::less;
+
+using std::make_move_iterator;
 } // namespace std
 
 namespace infinity {

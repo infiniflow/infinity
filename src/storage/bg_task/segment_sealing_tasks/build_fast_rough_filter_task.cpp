@@ -16,6 +16,8 @@ module;
 
 #include <algorithm>
 #include <string_view>
+#include <cstdlib>
+
 module infinity_core;
 
 import :stl;

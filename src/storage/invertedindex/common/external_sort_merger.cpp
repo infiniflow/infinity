@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -21,7 +22,8 @@ module;
 #include <functional>
 #include <queue>
 #include <sys/mman.h>
-#include <unistd.h>
+#include <sched.h>
+#include <pthread.h>
 
 module infinity_core;
 

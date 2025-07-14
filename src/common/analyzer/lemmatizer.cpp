@@ -14,12 +14,12 @@
 module;
 
 #include <cassert>
-#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <iterator>
 
 module infinity_core;
 

@@ -135,7 +135,7 @@ void GeneratePqPivots(LocalFileHandle &pq_pivot_file_handle,
     SizeT high_val = (SizeT)std::ceil((double)dim / (double)num_pq_chunks); // size of big chunk
     SizeT max_num_high = dim - (low_val * num_pq_chunks);                   // number of big chunks
     Vector<Vector<u32>> bin_to_dims(num_pq_chunks);                         // which dimensions are in which chunk
-    std::unordered_map<u32, u32> dim_to_bin;                                // which chunk does a dimension belong to
+    HashMap<u32, u32> dim_to_bin;                                // which chunk does a dimension belong to
 
     // assign each dimension to a chunk in order(big chunks first)
     for (u32 cur_chunk = 0; cur_chunk < max_num_high; cur_chunk++) {

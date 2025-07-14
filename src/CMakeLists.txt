@@ -1,5 +1,5 @@
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 #find_package(Python)

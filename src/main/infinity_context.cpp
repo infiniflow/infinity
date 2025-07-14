@@ -16,6 +16,7 @@ module;
 
 #include <cstdlib>
 #include <string>
+#include <memory>
 
 module infinity_core;
 

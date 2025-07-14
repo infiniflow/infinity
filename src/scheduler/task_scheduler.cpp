@@ -16,6 +16,7 @@ module;
 
 #include <list>
 #include <sched.h>
+#include <vector>
 
 module infinity_core;
 

@@ -17,6 +17,7 @@ module;
 #include <compare>
 #include <memory>
 #include <numeric>
+#include <iterator>
 
 module infinity_core;
 

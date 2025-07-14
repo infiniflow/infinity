@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+#include <algorithm>
 
 import base_test;
 import infinity_core;

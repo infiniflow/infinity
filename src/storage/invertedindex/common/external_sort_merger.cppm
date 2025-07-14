@@ -19,6 +19,7 @@ module;
 #include <stdexcept>
 #include <unistd.h>
 #include <vector>
+#include <type_traits>
 
 export module infinity_core:external_sort_merger;
 

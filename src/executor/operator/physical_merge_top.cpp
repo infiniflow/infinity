@@ -16,6 +16,7 @@ module;
 
 #include <memory>
 #include <numeric>
+#include <iterator>
 
 module infinity_core;
 

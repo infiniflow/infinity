@@ -16,6 +16,7 @@ module;
 
 #include <functional>
 #include <memory>
+#include <print>
 
 module infinity_core;
 
@@ -556,9 +557,12 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
 }
 
 void NewTxnManager::PrintAllKeyValue() const {
-    std::cout << String("All store key and value: ") << std::endl;
-    std::cout << kv_store_->ToString() << std::endl;
-    std::cout << String(" -------------- ") << std::endl;
+    // std::cout << String("All store key and value: ") << std::endl;
+    std::println("All store key and value: ");
+    // std::cout << kv_store_->ToString() << std::endl;
+    std::println("{}", kv_store_->ToString());
+    // std::cout << String(" -------------- ") << std::endl;
+    std::println(" -------------- ");
 }
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
