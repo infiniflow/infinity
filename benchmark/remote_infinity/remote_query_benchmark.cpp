@@ -24,11 +24,8 @@
 #include <thrift/transport/TTransportUtils.h>
 #include <unordered_set>
 
+import infinity_core;
 import compilation_config;
-
-import :profiler;
-import :virtual_store;
-import :third_party;
 import statement_common;
 import internal_types;
 

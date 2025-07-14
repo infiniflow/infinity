@@ -15,16 +15,8 @@
 #include "hnsw_benchmark_util.h"
 #include <cassert>
 
-import :stl;
-import :third_party;
-import :hnsw_alg;
-import :vec_store_type;
+import infinity_core;
 import compilation_config;
-import :virtual_store;
-import :status;
-import :hnsw_common;
-import :infinity_exception;
-import :profiler;
 
 // import :hnsw_lsg_builder;
 // import :index_hnsw;
