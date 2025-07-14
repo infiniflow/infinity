@@ -67,6 +67,48 @@ namespace {
 
 using namespace infinity;
 
+String SerializeErrorCode(long code) {
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        {
+            writer.Key("error_code");
+            writer.Int64(code);
+        }
+        writer.EndObject();
+    }
+    return sb.GetString();
+}
+
+String SerializeErrorCode(long code, const String &message) {
+    rapidjson::StringBuffer sb;
+    {
+        rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+        writer.StartObject();
+        {
+            writer.Key("error_code");
+            writer.Int64(code);
+            writer.Key("error_message");
+            writer.String(message.c_str());
+        }
+        writer.EndObject();
+    }
+    return sb.GetString();
+}
+
+void SerializeErrorCode(rapidjson::Writer<rapidjson::StringBuffer> &writer, long code) {
+    writer.Key("error_code");
+    writer.Int64(code);
+}
+
+void SerializeErrorCode(rapidjson::Writer<rapidjson::StringBuffer> &writer, long code, const String &message) {
+    writer.Key("error_code");
+    writer.Int64(code);
+    writer.Key("error_message");
+    writer.String(message.c_str());
+}
+
 Pair<SharedPtr<DataType>, infinity::Status> ParseColumnType(const Span<const std::string> tokens, std::string_view json_sv) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
@@ -241,28 +283,38 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ListDatabases();
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int i = 0; i < row_count; ++i) {
-                    Value value = data_block->GetValue(0, i);
-                    const String &db_name = value.GetVarchar();
-                    json_response["databases"].push_back(db_name);
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->ListDatabases();
+                if (result.IsOk()) {
+                    writer.Key("databases");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int i = 0; i < row_count; ++i) {
+                            Value value = data_block->GetValue(0, i);
+                            const String &db_name = value.GetVarchar();
+                            writer.String(db_name.c_str());
+                        }
+                    }
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -283,8 +335,6 @@ public:
         String option = doc["create_option"].get<String>();
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
-
         CreateDatabaseOptions options;
         if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
@@ -296,16 +346,14 @@ public:
                 } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
-                    json_response["error_code"] = 3074;
-                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
                     http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                    String error_json = SerializeErrorCode(3074, fmt::format("Invalid create option: {}", option));
+                    return ResponseFactory::createResponse(http_status, error_json);
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                String error_json = SerializeErrorCode(3067, "'CREATE OPTION' field value should be string type");
                 http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                return ResponseFactory::createResponse(http_status, error_json);
             }
         }
 
@@ -316,16 +364,15 @@ public:
 
         // create database
         auto result = infinity->CreateDatabase(database_name, options, db_comment);
-
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -340,7 +387,6 @@ public:
 
         // get drop option
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
         String body_info = request->readBodyToString();
         simdjson::padded_string json_pad(body_info);
@@ -355,30 +401,27 @@ public:
                 } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
-                    json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    String error_json = SerializeErrorCode(3075, fmt::format("Invalid drop option: {}", option));
                     http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                    return ResponseFactory::createResponse(http_status, error_json);
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                String error_json = SerializeErrorCode(3067, "'DROP OPTION' field value should be string type");
                 http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                return ResponseFactory::createResponse(http_status, error_json);
             }
         }
 
         auto result = infinity->DropDatabase(database_name, options);
-
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -388,43 +431,57 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto result = infinity->ShowDatabase(database_name);
-
-        nlohmann::json json_response;
-        nlohmann::json json_res;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
+        rapidjson::StringBuffer response_sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> response_writer(response_sb);
+            response_writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto result = infinity->ShowDatabase(database_name);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
 
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_database;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        const String &column_value = value.ToString();
-                        json_database[column_name] = column_value;
+                        rapidjson::StringBuffer sb;
+                        {
+                            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                            writer.StartArray();
+                            for (int row = 0; row < row_count; ++row) {
+                                writer.StartObject();
+                                for (SizeT col = 0; col < column_cnt; ++col) {
+                                    Value value = data_block->GetValue(col, row);
+                                    const String &column_name = result.result_table_->GetColumnNameById(col);
+                                    const String &column_value = value.ToString();
+                                    writer.Key(column_name.c_str());
+                                    writer.String(column_value.c_str());
+                                }
+                                writer.EndObject();
+                            }
+                            writer.EndArray();
+                        }
+                        simdjson::padded_string json_pad((String)sb.GetString());
+                        simdjson::parser parser;
+                        simdjson::document doc = parser.iterate(json_pad);
+                        for (auto element : doc.get_array()) {
+                            response_writer.Key(((String)element["name"].get<String>()).c_str());
+                            response_writer.String(((String)element["value"].get<String>()).c_str());
+                        }
                     }
-                    json_res["res"].push_back(json_database);
-                }
-                for (auto &element : json_res["res"]) {
-                    json_response[element["name"]] = element["value"];
+                    SerializeErrorCode(response_writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(response_writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            response_writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, response_sb.GetString());
     }
 };
 
@@ -444,18 +501,13 @@ public:
 
         auto fields = doc["fields"];
 
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
-        HTTPStatus http_status;
-        http_status = HTTPStatus::CODE_200;
+        HTTPStatus http_status = HTTPStatus::CODE_200;
 
         if (fields.type() != simdjson::json_type::array) {
             infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
-            HTTPStatus http_status;
+            String error_json = SerializeErrorCode((long)status.code(), status.message());
             http_status = HTTPStatus::CODE_500;
-            return ResponseFactory::createResponse(http_status, json_response.dump());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
 
         Vector<ColumnDef *> column_definitions;
@@ -471,11 +523,9 @@ public:
             }
         });
         if (infinity::Status status = ParseColumnDefs(fields.raw_json(), column_definitions); !status.ok()) {
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
-            HTTPStatus http_status;
+            String error_json = SerializeErrorCode((long)status.code(), status.message());
             http_status = HTTPStatus::CODE_500;
-            return ResponseFactory::createResponse(http_status, json_response.dump());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
 
         CreateTableOptions options;
@@ -489,31 +539,29 @@ public:
                 } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
-                    json_response["error_code"] = 3074;
-                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    String error_json = SerializeErrorCode(3074, fmt::format("Invalid create option: {}", option));
                     http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, error_json);
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                String error_json = SerializeErrorCode(3067, "'CREATE OPTION' field value should be string type");
                 http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, error_json);
             }
         }
 
-        if (json_response["error_code"] == 0) {
-            auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
-            column_definitions.clear();
-            table_constraint.clear();
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
-            }
+        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+        column_definitions.clear();
+        table_constraint.clear();
+        String error_json;
+        if (result.IsOk()) {
+            error_json = SerializeErrorCode(0);
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
+            http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -532,9 +580,6 @@ public:
         simdjson::document doc = parser.iterate(json_pad);
 
         HTTPStatus http_status;
-        http_status = HTTPStatus::CODE_200;
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
 
         DropTableOptions options;
         if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
@@ -545,29 +590,27 @@ public:
                 } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
-                    json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    String error_json = SerializeErrorCode(3075, fmt::format("Invalid drop option: {}", option));
                     http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, error_json);
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                String error_json = SerializeErrorCode(3067, "'DROP OPTION' field value should be string type");
                 http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, error_json);
             }
         }
 
-        if (json_response["error_code"] == 0) {
-            auto result = infinity->DropTable(database_name, table_name, options);
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
-            }
+        auto result = infinity->DropTable(database_name, table_name, options);
+        String error_json;
+        if (result.IsOk()) {
+            error_json = SerializeErrorCode(0);
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
+            http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -577,31 +620,40 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        String database_name = request->getPathVariable("database_name");
-        auto result = infinity->ShowTables(database_name);
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    // Column 1: table name
-                    Value value = data_block->GetValue(1, row);
-                    const String &column_value = value.ToString();
-                    json_response["tables"].push_back(column_value);
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String database_name = request->getPathVariable("database_name");
+                auto result = infinity->ShowTables(database_name);
+                if (result.IsOk()) {
+                    writer.Key("tables");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            // Column 1: table name
+                            Value value = data_block->GetValue(1, row);
+                            const String &column_value = value.ToString();
+                            writer.String(column_value.c_str());
+                        }
+                    }
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -611,41 +663,58 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        String database_name = request->getPathVariable("database_name");
-        String table_name = request->getPathVariable("table_name");
-
-        auto result = infinity->ShowTable(database_name, table_name);
-        nlohmann::json json_response;
-        nlohmann::json json_res;
         HTTPStatus http_status;
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer response_sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> response_writer(response_sb);
+            response_writer.StartObject();
+            {
+                String database_name = request->getPathVariable("database_name");
+                String table_name = request->getPathVariable("table_name");
+                auto result = infinity->ShowTable(database_name, table_name);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        rapidjson::StringBuffer sb;
+                        {
+                            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                            writer.StartArray();
+                            {
+                                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                                auto row_count = data_block->row_count();
+                                auto column_cnt = result.result_table_->ColumnCount();
+                                for (int row = 0; row < row_count; ++row) {
+                                    writer.StartObject();
+                                    for (SizeT col = 0; col < column_cnt; ++col) {
+                                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                                        Value value = data_block->GetValue(col, row);
+                                        const String &column_value = value.ToString();
+                                        writer.Key(column_name.c_str());
+                                        writer.String(column_value.c_str());
+                                    }
+                                    writer.EndObject();
+                                }
+                            }
+                            writer.EndArray();
+                        }
+                        simdjson::padded_string json_pad((String)sb.GetString());
+                        simdjson::parser parser;
+                        simdjson::document doc = parser.iterate(json_pad);
+                        for (auto element : doc.get_array()) {
+                            response_writer.Key(((String)element["name"].get<String>()).c_str());
+                            response_writer.String(((String)element["value"].get<String>()).c_str());
+                        }
                     }
-                    json_res["tables"].push_back(json_table);
-                }
-                for (auto &element : json_res["tables"]) {
-                    json_response[element["name"]] = element["value"];
+                    SerializeErrorCode(response_writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(response_writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            response_writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, response_sb.GetString());
     }
 };
 
@@ -658,7 +727,6 @@ public:
         String database_name = request->getPathVariable("database_name");
         String table_name = request->getPathVariable("table_name");
 
-        nlohmann::json json_response;
         HTTPStatus http_status = HTTPStatus::CODE_500;
 
         String data_body = request->readBodyToString();
@@ -677,36 +745,33 @@ public:
             } else if (file_type_str == "fvecs") {
                 export_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
-                json_response["error_code"] = ErrorCode::kNotSupported;
-                json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                String error_json = SerializeErrorCode((long)ErrorCode::kNotSupported, fmt::format("Not supported file type {}", file_type_str));
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
-            if (json_response["error_code"] != ErrorCode::kNotSupported) {
-                if (simdjson::value val; doc["header"].get(val) == simdjson::SUCCESS) {
-                    export_options.header_ = val.get<bool>();
-                }
-                if (simdjson::value val; doc["offset"].get(val) == simdjson::SUCCESS) {
-                    export_options.offset_ = val.get<SizeT>();
-                }
-                if (simdjson::value val; doc["limit"].get(val) == simdjson::SUCCESS) {
-                    export_options.limit_ = val.get<SizeT>();
-                }
-                if (simdjson::value val; doc["row_limit"].get(val) == simdjson::SUCCESS) {
-                    export_options.row_limit_ = val.get<SizeT>();
-                }
-                if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
-                    String delimiter = val.get<String>();
-                    if (delimiter.size() != 1) {
-                        json_response["error_code"] = ErrorCode::kNotSupported;
-                        json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                    }
-                    export_options.delimiter_ = delimiter[0];
-                } else {
-                    export_options.delimiter_ = ',';
-                }
+            if (simdjson::value val; doc["header"].get(val) == simdjson::SUCCESS) {
+                export_options.header_ = val.get<bool>();
             }
+            if (simdjson::value val; doc["offset"].get(val) == simdjson::SUCCESS) {
+                export_options.offset_ = val.get<SizeT>();
+            }
+            if (simdjson::value val; doc["limit"].get(val) == simdjson::SUCCESS) {
+                export_options.limit_ = val.get<SizeT>();
+            }
+            if (simdjson::value val; doc["row_limit"].get(val) == simdjson::SUCCESS) {
+                export_options.row_limit_ = val.get<SizeT>();
+            }
+            if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
+                String delimiter = val.get<String>();
+                if (delimiter.size() != 1) {
+                    String error_json = SerializeErrorCode((long)ErrorCode::kNotSupported, fmt::format("Not supported delimiter: {}", delimiter));
+                    return ResponseFactory::createResponse(http_status, error_json);
+                }
+                export_options.delimiter_ = delimiter[0];
+            } else {
+                export_options.delimiter_ = ',';
+            }
+
             String file_path = doc["file_path"].get<String>();
             Vector<ParsedExpr *> *export_columns{nullptr};
             DeferFn defer_fn([&]() {
@@ -745,8 +810,8 @@ public:
                             export_columns->emplace_back(expr);
                         }
                     } else {
-                        json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                        json_response["error_message"] = "Export data isn't a column";
+                        String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, "Export data isn't a column");
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                 }
             }
@@ -754,20 +819,19 @@ public:
             auto result = infinity->Export(database_name, table_name, export_columns, file_path, export_options);
 
             export_columns = nullptr;
+            String error_json;
             if (result.IsOk()) {
-                json_response["error_code"] = 0;
+                error_json = SerializeErrorCode(0);
                 http_status = HTTPStatus::CODE_200;
             } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
                 http_status = HTTPStatus::CODE_500;
             }
+            return ResponseFactory::createResponse(http_status, error_json);
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -777,37 +841,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        String database_name = request->getPathVariable("database_name");
-        String table_name = request->getPathVariable("table_name");
-
-        auto result = infinity->ShowColumns(database_name, table_name);
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String database_name = request->getPathVariable("database_name");
+                String table_name = request->getPathVariable("table_name");
+                auto result = infinity->ShowColumns(database_name, table_name);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    writer.Key("columns");
+                    writer.StartArray();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["columns"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -820,7 +894,6 @@ public:
         String database_name = request->getPathVariable("database_name");
         String table_name = request->getPathVariable("table_name");
 
-        nlohmann::json json_response;
         HTTPStatus http_status = HTTPStatus::CODE_500;
 
         String data_body = request->readBodyToString();
@@ -841,9 +914,8 @@ public:
             } else if (file_type_str == "fvecs") {
                 import_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
-                json_response["error_code"] = ErrorCode::kNotSupported;
-                json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                String error_json = SerializeErrorCode((long)ErrorCode::kNotSupported, fmt::format("Not supported file type {}", file_type_str));
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
             if (import_options.copy_file_type_ == CopyFileType::kCSV) {
@@ -853,9 +925,8 @@ public:
                 if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
                     String delimiter = val.get<String>();
                     if (delimiter.size() != 1) {
-                        json_response["error_code"] = ErrorCode::kNotSupported;
-                        json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        String error_json = SerializeErrorCode((long)ErrorCode::kNotSupported, fmt::format("Not supported delimiter: {}", delimiter));
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                     import_options.delimiter_ = delimiter[0];
                 } else {
@@ -865,20 +936,19 @@ public:
             String file_path = doc["file_path"].get<String>();
 
             auto result = infinity->Import(database_name, table_name, file_path, import_options);
+            String error_json;
             if (result.IsOk()) {
-                json_response["error_code"] = 0;
+                error_json = SerializeErrorCode(0);
                 http_status = HTTPStatus::CODE_200;
             } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
                 http_status = HTTPStatus::CODE_500;
             }
+            return ResponseFactory::createResponse(http_status, error_json);
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -888,7 +958,6 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status = HTTPStatus::CODE_500;
 
         String data_body = request->readBodyToString();
@@ -898,8 +967,8 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
 
             if (!(doc.type() == simdjson::json_type::array && doc.count_elements() > 0)) {
-                json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-                json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
+                String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, fmt::format("Invalid json format: {}", data_body));
+                return ResponseFactory::createResponse(http_status, error_json);
             }
             auto *insert_rows = new Vector<InsertRowExpr *>();
             DeferFn free_insert_rows([&]() {
@@ -918,9 +987,8 @@ public:
                     String key = String((std::string_view)field.unescaped_key());
                     ToLower(key);
                     if (const auto [_, success] = column_name_set.insert(key); !success) {
-                        json_response["error_code"] = ErrorCode::kDuplicateColumnName;
-                        json_response["error_message"] = fmt::format("Duplicated column name: {}", key);
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        String error_json = SerializeErrorCode((long)ErrorCode::kDuplicateColumnName, fmt::format("Duplicated column name: {}", key));
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                     insert_one_row->columns_.emplace_back(key);
                     auto value = field.value();
@@ -956,9 +1024,9 @@ public:
                                     break;
                                 }
                                 default: {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Embedding element type can only be integer or float";
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                           fmt::format("Embedding element type can only be integer or float"));
+                                    return ResponseFactory::createResponse(http_status, error_json);
                                 }
                             }
                             break;
@@ -972,9 +1040,10 @@ public:
                         case simdjson::json_type::array: {
                             SizeT dimension = value.count_elements();
                             if (dimension == 0) {
-                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = fmt::format("Empty embedding data: {}", String((std::string_view)value.raw_json()));
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json =
+                                    SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                       fmt::format("Empty embedding data: {}", String((std::string_view)value.raw_json())));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
 
                             UniquePtr<ConstantExpr> const_expr = {};
@@ -986,10 +1055,10 @@ public:
                                         }
                                         SizeT subdimension = sub_value.count_elements();
                                         if (subdimension == 0) {
-                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] =
-                                                fmt::format("Empty tensor array: {}", String((std::string_view)sub_value.raw_json()));
-                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                            String error_json = SerializeErrorCode(
+                                                (long)ErrorCode::kInvalidEmbeddingDataType,
+                                                fmt::format("Empty tensor array: {}", String((std::string_view)sub_value.raw_json())));
+                                            return ResponseFactory::createResponse(http_status, error_json);
                                         }
 
                                         UniquePtr<ConstantExpr> const_expr_2 = {};
@@ -1001,19 +1070,21 @@ public:
                                                     }
                                                     SizeT subsubdimension = sub_sub_value.count_elements();
                                                     if (subsubdimension == 0) {
-                                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                        json_response["error_message"] =
-                                                            fmt::format("Empty tensor array: {}", String((std::string_view)sub_sub_value.raw_json()));
-                                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                        String error_json =
+                                                            SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                               fmt::format("Empty tensor array: {}",
+                                                                                           String((std::string_view)sub_sub_value.raw_json())));
+                                                        return ResponseFactory::createResponse(http_status, error_json);
                                                     }
 
                                                     UniquePtr<ConstantExpr> const_expr_3 = {};
                                                     for (auto sub_sub_sub_value : sub_sub_value.get_array()) {
                                                         if (sub_sub_sub_value.type() != simdjson::json_type::number) {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] =
-                                                                "Embedding element type can only be integer or float or tensor or tensor array";
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                            String error_json = SerializeErrorCode(
+                                                                (long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                fmt::format(
+                                                                    "Embedding element type can only be integer or float or tensor or tensor array"));
+                                                            return ResponseFactory::createResponse(http_status, error_json);
                                                         }
 
                                                         switch (sub_sub_sub_value.get_number_type()) {
@@ -1039,10 +1110,11 @@ public:
                                                                 break;
                                                             }
                                                             default: {
-                                                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                                json_response["error_message"] =
-                                                                    "Embedding element type can only be integer or float or tensor or tensor array";
-                                                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                                String error_json =
+                                                                    SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                                       fmt::format("Embedding element type can only be integer or "
+                                                                                                   "float or tensor or tensor array"));
+                                                                return ResponseFactory::createResponse(http_status, error_json);
                                                             }
                                                         }
                                                     }
@@ -1073,18 +1145,20 @@ public:
                                                             break;
                                                         }
                                                         default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] =
-                                                                "Embedding element type can only be integer or float or tensor or tensor array";
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                            String error_json = SerializeErrorCode(
+                                                                (long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                fmt::format(
+                                                                    "Embedding element type can only be integer or float or tensor or tensor array"));
+                                                            return ResponseFactory::createResponse(http_status, error_json);
                                                         }
                                                     }
                                                     break;
                                                 }
                                                 default: {
-                                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = "Embedding element type can only be integer or float or tensor or tensor array";
-                                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                    String error_json = SerializeErrorCode(
+                                                        (long)ErrorCode::kInvalidEmbeddingDataType,
+                                                        fmt::format("Embedding element type can only be integer or float or tensor or tensor array"));
+                                                    return ResponseFactory::createResponse(http_status, error_json);
                                                 }
                                             }
                                         }
@@ -1117,18 +1191,19 @@ public:
                                                 break;
                                             }
                                             default: {
-                                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                json_response["error_message"] = "Embedding element type can only be integer or float or tensor or tensor array";
-                                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                String error_json = SerializeErrorCode(
+                                                    (long)ErrorCode::kInvalidEmbeddingDataType,
+                                                    fmt::format("Embedding element type can only be integer or float or tensor or tensor array"));
+                                                return ResponseFactory::createResponse(http_status, error_json);
                                             }
                                         }
                                         break;
                                     }
                                     default: {
-                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                        json_response["error_message"] =
-                                            "Embedding element type can only be integer or float or tensor or tensor array";
-                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                        String error_json = SerializeErrorCode(
+                                            (long)ErrorCode::kInvalidEmbeddingDataType,
+                                            fmt::format("Embedding element type can only be integer or float or tensor or tensor array"));
+                                        return ResponseFactory::createResponse(http_status, error_json);
                                     }
                                 }
                             }
@@ -1147,9 +1222,9 @@ public:
                                     }
                                     array_expr = std::move(array_result);
                                 } catch (std::exception &e) {
-                                    json_response["error_code"] = ErrorCode::kSyntaxError;
-                                    json_response["error_message"] = fmt::format("Error when parsing array value: {}", e.what());
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    String error_json = SerializeErrorCode((long)ErrorCode::kSyntaxError,
+                                                                           fmt::format("Error when parsing array value: {}", e.what()));
+                                    return ResponseFactory::createResponse(http_status, error_json);
                                 }
                                 auto const_expr = std::make_unique<ConstantExpr>(std::move(*array_expr));
                                 insert_one_row->values_.emplace_back(std::move(const_expr));
@@ -1157,9 +1232,9 @@ public:
                             }
                             std::unique_ptr<ConstantExpr> const_sparse_expr = {};
                             if (value_obj.count_fields() == 0) {
-                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = "Empty sparse vector, cannot decide type";
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                       fmt::format("Empty sparse vector, cannot decide type"));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
                             for (HashSet<i64> key_set; auto sparse_it : value_obj) {
                                 const String sparse_k = String((std::string_view)sparse_it.unescaped_key());
@@ -1167,9 +1242,9 @@ public:
                                 i64 key_val = std::stoll(sparse_k);
 
                                 if (sparse_v.type() != simdjson::json_type::number) {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Sparse value element type error";
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                           fmt::format("Sparse value element type error"));
+                                    return ResponseFactory::createResponse(http_status, error_json);
                                 }
 
                                 if (const_sparse_expr == nullptr) {
@@ -1184,18 +1259,19 @@ public:
                                             break;
                                         }
                                         default: {
-                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = "Sparse value element type error";
-                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                                   fmt::format("Sparse value element type error"));
+                                            return ResponseFactory::createResponse(http_status, error_json);
                                         }
                                     }
                                 }
 
                                 if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                           fmt::format("Duplicate key {} in sparse array!", key));
+                                    return ResponseFactory::createResponse(http_status, error_json);
                                 }
+
                                 bool good_v = false;
                                 switch (sparse_v.get_number_type()) {
                                     case simdjson::number_type::signed_integer:
@@ -1220,18 +1296,18 @@ public:
                                     }
                                 }
                                 if (!good_v) {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Sparse value element type error";
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                           fmt::format("Sparse value element type error"));
+                                    return ResponseFactory::createResponse(http_status, error_json);
                                 }
                             }
                             insert_one_row->values_.emplace_back(std::move(const_sparse_expr));
                             break;
                         }
                         default: {
-                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = "Embedding element type can only be integer or float";
-                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                   fmt::format("Embedding element type can only be integer or float"));
+                            return ResponseFactory::createResponse(http_status, error_json);
                         }
                     }
                 }
@@ -1242,20 +1318,19 @@ public:
             auto table_name = request->getPathVariable("table_name");
             auto result = infinity->Insert(database_name, table_name, insert_rows);
             insert_rows = nullptr;
+            String error_json;
             if (result.IsOk()) {
-                json_response["error_code"] = 0;
+                error_json = SerializeErrorCode(0);
                 http_status = HTTPStatus::CODE_200;
             } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
                 http_status = HTTPStatus::CODE_500;
             }
-
+            return ResponseFactory::createResponse(http_status, error_json);
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -1265,70 +1340,76 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status = HTTPStatus::CODE_500;
 
         String data_body = request->readBodyToString();
         try {
-            simdjson::padded_string json_pad(data_body);
-            simdjson::parser parser;
-            simdjson::document doc = parser.iterate(json_pad);
-            const String filter_string = doc["filter"].get<String>();
-            if (filter_string != "") {
-                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-                ExprParser expr_parser;
-                expr_parser.Parse(filter_string, expr_parsed_result.get());
-                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                    json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                    json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
+            rapidjson::StringBuffer sb;
+            {
+                rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                writer.StartObject();
+                {
+                    simdjson::padded_string json_pad(data_body);
+                    simdjson::parser parser;
+                    simdjson::document doc = parser.iterate(json_pad);
+                    const String filter_string = doc["filter"].get<String>();
+                    if (filter_string != "") {
+                        UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                        ExprParser expr_parser;
+                        expr_parser.Parse(filter_string, expr_parsed_result.get());
+                        if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidFilterExpression,
+                                                                   fmt::format("Invalid filter expression: {}", filter_string));
+                            return ResponseFactory::createResponse(http_status, error_json);
+                        }
+
+                        auto database_name = request->getPathVariable("database_name");
+                        auto table_name = request->getPathVariable("table_name");
+                        const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
+                        expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+
+                        if (result.IsOk()) {
+                            SerializeErrorCode(writer, 0);
+                            http_status = HTTPStatus::CODE_200;
+
+                            // Only one block
+                            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                            // Get sum delete rows
+                            Value value = data_block->GetValue(1, 0);
+                            writer.Key("deleted_rows");
+                            writer.Uint64(value.value_.big_int);
+                        } else {
+                            SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                            http_status = HTTPStatus::CODE_500;
+                        }
+                    } else {
+                        auto database_name = request->getPathVariable("database_name");
+                        auto table_name = request->getPathVariable("table_name");
+                        const QueryResult result = infinity->Delete(database_name, table_name, nullptr);
+
+                        if (result.IsOk()) {
+                            SerializeErrorCode(writer, 0);
+                            http_status = HTTPStatus::CODE_200;
+
+                            // Only one block
+                            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                            // Get sum delete rows
+                            Value value = data_block->GetValue(1, 0);
+                            writer.Key("deleted_rows");
+                            writer.Uint64(value.value_.big_int);
+                        } else {
+                            SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                            http_status = HTTPStatus::CODE_500;
+                        }
+                    }
                 }
-
-                auto database_name = request->getPathVariable("database_name");
-                auto table_name = request->getPathVariable("table_name");
-                const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
-                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
-
-                if (result.IsOk()) {
-                    json_response["error_code"] = 0;
-                    http_status = HTTPStatus::CODE_200;
-
-                    // Only one block
-                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-                    // Get sum delete rows
-                    Value value = data_block->GetValue(1, 0);
-                    json_response["deleted_rows"] = value.value_.big_int;
-                } else {
-                    json_response["error_code"] = result.ErrorCode();
-                    json_response["error_message"] = result.ErrorMsg();
-                    http_status = HTTPStatus::CODE_500;
-                }
-            } else {
-                auto database_name = request->getPathVariable("database_name");
-                auto table_name = request->getPathVariable("table_name");
-                const QueryResult result = infinity->Delete(database_name, table_name, nullptr);
-
-                if (result.IsOk()) {
-                    json_response["error_code"] = 0;
-                    http_status = HTTPStatus::CODE_200;
-
-                    // Only one block
-                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-                    // Get sum delete rows
-                    Value value = data_block->GetValue(1, 0);
-                    json_response["deleted_rows"] = value.value_.big_int;
-                } else {
-                    json_response["error_code"] = result.ErrorCode();
-                    json_response["error_message"] = result.ErrorMsg();
-                    http_status = HTTPStatus::CODE_500;
-                }
+                writer.EndObject();
             }
+            return ResponseFactory::createResponse(http_status, sb.GetString());
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -1338,7 +1419,6 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status = HTTPStatus::CODE_500;
 
         String data_body = request->readBodyToString();
@@ -1406,9 +1486,9 @@ public:
                                 break;
                             }
                             default: {
-                                json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid update set expression";
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json =
+                                    SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid update set expression"));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
                         }
                         break;
@@ -1424,9 +1504,10 @@ public:
                     case simdjson::json_type::array: {
                         SizeT dimension = value.count_elements();
                         if (dimension == 0) {
-                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = fmt::format("Empty embedding data: {}", String((std::string_view)value.raw_json()));
-                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                            String error_json =
+                                SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                   fmt::format("Empty embedding data: {}", String((std::string_view)value.raw_json())));
+                            return ResponseFactory::createResponse(http_status, error_json);
                         }
 
                         infinity::ConstantExpr *const_expr = nullptr;
@@ -1438,9 +1519,9 @@ public:
                         });
                         for (auto sub_value : value.get_array()) {
                             if (sub_value.type() != simdjson::json_type::number) {
-                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = "Embedding element type can only be integer or float";
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                       fmt::format("Embedding element type can only be integer or float"));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
 
                             switch (sub_value.get_number_type()) {
@@ -1460,9 +1541,9 @@ public:
                                     break;
                                 }
                                 default: {
-                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = "Embedding element type can only be integer or float";
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    String error_json = SerializeErrorCode((long)ErrorCode::kInvalidEmbeddingDataType,
+                                                                           fmt::format("Embedding element type can only be integer or float"));
+                                    return ResponseFactory::createResponse(http_status, error_json);
                                 }
                             }
                         }
@@ -1471,9 +1552,8 @@ public:
                         break;
                     }
                     default: {
-                        json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid update set expression";
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        String error_json = SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid update set expression"));
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                 }
 
@@ -1487,9 +1567,9 @@ public:
             ExprParser expr_parser;
             expr_parser.Parse(where_clause, expr_parsed_result.get());
             if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                json_response["error_message"] = fmt::format("Invalid filter expression: {}", where_clause);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                String error_json =
+                    SerializeErrorCode((long)ErrorCode::kInvalidFilterExpression, fmt::format("Invalid filter expression: {}", where_clause));
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
             auto database_name = request->getPathVariable("database_name");
@@ -1499,21 +1579,19 @@ public:
             expr_parsed_result->exprs_ptr_->at(0) = nullptr;
             update_expr_array = nullptr;
 
+            String error_json;
             if (result.IsOk()) {
-                json_response["error_code"] = 0;
+                error_json = SerializeErrorCode(0);
                 http_status = HTTPStatus::CODE_200;
             } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
+                error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
                 http_status = HTTPStatus::CODE_500;
             }
-
+            return ResponseFactory::createResponse(http_status, error_json);
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -1523,16 +1601,21 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        String data_body = request->readBodyToString();
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        HTTPSearch::Process(infinity.get(), database_name, table_name, data_body, http_status, json_response);
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                String data_body = request->readBodyToString();
+                HTTPSearch::Process(infinity.get(), database_name, table_name, data_body, http_status, writer);
+            }
+            writer.EndObject();
+        }
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -1542,16 +1625,21 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        String data_body = request->readBodyToString();
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        HTTPSearch::Explain(infinity.get(), database_name, table_name, data_body, http_status, json_response);
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                String data_body = request->readBodyToString();
+                HTTPSearch::Explain(infinity.get(), database_name, table_name, data_body, http_status, writer);
+            }
+            writer.EndObject();
+        }
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -1561,55 +1649,65 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto result = infinity->ListTableIndexes(database_name, table_name);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto result = infinity->ListTableIndexes(database_name, table_name);
+                if (result.IsOk()) {
+                    writer.Key("indexes");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
 
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
+                            {
+                                // index name
+                                Value value = data_block->GetValue(0, row);
+                                const String &column_value = value.ToString();
+                                writer.Key("index_name");
+                                writer.String(column_value.c_str());
+                            }
 
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_index;
+                            {
+                                // index type
+                                Value value = data_block->GetValue(1, row);
+                                const String &column_value = value.ToString();
+                                writer.Key("index_type");
+                                writer.String(column_value.c_str());
+                            }
 
-                    {
-                        // index name
-                        Value value = data_block->GetValue(0, row);
-                        const String &column_value = value.ToString();
-                        json_index["index_name"] = column_value;
+                            {
+                                // columns
+                                Value value = data_block->GetValue(3, row);
+                                const String &column_value = value.ToString();
+                                writer.Key("columns");
+                                writer.String(column_value.c_str());
+                            }
+
+                            writer.EndObject();
+                        }
                     }
+                    writer.EndArray();
 
-                    {
-                        // index type
-                        Value value = data_block->GetValue(1, row);
-                        const String &column_value = value.ToString();
-                        json_index["index_type"] = column_value;
-                    }
-
-                    {
-                        // columns
-                        Value value = data_block->GetValue(3, row);
-                        const String &column_value = value.ToString();
-                        json_index["columns"] = column_value;
-                    }
-
-                    json_response["indexes"].push_back(json_index);
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -1619,36 +1717,40 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto index_name = request->getPathVariable("index_name");
-
-        auto result = infinity->ShowIndex(database_name, table_name, index_name);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto index_name = request->getPathVariable("index_name");
+                auto result = infinity->ShowIndex(database_name, table_name, index_name);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            auto field_name = data_block->GetValue(0, row).ToString();
+                            auto field_value = data_block->GetValue(1, row).ToString();
+                            writer.Key(field_name.c_str());
+                            writer.String(field_value.c_str());
+                        }
+                    }
 
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    auto field_name = data_block->GetValue(0, row).ToString();
-                    auto field_value = data_block->GetValue(1, row).ToString();
-                    json_response[field_name] = field_value;
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -1658,37 +1760,41 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto index_name = request->getPathVariable("index_name");
-        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
-
-        auto result = infinity->ShowIndexSegment(database_name, table_name, index_name, segment_id);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto index_name = request->getPathVariable("index_name");
+                auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+                auto result = infinity->ShowIndexSegment(database_name, table_name, index_name, segment_id);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            auto field_name = data_block->GetValue(0, row).ToString();
+                            auto field_value = data_block->GetValue(1, row).ToString();
+                            writer.Key(field_name.c_str());
+                            writer.String(field_value.c_str());
+                        }
+                    }
 
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    auto field_name = data_block->GetValue(0, row).ToString();
-                    auto field_value = data_block->GetValue(1, row).ToString();
-                    json_response[field_name] = field_value;
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -1698,37 +1804,42 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto index_name = request->getPathVariable("index_name");
-        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
-        auto chunk_id = std::strtoll(request->getPathVariable("chunk_id").get()->c_str(), nullptr, 0);
-        auto result = infinity->ShowIndexChunk(database_name, table_name, index_name, segment_id, chunk_id);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto index_name = request->getPathVariable("index_name");
+                auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+                auto chunk_id = std::strtoll(request->getPathVariable("chunk_id").get()->c_str(), nullptr, 0);
+                auto result = infinity->ShowIndexChunk(database_name, table_name, index_name, segment_id, chunk_id);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            auto field_name = data_block->GetValue(0, row).ToString();
+                            auto field_value = data_block->GetValue(1, row).ToString();
+                            writer.Key(field_name.c_str());
+                            writer.String(field_value.c_str());
+                        }
+                    }
 
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    auto field_name = data_block->GetValue(0, row).ToString();
-                    auto field_value = data_block->GetValue(1, row).ToString();
-                    json_response[field_name] = field_value;
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -1748,8 +1859,6 @@ public:
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
 
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_500;
         DropIndexOptions options{ConflictType::kInvalid};
@@ -1762,29 +1871,27 @@ public:
                 } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
-                    json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    String error_json = SerializeErrorCode(3075, fmt::format("Invalid drop option: {}", option));
                     http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, error_json);
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                String error_json = SerializeErrorCode(3067, "'CREATE OPTION' field value should be string type");
                 http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, error_json);
             }
         }
 
-        if (json_response["error_code"] == 0) {
-            auto result = infinity->DropIndex(database_name, table_name, index_name, options);
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
-            }
+        auto result = infinity->DropIndex(database_name, table_name, index_name, options);
+        String error_json;
+        if (result.IsOk()) {
+            error_json = SerializeErrorCode(0);
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
+            http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -1803,8 +1910,6 @@ public:
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
 
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
@@ -1824,14 +1929,14 @@ public:
                 } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
-                    json_response["error_code"] = 3075;
-                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    String error_json = SerializeErrorCode(3075, fmt::format("Invalid create option: {}", option));
                     http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, error_json);
                 }
             } else {
-                json_response["error_code"] = 3067;
-                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                String error_json = SerializeErrorCode(3067, "'CREATE OPTION' field value should be string type");
                 http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, error_json);
             }
         }
 
@@ -1871,10 +1976,9 @@ public:
                     ToUpper(version_str);
                     index_info->index_type_ = IndexInfo::StringToIndexType(version_str);
                     if (index_info->index_type_ == IndexType::kInvalid) {
-                        json_response["error_code"] = ErrorCode::kInvalidIndexType;
-                        json_response["error_message"] = fmt::format("Invalid index type: {}", name);
+                        String error_json = SerializeErrorCode((long)ErrorCode::kInvalidIndexType, fmt::format("Invalid index type: {}", name));
                         http_status = HTTPStatus::CODE_500;
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                 } else {
                     index_param_list->push_back(new InitParameter(name, value));
@@ -1885,19 +1989,17 @@ public:
             index_param_list = nullptr;
         }
 
-        if (json_response["error_code"] == 0) {
-            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_comment, index_info, options);
-            index_info = nullptr;
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
-            }
+        auto result = infinity->CreateIndex(database_name, table_name, index_name, index_comment, index_info, options);
+        index_info = nullptr;
+        String error_json;
+        if (result.IsOk()) {
+            error_json = SerializeErrorCode(0);
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
+            http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -1916,8 +2018,6 @@ public:
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
 
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
@@ -1925,10 +2025,9 @@ public:
         optimize_options.index_name_ = index_name;
         if (simdjson::value val; doc["optimize_options"].get(val) == simdjson::SUCCESS) {
             if (val.type() != simdjson::json_type::object) {
-                json_response["error_code"] = ErrorCode::kInvalidParameterValue;
-                json_response["error_message"] = "Optimize options should be key value pairs!";
+                String error_json = SerializeErrorCode((long)ErrorCode::kInvalidParameterValue, "Optimize options should be key value pairs!");
                 http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                return ResponseFactory::createResponse(http_status, error_json);
             }
             for (auto option : val.get_object()) {
                 const String key = String((std::string_view)option.unescaped_key());
@@ -1941,15 +2040,15 @@ public:
         }
 
         const QueryResult result = infinity->Optimize(database_name, table_name, std::move(optimize_options));
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -1967,10 +2066,7 @@ public:
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
 
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
-        HTTPStatus http_status;
-        http_status = HTTPStatus::CODE_200;
+        HTTPStatus http_status = HTTPStatus::CODE_200;
 
         Vector<ColumnDef *> column_def_ptrs;
         DeferFn defer_free_column_def_ptrs([&]() {
@@ -1979,10 +2075,9 @@ public:
             }
         });
         if (infinity::Status status = ParseColumnDefs(doc["fields"].raw_json(), column_def_ptrs); !status.ok()) {
-            json_response["error_code"] = status.code();
-            json_response["error_message"] = status.message();
+            String error_json = SerializeErrorCode((long)status.code(), status.message());
             http_status = HTTPStatus::CODE_500;
-            return ResponseFactory::createResponse(http_status, json_response.dump());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
         Vector<SharedPtr<ColumnDef>> column_defs;
         for (auto &column_def_ptr : column_def_ptrs) {
@@ -1991,15 +2086,15 @@ public:
         column_def_ptrs.clear();
 
         const QueryResult result = infinity->AddColumns(database_name, table_name, std::move(column_defs));
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -2017,10 +2112,7 @@ public:
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
 
-        nlohmann::json json_response;
-        json_response["error_code"] = 0;
-        HTTPStatus http_status;
-        http_status = HTTPStatus::CODE_200;
+        HTTPStatus http_status = HTTPStatus::CODE_200;
 
         Vector<String> column_names;
         for (auto column : doc["column_names"].get_array()) {
@@ -2028,15 +2120,15 @@ public:
         }
 
         const QueryResult result = infinity->DropColumns(database_name, table_name, std::move(column_names));
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -2046,38 +2138,43 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
-        auto result = infinity->ShowSegment(database_name, table_name, segment_id);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
-
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_response[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+                auto result = infinity->ShowSegment(database_name, table_name, segment_id);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                        }
                     }
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2087,41 +2184,51 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto result = infinity->ShowSegments(database_name, table_name);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
-
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-
-                    nlohmann::json json_segment;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_segment[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto result = infinity->ShowSegments(database_name, table_name);
+                if (result.IsOk()) {
+                    writer.Key("segments");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["segments"].push_back(json_segment);
+                    writer.EndArray();
+
+                    writer.Key("table_name");
+                    writer.String(((String)table_name).c_str());
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["table_name"] = table_name;
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2131,43 +2238,52 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
-        auto result = infinity->ShowBlocks(database_name, table_name, segment_id);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
-
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-
-                    nlohmann::json json_block;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_block[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+                auto result = infinity->ShowBlocks(database_name, table_name, segment_id);
+                if (result.IsOk()) {
+                    writer.Key("blocks");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["blocks"].push_back(json_block);
+                    writer.EndArray();
+
+                    writer.Key("segment_id");
+                    writer.Int64(segment_id);
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-
-            json_response["segment_id"] = segment_id;
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2177,38 +2293,44 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
-        auto block_id = std::strtoll(request->getPathVariable("block_id").get()->c_str(), nullptr, 0);
-        auto result = infinity->ShowBlock(database_name, table_name, segment_id, block_id);
-
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_response[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+                auto block_id = std::strtoll(request->getPathVariable("block_id").get()->c_str(), nullptr, 0);
+                auto result = infinity->ShowBlock(database_name, table_name, segment_id, block_id);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                        }
                     }
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2218,44 +2340,63 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto database_name = request->getPathVariable("database_name");
-        auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
-        auto block_id = std::strtoll(request->getPathVariable("block_id").get()->c_str(), nullptr, 0);
-        auto column_id = std::strtoll(request->getPathVariable("column_id").get()->c_str(), nullptr, 0);
-        auto result = infinity->ShowBlockColumn(database_name, table_name, segment_id, block_id, column_id);
-
-        nlohmann::json json_response;
-        nlohmann::json json_res;
         HTTPStatus http_status;
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+
+        rapidjson::StringBuffer response_sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> response_writer(response_sb);
+            response_writer.StartObject();
+            {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+                auto block_id = std::strtoll(request->getPathVariable("block_id").get()->c_str(), nullptr, 0);
+                auto column_id = std::strtoll(request->getPathVariable("column_id").get()->c_str(), nullptr, 0);
+                auto result = infinity->ShowBlockColumn(database_name, table_name, segment_id, block_id, column_id);
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        rapidjson::StringBuffer sb;
+                        {
+                            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+                            writer.StartArray();
+                            {
+                                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                                auto row_count = data_block->row_count();
+                                auto column_cnt = result.result_table_->ColumnCount();
+                                for (int row = 0; row < row_count; ++row) {
+                                    writer.StartObject();
+                                    for (SizeT col = 0; col < column_cnt; ++col) {
+                                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                                        Value value = data_block->GetValue(col, row);
+                                        const String &column_value = value.ToString();
+                                        writer.Key(column_name.c_str());
+                                        writer.String(column_value.c_str());
+                                    }
+                                    writer.EndObject();
+                                }
+                            }
+                            writer.EndArray();
+                        }
+                        simdjson::padded_string json_pad((String)sb.GetString());
+                        simdjson::parser parser;
+                        simdjson::document doc = parser.iterate(json_pad);
+                        for (auto element : doc.get_array()) {
+                            response_writer.Key(((String)element["name"].get<String>()).c_str());
+                            response_writer.String(((String)element["description"].get<String>()).c_str());
+                        }
                     }
-                    json_res["tables"].push_back(json_table);
-                }
-                for (auto &element : json_res["tables"]) {
-                    json_response[element["name"]] = element["description"];
+
+                    SerializeErrorCode(response_writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(response_writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            response_writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, response_sb.GetString());
     }
 };
 
@@ -2265,31 +2406,38 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ShowConfigs();
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                // config name
-                Value name_value = data_block->GetValue(0, row);
-                const String &config_name = name_value.ToString();
-                // config value
-                Value value = data_block->GetValue(1, row);
-                const String &config_value = value.ToString();
-                json_response[config_name] = config_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->ShowConfigs();
+                if (result.IsOk()) {
+                    DataBlock *data_block =
+                        result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+                    auto row_count = data_block->row_count();
+                    for (int row = 0; row < row_count; ++row) {
+                        // config name
+                        Value name_value = data_block->GetValue(0, row);
+                        const String &config_name = name_value.ToString();
+                        // config value
+                        Value value = data_block->GetValue(1, row);
+                        const String &config_value = value.ToString();
+                        writer.Key(config_name.c_str());
+                        writer.String(config_value.c_str());
+                    }
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2299,25 +2447,31 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto config_name = request->getPathVariable("config_name");
-        auto result = infinity->ShowConfig(config_name);
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            Value value = data_block->GetValue(0, 0);
-            const String &variable_value = value.ToString();
-            json_response[config_name] = variable_value;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto config_name = request->getPathVariable("config_name");
+                auto result = infinity->ShowConfig(config_name);
+                if (result.IsOk()) {
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    Value value = data_block->GetValue(0, 0);
+                    const String &variable_value = value.ToString();
+                    writer.Key(((String)config_name).c_str());
+                    writer.String(variable_value.c_str());
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
+            }
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2327,32 +2481,38 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ShowVariables(SetScope::kGlobal);
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block =
-                result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                // variable name
-                Value name_value = data_block->GetValue(0, row);
-                const String &config_name = name_value.ToString();
-                // variable value
-                Value value = data_block->GetValue(1, row);
-                const String &config_value = value.ToString();
-                json_response[config_name] = config_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->ShowVariables(SetScope::kGlobal);
+                if (result.IsOk()) {
+                    DataBlock *data_block =
+                        result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+                    auto row_count = data_block->row_count();
+                    for (int row = 0; row < row_count; ++row) {
+                        // variable name
+                        Value name_value = data_block->GetValue(0, row);
+                        const String &config_name = name_value.ToString();
+                        // variable value
+                        Value value = data_block->GetValue(1, row);
+                        const String &config_value = value.ToString();
+                        writer.Key(config_name.c_str());
+                        writer.String(config_value.c_str());
+                    }
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2362,26 +2522,33 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto variable_name = request->getPathVariable("variable_name");
-        auto result = infinity->ShowVariable(variable_name, SetScope::kGlobal);
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            Value value = data_block->GetValue(0, 0);
-            const String &variable_value = value.ToString();
-            json_response[variable_name] = variable_value;
-
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto variable_name = request->getPathVariable("variable_name");
+                auto result = infinity->ShowVariable(variable_name, SetScope::kGlobal);
+                if (result.IsOk()) {
+                    writer.Key("error_code");
+                    writer.Int64(0);
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    Value value = data_block->GetValue(0, 0);
+                    const String &variable_value = value.ToString();
+                    writer.Key(((String)variable_name).c_str());
+                    writer.String(variable_value.c_str());
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
+            }
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2391,7 +2558,6 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result;
 
@@ -2401,10 +2567,9 @@ public:
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json_pad);
             if (doc.count_fields() != 1) {
-                json_response["error_code"] = 3076;
-                json_response["error_message"] = "No variable will be set";
+                String error_json = SerializeErrorCode(3076, "No variable will be set");
                 http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
             for (auto set_variable : doc.get_object()) {
@@ -2434,9 +2599,9 @@ public:
                                 break;
                             }
                             default: {
-                                json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid set variable expression";
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json =
+                                    SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid set variable expression"));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
                         }
                     }
@@ -2446,25 +2611,24 @@ public:
                         break;
                     }
                     default: {
-                        json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid set variable expression";
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        String error_json = SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid set variable expression"));
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                 }
             }
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -2474,32 +2638,38 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ShowVariables(SetScope::kSession);
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block =
-                result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                // variable name
-                Value name_value = data_block->GetValue(0, row);
-                const String &config_name = name_value.ToString();
-                // variable value
-                Value value = data_block->GetValue(1, row);
-                const String &config_value = value.ToString();
-                json_response[config_name] = config_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->ShowVariables(SetScope::kSession);
+                if (result.IsOk()) {
+                    DataBlock *data_block =
+                        result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+                    auto row_count = data_block->row_count();
+                    for (int row = 0; row < row_count; ++row) {
+                        // variable name
+                        Value name_value = data_block->GetValue(0, row);
+                        const String &config_name = name_value.ToString();
+                        // variable value
+                        Value value = data_block->GetValue(1, row);
+                        const String &config_value = value.ToString();
+                        writer.Key(config_name.c_str());
+                        writer.String(config_value.c_str());
+                    }
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2509,26 +2679,31 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto variable_name = request->getPathVariable("variable_name");
-        auto result = infinity->ShowVariable(variable_name, SetScope::kSession);
-
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            Value value = data_block->GetValue(0, 0);
-            const String &variable_value = value.ToString();
-            json_response[variable_name] = variable_value;
-
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto variable_name = request->getPathVariable("variable_name");
+                auto result = infinity->ShowVariable(variable_name, SetScope::kSession);
+                if (result.IsOk()) {
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    Value value = data_block->GetValue(0, 0);
+                    const String &variable_value = value.ToString();
+                    writer.Key(((String)variable_name).c_str());
+                    writer.String(variable_value.c_str());
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    String error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
+            }
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2538,7 +2713,6 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result;
 
@@ -2548,10 +2722,9 @@ public:
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json_pad);
             if (doc.count_fields() != 1) {
-                json_response["error_code"] = 3076;
-                json_response["error_message"] = "No variable will be set";
+                String error_json = SerializeErrorCode(3076, "No variable will be set");
                 http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
             for (auto set_variable : doc.get_object()) {
@@ -2581,9 +2754,9 @@ public:
                                 break;
                             }
                             default: {
-                                json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid set variable expression";
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json =
+                                    SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid set variable expression"));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
                         }
                     }
@@ -2593,25 +2766,24 @@ public:
                         break;
                     }
                     default: {
-                        json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid set variable expression";
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        String error_json = SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid set variable expression"));
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                 }
             }
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -2621,7 +2793,6 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result;
 
@@ -2631,10 +2802,9 @@ public:
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json_pad);
             if (doc.count_fields() != 1) {
-                json_response["error_code"] = 3076;
-                json_response["error_message"] = "No config will be set";
+                String error_json = SerializeErrorCode(3076, "No config will be set");
                 http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
             for (auto set_config : doc.get_object()) {
@@ -2664,9 +2834,9 @@ public:
                                 break;
                             }
                             default: {
-                                json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                json_response["error_message"] = "Invalid set config expression";
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                String error_json =
+                                    SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid set config expression"));
+                                return ResponseFactory::createResponse(http_status, error_json);
                             }
                         }
                     }
@@ -2676,25 +2846,24 @@ public:
                         break;
                     }
                     default: {
-                        json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = "Invalid set config expression";
-                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                        String error_json = SerializeErrorCode((long)ErrorCode::kInvalidExpression, fmt::format("Invalid set config expression"));
+                        return ResponseFactory::createResponse(http_status, error_json);
                     }
                 }
             }
         } catch (simdjson::simdjson_error &e) {
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -2704,36 +2873,46 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->Query("show buffer");
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->Query("show buffer");
+                if (result.IsOk()) {
+                    writer.Key("buffer");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["buffer"].push_back(json_table);
+                    writer.EndObject();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2743,36 +2922,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->Query("show profiles");
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->Query("show profiles");
+                if (result.IsOk()) {
+                    writer.Key("profiles");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["profiles"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2782,36 +2972,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->Query("show memindex");
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->Query("show memindex");
+                if (result.IsOk()) {
+                    writer.Key("index");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["index"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2821,36 +3022,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->Query("show queries");
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->Query("show queries");
+                if (result.IsOk()) {
+                    writer.Key("index");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["queries"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2860,36 +3072,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->ShowLogs();
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->ShowLogs();
+                if (result.IsOk()) {
+                    writer.Key("logs");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["logs"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2899,31 +3122,40 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
-        nlohmann::json json_table;
         HTTPStatus http_status;
-        String query_id = request->getPathVariable("query_id");
-        QueryResult result = infinity->Query(fmt::format("show query {}", query_id));
 
-        if (result.IsOk()) {
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT col = 0; col < column_cnt; ++col) {
-                const String &column_name = result.result_table_->GetColumnNameById(col);
-                Value value = data_block->GetValue(col, 0);
-                const String &column_value = value.ToString();
-                json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String query_id = request->getPathVariable("query_id");
+                QueryResult result = infinity->Query(fmt::format("show query {}", query_id));
+                if (result.IsOk()) {
+                    writer.Key("query");
+                    writer.StartObject();
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, 0);
+                        const String &column_value = value.ToString();
+                        writer.Key(column_name.c_str());
+                        writer.String(column_value.c_str());
+                    }
+                    writer.EndObject();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            json_response["query"] = json_table;
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2933,36 +3165,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->Query("show transactions");
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->Query("show transactions");
+                if (result.IsOk()) {
+                    writer.Key("transactions");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["transactions"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -2972,31 +3215,40 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
-        nlohmann::json json_table;
         HTTPStatus http_status;
-        String transaction_id = request->getPathVariable("transaction_id");
-        QueryResult result = infinity->Query(fmt::format("show transaction {}", transaction_id));
 
-        if (result.IsOk()) {
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT col = 0; col < column_cnt; ++col) {
-                const String &column_name = result.result_table_->GetColumnNameById(col);
-                Value value = data_block->GetValue(col, 0);
-                const String &column_value = value.ToString();
-                json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String transaction_id = request->getPathVariable("transaction_id");
+                QueryResult result = infinity->Query(fmt::format("show transaction {}", transaction_id));
+                if (result.IsOk()) {
+                    writer.Key("transactions");
+                    writer.StartObject();
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, 0);
+                        const String &column_value = value.ToString();
+                        writer.Key(column_name.c_str());
+                        writer.String(column_value.c_str());
+                    }
+                    writer.EndObject();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            json_response["error_code"] = 0;
-            json_response["transaction"] = json_table;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3006,36 +3258,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->ShowObjects();
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->ShowObjects();
+                if (result.IsOk()) {
+                    writer.Key("objects");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["objects"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3045,31 +3308,40 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
-        nlohmann::json json_table;
         HTTPStatus http_status;
-        String object_name = request->getPathVariable("object_name");
-        QueryResult result = infinity->ShowObject(object_name);
 
-        if (result.IsOk()) {
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            auto column_cnt = result.result_table_->ColumnCount();
-            for (SizeT col = 0; col < column_cnt; ++col) {
-                const String &column_name = result.result_table_->GetColumnNameById(col);
-                Value value = data_block->GetValue(col, 0);
-                const String &column_value = value.ToString();
-                json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String object_name = request->getPathVariable("object_name");
+                QueryResult result = infinity->ShowObject(object_name);
+                if (result.IsOk()) {
+                    writer.Key("object");
+                    writer.StartObject();
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    auto column_cnt = result.result_table_->ColumnCount();
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, 0);
+                        const String &column_value = value.ToString();
+                        writer.Key(column_name.c_str());
+                        writer.String(column_value.c_str());
+                    }
+                    writer.EndObject();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            json_response["error_code"] = 0;
-            json_response["object"] = json_table;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3079,36 +3351,47 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result = infinity->ShowFilesInObject();
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                if (result.IsOk()) {
+                    writer.Key("files");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["files"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3118,35 +3401,42 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->ShowMemory();
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->ShowMemory();
+                if (result.IsOk()) {
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        SizeT row_count = data_block->row_count();
+                        for (SizeT row = 0; row < row_count; row++) {
+                            // config name
+                            Value name_value = data_block->GetValue(0, row);
+                            const String &config_name = name_value.ToString();
+                            // config value
+                            Value value = data_block->GetValue(1, row);
+                            const String &config_value = value.ToString();
+                            writer.Key(config_name.c_str());
+                            writer.String(config_value.c_str());
+                        }
+                    }
 
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                SizeT row_count = data_block->row_count();
-                for (SizeT row = 0; row < row_count; row++) {
-                    // config name
-                    Value name_value = data_block->GetValue(0, row);
-                    const String &config_name = name_value.ToString();
-                    // config value
-                    Value value = data_block->GetValue(1, row);
-                    const String &config_value = value.ToString();
-                    json_response[config_name] = config_value;
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3156,35 +3446,46 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        QueryResult result = infinity->ShowMemoryObjects();
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->ShowMemoryObjects();
+                if (result.IsOk()) {
+                    writer.Key("memory_objects");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["memory_objects"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3194,34 +3495,45 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
-        QueryResult result = infinity->ShowMemoryAllocations();
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col) {
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
-                        const String &column_value = value.ToString();
-                        json_table[column_name] = column_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->ShowMemoryAllocations();
+                if (result.IsOk()) {
+                    writer.Key("memory_allocations");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        auto column_cnt = result.result_table_->ColumnCount();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            for (SizeT col = 0; col < column_cnt; ++col) {
+                                const String &column_name = result.result_table_->GetColumnNameById(col);
+                                Value value = data_block->GetValue(col, row);
+                                const String &column_value = value.ToString();
+                                writer.Key(column_name.c_str());
+                                writer.String(column_value.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    json_response["memory_allocations"].push_back(json_table);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3231,19 +3543,18 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result = infinity->ForceCheckpoint();
 
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -3257,22 +3568,22 @@ public:
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
+
         String db_name = doc["db_name"].get<String>();
         String table_name = doc["table_name"].get<String>();
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result = infinity->CompactTable(db_name, table_name);
 
+        String error_json;
         if (result.IsOk()) {
-            json_response["error_code"] = 0;
+            error_json = SerializeErrorCode(0);
             http_status = HTTPStatus::CODE_200;
         } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
+            error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, error_json);
     }
 };
 
@@ -3283,35 +3594,42 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->AdminShowCurrentNode();
-
-        nlohmann::json json_response;
-        nlohmann::json node_info;
         HTTPStatus http_status;
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    // variable name
-                    const String &attrib_name = data_block->GetValue(0, row).ToString();
-                    // variable value
-                    const String &attrib_value = data_block->GetValue(1, row).ToString();
-                    node_info[attrib_name] = attrib_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->AdminShowCurrentNode();
+                if (result.IsOk()) {
+                    writer.Key("node");
+                    writer.StartObject();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            // variable name
+                            const String &attrib_name = data_block->GetValue(0, row).ToString();
+                            // variable value
+                            const String &attrib_value = data_block->GetValue(1, row).ToString();
+                            writer.Key(attrib_name.c_str());
+                            writer.String(attrib_value.c_str());
+                        }
+                    }
+                    writer.EndObject();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            http_status = HTTPStatus::CODE_200;
-            json_response["error_code"] = ErrorCode::kOk;
-            json_response["node"] = node_info;
-
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3321,36 +3639,44 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
-        nlohmann::json node_info;
         HTTPStatus http_status;
 
-        String node_name = request->getPathVariable("node_name");
-        QueryResult result = infinity->AdminShowNode(node_name);
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String node_name = request->getPathVariable("node_name");
+                QueryResult result = infinity->AdminShowNode(node_name);
+                if (result.IsOk()) {
+                    writer.Key("node");
+                    writer.StartObject();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            // variable name
+                            const String &attrib_name = data_block->GetValue(0, row).ToString();
+                            // variable value
+                            const String &attrib_value = data_block->GetValue(1, row).ToString();
+                            writer.Key(attrib_name.c_str());
+                            writer.String(attrib_value.c_str());
+                        }
+                    }
+                    writer.EndObject();
 
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    // variable name
-                    const String &attrib_name = data_block->GetValue(0, row).ToString();
-                    // variable value
-                    const String &attrib_value = data_block->GetValue(1, row).ToString();
-                    node_info[attrib_name] = attrib_value;
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            http_status = HTTPStatus::CODE_200;
-            json_response["node"] = node_info;
-            json_response["error_code"] = ErrorCode::kOk;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3361,53 +3687,67 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
-        nlohmann::json nodes_json;
 
-        QueryResult result = infinity->AdminShowNodes();
-        if (result.IsOk()) {
-            SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
-                auto row_count = data_block->row_count();
-                for (int row = 0; row < row_count; ++row) {
-                    nlohmann::json node_json;
-                    {
-                        String node_name = data_block->GetValue(0, row).ToString();
-                        node_json["name"] = node_name;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                QueryResult result = infinity->AdminShowNodes();
+                if (result.IsOk()) {
+                    writer.Key("nodes");
+                    writer.StartArray();
+                    SizeT block_rows = result.result_table_->DataBlockCount();
+                    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                        DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                        auto row_count = data_block->row_count();
+                        for (int row = 0; row < row_count; ++row) {
+                            writer.StartObject();
+                            {
+                                String node_name = data_block->GetValue(0, row).ToString();
+                                writer.Key("name");
+                                writer.String(node_name.c_str());
+                            }
+                            {
+                                String node_role = data_block->GetValue(1, row).ToString();
+                                writer.Key("role");
+                                writer.String(node_role.c_str());
+                            }
+                            {
+                                String node_status = data_block->GetValue(2, row).ToString();
+                                writer.Key("status");
+                                writer.String(node_status.c_str());
+                            }
+                            {
+                                String node_address = data_block->GetValue(3, row).ToString();
+                                writer.Key("address");
+                                writer.String(node_address.c_str());
+                            }
+                            {
+                                String last_update = data_block->GetValue(4, row).ToString();
+                                writer.Key("last_update");
+                                writer.String(last_update.c_str());
+                            }
+                            {
+                                String heartbeat = data_block->GetValue(5, row).ToString();
+                                writer.Key("heartbeat");
+                                writer.String(heartbeat.c_str());
+                            }
+                            writer.EndObject();
+                        }
                     }
-                    {
-                        String node_role = data_block->GetValue(1, row).ToString();
-                        node_json["role"] = node_role;
-                    }
-                    {
-                        String node_status = data_block->GetValue(2, row).ToString();
-                        node_json["status"] = node_status;
-                    }
-                    {
-                        String node_address = data_block->GetValue(3, row).ToString();
-                        node_json["address"] = node_address;
-                    }
-                    {
-                        String last_update = data_block->GetValue(4, row).ToString();
-                        node_json["last_update"] = last_update;
-                    }
-                    {
-                        String heartbeat = data_block->GetValue(5, row).ToString();
-                        node_json["heartbeat"] = heartbeat;
-                    }
-                    nodes_json.push_back(node_json);
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
             }
-            http_status = HTTPStatus::CODE_200;
-            json_response["error_code"] = ErrorCode::kOk;
-            json_response["nodes"] = nodes_json;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3418,7 +3758,6 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
         infinity::Status status;
 
         String data_body = request->readBodyToString();
@@ -3430,9 +3769,8 @@ public:
 
             if (simdjson::value val; doc["role"].get(val) != simdjson::SUCCESS || !val.is_string()) {
                 http_status = HTTPStatus::CODE_500;
-                json_response["error_code"] = ErrorCode::kInvalidCommand;
-                json_response["error_message"] = "Field 'role' is required";
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                String error_json = SerializeErrorCode((long)ErrorCode::kInvalidCommand, "Field 'role' is required");
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
             String role = doc["role"].get<String>();
@@ -3450,27 +3788,24 @@ public:
                 result = infinity->AdminSetLearner(doc["name"].get<String>(), doc["address"].get<String>());
             } else {
                 http_status = HTTPStatus::CODE_500;
-                json_response["error_code"] = ErrorCode::kInvalidNodeRole;
-                json_response["error_message"] = fmt::format("Invalid node role {}", role);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                String error_json = SerializeErrorCode((long)ErrorCode::kInvalidNodeRole, fmt::format("Invalid node role {}", role));
+                return ResponseFactory::createResponse(http_status, error_json);
             }
 
+            String error_json;
             if (result.IsOk()) {
+                error_json = SerializeErrorCode(0);
                 http_status = HTTPStatus::CODE_200;
-                json_response["error_code"] = ErrorCode::kOk;
             } else {
+                error_json = SerializeErrorCode((long)result.ErrorCode(), result.ErrorMsg());
                 http_status = HTTPStatus::CODE_500;
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
             }
+            return ResponseFactory::createResponse(http_status, error_json);
         } catch (simdjson::simdjson_error &e) {
             http_status = HTTPStatus::CODE_500;
-            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
-            json_response["error_message"] = e.what();
-            return ResponseFactory::createResponse(http_status, json_response.dump());
+            String error_json = SerializeErrorCode((long)ErrorCode::kInvalidJsonFormat, e.what());
+            return ResponseFactory::createResponse(http_status, error_json);
         }
-
-        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -3481,30 +3816,38 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        auto result = infinity->AdminShowVariables();
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block =
-                result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                // variable name
-                Value name_value = data_block->GetValue(0, row);
-                const String &config_name = name_value.ToString();
-                // variable value
-                Value value = data_block->GetValue(1, row);
-                const String &config_value = value.ToString();
-                json_response[config_name] = config_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->AdminShowVariables();
+                if (result.IsOk()) {
+                    DataBlock *data_block =
+                        result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+                    auto row_count = data_block->row_count();
+                    for (int row = 0; row < row_count; ++row) {
+                        // variable name
+                        Value name_value = data_block->GetValue(0, row);
+                        const String &config_name = name_value.ToString();
+                        // variable value
+                        Value value = data_block->GetValue(1, row);
+                        const String &config_value = value.ToString();
+                        writer.Key(config_name.c_str());
+                        writer.String(config_value.c_str());
+                    }
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3515,29 +3858,38 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        auto result = infinity->AdminShowConfigs();
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                // config name
-                Value name_value = data_block->GetValue(0, row);
-                const String &config_name = name_value.ToString();
-                // config value
-                Value value = data_block->GetValue(1, row);
-                const String &config_value = value.ToString();
-                json_response[config_name] = config_value;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->AdminShowConfigs();
+                if (result.IsOk()) {
+                    DataBlock *data_block =
+                        result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+                    auto row_count = data_block->row_count();
+                    for (int row = 0; row < row_count; ++row) {
+                        // config name
+                        Value name_value = data_block->GetValue(0, row);
+                        const String &config_name = name_value.ToString();
+                        // config value
+                        Value value = data_block->GetValue(1, row);
+                        const String &config_value = value.ToString();
+                        writer.Key(config_name.c_str());
+                        writer.String(config_value.c_str());
+                    }
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3551,27 +3903,35 @@ public:
         auto result = infinity->AdminShowVariable(variable_name);
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-            if (data_block->row_count() == 0) {
-                json_response["error_code"] = ErrorCode::kNoSuchSystemVar;
-                json_response["error_message"] = fmt::format("variable does not exist : {}.", variable_name);
-                http_status = HTTPStatus::CODE_500;
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                if (result.IsOk()) {
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    if (data_block->row_count() == 0) {
+                        String error_json =
+                            SerializeErrorCode((long)ErrorCode::kNoSuchSystemVar, fmt::format("variable does not exist : {}.", variable_name));
+                        http_status = HTTPStatus::CODE_500;
+                        return ResponseFactory::createResponse(http_status, error_json);
+                    }
+                    Value value = data_block->GetValue(0, 0);
+                    const String &variable_value = value.ToString();
+                    writer.Key(variable_name.c_str());
+                    writer.String(variable_value.c_str());
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
-            Value value = data_block->GetValue(0, 0);
-            const String &variable_value = value.ToString();
-            json_response[variable_name] = variable_value;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3582,39 +3942,51 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         HTTPStatus http_status;
-        nlohmann::json json_response;
-        nlohmann::json nodes_json;
 
-        auto result = infinity->AdminShowLogs();
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                nlohmann::json node_json;
-                {
-                    String index = data_block->GetValue(0, row).ToString();
-                    node_json["index"] = index;
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                auto result = infinity->AdminShowLogs();
+                if (result.IsOk()) {
+                    writer.Key("logs");
+                    writer.StartArray();
+                    DataBlock *data_block =
+                        result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+                    auto row_count = data_block->row_count();
+                    for (int row = 0; row < row_count; ++row) {
+                        writer.StartObject();
+                        {
+                            String index = data_block->GetValue(0, row).ToString();
+                            writer.Key("index");
+                            writer.String(index.c_str());
+                        }
+                        {
+                            String filename = data_block->GetValue(1, row).ToString();
+                            writer.Key("filename");
+                            writer.String(filename.c_str());
+                        }
+                        {
+                            String type = data_block->GetValue(2, row).ToString();
+                            writer.Key("type");
+                            writer.String(type.c_str());
+                        }
+                        writer.EndObject();
+                    }
+                    writer.EndArray();
+
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
                 }
-                {
-                    String filename = data_block->GetValue(1, row).ToString();
-                    node_json["filename"] = filename;
-                }
-                {
-                    String type = data_block->GetValue(2, row).ToString();
-                    node_json["type"] = type;
-                }
-                nodes_json.push_back(node_json);
             }
-            json_response["logs"] = nodes_json;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+            writer.EndObject();
         }
 
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
@@ -3624,22 +3996,29 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        nlohmann::json json_response;
         HTTPStatus http_status;
 
-        String node_name = request->getPathVariable("node_name");
-        auto result = infinity->AdminRemoveNode(node_name);
+        rapidjson::StringBuffer sb;
+        {
+            rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+            writer.StartObject();
+            {
+                String node_name = request->getPathVariable("node_name");
+                auto result = infinity->AdminRemoveNode(node_name);
+                if (result.IsOk()) {
+                    writer.Key("message");
+                    writer.String(fmt::format("Node {} removed successfully.", node_name).c_str());
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            json_response["message"] = fmt::format("Node {} removed successfully.", node_name);
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+                    SerializeErrorCode(writer, 0);
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    SerializeErrorCode(writer, (long)result.ErrorCode(), result.ErrorMsg());
+                    http_status = HTTPStatus::CODE_500;
+                }
+            }
+            writer.EndObject();
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, sb.GetString());
     }
 };
 
