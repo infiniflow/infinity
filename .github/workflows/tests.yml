@@ -75,8 +75,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && pip3 install psutil"
-
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install python/infinity_sdk -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
 #      - name: Run cluster test
 #        if: ${{ !cancelled() && !failure() }}
 #        id: run_cluster_test
