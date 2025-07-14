@@ -130,12 +130,15 @@ void ProbabilisticDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
     entry_json[JsonTag] = base64::to_base64(result_view);
 }
 
-bool ProbabilisticDataFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
-    if (!entry_json.contains(JsonTag)) {
+bool ProbabilisticDataFilter::LoadFromJsonFile(std::string_view json_sv) {
+    simdjson::padded_string json_pad(json_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
+    String filter_base64;
+    if (doc[JsonTag].get<String>(filter_base64) != simdjson::SUCCESS) {
         LOG_ERROR("ProbabilisticDataFilter::LoadFromJsonFile(): found no data.");
         return false;
     }
-    String filter_base64 = entry_json[JsonTag];
     auto filter_binary = base64::from_base64(filter_base64);
     IStringStream is(filter_binary);
     DeserializeFromStringStream(is);

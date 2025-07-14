@@ -49,18 +49,17 @@ public:
                         HTTPStatus &http_status,
                         nlohmann::json &response);
 
-    static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static Vector<OrderByExpr *> *ParseSort(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<ParsedExpr> ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static SearchExpr *ParseSearchExpr(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<FusionExpr> ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<KnnExpr> ParseMatchDense(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<MatchExpr> ParseMatchText(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<MatchTensorExpr> ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<MatchSparseExpr> ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static Tuple<i64, void *>
-    ParseVector(const nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
-    static UniquePtr<ConstantExpr> ParseSparseVector(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static Vector<ParsedExpr *> *ParseOutput(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static Vector<OrderByExpr *> *ParseSort(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<ParsedExpr> ParseFilter(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static SearchExpr *ParseSearchExpr(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<FusionExpr> ParseFusion(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<KnnExpr> ParseMatchDense(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<MatchExpr> ParseMatchText(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<MatchTensorExpr> ParseMatchTensor(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<MatchSparseExpr> ParseMatchSparse(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
+    static Tuple<i64, void *> ParseVector(std::string_view json_sv, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
+    static UniquePtr<ConstantExpr> ParseSparseVector(std::string_view json_sv, HTTPStatus &http_status, nlohmann::json &response);
 };
 
 } // namespace infinity

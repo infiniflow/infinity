@@ -67,7 +67,10 @@ namespace {
 
 using namespace infinity;
 
-Pair<SharedPtr<DataType>, infinity::Status> ParseColumnType(const Span<const std::string> tokens, const nlohmann::json &field_element) {
+Pair<SharedPtr<DataType>, infinity::Status> ParseColumnType(const Span<const std::string> tokens, std::string_view json_sv) {
+    simdjson::padded_string json_pad(json_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
     SharedPtr<DataType> column_type;
     if (tokens.empty()) {
         return {nullptr, infinity::Status::ParserError("Empty column type")};
@@ -142,10 +145,10 @@ Pair<SharedPtr<DataType>, infinity::Status> ParseColumnType(const Span<const std
         auto type_info = SparseInfo::Make(d_data_type, i_data_type, dimension, SparseStoreType::kSort);
         column_type = std::make_shared<DataType>(LogicalType::kSparse, std::move(type_info));
     } else if (tokens[0] == "decimal") {
-        auto type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
+        auto type_info = DecimalInfo::Make(doc["precision"].get<i64>(), doc["scale"].get<i64>());
         column_type = std::make_shared<DataType>(LogicalType::kDecimal, std::move(type_info));
     } else if (tokens[0] == "array") {
-        auto [element_type, stat] = ParseColumnType(tokens.subspan<1>(), field_element);
+        auto [element_type, stat] = ParseColumnType(tokens.subspan<1>(), doc.raw_json());
         if (!stat.ok()) {
             return {nullptr, std::move(stat)};
         }
@@ -159,20 +162,25 @@ Pair<SharedPtr<DataType>, infinity::Status> ParseColumnType(const Span<const std
     return std::make_pair(std::move(column_type), infinity::Status::OK());
 }
 
-infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_definitions) {
-    SizeT column_count = fields.size();
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        auto &field_element = fields[column_id];
-
-        if (!field_element.contains("name") && !field_element["name"].is_string()) {
+infinity::Status ParseColumnDefs(std::string_view json_sv, Vector<ColumnDef *> &column_definitions) {
+    simdjson::padded_string json_pad(json_sv);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
+    for (SizeT column_id = 0; auto element : doc.get_array()) {
+        std::string_view element_sv = element.raw_json();
+        String column_name;
+        if (simdjson::value val; element["name"].get(val) != simdjson::SUCCESS || !val.is_string()) {
             return infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
+        } else {
+            column_name = val.get<String>();
         }
-        String column_name = field_element["name"];
 
-        if (!field_element.contains("type") && !field_element["type"].is_string()) {
+        String value_type;
+        if (simdjson::value val; element["type"].get(val) != simdjson::SUCCESS || !val.is_string()) {
             return infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
+        } else {
+            value_type = val.get<String>();
         }
-        String value_type = field_element["type"];
         ToLower(value_type);
 
         std::vector<std::string> tokens;
@@ -180,7 +188,7 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
 
         SharedPtr<DataType> column_type{nullptr};
         try {
-            auto [result_type, err_status] = ParseColumnType(tokens, field_element);
+            auto [result_type, err_status] = ParseColumnType(tokens, element_sv);
             if (!err_status.ok()) {
                 return std::move(err_status);
             }
@@ -191,37 +199,37 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
 
         if (column_type) {
             std::set<ConstraintType> constraints;
-            if (field_element.contains("constraints")) {
-                for (auto &constraint_json : field_element["constraints"]) {
-                    String constraint = constraint_json;
+            if (simdjson::array array; element["constraints"].get(array) == simdjson::SUCCESS) {
+                for (auto constraint_json : array) {
+                    String constraint = constraint_json.get<String>();
                     ToLower(constraint);
                     constraints.insert(StringToConstraintType(constraint));
                 }
             }
 
             String table_comment;
-            if (field_element.contains("comment")) {
-                table_comment = field_element["comment"];
+            if (simdjson::value val; element["comment"].get(val) == simdjson::SUCCESS) {
+                table_comment = val.get<String>();
             }
 
             SharedPtr<ParsedExpr> default_expr{nullptr};
-            if (field_element.contains("default")) {
+            if (simdjson::value val; element["default"].get(val) == simdjson::SUCCESS) {
                 switch (column_type->type()) {
                     case LogicalType::kSparse: {
-                        default_expr = BuildConstantSparseExprFromJson(field_element["default"].dump(),
-                                                                       dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
+                        default_expr =
+                            BuildConstantSparseExprFromJson(val.raw_json(), dynamic_cast<const SparseInfo *>(column_type->type_info().get()));
                         break;
                     }
                     default: {
-                        default_expr = BuildConstantExprFromJson(field_element["default"].dump());
+                        default_expr = BuildConstantExprFromJson(val.raw_json());
                         break;
                     }
                 }
             }
-            ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, table_comment, default_expr);
+            ColumnDef *col_def = new ColumnDef(column_id++, column_type, column_name, constraints, table_comment, default_expr);
             column_definitions.emplace_back(col_def);
         } else {
-            return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"].dump()));
+            return infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", String((std::string_view)element["type"].raw_json())));
         }
     }
     return Status::OK();
@@ -269,17 +277,18 @@ public:
 
         // get create option
         String body_info = request->readBodyToString();
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
-        String option = body_info_json["create_option"];
+        simdjson::padded_string json_pad(body_info);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String option = doc["create_option"].get<String>();
 
         HTTPStatus http_status;
         nlohmann::json json_response;
 
         CreateDatabaseOptions options;
-        if (body_info_json.contains("create_option")) {
-            auto create_option = body_info_json["create_option"];
-            if (create_option.is_string()) {
-                String option = create_option;
+        if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
+            if (val.is_string()) {
+                String option = val.get<String>();
                 if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -301,8 +310,8 @@ public:
         }
 
         String db_comment;
-        if (body_info_json.contains("comment")) {
-            db_comment = body_info_json["comment"];
+        if (simdjson::value val; doc["comment"].get(val) == simdjson::SUCCESS) {
+            db_comment = val.get<String>();
         }
 
         // create database
@@ -334,13 +343,13 @@ public:
         nlohmann::json json_response;
 
         String body_info = request->readBodyToString();
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
-        String option = body_info_json["drop_option"];
+        simdjson::padded_string json_pad(body_info);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
         DropDatabaseOptions options;
-        if (body_info_json.contains("drop_option")) {
-            auto drop_option = body_info_json["drop_option"];
-            if (drop_option.is_string()) {
-                String option = drop_option;
+        if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
+            if (val.is_string()) {
+                String option = val.get<String>();
                 if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -429,17 +438,18 @@ public:
         String table_name = request->getPathVariable("table_name");
 
         String body_info = request->readBodyToString();
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        simdjson::padded_string json_pad(body_info);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
-        const auto &fields = body_info_json["fields"];
-        auto properties = body_info_json["properties"];
+        auto fields = doc["fields"];
 
         nlohmann::json json_response;
         json_response["error_code"] = 0;
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
 
-        if (!fields.is_array()) {
+        if (fields.type() != simdjson::json_type::array) {
             infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
             json_response["error_code"] = status.code();
             json_response["error_message"] = status.message();
@@ -460,7 +470,7 @@ public:
                 constraint = nullptr;
             }
         });
-        if (infinity::Status status = ParseColumnDefs(fields, column_definitions); !status.ok()) {
+        if (infinity::Status status = ParseColumnDefs(fields.raw_json(), column_definitions); !status.ok()) {
             json_response["error_code"] = status.code();
             json_response["error_message"] = status.message();
             HTTPStatus http_status;
@@ -469,10 +479,9 @@ public:
         }
 
         CreateTableOptions options;
-        if (body_info_json.contains("create_option")) {
-            auto create_option = body_info_json["create_option"];
-            if (create_option.is_string()) {
-                String option = create_option;
+        if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
+            if (val.is_string()) {
+                String option = val.get<String>();
                 if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -518,7 +527,9 @@ public:
         String table_name = request->getPathVariable("table_name");
         String body_info = request->readBodyToString();
 
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        simdjson::padded_string json_pad(body_info);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
@@ -526,10 +537,9 @@ public:
         json_response["error_code"] = 0;
 
         DropTableOptions options;
-        if (body_info_json.contains("drop_option")) {
-            auto drop_option = body_info_json["drop_option"];
-            if (drop_option.is_string()) {
-                String option = drop_option;
+        if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
+            if (val.is_string()) {
+                String option = val.get<String>();
                 if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -653,10 +663,12 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
             ExportOptions export_options;
 
-            String file_type_str = http_body_json["file_type"];
+            String file_type_str = doc["file_type"].get<String>();
             ToLower(file_type_str);
             if (file_type_str == "csv") {
                 export_options.copy_file_type_ = CopyFileType::kCSV;
@@ -671,20 +683,20 @@ public:
             }
 
             if (json_response["error_code"] != ErrorCode::kNotSupported) {
-                if (http_body_json.contains("header")) {
-                    export_options.header_ = http_body_json["header"];
+                if (simdjson::value val; doc["header"].get(val) == simdjson::SUCCESS) {
+                    export_options.header_ = val.get<bool>();
                 }
-                if (http_body_json.contains("offset")) {
-                    export_options.offset_ = http_body_json["offset"];
+                if (simdjson::value val; doc["offset"].get(val) == simdjson::SUCCESS) {
+                    export_options.offset_ = val.get<SizeT>();
                 }
-                if (http_body_json.contains("limit")) {
-                    export_options.limit_ = http_body_json["limit"];
+                if (simdjson::value val; doc["limit"].get(val) == simdjson::SUCCESS) {
+                    export_options.limit_ = val.get<SizeT>();
                 }
-                if (http_body_json.contains("row_limit")) {
-                    export_options.row_limit_ = http_body_json["row_limit"];
+                if (simdjson::value val; doc["row_limit"].get(val) == simdjson::SUCCESS) {
+                    export_options.row_limit_ = val.get<SizeT>();
                 }
-                if (http_body_json.contains("delimiter")) {
-                    String delimiter = http_body_json["delimiter"];
+                if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
+                    String delimiter = val.get<String>();
                     if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
                         json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
@@ -695,7 +707,7 @@ public:
                     export_options.delimiter_ = ',';
                 }
             }
-            String file_path = http_body_json["file_path"];
+            String file_path = doc["file_path"].get<String>();
             Vector<ParsedExpr *> *export_columns{nullptr};
             DeferFn defer_fn([&]() {
                 if (export_columns != nullptr) {
@@ -708,12 +720,12 @@ public:
                 }
             });
 
-            if (http_body_json.contains("columns")) {
+            if (simdjson::value val; doc["columns"].get(val) == simdjson::SUCCESS) {
                 export_columns = new Vector<ParsedExpr *>();
 
-                for (const auto &column : http_body_json["columns"]) {
+                for (auto column : val.get_array()) {
                     if (column.is_string()) {
-                        String column_name = column;
+                        String column_name = column.get<String>();
                         ToLower(column_name);
                         if (column_name == "_row_id") {
                             FunctionExpr *expr = new FunctionExpr();
@@ -750,7 +762,7 @@ public:
                 json_response["error_message"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -813,10 +825,12 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
             ImportOptions import_options;
 
-            String file_type_str = http_body_json["file_type"];
+            String file_type_str = doc["file_type"].get<String>();
             ToLower(file_type_str);
             if (file_type_str == "csv") {
                 import_options.copy_file_type_ = CopyFileType::kCSV;
@@ -833,11 +847,11 @@ public:
             }
 
             if (import_options.copy_file_type_ == CopyFileType::kCSV) {
-                if (http_body_json.contains("header")) {
-                    import_options.header_ = http_body_json["header"];
+                if (simdjson::value val; doc["header"].get(val) == simdjson::SUCCESS) {
+                    import_options.header_ = val.get<bool>();
                 }
-                if (http_body_json.contains("delimiter")) {
-                    String delimiter = http_body_json["delimiter"];
+                if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
+                    String delimiter = val.get<String>();
                     if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
                         json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
@@ -848,7 +862,7 @@ public:
                     import_options.delimiter_ = ',';
                 }
             }
-            String file_path = http_body_json["file_path"];
+            String file_path = doc["file_path"].get<String>();
 
             auto result = infinity->Import(database_name, table_name, file_path, import_options);
             if (result.IsOk()) {
@@ -859,7 +873,7 @@ public:
                 json_response["error_message"] = result.ErrorMsg();
                 http_status = HTTPStatus::CODE_500;
             }
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -879,10 +893,11 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
 
-            const SizeT row_count = http_body_json.size();
-            if (!(http_body_json.is_array() && row_count > 0)) {
+            if (!(doc.type() == simdjson::json_type::array && doc.count_elements() > 0)) {
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
                 json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
             }
@@ -897,11 +912,10 @@ public:
                     insert_rows = nullptr;
                 }
             });
-            for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-                const auto &row_json = http_body_json[row_id];
+            for (auto element : doc.get_array()) {
                 auto insert_one_row = std::make_unique<InsertRowExpr>();
-                for (std::set<std::string> column_name_set; const auto &item : row_json.items()) {
-                    std::string key = item.key();
+                for (std::set<String> column_name_set; auto field : element.get_object()) {
+                    String key = String((std::string_view)field.unescaped_key());
                     ToLower(key);
                     if (const auto [_, success] = column_name_set.insert(key); !success) {
                         json_response["error_code"] = ErrorCode::kDuplicateColumnName;
@@ -909,286 +923,225 @@ public:
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                     insert_one_row->columns_.emplace_back(key);
-                    const auto &value = item.value();
+                    auto value = field.value();
                     switch (value.type()) {
-                        case nlohmann::json::value_t::boolean: {
-                            auto bool_value = value.template get<bool>();
+                        case simdjson::json_type::boolean: {
                             // Generate constant expression
                             auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kBoolean);
-                            const_expr->bool_value_ = bool_value;
+                            const_expr->bool_value_ = value.get<bool>();
                             insert_one_row->values_.emplace_back(std::move(const_expr));
                             break;
                         }
-                        case nlohmann::json::value_t::number_integer: {
-                            auto integer_value = value.template get<i64>();
-                            // Generate constant expression
-                            auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
-                            const_expr->integer_value_ = integer_value;
-                            insert_one_row->values_.emplace_back(std::move(const_expr));
-                            break;
-                        }
-                        case nlohmann::json::value_t::number_unsigned: {
-                            auto integer_value = value.template get<u64>();
-                            // Generate constant expression
-                            auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
-                            const_expr->integer_value_ = integer_value;
-                            insert_one_row->values_.emplace_back(std::move(const_expr));
-                            break;
-                        }
-                        case nlohmann::json::value_t::number_float: {
-                            auto float_value = value.template get<f64>();
-                            // Generate constant expression
-                            auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kDouble);
-                            const_expr->double_value_ = float_value;
-                            insert_one_row->values_.emplace_back(std::move(const_expr));
-                            break;
-                        }
-                        case nlohmann::json::value_t::string: {
-                            auto string_value = value.template get<String>();
-                            auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
-                            const_expr->str_value_ = strdup(string_value.c_str());
-                            insert_one_row->values_.emplace_back(std::move(const_expr));
-                            break;
-                        }
-                        case nlohmann::json::value_t::array: {
-                            SizeT dimension = value.size();
-                            if (dimension == 0) {
-                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = fmt::format("Empty embedding data: {}", value.dump());
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
-                            }
-                            auto first_elem = value[0];
-                            auto first_elem_type = first_elem.type();
-                            if (first_elem_type == nlohmann::json::value_t::number_integer or
-                                first_elem_type == nlohmann::json::value_t::number_unsigned) {
-                                // Generate constant expression
-                                auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
-                                for (SizeT idx = 0; idx < dimension; ++idx) {
-                                    const auto &value_ref = value[idx];
-                                    const auto &value_type = value_ref.type();
-                                    switch (value_type) {
-                                        case nlohmann::json::value_t::number_integer: {
-                                            const_expr->long_array_.emplace_back(value_ref.template get<i64>());
-                                            break;
-                                        }
-                                        case nlohmann::json::value_t::number_unsigned: {
-                                            const_expr->long_array_.emplace_back(value_ref.template get<u64>());
-                                            break;
-                                        }
-                                        default: {
-                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = fmt::format("Embedding element type should be integer");
-                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                        }
-                                    }
-                                }
-                                insert_one_row->values_.emplace_back(std::move(const_expr));
-                            } else if (first_elem_type == nlohmann::json::value_t::number_float) {
-                                // Generate constant expression
-                                auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
-                                for (SizeT idx = 0; idx < dimension; ++idx) {
-                                    const auto &value_ref = value[idx];
-                                    const auto &value_type = value_ref.type();
-                                    if (value_type != nlohmann::json::value_t::number_float) {
-                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                        json_response["error_message"] = fmt::format("Embedding element type should be float");
-                                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                                    }
-                                    const_expr->double_array_.emplace_back(value_ref.template get<double>());
-                                }
-                                insert_one_row->values_.emplace_back(std::move(const_expr));
-                            } else if (first_elem_type == nlohmann::json::value_t::array) {
-                                // std::cout<<"tensor"<<std::endl;
-                                auto first_elem_first_elem = first_elem[0];
-                                auto first_elem_first_elem_type = first_elem_first_elem.type();
-                                if (first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
-                                    first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
-                                    auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
-                                    const_expr->sub_array_array_.reserve(dimension);
-                                    for (SizeT idx = 0; idx < dimension; ++idx) {
-                                        const auto &array = value[idx];
-                                        auto subdimension = array.size();
-                                        if (subdimension == 0) {
-                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
-                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                        }
-                                        auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
-                                        const_expr_2->long_array_.reserve(subdimension);
-                                        for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
-                                            const auto &value_ref = array[subidx];
-                                            const auto &value_type = value_ref.type();
-                                            switch (value_type) {
-                                                case nlohmann::json::value_t::number_integer: {
-                                                    const_expr_2->long_array_.emplace_back(value_ref.template get<i64>());
-                                                    break;
-                                                }
-                                                case nlohmann::json::value_t::number_unsigned: {
-                                                    const_expr_2->long_array_.emplace_back(value_ref.template get<u64>());
-                                                    break;
-                                                }
-                                                default: {
-                                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = fmt::format("Tensor Embedding element type should be integer");
-                                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                }
-                                            }
-                                        }
-                                        const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
-                                    }
+                        case simdjson::json_type::number: {
+                            switch (value.get_number_type()) {
+                                case simdjson::number_type::signed_integer: {
+                                    // Generate constant expression
+                                    auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
+                                    const_expr->integer_value_ = value.get<i64>();
                                     insert_one_row->values_.emplace_back(std::move(const_expr));
-                                } else if (first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
-                                    auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
-                                    const_expr->sub_array_array_.reserve(dimension);
-                                    for (SizeT idx = 0; idx < dimension; ++idx) {
-                                        const auto &array = value[idx];
-                                        auto subdimension = array.size();
-                                        if (subdimension == 0) {
-                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                            json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
-                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                        }
-                                        auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
-                                        const_expr_2->double_array_.reserve(subdimension);
-                                        for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
-                                            const auto &value_ref = array[subidx];
-                                            const auto &value_type = value_ref.type();
-                                            switch (value_type) {
-                                                case nlohmann::json::value_t::number_float: {
-                                                    const_expr_2->double_array_.emplace_back(value_ref.template get<double>());
-                                                    break;
-                                                }
-                                                default: {
-                                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = fmt::format("Tensor Embedding element type should be float");
-                                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                }
-                                            }
-                                        }
-                                        const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
-                                    }
+                                    break;
+                                }
+                                case simdjson::number_type::unsigned_integer: {
+                                    // Generate constant expression
+                                    auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kInteger);
+                                    const_expr->integer_value_ = value.get<u64>();
                                     insert_one_row->values_.emplace_back(std::move(const_expr));
-                                } else if (first_elem_first_elem_type == nlohmann::json::value_t::array) {
-                                    // std::cout<<"tensorarray"<<std::endl;
-                                    auto first_elem_first_elem_first_elem = first_elem_first_elem[0];
-                                    auto first_elem_first_elem_first_elem_type = first_elem_first_elem_first_elem.type();
-                                    if (first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_integer or
-                                        first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_unsigned) {
-                                        auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
-                                        const_expr->sub_array_array_.reserve(dimension);
-                                        for (SizeT idx = 0; idx < dimension; ++idx) {
-                                            const auto &array = value[idx];
-                                            auto subdimension = array.size();
-                                            if (subdimension == 0) {
-                                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
-                                                return ResponseFactory::createResponse(http_status, json_response.dump());
-                                            }
-                                            auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
-                                            const_expr_2->sub_array_array_.reserve(subdimension);
-                                            for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
-                                                const auto &subarray = array[subidx];
-                                                auto subsubdimension = subarray.size();
-                                                if (subsubdimension == 0) {
-                                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
-                                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                }
-                                                auto const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
-                                                const_expr_3->long_array_.reserve(subsubdimension);
-                                                for (SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
-                                                    const auto &value_ref = subarray[subsubidx];
-                                                    const auto &value_type = value_ref.type();
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_integer: {
-                                                            const_expr_3->long_array_.emplace_back(value_ref.template get<i64>());
-                                                            break;
-                                                        }
-                                                        case nlohmann::json::value_t::number_unsigned: {
-                                                            const_expr_3->long_array_.emplace_back(value_ref.template get<u64>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] =
-                                                                fmt::format("Tensor Embedding element type should be integer");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                                const_expr_2->sub_array_array_.emplace_back(std::move(const_expr_3));
-                                            }
-                                            const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
-                                        }
-                                        insert_one_row->values_.emplace_back(std::move(const_expr));
-                                    } else if (first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
-                                        auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
-                                        const_expr->sub_array_array_.reserve(dimension);
-                                        for (SizeT idx = 0; idx < dimension; ++idx) {
-                                            const auto &array = value[idx];
-                                            auto subdimension = array.size();
-                                            if (subdimension == 0) {
-                                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
-                                                return ResponseFactory::createResponse(http_status, json_response.dump());
-                                            }
-                                            auto const_expr_2 = std::make_unique<ConstantExpr>(LiteralType::kSubArrayArray);
-                                            const_expr_2->sub_array_array_.reserve(subdimension);
-                                            for (SizeT subidx = 0; subidx < subdimension; ++subidx) {
-                                                const auto &subarray = array[subidx];
-                                                auto subsubdimension = subarray.size();
-                                                if (subsubdimension == 0) {
-                                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                    json_response["error_message"] = fmt::format("Empty tensor array: {}", array.dump());
-                                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                }
-                                                auto const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
-                                                const_expr_3->double_array_.reserve(subsubdimension);
-                                                for (SizeT subsubidx = 0; subsubidx < subsubdimension; ++subsubidx) {
-                                                    const auto &value_ref = subarray[subsubidx];
-                                                    const auto &value_type = value_ref.type();
-                                                    switch (value_type) {
-                                                        case nlohmann::json::value_t::number_float: {
-                                                            const_expr_3->double_array_.emplace_back(value_ref.template get<double>());
-                                                            break;
-                                                        }
-                                                        default: {
-                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                                            json_response["error_message"] =
-                                                                fmt::format("Tensor Embedding element type should be float");
-                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
-                                                        }
-                                                    }
-                                                }
-                                                const_expr_2->sub_array_array_.emplace_back(std::move(const_expr_3));
-                                            }
-                                            const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
-                                        }
-                                        insert_one_row->values_.emplace_back(std::move(const_expr));
-                                    } else {
-                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                        json_response["error_message"] = fmt::format("Tensorarray element type error");
-                                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                                    }
-                                } else {
+                                    break;
+                                }
+                                case simdjson::number_type::floating_point_number: {
+                                    // Generate constant expression
+                                    auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kDouble);
+                                    const_expr->double_value_ = value.get<f64>();
+                                    insert_one_row->values_.emplace_back(std::move(const_expr));
+                                    break;
+                                }
+                                default: {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Tensor element type error");
+                                    json_response["error_message"] = "Embedding element type can only be integer or float";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
-                            } else {
-                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] =
-                                    fmt::format("Embedding element type can only be integer or float or tensor or tensor array");
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                             break;
                         }
-                        case nlohmann::json::value_t::object: {
+                        case simdjson::json_type::string: {
+                            auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
+                            const_expr->str_value_ = strdup(((String)value.get<String>()).c_str());
+                            insert_one_row->values_.emplace_back(std::move(const_expr));
+                            break;
+                        }
+                        case simdjson::json_type::array: {
+                            SizeT dimension = value.count_elements();
+                            if (dimension == 0) {
+                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                json_response["error_message"] = fmt::format("Empty embedding data: {}", String((std::string_view)value.raw_json()));
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+
+                            UniquePtr<ConstantExpr> const_expr = {};
+                            for (auto sub_value : value.get_array()) {
+                                switch (sub_value.type()) {
+                                    case simdjson::json_type::array: {
+                                        if (const_expr == nullptr) {
+                                            const_expr = MakeUnique<ConstantExpr>(LiteralType::kSubArrayArray);
+                                        }
+                                        SizeT subdimension = sub_value.count_elements();
+                                        if (subdimension == 0) {
+                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                            json_response["error_message"] =
+                                                fmt::format("Empty tensor array: {}", String((std::string_view)sub_value.raw_json()));
+                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                        }
+
+                                        UniquePtr<ConstantExpr> const_expr_2 = {};
+                                        for (auto sub_sub_value : sub_value.get_array()) {
+                                            switch (sub_sub_value.type()) {
+                                                case simdjson::json_type::array: {
+                                                    if (const_expr_2 == nullptr) {
+                                                        const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kSubArrayArray);
+                                                    }
+                                                    SizeT subsubdimension = sub_sub_value.count_elements();
+                                                    if (subsubdimension == 0) {
+                                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                                        json_response["error_message"] =
+                                                            fmt::format("Empty tensor array: {}", String((std::string_view)sub_sub_value.raw_json()));
+                                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                    }
+
+                                                    UniquePtr<ConstantExpr> const_expr_3 = {};
+                                                    for (auto sub_sub_sub_value : sub_sub_value.get_array()) {
+                                                        if (sub_sub_sub_value.type() != simdjson::json_type::number) {
+                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                                            json_response["error_message"] =
+                                                                "Embedding element type can only be integer or float or tensor or tensor array";
+                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                        }
+
+                                                        switch (sub_sub_sub_value.get_number_type()) {
+                                                            case simdjson::number_type::signed_integer: {
+                                                                if (const_expr_3 == nullptr) {
+                                                                    const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                                }
+                                                                const_expr_3->long_array_.emplace_back(sub_sub_sub_value.get<i64>());
+                                                                break;
+                                                            }
+                                                            case simdjson::number_type::unsigned_integer: {
+                                                                if (const_expr_3 == nullptr) {
+                                                                    const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                                }
+                                                                const_expr_3->long_array_.emplace_back(sub_sub_sub_value.get<u64>());
+                                                                break;
+                                                            }
+                                                            case simdjson::number_type::floating_point_number: {
+                                                                if (const_expr_3 == nullptr) {
+                                                                    const_expr_3 = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
+                                                                }
+                                                                const_expr_3->double_array_.emplace_back(sub_sub_sub_value.get<double>());
+                                                                break;
+                                                            }
+                                                            default: {
+                                                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                                                json_response["error_message"] =
+                                                                    "Embedding element type can only be integer or float or tensor or tensor array";
+                                                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                            }
+                                                        }
+                                                    }
+                                                    const_expr_2->sub_array_array_.emplace_back(std::move(const_expr_3));
+                                                    break;
+                                                }
+                                                case simdjson::json_type::number: {
+                                                    switch (sub_sub_value.get_number_type()) {
+                                                        case simdjson::number_type::signed_integer: {
+                                                            if (const_expr_2 == nullptr) {
+                                                                const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                            }
+                                                            const_expr_2->long_array_.emplace_back(sub_sub_value.get<i64>());
+                                                            break;
+                                                        }
+                                                        case simdjson::number_type::unsigned_integer: {
+                                                            if (const_expr_2 == nullptr) {
+                                                                const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                            }
+                                                            const_expr_2->long_array_.emplace_back(sub_sub_value.get<u64>());
+                                                            break;
+                                                        }
+                                                        case simdjson::number_type::floating_point_number: {
+                                                            if (const_expr_2 == nullptr) {
+                                                                const_expr_2 = MakeUnique<ConstantExpr>(LiteralType::kDoubleArray);
+                                                            }
+                                                            const_expr_2->double_array_.emplace_back(sub_sub_value.get<double>());
+                                                            break;
+                                                        }
+                                                        default: {
+                                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                                            json_response["error_message"] =
+                                                                "Embedding element type can only be integer or float or tensor or tensor array";
+                                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                                default: {
+                                                    json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                                    json_response["error_message"] = "Embedding element type can only be integer or float or tensor or tensor array";
+                                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                                }
+                                            }
+                                        }
+                                        const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
+                                        break;
+                                    }
+                                    case simdjson::json_type::number: {
+                                        switch (sub_value.get_number_type()) {
+                                            case simdjson::number_type::signed_integer: {
+                                                // Generate constant expression
+                                                if (const_expr == nullptr) {
+                                                    const_expr = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                }
+                                                const_expr->long_array_.emplace_back(sub_value.get<i64>());
+                                                break;
+                                            }
+                                            case simdjson::number_type::unsigned_integer: {
+                                                // Generate constant expression
+                                                if (const_expr == nullptr) {
+                                                    const_expr = std::make_unique<ConstantExpr>(LiteralType::kIntegerArray);
+                                                }
+                                                const_expr->long_array_.emplace_back(sub_value.get<u64>());
+                                                break;
+                                            }
+                                            case simdjson::number_type::floating_point_number: {
+                                                if (const_expr == nullptr) {
+                                                    const_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleArray);
+                                                }
+                                                const_expr->double_array_.emplace_back(sub_value.get<double>());
+                                                break;
+                                            }
+                                            default: {
+                                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                                json_response["error_message"] = "Embedding element type can only be integer or float or tensor or tensor array";
+                                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                            }
+                                        }
+                                        break;
+                                    }
+                                    default: {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] =
+                                            "Embedding element type can only be integer or float or tensor or tensor array";
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
+                                }
+                            }
+                            insert_one_row->values_.emplace_back(std::move(const_expr));
+                            break;
+                        }
+                        case simdjson::json_type::object: {
+                            simdjson::object value_obj = value.get_object();
                             // check array type
-                            if (value.size() == 1 && value.begin().key() == "array") {
+                            if (simdjson::value val_arr; value_obj.count_fields() == 1 && value_obj["array"].get(val_arr) == simdjson::SUCCESS) {
                                 SharedPtr<ConstantExpr> array_expr;
                                 try {
-                                    auto array_result = BuildConstantExprFromJson(value.dump());
+                                    auto array_result = BuildConstantExprFromJson(value_obj.raw_json());
                                     if (!array_result) {
                                         throw std::runtime_error("Empty return value!");
                                     }
@@ -1203,41 +1156,50 @@ public:
                                 break;
                             }
                             UniquePtr<ConstantExpr> const_sparse_expr = {};
-                            if (value.size() == 0) {
+                            if (value_obj.count_fields() == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                json_response["error_message"] = fmt::format("Empty sparse vector, cannot decide type");
+                                json_response["error_message"] = "Empty sparse vector, cannot decide type";
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
-                            switch (value.begin().value().type()) {
-                                case nlohmann::json::value_t::number_unsigned:
-                                case nlohmann::json::value_t::number_integer: {
-                                    const_sparse_expr = std::make_unique<ConstantExpr>(LiteralType::kLongSparseArray);
-                                    break;
-                                }
-                                case nlohmann::json::value_t::number_float: {
-                                    const_sparse_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleSparseArray);
-                                    break;
-                                }
-                                default: {
+                            for (HashSet<i64> key_set; auto sparse_it : value_obj) {
+                                const String sparse_k = String((std::string_view)sparse_it.unescaped_key());
+                                auto sparse_v = sparse_it.value();
+                                i64 key_val = std::stoll(sparse_k);
+
+                                if (sparse_v.type() != simdjson::json_type::number) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Sparse value element type error");
+                                    json_response["error_message"] = "Sparse value element type error";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
-                            }
-                            HashSet<i64> key_set;
-                            for (const auto &sparse_it : value.items()) {
-                                const auto &sparse_k = sparse_it.key();
-                                const auto &sparse_v = sparse_it.value();
-                                i64 key_val = std::stoll(sparse_k);
+
+                                if (const_sparse_expr == nullptr) {
+                                    switch (sparse_v.get_number_type()) {
+                                        case simdjson::number_type::signed_integer:
+                                        case simdjson::number_type::unsigned_integer: {
+                                            const_sparse_expr = std::make_unique<ConstantExpr>(LiteralType::kLongSparseArray);
+                                            break;
+                                        }
+                                        case simdjson::number_type::floating_point_number: {
+                                            const_sparse_expr = std::make_unique<ConstantExpr>(LiteralType::kDoubleSparseArray);
+                                            break;
+                                        }
+                                        default: {
+                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                            json_response["error_message"] = "Sparse value element type error";
+                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                        }
+                                    }
+                                }
+
                                 if (const auto [_, insert_ok] = key_set.insert(key_val); !insert_ok) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                                     json_response["error_message"] = fmt::format("Duplicate key {} in sparse array!", key);
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                                 bool good_v = false;
-                                switch (sparse_v.type()) {
-                                    case nlohmann::json::value_t::number_unsigned:
-                                    case nlohmann::json::value_t::number_integer: {
+                                switch (sparse_v.get_number_type()) {
+                                    case simdjson::number_type::signed_integer:
+                                    case simdjson::number_type::unsigned_integer: {
                                         if (const_sparse_expr->literal_type_ == LiteralType::kLongSparseArray) {
                                             const_sparse_expr->long_sparse_array_.first.push_back(key_val);
                                             const_sparse_expr->long_sparse_array_.second.push_back(sparse_v.get<i64>());
@@ -1245,7 +1207,7 @@ public:
                                         }
                                         break;
                                     }
-                                    case nlohmann::json::value_t::number_float: {
+                                    case simdjson::number_type::floating_point_number: {
                                         if (const_sparse_expr->literal_type_ == LiteralType::kDoubleSparseArray) {
                                             const_sparse_expr->double_sparse_array_.first.push_back(key_val);
                                             const_sparse_expr->double_sparse_array_.second.push_back(sparse_v.get<double>());
@@ -1259,18 +1221,16 @@ public:
                                 }
                                 if (!good_v) {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Sparse value element type error");
+                                    json_response["error_message"] = "Sparse value element type error";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
                             }
                             insert_one_row->values_.emplace_back(std::move(const_sparse_expr));
                             break;
                         }
-                        case nlohmann::json::value_t::binary:
-                        case nlohmann::json::value_t::null:
-                        case nlohmann::json::value_t::discarded: {
+                        default: {
                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = fmt::format("Embedding element type can only be integer or float");
+                            json_response["error_message"] = "Embedding element type can only be integer or float";
                             return ResponseFactory::createResponse(http_status, json_response.dump());
                         }
                     }
@@ -1291,7 +1251,7 @@ public:
                 http_status = HTTPStatus::CODE_500;
             }
 
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -1310,9 +1270,10 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-
-            const String filter_string = http_body_json["filter"];
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
+            const String filter_string = doc["filter"].get<String>();
             if (filter_string != "") {
                 UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
                 ExprParser expr_parser;
@@ -1362,7 +1323,7 @@ public:
                     http_status = HTTPStatus::CODE_500;
                 }
             }
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -1382,8 +1343,10 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            const auto &update_clause = http_body_json["update"];
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
+            auto update_clause = doc["update"];
 
             Vector<UpdateExpr *> *update_expr_array = new Vector<UpdateExpr *>();
             DeferFn defer_free_update_expr_array([&]() {
@@ -1395,9 +1358,9 @@ public:
                     update_expr_array = nullptr;
                 }
             });
-            update_expr_array->reserve(update_clause.size());
+            update_expr_array->reserve(update_clause.count_fields());
 
-            for (const auto &update_elem : update_clause.items()) {
+            for (auto update_elem : update_clause.get_object()) {
                 UpdateExpr *update_expr = new UpdateExpr();
                 DeferFn defer_free_update_expr([&]() {
                     if (update_expr != nullptr) {
@@ -1405,133 +1368,111 @@ public:
                         update_expr = nullptr;
                     }
                 });
-                update_expr->column_name = update_elem.key();
-                const auto &value = update_elem.value();
+                update_expr->column_name = String((std::string_view)update_elem.unescaped_key());
+                auto value = update_elem.value();
                 switch (value.type()) {
-                    case nlohmann::json::value_t::boolean: {
+                    case simdjson::json_type::boolean: {
                         // Generate constant expression
                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kBoolean);
-                        const_expr->bool_value_ = value.template get<bool>();
+                        const_expr->bool_value_ = value.get<bool>();
                         update_expr->value = const_expr;
                         const_expr = nullptr;
                         break;
                     }
-                    case nlohmann::json::value_t::number_integer: {
-                        // Generate constant expression
-                        infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
-                        const_expr->integer_value_ = value.template get<i64>();
-                        update_expr->value = const_expr;
-                        const_expr = nullptr;
+                    case simdjson::json_type::number: {
+                        switch (value.get_number_type()) {
+                            case simdjson::number_type::signed_integer: {
+                                // Generate constant expression
+                                infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
+                                const_expr->integer_value_ = value.get<i64>();
+                                update_expr->value = const_expr;
+                                const_expr = nullptr;
+                                break;
+                            }
+                            case simdjson::number_type::unsigned_integer: {
+                                // Generate constant expression
+                                infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
+                                const_expr->integer_value_ = value.get<u64>();
+                                update_expr->value = const_expr;
+                                const_expr = nullptr;
+                                break;
+                            }
+                            case simdjson::number_type::floating_point_number: {
+                                // Generate constant expression
+                                infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDouble);
+                                const_expr->double_value_ = value.get<f64>();
+                                update_expr->value = const_expr;
+                                const_expr = nullptr;
+                                break;
+                            }
+                            default: {
+                                json_response["error_code"] = ErrorCode::kInvalidExpression;
+                                json_response["error_message"] = "Invalid update set expression";
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+                        }
                         break;
                     }
-                    case nlohmann::json::value_t::number_unsigned: {
-                        // Generate constant expression
-                        infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
-                        const_expr->integer_value_ = value.template get<u64>();
-                        update_expr->value = const_expr;
-                        const_expr = nullptr;
-                        break;
-                    }
-                    case nlohmann::json::value_t::number_float: {
-                        // Generate constant expression
-                        infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDouble);
-                        const_expr->double_value_ = value.template get<f64>();
-                        update_expr->value = const_expr;
-                        const_expr = nullptr;
-                        break;
-                    }
-                    case nlohmann::json::value_t::string: {
+                    case simdjson::json_type::string: {
                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
-                        String str_value = value.template get<String>();
+                        String str_value = value.get<String>();
                         const_expr->str_value_ = strdup(str_value.c_str());
                         update_expr->value = const_expr;
                         const_expr = nullptr;
                         break;
                     }
-                    case nlohmann::json::value_t::array: {
-                        SizeT dimension = value.size();
+                    case simdjson::json_type::array: {
+                        SizeT dimension = value.count_elements();
                         if (dimension == 0) {
                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = fmt::format("Empty embedding data: {}", value.dump());
+                            json_response["error_message"] = fmt::format("Empty embedding data: {}", String((std::string_view)value.raw_json()));
                             return ResponseFactory::createResponse(http_status, json_response.dump());
                         }
 
-                        auto first_elem = value[0];
-                        auto first_elem_type = first_elem.type();
-                        if (first_elem_type == nlohmann::json::value_t::number_integer or
-                            first_elem_type == nlohmann::json::value_t::number_unsigned) {
-
-                            // Generate constant expression
-                            infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kIntegerArray);
-                            DeferFn defer_free_integer_array([&]() {
-                                if (const_expr != nullptr) {
-                                    delete const_expr;
-                                    const_expr = nullptr;
-                                }
-                            });
-
-                            for (SizeT idx = 0; idx < dimension; ++idx) {
-                                const auto &value_ref = value[idx];
-                                const auto &value_type = value_ref.type();
-
-                                switch (value_type) {
-                                    case nlohmann::json::value_t::number_integer: {
-                                        const_expr->long_array_.emplace_back(value_ref.template get<i64>());
-                                        break;
-                                    }
-                                    case nlohmann::json::value_t::number_unsigned: {
-                                        const_expr->long_array_.emplace_back(value_ref.template get<u64>());
-                                        break;
-                                    }
-                                    default: {
-                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                        json_response["error_message"] = fmt::format("Embedding element type should be integer");
-                                        return ResponseFactory::createResponse(http_status, json_response.dump());
-                                    }
-                                }
+                        infinity::ConstantExpr *const_expr = nullptr;
+                        DeferFn defer_free_integer_array([&]() {
+                            if (const_expr != nullptr) {
+                                delete const_expr;
+                                const_expr = nullptr;
+                            }
+                        });
+                        for (auto sub_value : value.get_array()) {
+                            if (sub_value.type() != simdjson::json_type::number) {
+                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                json_response["error_message"] = "Embedding element type can only be integer or float";
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
 
-                            update_expr->value = const_expr;
-                            const_expr = nullptr;
-                        } else if (first_elem_type == nlohmann::json::value_t::number_float) {
-
-                            // Generate constant expression
-                            infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDoubleArray);
-                            DeferFn defer_free_double_array([&]() {
-                                if (const_expr != nullptr) {
-                                    delete const_expr;
-                                    const_expr = nullptr;
+                            switch (sub_value.get_number_type()) {
+                                case simdjson::number_type::signed_integer: {
+                                    const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                    const_expr->long_array_.emplace_back(sub_value.get<i64>());
+                                    break;
                                 }
-                            });
-
-                            for (SizeT idx = 0; idx < dimension; ++idx) {
-                                const auto &value_ref = value[idx];
-                                const auto &value_type = value_ref.type();
-                                if (value_type != nlohmann::json::value_t::number_float) {
+                                case simdjson::number_type::unsigned_integer: {
+                                    const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                    const_expr->long_array_.emplace_back(sub_value.get<u64>());
+                                    break;
+                                }
+                                case simdjson::number_type::floating_point_number: {
+                                    const_expr = new ConstantExpr(LiteralType::kDoubleArray);
+                                    const_expr->double_array_.emplace_back(sub_value.get<double>());
+                                    break;
+                                }
+                                default: {
                                     json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                                    json_response["error_message"] = fmt::format("Embedding element type should be float");
+                                    json_response["error_message"] = "Embedding element type can only be integer or float";
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
-
-                                const_expr->double_array_.emplace_back(value_ref.template get<double>());
                             }
-
-                            update_expr->value = const_expr;
-                            const_expr = nullptr;
-                        } else {
-                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                            json_response["error_message"] = fmt::format("Embedding element type can only be integer or float");
-                            return ResponseFactory::createResponse(http_status, json_response.dump());
                         }
+                        update_expr->value = const_expr;
+                        const_expr = nullptr;
                         break;
                     }
-
-                    case nlohmann::json::value_t::object:
-                    case nlohmann::json::value_t::binary:
-                    case nlohmann::json::value_t::null:
-                    case nlohmann::json::value_t::discarded: {
+                    default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = fmt::format("Invalid update set expression");
+                        json_response["error_message"] = "Invalid update set expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
@@ -1540,7 +1481,7 @@ public:
                 update_expr = nullptr;
             }
 
-            String where_clause = http_body_json["filter"];
+            String where_clause = doc["filter"].get<String>();
 
             UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
             ExprParser expr_parser;
@@ -1567,7 +1508,7 @@ public:
                 http_status = HTTPStatus::CODE_500;
             }
 
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -1803,17 +1744,19 @@ public:
 
         String body_info = request->readBodyToString();
 
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        simdjson::padded_string json_pad(body_info);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
         nlohmann::json json_response;
         json_response["error_code"] = 0;
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_500;
         DropIndexOptions options{ConflictType::kInvalid};
-        if (body_info_json.contains("drop_option")) {
-            auto drop_option = body_info_json["drop_option"];
-            if (drop_option.is_string()) {
-                String option = drop_option;
+
+        if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
+            if (val.is_string()) {
+                String option = val.get<String>();
                 if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -1856,7 +1799,9 @@ public:
         auto index_name = request->getPathVariable("index_name");
 
         String body_info_str = request->readBodyToString();
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
+        simdjson::padded_string json_pad(body_info_str);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
         nlohmann::json json_response;
         json_response["error_code"] = 0;
@@ -1864,15 +1809,14 @@ public:
         http_status = HTTPStatus::CODE_200;
 
         String index_comment;
-        if (body_info_json.contains("comment")) {
-            index_comment = body_info_json["comment"];
+        if (simdjson::value val; doc["comment"].get(val) == simdjson::SUCCESS) {
+            index_comment = val.get<String>();
         }
 
         CreateIndexOptions options;
-        if (body_info_json.contains("create_option")) {
-            auto create_option = body_info_json["create_option"];
-            if (create_option.is_string()) {
-                String option = create_option;
+        if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
+            if (val.is_string()) {
+                String option = val.get<String>();
                 if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -1891,9 +1835,6 @@ public:
             }
         }
 
-        auto fields = body_info_json["fields"];
-        auto index = body_info_json["index"];
-
         auto index_info = new IndexInfo();
         DeferFn release_index_info([&]() {
             if (index_info != nullptr) {
@@ -1902,7 +1843,7 @@ public:
             }
         });
         {
-            index_info->column_name_ = fields[0];
+            index_info->column_name_ = doc["fields"].get_array().at(0).get<String>();
             ToLower(index_info->column_name_);
             auto index_param_list = new Vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
@@ -1915,12 +1856,14 @@ public:
                 }
             });
 
-            for (auto &ele : index.items()) {
-                String name = ele.key();
+            for (auto element : doc["index"].get_object()) {
+                String name = String((std::string_view)element.unescaped_key());
                 ToLower(name);
-                auto value = ele.value();
-                if (!ele.value().is_string()) {
-                    value = ele.value().dump();
+                String value;
+                if (element.value().is_string()) {
+                    value = element.value().get<String>();
+                } else {
+                    value = String((std::string_view)element.value().raw_json());
                 }
 
                 if (strcmp(name.c_str(), "type") == 0) {
@@ -1969,7 +1912,9 @@ public:
         auto index_name = request->getPathVariable("index_name");
 
         String body_info_str = request->readBodyToString();
-        nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
+        simdjson::padded_string json_pad(body_info_str);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
         nlohmann::json json_response;
         json_response["error_code"] = 0;
@@ -1978,16 +1923,16 @@ public:
 
         OptimizeOptions optimize_options;
         optimize_options.index_name_ = index_name;
-        if (body_info_json.contains("optimize_options")) {
-            if (body_info_json["optimize_options"].type() != nlohmann::json::value_t::object) {
+        if (simdjson::value val; doc["optimize_options"].get(val) == simdjson::SUCCESS) {
+            if (val.type() != simdjson::json_type::object) {
                 json_response["error_code"] = ErrorCode::kInvalidParameterValue;
                 json_response["error_message"] = "Optimize options should be key value pairs!";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
-            for (const auto &option : body_info_json["optimize_options"].items()) {
-                const auto &key = option.key();
-                const auto &value = option.value();
+            for (auto option : val.get_object()) {
+                const String key = String((std::string_view)option.unescaped_key());
+                const String value = option.value().get<String>();
                 auto *init_param = new InitParameter();
                 init_param->param_name_ = key;
                 init_param->param_value_ = value;
@@ -2018,7 +1963,9 @@ public:
         auto table_name = request->getPathVariable("table_name");
 
         String data_body = request->readBodyToString();
-        nlohmann::json json_body = nlohmann::json::parse(data_body);
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
         nlohmann::json json_response;
         json_response["error_code"] = 0;
@@ -2031,11 +1978,9 @@ public:
                 delete column_def_ptr;
             }
         });
-        const nlohmann::json &fields = json_body["fields"];
-        if (infinity::Status status = ParseColumnDefs(fields, column_def_ptrs); !status.ok()) {
+        if (infinity::Status status = ParseColumnDefs(doc["fields"].raw_json(), column_def_ptrs); !status.ok()) {
             json_response["error_code"] = status.code();
             json_response["error_message"] = status.message();
-            HTTPStatus http_status;
             http_status = HTTPStatus::CODE_500;
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
@@ -2068,7 +2013,9 @@ public:
         auto table_name = request->getPathVariable("table_name");
 
         String data_body = request->readBodyToString();
-        nlohmann::json json_body = nlohmann::json::parse(data_body);
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
 
         nlohmann::json json_response;
         json_response["error_code"] = 0;
@@ -2076,8 +2023,8 @@ public:
         http_status = HTTPStatus::CODE_200;
 
         Vector<String> column_names;
-        for (const auto &column : json_body["column_names"]) {
-            column_names.emplace_back(column);
+        for (auto column : doc["column_names"].get_array()) {
+            column_names.emplace_back(column.get<String>());
         }
 
         const QueryResult result = infinity->DropColumns(database_name, table_name, std::move(column_names));
@@ -2450,56 +2397,62 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if (http_body_json.size() != 1) {
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
+            if (doc.count_fields() != 1) {
                 json_response["error_code"] = 3076;
                 json_response["error_message"] = "No variable will be set";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            for (const auto &set_variable : http_body_json.items()) {
-                String var_name = set_variable.key();
-                const auto &var_value = set_variable.value();
+            for (auto set_variable : doc.get_object()) {
+                String var_name = String((std::string_view)set_variable.unescaped_key());
+                auto var_value = set_variable.value();
                 switch (var_value.type()) {
-                    case nlohmann::json::value_t::boolean: {
-                        bool bool_value = var_value.template get<bool>();
+                    case simdjson::json_type::boolean: {
+                        bool bool_value = var_value.get<bool>();
                         result = infinity->SetVariableOrConfig(var_name, bool_value, SetScope::kGlobal);
                         break;
                     }
-                    case nlohmann::json::value_t::number_integer: {
-                        i64 integer_value = var_value.template get<i64>();
-                        result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kGlobal);
-                        break;
+                    case simdjson::json_type::number: {
+                        switch (var_value.get_number_type()) {
+                            case simdjson::number_type::signed_integer: {
+                                i64 integer_value = var_value.get<i64>();
+                                result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kGlobal);
+                                break;
+                            }
+                            case simdjson::number_type::unsigned_integer: {
+                                i64 integer_value = var_value.get<u64>();
+                                result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kGlobal);
+                                break;
+                            }
+                            case simdjson::number_type::floating_point_number: {
+                                f64 double_value = var_value.get<f64>();
+                                result = infinity->SetVariableOrConfig(var_name, double_value, SetScope::kGlobal);
+                                break;
+                            }
+                            default: {
+                                json_response["error_code"] = ErrorCode::kInvalidExpression;
+                                json_response["error_message"] = "Invalid set variable expression";
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+                        }
                     }
-                    case nlohmann::json::value_t::number_unsigned: {
-                        i64 integer_value = var_value.template get<u64>();
-                        result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kGlobal);
-                        break;
-                    }
-                    case nlohmann::json::value_t::number_float: {
-                        f64 double_value = var_value.template get<f64>();
-                        result = infinity->SetVariableOrConfig(var_name, double_value, SetScope::kGlobal);
-                        break;
-                    }
-                    case nlohmann::json::value_t::string: {
-                        String str_value = var_value.template get<std::string>();
+                    case simdjson::json_type::string: {
+                        String str_value = var_value.get<std::string>();
                         result = infinity->SetVariableOrConfig(var_name, str_value, SetScope::kGlobal);
                         break;
                     }
-                    case nlohmann::json::value_t::array:
-                    case nlohmann::json::value_t::object:
-                    case nlohmann::json::value_t::binary:
-                    case nlohmann::json::value_t::null:
-                    case nlohmann::json::value_t::discarded: {
+                    default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = fmt::format("Invalid set variable expression");
+                        json_response["error_message"] = "Invalid set variable expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
             }
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -2591,56 +2544,62 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if (http_body_json.size() != 1) {
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
+            if (doc.count_fields() != 1) {
                 json_response["error_code"] = 3076;
                 json_response["error_message"] = "No variable will be set";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            for (const auto &set_variable : http_body_json.items()) {
-                String var_name = set_variable.key();
-                const auto &var_value = set_variable.value();
+            for (auto set_variable : doc.get_object()) {
+                String var_name = String((std::string_view)set_variable.unescaped_key());
+                auto var_value = set_variable.value();
                 switch (var_value.type()) {
-                    case nlohmann::json::value_t::boolean: {
+                    case simdjson::json_type::boolean: {
                         bool bool_value = var_value.template get<bool>();
                         result = infinity->SetVariableOrConfig(var_name, bool_value, SetScope::kSession);
                         break;
                     }
-                    case nlohmann::json::value_t::number_integer: {
-                        i64 integer_value = var_value.template get<i64>();
-                        result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kSession);
-                        break;
+                    case simdjson::json_type::number: {
+                        switch (var_value.get_number_type()) {
+                            case simdjson::number_type::signed_integer: {
+                                i64 integer_value = var_value.get<i64>();
+                                result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kSession);
+                                break;
+                            }
+                            case simdjson::number_type::unsigned_integer: {
+                                i64 integer_value = var_value.get<u64>();
+                                result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kSession);
+                                break;
+                            }
+                            case simdjson::number_type::floating_point_number: {
+                                f64 double_value = var_value.get<f64>();
+                                result = infinity->SetVariableOrConfig(var_name, double_value, SetScope::kSession);
+                                break;
+                            }
+                            default: {
+                                json_response["error_code"] = ErrorCode::kInvalidExpression;
+                                json_response["error_message"] = "Invalid set variable expression";
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+                        }
                     }
-                    case nlohmann::json::value_t::number_unsigned: {
-                        i64 integer_value = var_value.template get<u64>();
-                        result = infinity->SetVariableOrConfig(var_name, integer_value, SetScope::kSession);
-                        break;
-                    }
-                    case nlohmann::json::value_t::number_float: {
-                        f64 double_value = var_value.template get<f64>();
-                        result = infinity->SetVariableOrConfig(var_name, double_value, SetScope::kSession);
-                        break;
-                    }
-                    case nlohmann::json::value_t::string: {
-                        String str_value = var_value.template get<std::string>();
+                    case simdjson::json_type::string: {
+                        String str_value = var_value.get<std::string>();
                         result = infinity->SetVariableOrConfig(var_name, str_value, SetScope::kSession);
                         break;
                     }
-                    case nlohmann::json::value_t::array:
-                    case nlohmann::json::value_t::object:
-                    case nlohmann::json::value_t::binary:
-                    case nlohmann::json::value_t::null:
-                    case nlohmann::json::value_t::discarded: {
+                    default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = fmt::format("Invalid set variable expression");
+                        json_response["error_message"] = "Invalid set variable expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
             }
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -2668,56 +2627,62 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if (http_body_json.size() != 1) {
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
+            if (doc.count_fields() != 1) {
                 json_response["error_code"] = 3076;
                 json_response["error_message"] = "No config will be set";
                 http_status = HTTPStatus::CODE_500;
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            for (const auto &set_config : http_body_json.items()) {
-                String config_name = set_config.key();
-                const auto &config_value = set_config.value();
+            for (auto set_config : doc.get_object()) {
+                String config_name = String((std::string_view)set_config.unescaped_key());
+                auto config_value = set_config.value();
                 switch (config_value.type()) {
-                    case nlohmann::json::value_t::boolean: {
+                    case simdjson::json_type::boolean: {
                         bool bool_value = config_value.template get<bool>();
                         result = infinity->SetVariableOrConfig(config_name, bool_value, SetScope::kConfig);
                         break;
                     }
-                    case nlohmann::json::value_t::number_integer: {
-                        i64 integer_value = config_value.template get<i64>();
-                        result = infinity->SetVariableOrConfig(config_name, integer_value, SetScope::kConfig);
-                        break;
+                    case simdjson::json_type::number: {
+                        switch (config_value.get_number_type()) {
+                            case simdjson::number_type::signed_integer: {
+                                i64 integer_value = config_value.template get<i64>();
+                                result = infinity->SetVariableOrConfig(config_name, integer_value, SetScope::kConfig);
+                                break;
+                            }
+                            case simdjson::number_type::unsigned_integer: {
+                                i64 integer_value = config_value.template get<u64>();
+                                result = infinity->SetVariableOrConfig(config_name, integer_value, SetScope::kConfig);
+                                break;
+                            }
+                            case simdjson::number_type::floating_point_number: {
+                                f64 double_value = config_value.template get<f64>();
+                                result = infinity->SetVariableOrConfig(config_name, double_value, SetScope::kConfig);
+                                break;
+                            }
+                            default: {
+                                json_response["error_code"] = ErrorCode::kInvalidExpression;
+                                json_response["error_message"] = "Invalid set config expression";
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+                        }
                     }
-                    case nlohmann::json::value_t::number_unsigned: {
-                        i64 integer_value = config_value.template get<u64>();
-                        result = infinity->SetVariableOrConfig(config_name, integer_value, SetScope::kConfig);
-                        break;
-                    }
-                    case nlohmann::json::value_t::number_float: {
-                        f64 double_value = config_value.template get<f64>();
-                        result = infinity->SetVariableOrConfig(config_name, double_value, SetScope::kConfig);
-                        break;
-                    }
-                    case nlohmann::json::value_t::string: {
+                    case simdjson::json_type::string: {
                         String str_value = config_value.template get<std::string>();
                         result = infinity->SetVariableOrConfig(config_name, str_value, SetScope::kConfig);
                         break;
                     }
-                    case nlohmann::json::value_t::array:
-                    case nlohmann::json::value_t::object:
-                    case nlohmann::json::value_t::binary:
-                    case nlohmann::json::value_t::null:
-                    case nlohmann::json::value_t::discarded: {
+                    default: {
                         json_response["error_code"] = ErrorCode::kInvalidExpression;
-                        json_response["error_message"] = fmt::format("Invalid set config expression");
+                        json_response["error_message"] = "Invalid set config expression";
                         return ResponseFactory::createResponse(http_status, json_response.dump());
                     }
                 }
             }
-        } catch (nlohmann::json::exception &e) {
+        } catch (simdjson::simdjson_error &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
@@ -3289,9 +3254,11 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         String data_body = request->readBodyToString();
-        nlohmann::json json_body = nlohmann::json::parse(data_body);
-        String db_name = json_body["db_name"];
-        String table_name = json_body["table_name"];
+        simdjson::padded_string json_pad(data_body);
+        simdjson::parser parser;
+        simdjson::document doc = parser.iterate(json_pad);
+        String db_name = doc["db_name"].get<String>();
+        String table_name = doc["table_name"].get<String>();
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -3455,50 +3422,52 @@ public:
         infinity::Status status;
 
         String data_body = request->readBodyToString();
-        nlohmann::json http_body_json;
+
         try {
-            http_body_json = nlohmann::json::parse(data_body);
-        } catch (nlohmann::json::exception &e) {
+            simdjson::padded_string json_pad(data_body);
+            simdjson::parser parser;
+            simdjson::document doc = parser.iterate(json_pad);
+
+            if (simdjson::value val; doc["role"].get(val) != simdjson::SUCCESS || !val.is_string()) {
+                http_status = HTTPStatus::CODE_500;
+                json_response["error_code"] = ErrorCode::kInvalidCommand;
+                json_response["error_message"] = "Field 'role' is required";
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            String role = doc["role"].get<String>();
+            QueryResult result;
+            ToLower(role);
+            if (role == "admin") {
+                result = infinity->AdminSetAdmin();
+            } else if (role == "standalone") {
+                result = infinity->AdminSetStandalone();
+            } else if (role == "leader") {
+                result = infinity->AdminSetLeader(doc["name"].get<String>());
+            } else if (role == "follower") {
+                result = infinity->AdminSetFollower(doc["name"].get<String>(), doc["address"].get<String>());
+            } else if (role == "learner") {
+                result = infinity->AdminSetLearner(doc["name"].get<String>(), doc["address"].get<String>());
+            } else {
+                http_status = HTTPStatus::CODE_500;
+                json_response["error_code"] = ErrorCode::kInvalidNodeRole;
+                json_response["error_message"] = fmt::format("Invalid node role {}", role);
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            if (result.IsOk()) {
+                http_status = HTTPStatus::CODE_200;
+                json_response["error_code"] = ErrorCode::kOk;
+            } else {
+                http_status = HTTPStatus::CODE_500;
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+            }
+        } catch (simdjson::simdjson_error &e) {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
             return ResponseFactory::createResponse(http_status, json_response.dump());
-        }
-
-        if (!http_body_json.contains("role") or !http_body_json["role"].is_string()) {
-            http_status = HTTPStatus::CODE_500;
-            json_response["error_code"] = ErrorCode::kInvalidCommand;
-            json_response["error_message"] = "Field 'role' is required";
-            return ResponseFactory::createResponse(http_status, json_response.dump());
-        }
-
-        String role = http_body_json["role"];
-        QueryResult result;
-        ToLower(role);
-        if (role == "admin") {
-            result = infinity->AdminSetAdmin();
-        } else if (role == "standalone") {
-            result = infinity->AdminSetStandalone();
-        } else if (role == "leader") {
-            result = infinity->AdminSetLeader(http_body_json["name"]);
-        } else if (role == "follower") {
-            result = infinity->AdminSetFollower(http_body_json["name"], http_body_json["address"]);
-        } else if (role == "learner") {
-            result = infinity->AdminSetLearner(http_body_json["name"], http_body_json["address"]);
-        } else {
-            http_status = HTTPStatus::CODE_500;
-            json_response["error_code"] = ErrorCode::kInvalidNodeRole;
-            json_response["error_message"] = fmt::format("Invalid node role {}", role);
-            return ResponseFactory::createResponse(http_status, json_response.dump());
-        }
-
-        if (result.IsOk()) {
-            http_status = HTTPStatus::CODE_200;
-            json_response["error_code"] = ErrorCode::kOk;
-        } else {
-            http_status = HTTPStatus::CODE_500;
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
