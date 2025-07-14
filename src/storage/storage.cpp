@@ -309,6 +309,7 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+    memory_index_tracer_->InitMemUsed();
 
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
@@ -798,6 +799,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_txn_mgr_.get());
+    memory_index_tracer_->InitMemUsed();
 
     bg_processor_->Start();
 
