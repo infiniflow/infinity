@@ -1062,7 +1062,8 @@ add_arrow_lib(arrow
               STATIC_INSTALL_INTERFACE_LIBS
               ${ARROW_STATIC_INSTALL_INTERFACE_LIBS}
               SHARED_INSTALL_INTERFACE_LIBS
-              ${ARROW_SHARED_INSTALL_INTERFACE_LIBS})
+              ${ARROW_SHARED_INSTALL_INTERFACE_LIBS}
+              snappy.a)
 # The following block includes a code for MSYS2 but GDB on MSYS2 doesn't
 # auto load our plugin. GDB's auto load may not be supported on MSYS2...
 # So it's disabled for now.
