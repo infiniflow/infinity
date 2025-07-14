@@ -243,8 +243,7 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     const String &index_name = dump_index_cmd->index_name_;
     const SegmentID &segment_id = dump_index_cmd->segment_id_;
 
-    DumpMemIndexTxnStore *dump_index_txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
-    ChunkID chunk_id = dump_index_txn_store->chunk_infos_in_segments_.at(segment_id)[0].chunk_id_;
+    ChunkID chunk_id = dump_index_cmd->chunk_infos_[0].chunk_id_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
@@ -1057,7 +1056,6 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
 Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     Status status;
-
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
@@ -1095,9 +1093,9 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     SegmentIndexMeta &segment_index_meta = *segment_index_meta_opt;
 
     Vector<ChunkID> chunk_ids_to_delete;
+    Vector<ChunkID> *chunk_ids_ptr = nullptr;
     {
         HashSet<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
-        Vector<ChunkID> *chunk_ids_ptr = nullptr;
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
             return status;
@@ -1108,17 +1106,110 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
             }
         }
     }
-    for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
-        status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, chunk_info, this);
-        if (!status.ok()) {
-            return status;
-        }
-    }
 
-    // and remove old ones;
+    // Remove old ones;
     status = segment_index_meta.RemoveChunkIDs(chunk_ids_to_delete);
     if (!status.ok()) {
         return status;
+    }
+
+    bool dump_success = true;
+    for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+        ChunkID chunk_id = chunk_info.chunk_id_;
+        if (std::find(chunk_ids_ptr->begin(), chunk_ids_ptr->end(), chunk_id) == chunk_ids_ptr->end()) {
+
+            String drop_ts{};
+            kv_instance_->Get(
+                KeyEncode::DropChunkIndexKey(dump_index_cmd->db_id_, dump_index_cmd->table_id_, dump_index_cmd->index_id_, segment_id, chunk_id),
+                drop_ts);
+
+            if (drop_ts.empty()) {
+                dump_success = false;
+                break;
+            }
+        }
+    }
+
+    if (dump_success) {
+        for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+            status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, chunk_info, this);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        SharedPtr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+        if (mem_index != nullptr) {
+            mem_index->ClearMemIndex();
+        }
+    } else {
+        u32 dump_row_count = 0;
+        for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+            dump_row_count += chunk_info.row_count_;
+        }
+
+        SizeT mem_index_row_count = 0;
+        bool valid_mem_index = false;
+        if (segment_index_meta.HasMemIndex()) {
+            SharedPtr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
+            mem_index_row_count = mem_index->GetRowCount();
+
+            if (mem_index_row_count == dump_row_count) {
+                valid_mem_index = true;
+            } else {
+                LOG_DEBUG(fmt::format("Dump row count {} is not equal to row count in mem index {}, clear the mem index",
+                                      mem_index_row_count,
+                                      dump_row_count));
+                mem_index->ClearMemIndex();
+            }
+        }
+
+        if (!valid_mem_index) {
+            Vector<Pair<RowID, u64>> append_ranges;
+            SegmentMeta segment_meta(segment_id, *table_meta);
+            status = CountMemIndexGapInSegment(segment_index_meta, segment_meta, append_ranges);
+            if (!status.ok()) {
+                return status;
+            }
+
+            u32 append_ranges_row_count = 0;
+            for (const auto &range : append_ranges) {
+                append_ranges_row_count += range.second;
+            }
+
+            if (dump_row_count != append_ranges_row_count) {
+                UnrecoverableError(
+                    fmt::format("Dump row count {} is not equal to row count of append ranges {}", dump_row_count, append_ranges_row_count));
+            }
+
+            for (const auto &range : append_ranges) {
+                status = this->AppendIndex(*table_index_meta, range);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+        CommitBottomDumpMemIndex(dump_index_cmd);
+    }
+
+    ChunkID next_chunk_id = 0;
+    status = segment_index_meta.GetNextChunkID(next_chunk_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    ChunkID max_chunk_id = 0;
+    for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+        if (chunk_info.chunk_id_ > max_chunk_id) {
+            max_chunk_id = chunk_info.chunk_id_;
+        }
+
+        if (next_chunk_id <= max_chunk_id) {
+            status = segment_index_meta.SetNextChunkID(max_chunk_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+        }
     }
 
     return Status::OK();

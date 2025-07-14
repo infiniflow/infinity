@@ -99,6 +99,8 @@ public:
 
     explicit SkipListReaderByteSlice(const PositionListFormatOption &pos_list_format_option) : SkipListReader(pos_list_format_option) {}
 
+    ~SkipListReaderByteSlice() override = default;
+
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end);
 
     void Load(ByteSlice *byteSlice, u32 start, u32 end);
