@@ -251,7 +251,10 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     if (!status.ok()) {
         return status;
     }
-    Vector<SegmentID> segment_ids = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
+    simdjson::padded_string json_pad(segment_ids_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
+    Vector<SegmentID> segment_ids = doc.get<Vector<SegmentID>>();
     segment_ids_ = segment_ids;
     return Status::OK();
 }
