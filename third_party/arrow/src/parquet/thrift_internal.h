@@ -43,6 +43,7 @@
 #include "parquet/exception.h"
 #include "parquet/platform.h"
 #include "parquet/properties.h"
+#include "parquet/size_statistics.h"
 #include "parquet/statistics.h"
 #include "parquet/types.h"
 
@@ -254,6 +255,14 @@ static inline SortingColumn FromThrift(format::SortingColumn thrift_sorting_colu
   return sorting_column;
 }
 
+static inline SizeStatistics FromThrift(const format::SizeStatistics& size_stats) {
+  return SizeStatistics{
+      size_stats.definition_level_histogram, size_stats.repetition_level_histogram,
+      size_stats.__isset.unencoded_byte_array_data_bytes
+          ? std::make_optional(size_stats.unencoded_byte_array_data_bytes)
+          : std::nullopt};
+}
+
 // ----------------------------------------------------------------------
 // Convert Thrift enums from Parquet enums
 
@@ -383,6 +392,17 @@ static inline format::EncryptionAlgorithm ToThrift(EncryptionAlgorithm encryptio
   return encryption_algorithm;
 }
 
+static inline format::SizeStatistics ToThrift(const SizeStatistics& size_stats) {
+  format::SizeStatistics size_statistics;
+  size_statistics.__set_definition_level_histogram(size_stats.definition_level_histogram);
+  size_statistics.__set_repetition_level_histogram(size_stats.repetition_level_histogram);
+  if (size_stats.unencoded_byte_array_data_bytes.has_value()) {
+    size_statistics.__set_unencoded_byte_array_data_bytes(
+        size_stats.unencoded_byte_array_data_bytes.value());
+  }
+  return size_statistics;
+}
+
 // ----------------------------------------------------------------------
 // Thrift struct serialization / deserialization utilities
 
@@ -436,13 +456,13 @@ class ThriftDeserializer {
   // limit (ARROW-13655).  If we wanted to protect against huge messages, we could
   // do it ourselves since we know the message size up front.
   std::shared_ptr<ThriftBuffer> CreateReadOnlyMemoryBuffer(uint8_t* buf, uint32_t len) {
-#if PARQUET_THRIFT_VERSION_MAJOR > 0 || PARQUET_THRIFT_VERSION_MINOR >= 14
+//#if PARQUET_THRIFT_VERSION_MAJOR > 0 || PARQUET_THRIFT_VERSION_MINOR >= 14
     auto conf = std::make_shared<apache::thrift::TConfiguration>();
     conf->setMaxMessageSize(std::numeric_limits<int>::max());
     return std::make_shared<ThriftBuffer>(buf, len, ThriftBuffer::OBSERVE, conf);
-#else
-    return std::make_shared<ThriftBuffer>(buf, len);
-#endif
+//#else
+//    return std::make_shared<ThriftBuffer>(buf, len);
+//#endif
   }
 
   template <class T>
@@ -530,7 +550,7 @@ class ThriftSerializer {
     auto cipher_buffer =
         AllocateBuffer(encryptor->pool(), encryptor->CiphertextLength(out_length));
     ::arrow::util::span<const uint8_t> out_span(out_buffer, out_length);
-    int cipher_buffer_len =
+    int32_t cipher_buffer_len =
         encryptor->Encrypt(out_span, cipher_buffer->mutable_span_as<uint8_t>());
 
     PARQUET_THROW_NOT_OK(out->Write(cipher_buffer->data(), cipher_buffer_len));
