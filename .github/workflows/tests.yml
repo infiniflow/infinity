@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'clang-18'
       - '*.*.*'
     paths-ignore:
       - 'docs/**'
