@@ -136,7 +136,7 @@ public:
     HashMap<String, ObjStat> GetAllObjects() const override;
 
 private:
-    mutable std::shared_mutex mutex_{}; // protect obj_map_
+    mutable std::mutex mutex_{}; // protect obj_map_
     HashMap<String, ObjStat> obj_map_{};
 };
 

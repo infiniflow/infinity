@@ -1678,7 +1678,7 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
             }
 
             {
-                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+                std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
                 block_lock->checkpoint_ts_ = checkpoint_ts;
             }
         }
