@@ -121,7 +121,7 @@ public:
         task_queue_.Enqueue(nullptr);
         dump_thread_.join();
         catalog_.reset();
-        EXPECT_EQ(this->cur_index_memory(), 0ul);
+        EXPECT_EQ(cur_index_memory_, 0ul);
     }
 
     void TriggerDump(SharedPtr<DumpMemIndexTask> task) override {

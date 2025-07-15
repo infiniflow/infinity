@@ -527,6 +527,7 @@ void NewTxnManager::CleanupTxn(NewTxn *txn) {
 
         CleanupTxnBottomNolock(txn_id, begin_ts);
     }
+    LOG_FLUSH();
 }
 
 void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {

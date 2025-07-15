@@ -77,7 +77,8 @@ Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts());
+                                                       table_meta_.begin_ts(),
+                                                       table_meta_.commit_ts());
     }
     return {&*segment_ids_, Status::OK()};
 }
@@ -250,7 +251,10 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     if (!status.ok()) {
         return status;
     }
-    Vector<SegmentID> segment_ids = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
+    simdjson::padded_string json_pad(segment_ids_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_pad);
+    Vector<SegmentID> segment_ids = doc.get<Vector<SegmentID>>();
     segment_ids_ = segment_ids;
     return Status::OK();
 }
@@ -268,7 +272,8 @@ Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts());
+                                                       table_meta_.begin_ts(),
+                                                       table_meta_.commit_ts());
     }
     if (!index_def_) {
         index_def_ =

@@ -117,6 +117,13 @@ Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
         if (!status.ok()) {
             return status;
         }
+
+        for (auto it = chunk_ids_->begin(); it != chunk_ids_->end(); ++it) {
+            if (*it == chunk_id) {
+                chunk_ids_->erase(it);
+                break;
+            }
+        }
     }
     return Status::OK();
 }
@@ -373,6 +380,12 @@ SharedPtr<MemIndex> SegmentIndexMeta::PopMemIndex() {
     return new_catalog->PopMemIndex(mem_index_key);
 }
 
+bool SegmentIndexMeta::HasMemIndex() {
+    String mem_index_key = GetSegmentIndexTag("mem_index");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    return new_catalog->HasMemIndex(mem_index_key);
+}
+
 Status SegmentIndexMeta::LoadChunkIDs() {
     String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
     String chunk_ids_str;
@@ -380,7 +393,10 @@ Status SegmentIndexMeta::LoadChunkIDs() {
     if (!status.ok()) {
         return status;
     }
-    chunk_ids_ = nlohmann::json::parse(chunk_ids_str).get<Vector<ChunkID>>();
+    simdjson::padded_string json_str(chunk_ids_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    chunk_ids_ = doc.get<Vector<ChunkID>>();
     return Status::OK();
 }
 
@@ -388,6 +404,7 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
     chunk_ids_ = Vector<ChunkID>();
     Vector<ChunkID> &chunk_ids = *chunk_ids_;
     TxnTimeStamp begin_ts = table_index_meta_.table_meta().begin_ts();
+    TxnTimeStamp commit_ts = table_index_meta_.table_meta().commit_ts();
 
     TableMeeta &table_meta = table_index_meta_.table_meta();
     String chunk_id_prefix =
@@ -398,8 +415,8 @@ Status SegmentIndexMeta::LoadChunkIDs1() {
         String key = iter->Key().ToString();
         auto [chunk_id, is_chunk_id] = ExtractU64FromStringSuffix(key, chunk_id_prefix.size());
         if (is_chunk_id) {
-            TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-            if (commit_ts > begin_ts and commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
+            TxnTimeStamp chunk_commit_ts = std::stoull(iter->Value().ToString());
+            if (chunk_commit_ts > begin_ts && chunk_commit_ts != commit_ts && chunk_commit_ts != std::numeric_limits<TxnTimeStamp>::max()) {
                 iter->Next();
                 continue;
             }
@@ -437,7 +454,10 @@ Status SegmentIndexMeta::LoadFtInfo() {
         }
         return status;
     }
-    Vector<u64> sum_cnt = nlohmann::json::parse(ft_info_str).get<Vector<u64>>();
+    simdjson::padded_string json_str(ft_info_str);
+    simdjson::parser parser;
+    simdjson::document doc = parser.iterate(json_str);
+    Vector<u64> sum_cnt = doc.get<Vector<u64>>();
     ft_info_->ft_column_len_sum_ = sum_cnt[0];
     ft_info_->ft_column_len_cnt_ = sum_cnt[1];
     return Status::OK();

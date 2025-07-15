@@ -164,6 +164,8 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         handler.HandleWriteResult(result1);
         handler.HandleWriteResult(result2);
         handler.HandleWriteResult(result3);
+        PersistWriteResult result4 = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result4);
     }
 }
 

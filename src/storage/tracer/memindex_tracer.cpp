@@ -41,10 +41,33 @@ import defer_op;
 
 namespace infinity {
 
-void MemIndexTracer::DecreaseMemUsed(SizeT mem_used) {
-    SizeT old_index_memory = cur_index_memory_.fetch_sub(mem_used);
-    if (old_index_memory < mem_used) {
-        UnrecoverableException(fmt::format("Memindex memory {} is larger than current index memory {}", mem_used, old_index_memory));
+void MemIndexTracer::InitMemUsed() {
+    SizeT cur_index_memory = 0;
+    auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<NewTxn> new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("Init mem index tracer"), TransactionType::kNormal);
+    Vector<SharedPtr<MemIndexDetail>> mem_index_details = GetAllMemIndexes(new_txn_shared.get());
+    for (auto &mem_index_detail : mem_index_details) {
+        if (mem_index_detail->is_emvb_index_) {
+            continue;
+        }
+        cur_index_memory += mem_index_detail->mem_used_;
+    }
+    Status status = new_txn_mgr->CommitTxn(new_txn_shared.get());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    std::lock_guard lck(mtx_);
+    cur_index_memory_ = cur_index_memory;
+}
+
+void MemIndexTracer::DecreaseMemUsed(SizeT mem_dec) {
+    std::lock_guard lck(mtx_);
+    LOG_TRACE(fmt::format("DecreaseMemUsed mem_dec {}, cur_index_memory_ {}", mem_dec, cur_index_memory_));
+    if (cur_index_memory_ >= mem_dec) {
+        cur_index_memory_ -= mem_dec;
+    } else {
+        LOG_ERROR(fmt::format("DecreaseMemUsed mem_dec {} is larger than cur_index_memory_ {}", mem_dec, cur_index_memory_));
+        cur_index_memory_ = 0;
     }
 }
 
@@ -68,8 +91,15 @@ void MemIndexTracer::DumpDone(SharedPtr<MemIndex> mem_index) {
         return;
     }
     SizeT dump_size = iter->second;
-    proposed_dump_size_ -= dump_size;
     proposed_dump_.erase(iter);
+    if (proposed_dump_size_ >= dump_size) {
+        proposed_dump_size_ -= dump_size;
+        if (proposed_dump_.empty()) {
+            proposed_dump_size_ = 0;
+        }
+    } else {
+        proposed_dump_size_ = 0;
+    }
 }
 
 Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
@@ -100,6 +130,10 @@ Vector<SharedPtr<DumpMemIndexTask>> MemIndexTracer::MakeDumpTask() {
         if (!mem_index_detail->is_emvb_index_) {
             break;
         }
+    }
+    Status status = new_txn_mgr->CommitTxn(new_txn_shared.get());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
     return dump_tasks;
 }

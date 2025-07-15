@@ -1425,7 +1425,6 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
-    DeferFn defer1([&] { LOG_FLUSH(); });
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
@@ -2264,7 +2263,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, this);
-         status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
+        status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
         if (!status.ok()) {
             return status;
         }
@@ -4125,7 +4124,7 @@ void NewTxn::CommitBottom() {
             }
             case WalCommandType::DUMP_INDEX_V2: {
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex && !IsReplay()) {
                     Status status = CommitBottomDumpMemIndex(dump_index_cmd);
                     if (!status.ok()) {
                         UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
