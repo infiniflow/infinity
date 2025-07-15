@@ -19,6 +19,8 @@ download()
 # https://stackoverflow.com/questions/24628076/convert-multiline-string-to-array
 names="https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7-linux-x86_64.tar.gz
 https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
+https://www.python.org/ftp/python/3.10.17/Python-3.10.17.tar.xz
+https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/gcc-15.1.0.tar.gz
 https://github.com/boostorg/boost/releases/download/boost-1.86.0/boost-1.86.0-cmake.tar.xz
 https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
 https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz
