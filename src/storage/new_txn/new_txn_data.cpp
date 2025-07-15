@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <string>
 #include <memory>
 

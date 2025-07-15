@@ -16,12 +16,11 @@ module;
 
 #include <iostream>
 #include <vector>
-// #include "storage/invertedindex/search/query_node.h"
+#include <memory>
 
 module infinity_core;
 
 import :stl;
-
 import :doc_iterator;
 import :column_index_reader;
 import internal_types;

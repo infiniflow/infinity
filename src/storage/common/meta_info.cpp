@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <string>
 
 module infinity_core;

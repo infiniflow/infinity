@@ -21,6 +21,7 @@ module;
 #include <cstdlib>
 #include <map>
 #include <vector>
+#include <memory>
 
 module infinity_core;
 import :stl;

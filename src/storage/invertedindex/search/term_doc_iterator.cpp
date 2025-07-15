@@ -16,6 +16,8 @@ module;
 
 #include <cassert>
 #include <iostream>
+#include <cmath>
+
 module infinity_core;
 
 import :stl;

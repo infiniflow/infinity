@@ -14,9 +14,7 @@
 
 module;
 
-#include <__iterator/next.h>
-
-#include <simdjson.h>
+#include <iterator>
 
 module infinity_core;
 

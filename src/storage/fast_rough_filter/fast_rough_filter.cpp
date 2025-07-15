@@ -15,7 +15,10 @@
 module;
 
 #include <map> // fix nlohmann::json compile error in release mode
+#include <memory>
+
 module infinity_core;
+
 import :stl;
 import :value;
 import :default_values;

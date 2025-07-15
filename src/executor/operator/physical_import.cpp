@@ -24,6 +24,8 @@ module;
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <string>
+#include <memory>
 
 module infinity_core;
 

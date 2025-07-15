@@ -150,6 +150,11 @@ SharedPtr<WalEntry> DropIndexTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const 
 String OptimizeIndexTxnStore::ToString() const {
     std::string result;
     for (const auto &store_entry : entries_) {
+        SizeT size = store_entry.new_chunk_infos_.size();
+        std::vector<ChunkID> chunk_ids(size);
+        for (SizeT i = 0; i < size; ++i) {
+            chunk_ids[i] = store_entry.new_chunk_infos_[i].chunk_id_;
+        }
         result += fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}, table_key: {}, index: {}, index_id: {}, segment_id: {}, "
                               "new_chunk_infos: {}, deprecate_chunks: {}\n",
                               TransactionType2Str(type_),
@@ -161,7 +166,7 @@ String OptimizeIndexTxnStore::ToString() const {
                               store_entry.index_name_,
                               store_entry.index_id_str_,
                               store_entry.segment_id_,
-                              fmt::join(store_entry.new_chunk_infos_ | std::views::transform([](const auto &info) { return info.chunk_id_; }), " "),
+                              fmt::join(chunk_ids, " "),
                               fmt::join(store_entry.deprecate_chunks_, " "));
     }
     return result;

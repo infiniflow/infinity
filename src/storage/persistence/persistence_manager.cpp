@@ -14,6 +14,7 @@
 
 module;
 
+#include <string.h>
 #include <cassert>
 #include <filesystem>
 

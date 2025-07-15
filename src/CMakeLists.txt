@@ -1,6 +1,6 @@
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+#set(CMAKE_CXX_STANDARD 23)
+#set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 #find_package(Python)
 
@@ -370,6 +370,7 @@ target_link_libraries(infinity
         re2.a
         pcre2-8-static
         rocksdb.a
+        stdc++exp
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -606,6 +607,7 @@ target_link_libraries(unit_test
         ssl.a
         crypto.a
         rocksdb.a
+        stdc++exp
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")

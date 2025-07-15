@@ -14,9 +14,8 @@
 
 module;
 
-#include <cstdlib>
-#include <execinfo.h>
-#include <iostream>
+#include <print>
+#include <stacktrace>
 
 module infinity_core;
 
@@ -45,17 +44,8 @@ void PrintTransactionHistory() {
 }
 
 void PrintStacktrace(const String &err_msg) {
-    int trace_stack_depth = 256;
-    void *array[256];
-    int stack_num = backtrace(array, trace_stack_depth);
-    char **stacktrace = backtrace_symbols(array, stack_num);
-
     LOG_CRITICAL(fmt::format("Error: {}", err_msg));
-    for (int i = 0; i < stack_num; ++i) {
-        String info = stacktrace[i];
-        LOG_CRITICAL(fmt::format("{}, {}", i, info));
-    }
-    free(stacktrace);
+    std::println("{}", std::stacktrace::current());
 }
 
 #define ADD_LOG_INFO
@@ -89,7 +79,6 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (IS_LOGGER_INITIALIZED()) {
-
         PrintStacktrace(location_message);
     }
     Logger::Flush();

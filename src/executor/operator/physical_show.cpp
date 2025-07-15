@@ -17,6 +17,7 @@ module;
 #include <iomanip>
 #include <map>
 #include <string>
+#include <unordered_map>
 
 module infinity_core;
 

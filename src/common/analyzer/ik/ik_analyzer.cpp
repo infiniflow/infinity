@@ -1,6 +1,7 @@
 module;
 
 #include <vector>
+#include <string>
 
 module infinity_core;
 

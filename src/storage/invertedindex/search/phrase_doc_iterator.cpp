@@ -3,6 +3,7 @@ module;
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 module infinity_core;
 

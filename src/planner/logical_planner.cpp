@@ -20,6 +20,8 @@ module;
 #include <string>
 #include <tuple>
 #include <vector>
+#include <memory>
+
 module infinity_core;
 
 import :stl;

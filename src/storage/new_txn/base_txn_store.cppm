@@ -14,6 +14,9 @@
 
 module;
 
+#include <vector>
+#include <ranges>
+
 export module infinity_core:base_txn_store;
 
 import :stl;
@@ -207,7 +210,7 @@ export struct OptimizeIndexStoreEntry {
     String index_id_str_{};
     u64 index_id_{};
     SegmentID segment_id_{};
-    Vector<WalChunkIndexInfo> new_chunk_infos_;
+    std::vector<WalChunkIndexInfo> new_chunk_infos_;
     Vector<ChunkID> deprecate_chunks_;
 };
 
