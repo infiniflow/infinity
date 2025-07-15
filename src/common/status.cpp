@@ -696,8 +696,4 @@ Status Status::SnapshotAlreadyExists(const String &snapshot_name) {
     return Status(ErrorCode::kSnapshotAlreadyExists, MakeUnique<String>(fmt::format("Snapshot: {} already exists", snapshot_name)));
 }
 
-Status Status::SnapshotAlreadyDeleted(const String &snapshot_name) {
-    return Status(ErrorCode::kSnapshotAlreadyDeleted, MakeUnique<String>(fmt::format("Snapshot: {} already deleted", snapshot_name)));
-}
-
 } // namespace infinity

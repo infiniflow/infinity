@@ -1061,7 +1061,10 @@ Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table
     return Status::OK();
 }
 
-
+Status TableMeeta::SetBeginTS(TxnTimeStamp begin_ts) {
+    begin_ts_ = begin_ts;
+    return Status::OK();
+}
 
 
 } // namespace infinity

@@ -455,22 +455,22 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
                     // TODO: do we need a new checkpoint in case the last one just create the table
                     // Get WAL manager and check if checkpoint is already in progress
-                    auto *wal_manager = query_context->storage()->wal_manager();
-                    if (wal_manager->IsCheckpointing()) {
-                        LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
-                        Status status = Status::Checkpointing();
-                        RecoverableError(status);
-                    } else {
-                        // Get current commit state
-                        TxnTimeStamp max_commit_ts{};
-                        i64 wal_size{};
-                        std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
-                        LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
+                    // auto *wal_manager = query_context->storage()->wal_manager();
+                    // if (wal_manager->IsCheckpointing()) {
+                    //     LOG_ERROR("There is a running checkpoint task, skip this checkpoint triggered by snapshot");
+                    //     Status status = Status::Checkpointing();
+                    //     RecoverableError(status);
+                    // } else {
+                    //     // Get current commit state
+                    //     TxnTimeStamp max_commit_ts{};
+                    //     i64 wal_size{};
+                    //     std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                    //     LOG_TRACE(fmt::format("Construct checkpoint task with WAL size: {}, max_commit_ts: {}", wal_size, max_commit_ts));
 
-                        // Create and configure checkpoint task
-                        auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
-                        checkpoint_task->ExecuteWithNewTxn();
-                    }
+                    //     // Create and configure checkpoint task
+                    //     auto checkpoint_task = MakeShared<NewCheckpointTask>(wal_size);
+                    //     checkpoint_task->ExecuteWithNewTxn();
+                    // }
 
 
                     // // wait for checkpoint to complete
@@ -542,9 +542,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kTable: {
                             Status snapshot_status = Snapshot::RestoreTableSnapshot(query_context, snapshot_name);
-                            auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
+                            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
 
-                            new_txn_mgr->PrintAllKeyValue();
+                            // new_txn_mgr->PrintAllKeyValue();
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }

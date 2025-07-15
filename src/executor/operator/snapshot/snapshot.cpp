@@ -71,7 +71,8 @@ Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapsho
     // ATOMIC RENAME - Move entire directory to deleted location
     String deleted_path = fmt::format("{}/deleted_{}", snapshot_dir, snapshot_name);
     if (VirtualStore::Exists(deleted_path)) {
-        return Status::SnapshotAlreadyDeleted(snapshot_name);
+        LOG_WARN(fmt::format("Snapshot: {} already deleted", snapshot_name));
+        VirtualStore::RemoveDirectory(deleted_path);
     }
     Status rename_status = VirtualStore::Rename(snapshot_path, deleted_path);
     
@@ -84,6 +85,7 @@ Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapsho
     // Remove the entire deleted snapshot directory and all its contents
     LOG_INFO(fmt::format("Removing snapshot directory: {}", deleted_path));
     VirtualStore::RemoveDirectory(deleted_path);
+    
 
 
     return Status::OK();

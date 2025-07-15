@@ -158,6 +158,8 @@ public:
 
     Status RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
 
+    Status SetBeginTS(TxnTimeStamp begin_ts);
+
 private:
     Status LoadComment();
 

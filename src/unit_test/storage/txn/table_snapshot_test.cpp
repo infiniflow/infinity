@@ -165,6 +165,15 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     
 }
 
+TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
+    using namespace infinity;
+    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    // Test 1: Successful restore
+    NewTxn *restore_txn = txn_mgr->BeginTxn(MakeUnique<String>("restore table"), TransactionType::kNormal);
+    
+}
+
 TEST_P(TableSnapshotTest, test_restore_table_create_table_multithreaded) {
     LOG_INFO("--test_restore_table_create_table_multithreaded--");
 

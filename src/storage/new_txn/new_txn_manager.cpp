@@ -589,6 +589,22 @@ void NewTxnManager::PrintAllKeyValue() const {
     std::cout << String(" -------------- ") << std::endl;
 }
 
+void NewTxnManager::PrintAllDroppedKeys() const {
+    std::cout << String("All dropped keys: ") << std::endl;
+    
+    // Get all key-value pairs from the KV store
+    Vector<Pair<String, String>> all_key_values = kv_store_->GetAllKeyValue();
+    
+    
+    for (const auto& [key, value] : all_key_values) {
+        // Check if the key is a dropped key by looking for "drop|" prefix
+        if (key.find("drop|") == 0) {
+            std::cout << "Dropped Key: " << key << " -> Value: " << value << std::endl;
+            std::cout << " -------------- " << std::endl;
+        }
+    }
+}
+
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
 Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID this_txn_id, TxnTimeStamp this_begin_ts, TxnTimeStamp this_commit_ts) {

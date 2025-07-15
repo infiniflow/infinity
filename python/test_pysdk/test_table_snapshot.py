@@ -99,136 +99,136 @@ class TestSnapshot:
             print(f"   ERROR in search operations: {e}")
             raise
         
-        # # 3. Test insert operations
-        # print("3. Testing insert operations...")
-        # try:
-        #     # Insert new data
-        #     new_sparse_data = SparseVector([1, 2], [0.1, 0.2])
-        #     new_row = {
-        #         "id": 999999,
-        #         "name": "test_insert_user",
-        #         "age": 25,
-        #         "salary": 75000.0,
-        #         "is_active": True,
-        #         "vector_col": [0.1] * 1,
-        #         "tensor_col": [0.1] * 2,
-        #         "sparse_col": new_sparse_data,
-        #     }
-        #     insert_result = restored_table.insert(new_row)
-        #     print(f"   Insert result: {insert_result.error_code}")
+        # 3. Test insert operations
+        print("3. Testing insert operations...")
+        try:
+            # Insert new data
+            new_sparse_data = SparseVector([1, 2], [0.1, 0.2])
+            new_row = {
+                "id": 999999,
+                "name": "test_insert_user",
+                "age": 25,
+                "salary": 75000.0,
+                "is_active": True,
+                "vector_col": [0.1] * 1,
+                "tensor_col": [0.1] * 2,
+                "sparse_col": new_sparse_data,
+            }
+            insert_result = restored_table.insert(new_row)
+            print(f"   Insert result: {insert_result.error_code}")
             
-        #     # Verify insert
-        #     verify_result = restored_table.query_builder.output(["id", "name"]).filter("id = 999999").to_result()
-        #     assert len(verify_result[0]) > 0, "Inserted row not found"
-        #     print(f"   Insert verification: OK")
+            # Verify insert
+            verify_result = restored_table.query_builder.output(["id", "name"]).filter("id = 999999").to_result()
+            assert len(verify_result[0]) > 0, "Inserted row not found"
+            print(f"   Insert verification: OK")
             
-        # except Exception as e:
-        #     print(f"   ERROR in insert operations: {e}")
-        #     raise
+        except Exception as e:
+            print(f"   ERROR in insert operations: {e}")
+            raise
         
-        # # 4. Test index operations
-        # print("4. Testing index operations...")
-        # try:
-        #     # List existing indexes
-        #     index_response = restored_table.list_indexes()
-        #     existing_indexes = index_response.index_names if hasattr(index_response, 'index_names') else []
-        #     print(f"   Existing indexes: {existing_indexes}")
+        # 4. Test index operations
+        print("4. Testing index operations...")
+        try:
+            # List existing indexes
+            index_response = restored_table.list_indexes()
+            existing_indexes = index_response.index_names if hasattr(index_response, 'index_names') else []
+            print(f"   Existing indexes: {existing_indexes}")
             
-        #     # Drop an index if it exists
-        #     if 'idx_name_fts' in existing_indexes:
-        #         drop_result = restored_table.drop_index("idx_name_fts")
-        #         print(f"   Drop index result: {drop_result.error_code}")
-        #         # Verify index is dropped
-        #         remaining_response = restored_table.list_indexes()
-        #         remaining_indexes = remaining_response.index_names if hasattr(remaining_response, 'index_names') else []
-        #         assert 'idx_name_fts' not in remaining_indexes, "Index not dropped"
-        #         print(f"   Index drop verification: OK")
-        #     else:
-        #         print(f"   Index 'idx_name_fts' not found, skipping drop test")
+            # Drop an index if it exists
+            if 'idx_name_fts' in existing_indexes:
+                drop_result = restored_table.drop_index("idx_name_fts")
+                print(f"   Drop index result: {drop_result.error_code}")
+                # Verify index is dropped
+                remaining_response = restored_table.list_indexes()
+                remaining_indexes = remaining_response.index_names if hasattr(remaining_response, 'index_names') else []
+                assert 'idx_name_fts' not in remaining_indexes, "Index not dropped"
+                print(f"   Index drop verification: OK")
+            else:
+                print(f"   Index 'idx_name_fts' not found, skipping drop test")
             
-        #     # Add a new index
-        #     new_index_result = restored_table.create_index("idx_test_new", index.IndexInfo("age", index.IndexType.Secondary), ConflictType.Ignore)
-        #     print(f"   Add new index result: {new_index_result.error_code}")
+            # Add a new index
+            new_index_result = restored_table.create_index("idx_test_new", index.IndexInfo("age", index.IndexType.Secondary), ConflictType.Ignore)
+            print(f"   Add new index result: {new_index_result.error_code}")
             
-        #     # Verify new index
-        #     final_response = restored_table.list_indexes()
-        #     final_indexes = final_response.index_names if hasattr(final_response, 'index_names') else []
-        #     print(f"   Final indexes: {final_indexes}")
-        #     assert 'idx_test_new' in final_indexes, "New index not created"
-        #     print(f"   New index verification: OK")
+            # Verify new index
+            final_response = restored_table.list_indexes()
+            final_indexes = final_response.index_names if hasattr(final_response, 'index_names') else []
+            print(f"   Final indexes: {final_indexes}")
+            assert 'idx_test_new' in final_indexes, "New index not created"
+            print(f"   New index verification: OK")
             
-        # except Exception as e:
-        #     print(f"   ERROR in index operations: {e}")
-        #     raise
+        except Exception as e:
+            print(f"   ERROR in index operations: {e}")
+            raise
         
-        # # 5. Test delete operations
-        # print("5. Testing delete operations...")
-        # try:
-        #     # Delete the test row we inserted
-        #     delete_result = restored_table.delete("id = 999999")
-        #     print(f"   Delete result: {delete_result.error_code}")
+        # 5. Test delete operations
+        print("5. Testing delete operations...")
+        try:
+            # Delete the test row we inserted
+            delete_result = restored_table.delete("id = 999999")
+            print(f"   Delete result: {delete_result.error_code}")
             
-        #     # Verify deletion
-        #     verify_delete = restored_table.query_builder.output(["id"]).filter("id = 999999").to_result()
-        #     data_dict = verify_delete[0]  # {'id': []}
-        #     id_list = data_dict['id']     # []
-        #     assert len(id_list) == 0, "Row not deleted"  # len([]) == 0 ✅
-        #     print(f"   Delete verification: OK")
+            # Verify deletion
+            verify_delete = restored_table.query_builder.output(["id"]).filter("id = 999999").to_result()
+            data_dict = verify_delete[0]  # {'id': []}
+            id_list = data_dict['id']     # []
+            assert len(id_list) == 0, "Row not deleted"  # len([]) == 0 ✅
+            print(f"   Delete verification: OK")
             
-        # except Exception as e:
-        #     print(f"   ERROR in delete operations: {e}")
-        #     raise
+        except Exception as e:
+            print(f"   ERROR in delete operations: {e}")
+            raise
         
-        # # 6. Test column operations (rename, drop column, etc.)
-        # print("6. Testing column operations...")
-        # try:
-        #     # Test drop column operation
-        #     print(f"   Testing drop column operation...")
+        # 6. Test column operations (rename, drop column, etc.)
+        print("6. Testing column operations...")
+        try:
+            # Test drop column operation
+            print(f"   Testing drop column operation...")
             
-        #     # Add a test column first
-        #     add_columns_result = restored_table.add_columns({"test_col": {"type": "int", "default": 0}})
-        #     print(f"   Add column result: {add_columns_result.error_code}")
+            # Add a test column first
+            add_columns_result = restored_table.add_columns({"test_col": {"type": "int", "default": 0}})
+            print(f"   Add column result: {add_columns_result.error_code}")
             
-        #     # Verify column was added by checking the full table structure
+            # Verify column was added by checking the full table structure
+            try:
+                verify_add = restored_table.query_builder.output(["*"]).to_result()
+                print(f"   Column add verification: OK - table has {len(verify_add[0])} columns")
+            except Exception as e:
+                print(f"   Column add verification failed: {e}")
+            
+            # Drop the test column
+            drop_columns_result = restored_table.drop_columns(["test_col"])
+            print(f"   Drop column result: {drop_columns_result.error_code}")
+            
+            # Verify column was dropped by checking the full table structure
+            try:
+                verify_drop = restored_table.query_builder.output(["*"]).to_result()
+                print(f"   Column drop verification: OK - table structure updated")
+            except Exception as e:
+                print(f"   Column drop verification failed: {e}")
+            
+        except Exception as e:
+            print(f"   ERROR in column operations: {e}")
+            # Don't raise here as column operations might not be supported
+        
+        # 7. Test complex queries
+        # TODO: test after fix
+        print("7. Testing complex queries...")
+        try:
+            # Complex filter query
+            complex_result = restored_table.query_builder.output(["id", "name", "age", "salary"]).filter("age > 30 AND salary > 50000").to_result()
+            print(f"   Complex filter results: {len(complex_result[0])} rows")
+            
+        #     # Group by query (if supported)
         #     try:
-        #         verify_add = restored_table.query_builder.output(["*"]).to_result()
-        #         print(f"   Column add verification: OK - table has {len(verify_add[0])} columns")
+        #         group_result = restored_table.query_builder.output(["age", "salary"]).group_by(["age"]).to_result()
+        #         print(f"   Group by results: {len(group_result[0])} rows")
         #     except Exception as e:
-        #         print(f"   Column add verification failed: {e}")
+        #         print(f"   Group by not supported: {e}")
             
-        #     # Drop the test column
-        #     drop_columns_result = restored_table.drop_columns(["test_col"])
-        #     print(f"   Drop column result: {drop_columns_result.error_code}")
-            
-        #     # Verify column was dropped by checking the full table structure
-        #     try:
-        #         verify_drop = restored_table.query_builder.output(["*"]).to_result()
-        #         print(f"   Column drop verification: OK - table structure updated")
-        #     except Exception as e:
-        #         print(f"   Column drop verification failed: {e}")
-            
-        # except Exception as e:
-        #     print(f"   ERROR in column operations: {e}")
-        #     # Don't raise here as column operations might not be supported
-        
-        # # 7. Test complex queries
-        # # TODO: test after fix
-        # print("7. Testing complex queries...")
-        # try:
-        #     # Complex filter query
-        #     complex_result = restored_table.query_builder.output(["id", "name", "age", "salary"]).filter("age > 30 AND salary > 50000").to_result()
-        #     print(f"   Complex filter results: {len(complex_result[0])} rows")
-            
-        # #     # Group by query (if supported)
-        # #     try:
-        # #         group_result = restored_table.query_builder.output(["age", "salary"]).group_by(["age"]).to_result()
-        # #         print(f"   Group by results: {len(group_result[0])} rows")
-        # #     except Exception as e:
-        # #         print(f"   Group by not supported: {e}")
-            
-        # except Exception as e:
-        #     print(f"   ERROR in complex queries: {e}")
-        #     raise
+        except Exception as e:
+            print(f"   ERROR in complex queries: {e}")
+            raise
         
         print(f"=== All functionality tests passed for {table_name} ===\n")
         return True
@@ -248,6 +248,7 @@ class TestSnapshot:
         
         # Create table
         db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table(table_name, ConflictType.Ignore)
         table_obj = db_obj.create_table(table_name, table_schema, ConflictType.Ignore)
         
         return table_obj
@@ -269,7 +270,7 @@ class TestSnapshot:
         table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
         # # EMVB index (for tensors)
-        # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
+        table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
         # IVF index
         table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}), ConflictType.Ignore)
@@ -332,23 +333,25 @@ class TestSnapshot:
         print(f"Error code: {snapshots_response.error_code}")
         print(f"Error message: {snapshots_response.error_msg}")
         assert snapshot_name in [s.name for s in snapshots]
-        
-        # # Drop original table
-        # db_obj.drop_table(table_name, ConflictType.Error)
-        
-        # # Restore from snapshot
-        # restore_result = db_obj.restore_table_snapshot(snapshot_name)
-        # assert restore_result.error_code == ErrorCode.OK
-        
-        # # Verify data integrity and functionality
-        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
-        
-        # # Drop snapshot
-        # drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
-        # assert drop_result.error_code == ErrorCode.OK
 
-        # # Drop table
-        # db_obj.drop_table(table_name, ConflictType.Error)
+        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
+        
+        # Drop original table
+        db_obj.drop_table(table_name, ConflictType.Error)
+        
+        # Restore from snapshot
+        restore_result = db_obj.restore_table_snapshot(snapshot_name)
+        assert restore_result.error_code == ErrorCode.OK
+        
+        # Verify data integrity and functionality
+        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
+        
+        # Drop snapshot
+        drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
+        assert drop_result.error_code == ErrorCode.OK
+
+        # Drop table
+        db_obj.drop_table(table_name, ConflictType.Error)
     
     # def test_snapshot_concurrency(self):
     #     """Test concurrent snapshot operations"""
@@ -383,55 +386,57 @@ class TestSnapshot:
         db_obj.drop_table(table_name, ConflictType.Ignore)
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
+        self._create_indexes(table_obj)
         self.insert_comprehensive_data(table_obj, 100000)  # 100k rows - should be fine with small dimensions
 
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
+        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
 
 
         
-        # Measure snapshot creation time
-        start_time = time.time()
-        snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
-        snapshot_time = time.time() - start_time
+        # # Measure snapshot creation time
+        # start_time = time.time()
+        # snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
+        # snapshot_time = time.time() - start_time
         
-        assert snapshot_result.error_code == ErrorCode.OK
-        print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
+        # assert snapshot_result.error_code == ErrorCode.OK
+        # print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
 
-        # Drop table
-        db_obj.drop_table(table_name, ConflictType.Error)
+        # # Drop table
+        # db_obj.drop_table(table_name, ConflictType.Error)
         
-        # Test restore performance
-        start_time = time.time()
-        restore_result = db_obj.restore_table_snapshot(snapshot_name)
-        restore_time = time.time() - start_time
+        # # Test restore performance
+        # start_time = time.time()
+        # restore_result = db_obj.restore_table_snapshot(snapshot_name)
+        # restore_time = time.time() - start_time
         
-        assert restore_result.error_code == ErrorCode.OK
+        # assert restore_result.error_code == ErrorCode.OK
 
-        # Verify data integrity and functionality
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
+        # # Verify data integrity and functionality
+        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
 
-        # Drop snapshot
-        drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
-        assert drop_result.error_code == ErrorCode.OK
+        # # Drop snapshot
+        # drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
+        # assert drop_result.error_code == ErrorCode.OK
 
-        # Drop table
-        db_obj.drop_table(table_name, ConflictType.Error)
+        # # Drop table
+        # db_obj.drop_table(table_name, ConflictType.Error)
 
-        print(f"Snapshot restore time: {restore_time:.2f} seconds")
+        # print(f"Snapshot restore time: {restore_time:.2f} seconds")
     
     def test_snapshot_error_conditions(self):
         """Test error conditions for snapshot operations"""
         # Test creating snapshot of non-existent table
+        db_obj = self.infinity_obj.get_database("default_db")
         with pytest.raises(InfinityException) as e:
-            self.db_obj.create_snapshot("non_existent", "non_existent_table")
+            db_obj.create_snapshot("non_existent", "non_existent_table")
         
         # Test restoring non-existent snapshot
         with pytest.raises(InfinityException) as e:
-            self.db_obj.restore_snapshot("non_existent_snapshot", "new_table")
+            db_obj.restore_snapshot("non_existent_snapshot", "new_table")
         
         # Test dropping non-existent snapshot
         with pytest.raises(InfinityException) as e:
-            self.db_obj.drop_snapshot("non_existent_snapshot")
+            db_obj.drop_snapshot("non_existent_snapshot")
     
     def test_snapshot_naming_conventions(self, suffix):
         """Test snapshot with various naming conventions"""

@@ -204,6 +204,10 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, checkpoint_ts, MAX_TIMESTAMP);
 
+        if (table_id_str == "24") {
+            LOG_INFO(fmt::format("InitTable: table_id_str: {}", table_id_str));
+        }
+
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
         if (!status.ok()) {

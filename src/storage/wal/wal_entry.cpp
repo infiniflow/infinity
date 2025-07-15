@@ -3244,6 +3244,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT:
             command = "RESTORE_DATABASE_SNAPSHOT";
             break;
+        case WalCommandType::CREATE_TABLE_SNAPSHOT:
+            command = "CREATE_TABLE_SNAPSHOT";
+            break;
         default: {
             String error_message = "Unknown command type";
             UnrecoverableError(error_message);
