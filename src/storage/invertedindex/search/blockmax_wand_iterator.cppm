@@ -14,12 +14,12 @@
 
 module;
 
-export module blockmax_wand_iterator;
-import stl;
-import index_defines;
-import doc_iterator;
-import blockmax_leaf_iterator;
-import multi_doc_iterator;
+export module infinity_core:blockmax_wand_iterator;
+import :stl;
+import :index_defines;
+import :doc_iterator;
+import :blockmax_leaf_iterator;
+import :multi_doc_iterator;
 import internal_types;
 
 namespace infinity {
@@ -46,6 +46,11 @@ public:
     u32 MatchCount() const override;
 
 private:
+    // Optimized pivot calculation using prefix sums
+    SizeT FindPivotOptimized(float threshold);
+    void UpdateScoreUpperBoundPrefixSums();
+    bool ShouldSkipSort() const;
+
     // block max info
     RowID common_block_min_possible_doc_id_{}; // not always exist
     RowID common_block_last_doc_id_{};
@@ -53,6 +58,14 @@ private:
     Vector<BlockMaxLeafIterator *> sorted_iterators_; // sort by DocID(), in ascending order
     Vector<BlockMaxLeafIterator *> backup_iterators_;
     SizeT pivot_;
+
+    // Optimization for many keywords
+    static constexpr u32 SORT_SKIP_THRESHOLD = 20; // Skip sorting when keyword count > threshold
+    static constexpr u32 LAZY_SORT_INTERVAL = 5;   // Sort every N iterations for large keyword sets
+    Vector<f32> score_ub_prefix_sums_;             // Prefix sums for fast pivot calculation
+    bool prefix_sums_valid_ = false;
+    u32 iterations_since_sort_ = 0;
+
     // bm25 score cache
     bool bm25_score_cached_ = false;
     float bm25_score_cache_ = 0.0f;

@@ -16,15 +16,15 @@ module;
 
 #include <cassert>
 
-module blockmax_wand_iterator;
-import stl;
-import third_party;
-import index_defines;
-import blockmax_leaf_iterator;
-import multi_doc_iterator;
+module infinity_core;
+import :stl;
+import :third_party;
+import :index_defines;
+import :blockmax_leaf_iterator;
+import :multi_doc_iterator;
 import internal_types;
-import logger;
-import infinity_exception;
+import :logger;
+import :infinity_exception;
 
 namespace infinity {
 
@@ -65,6 +65,52 @@ BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iter
     }
     next_sum_score_bm_low_cnt_dist_.resize(100, 0);
     backup_iterators_.reserve(sorted_iterators_.size());
+
+    // Initialize optimization structures for many keywords
+    score_ub_prefix_sums_.reserve(num_iterators + 1);
+    UpdateScoreUpperBoundPrefixSums();
+}
+
+// Optimized pivot calculation using prefix sums for fast binary search
+SizeT BlockMaxWandIterator::FindPivotOptimized(float threshold) {
+    if (!prefix_sums_valid_) {
+        UpdateScoreUpperBoundPrefixSums();
+    }
+
+    // Binary search for pivot using prefix sums
+    SizeT left = 0, right = sorted_iterators_.size();
+    while (left < right) {
+        SizeT mid = (left + right) / 2;
+        if (score_ub_prefix_sums_[mid + 1] > threshold) {
+            right = mid;
+        } else {
+            left = mid + 1;
+        }
+    }
+    return left;
+}
+
+void BlockMaxWandIterator::UpdateScoreUpperBoundPrefixSums() {
+    const SizeT num_iterators = sorted_iterators_.size();
+    score_ub_prefix_sums_.clear();
+    score_ub_prefix_sums_.resize(num_iterators + 1, 0.0f);
+
+    for (SizeT i = 0; i < num_iterators; i++) {
+        score_ub_prefix_sums_[i + 1] = score_ub_prefix_sums_[i] + sorted_iterators_[i]->BM25ScoreUpperBound();
+    }
+    prefix_sums_valid_ = true;
+}
+
+bool BlockMaxWandIterator::ShouldSkipSort() const {
+    const SizeT num_iterators = sorted_iterators_.size();
+
+    // For small keyword sets, always sort for optimal performance
+    if (num_iterators <= SORT_SKIP_THRESHOLD) {
+        return false;
+    }
+
+    // For large keyword sets, use lazy sorting strategy
+    return iterations_since_sort_ < LAZY_SORT_INTERVAL;
 }
 
 void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
@@ -77,6 +123,8 @@ void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
             float new_threshold = base_threshold + it->BM25ScoreUpperBound();
             it->UpdateScoreThreshold(new_threshold);
         }
+        // Invalidate prefix sums when threshold changes significantly
+        prefix_sums_valid_ = false;
     }
 }
 
@@ -100,9 +148,28 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
         }
     }
     while (1) {
-        // sort the lists by current docIDs
-        next_sort_cnt_++;
-        std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+        // Optimized sorting strategy for many keywords
+        bool should_sort = !ShouldSkipSort();
+        if (should_sort) {
+            next_sort_cnt_++;
+            if (num_iterators > SORT_SKIP_THRESHOLD) {
+                // For large keyword sets, use partial sort when possible
+                // Only sort the first half if pivot is likely to be in the first half
+                SizeT sort_limit = std::min(num_iterators, num_iterators / 2 + 10);
+                std::partial_sort(sorted_iterators_.begin(),
+                                  sorted_iterators_.begin() + sort_limit,
+                                  sorted_iterators_.end(),
+                                  [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+            } else {
+                // For smaller keyword sets, use full sort
+                std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocID() < b->DocID(); });
+            }
+            iterations_since_sort_ = 0;
+            prefix_sums_valid_ = false; // Invalidate prefix sums after sorting
+        } else {
+            iterations_since_sort_++;
+        }
+
         // remove exhausted lists
         for (int i = int(num_iterators) - 1; i >= 0 && sorted_iterators_[i]->DocID() == INVALID_ROWID; i--) {
             if (SHOULD_LOG_TRACE()) {
@@ -113,22 +180,30 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             bm25_score_upper_bound_ -= sorted_iterators_[i]->BM25ScoreUpperBound();
             sorted_iterators_.pop_back();
             num_iterators--;
+            prefix_sums_valid_ = false; // Invalidate prefix sums when iterators are removed
         }
         if (bm25_score_upper_bound_ <= threshold_) [[unlikely]] {
             doc_id_ = INVALID_ROWID;
             return false;
         }
 
-        // same "pivoting" as in WAND using the max impact for the whole lists, use p to denote the pivot
-        SizeT pivot = num_iterators;
-        float sum_score_ub = 0.0f;
-        for (SizeT i = 0; i < num_iterators; i++) {
-            sum_score_ub += sorted_iterators_[i]->BM25ScoreUpperBound();
-            if (sum_score_ub > threshold_) {
-                pivot = i;
-                break;
+        // Optimized pivot calculation using binary search for large keyword sets
+        SizeT pivot;
+        if (num_iterators > SORT_SKIP_THRESHOLD && should_sort) {
+            pivot = FindPivotOptimized(threshold_);
+        } else {
+            // Fallback to linear search for smaller sets or when skipping sort
+            pivot = num_iterators;
+            float sum_score_ub = 0.0f;
+            for (SizeT i = 0; i < num_iterators; i++) {
+                sum_score_ub += sorted_iterators_[i]->BM25ScoreUpperBound();
+                if (sum_score_ub > threshold_) {
+                    pivot = i;
+                    break;
+                }
             }
         }
+
         if (pivot >= num_iterators) [[unlikely]] {
             doc_id_ = INVALID_ROWID;
             return false;
