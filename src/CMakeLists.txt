@@ -352,8 +352,6 @@ target_link_libraries(infinity
         lz4.a
         atomic.a
         event.a
-        c++.a
-        c++abi.a
         #        profiler
         oatpp.a
         parquet.a
@@ -370,7 +368,8 @@ target_link_libraries(infinity
         re2.a
         pcre2-8-static
         rocksdb.a
-        stdc++exp
+        libstdc++exp.a
+        libstdc++.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -587,8 +586,6 @@ target_link_libraries(unit_test
         dl
         lz4.a
         atomic.a
-        c++.a
-        c++abi.a
         parquet.a
         arrow.a
         snappy.a
@@ -607,7 +604,8 @@ target_link_libraries(unit_test
         ssl.a
         crypto.a
         rocksdb.a
-        stdc++exp
+        libstdc++exp.a
+        libstdc++.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")

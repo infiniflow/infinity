@@ -24,8 +24,8 @@ target_link_libraries(
     lz4.a
     atomic.a
     event.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     snappy.a
     ${JEMALLOC_STATIC_LIB}
     miniocpp.a
@@ -76,8 +76,8 @@ target_link_libraries(
     lz4.a
     atomic.a
     event.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     #        profiler
     parquet.a
     arrow.a
@@ -131,8 +131,8 @@ target_link_libraries(
     dl
     lz4.a
     atomic.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     parquet.a
     arrow.a
     thrift.a
@@ -186,8 +186,8 @@ target_link_libraries(
     dl
     lz4.a
     atomic.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     parquet.a
     arrow.a
     thrift.a
@@ -239,8 +239,8 @@ target_link_libraries(
     dl
     lz4.a
     atomic.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     parquet.a
     arrow.a
     thrift.a
@@ -291,8 +291,8 @@ target_link_libraries(
     dl
     lz4.a
     atomic.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     parquet.a
     arrow.a
     thrift.a
@@ -343,8 +343,8 @@ target_link_libraries(
     dl
     lz4.a
     atomic.a
-    c++.a
-    c++abi.a
+    libstdc++exp.a
+    libstdc++.a
     parquet.a
     arrow.a
     thrift.a
