@@ -14,11 +14,11 @@
 
 module;
 
-import stl;
-import base_expression;
-import expression_type;
+module infinity_core;
 
-module conjunction_expression;
+import :stl;
+import :base_expression;
+import :expression_type;
 
 namespace infinity {
 

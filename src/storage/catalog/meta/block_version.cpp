@@ -16,17 +16,17 @@ module;
 
 #include <fstream>
 
-module block_version;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import logger;
-import third_party;
-import default_values;
-import column_vector;
+import :stl;
+import :infinity_exception;
+import :logger;
+import :third_party;
+import :default_values;
+import :column_vector;
 import serialize;
-import local_file_handle;
-import status;
+import :local_file_handle;
+import :status;
 
 namespace infinity {
 

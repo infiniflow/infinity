@@ -1,17 +1,17 @@
 module;
 #include <cassert>
 
-import stl;
+module infinity_core;
 
-import position_list_decoder;
-import posting_byte_slice_reader;
-import in_doc_pos_state;
-import short_list_optimize_util;
-import posting_list_format;
-import position_list_format_option;
-import skiplist_reader;
-import index_defines;
-module inmem_position_list_decoder;
+import :stl;
+import :position_list_decoder;
+import :posting_byte_slice_reader;
+import :in_doc_pos_state;
+import :short_list_optimize_util;
+import :posting_list_format;
+import :position_list_format_option;
+import :skiplist_reader;
+import :index_defines;
 
 namespace infinity {
 

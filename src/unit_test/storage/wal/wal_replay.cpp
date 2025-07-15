@@ -14,30 +14,10 @@
 
 #include "type/complex/embedding_type.h"
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import storage;
-import infinity_context;
-
-import table_def;
-import data_block;
-import value;
-import buffer_manager;
-import wal_entry;
-import infinity_exception;
-import status;
-import column_vector;
-import physical_import;
-import index_base;
-import index_ivf;
-import index_hnsw;
-import index_full_text;
-import bg_task;
-import background_process;
-import default_values;
-import base_table_ref;
 import internal_types;
 import logical_type;
 import embedding_info;
@@ -46,19 +26,7 @@ import knn_expr;
 import column_def;
 import statement_common;
 import data_type;
-
 import compilation_config;
-import compaction_process;
-import txn_state;
-import new_txn;
-import new_txn_manager;
-import wal_manager;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import db_meeta;
-import new_catalog;
 
 using namespace infinity;
 

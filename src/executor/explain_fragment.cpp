@@ -16,12 +16,13 @@ module;
 
 #include <string>
 
-import stl;
-import plan_fragment;
-import explain_physical_plan;
-import physical_operator;
+module infinity_core;
 
-module explain_fragment;
+import :stl;
+import :plan_fragment;
+import :explain_physical_plan;
+import :physical_operator;
+import :explain_fragment;
 
 namespace infinity {
 

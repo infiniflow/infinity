@@ -16,39 +16,40 @@ module;
 
 #include <vector>
 
-module physical_scan_base;
+module infinity_core;
 
-import stl;
-import physical_operator;
-import physical_operator_type;
-import global_block_id;
-import base_table_ref;
-import block_index;
-import data_block;
-import operator_state;
-import default_values;
-import third_party;
-import infinity_exception;
-import logger;
-import column_vector;
-import query_context;
-import cached_node_base;
-import cached_match_scan;
-import cached_index_scan;
-import physical_knn_scan;
-import physical_match_sparse_scan;
-import physical_match_tensor_scan;
-import physical_merge_knn;
-import physical_merge_match_sparse;
-import physical_merge_match_tensor;
-import physical_index_scan;
-import meta_info;
-import result_cache_manager;
+import :stl;
+import :physical_operator;
+import :physical_operator_type;
+import :global_block_id;
+import :base_table_ref;
+import :block_index;
+import :data_block;
+import :operator_state;
+import :default_values;
+import :third_party;
+import :infinity_exception;
+import :logger;
+import :column_vector;
+import :query_context;
+import :cached_node_base;
+import :cached_match_scan;
+import :cached_index_scan;
+import :physical_knn_scan;
+import :physical_match_sparse_scan;
+import :physical_match_tensor_scan;
+import :physical_merge_knn;
+import :physical_merge_match_sparse;
+import :physical_merge_match_tensor;
+import :physical_index_scan;
+import :meta_info;
+import :result_cache_manager;
 
-import table_meeta;
-import segment_meta;
-import block_meta;
-import new_txn;
+import :table_meeta;
+import :segment_meta;
+import :block_meta;
+import :new_txn;
+import row_id;
 
 namespace infinity {
 

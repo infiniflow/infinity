@@ -17,12 +17,14 @@ module;
 #include "string_utils.h"
 #include <cstring>
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import tokenizer;
-module common_analyzer;
+module infinity_core;
+
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :tokenizer;
+import :common_analyzer;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024;

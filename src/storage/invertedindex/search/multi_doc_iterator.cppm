@@ -14,13 +14,12 @@
 
 module;
 
-export module multi_doc_iterator;
+export module infinity_core:multi_doc_iterator;
 
-import stl;
-
-import index_defines;
-import doc_iterator;
-import term_doc_iterator;
+import :stl;
+import :index_defines;
+import :doc_iterator;
+import :term_doc_iterator;
 
 namespace infinity {
 export class MultiDocIterator : public DocIterator {

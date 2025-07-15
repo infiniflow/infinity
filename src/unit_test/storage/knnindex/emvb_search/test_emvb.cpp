@@ -13,26 +13,21 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
+import infinity_core;
 
-import infinity_exception;
-import stl;
-import emvb_search;
-import emvb_product_quantization;
-import emvb_shared_vec;
-import local_file_handle;
-
-namespace infinity {
-extern template class EMVBSharedVec<u32>;
-extern template class EMVBSearch<32>;
-extern template class EMVBSearch<64>;
-extern template class EMVBSearch<96>;
-extern template class EMVBSearch<128>;
-extern template class EMVBSearch<160>;
-extern template class EMVBSearch<192>;
-extern template class EMVBSearch<224>;
-extern template class EMVBSearch<256>;
-} // namespace infinity
+// namespace infinity {
+// extern template class EMVBSharedVec<u32>;
+// extern template class EMVBSearch<32>;
+// extern template class EMVBSearch<64>;
+// extern template class EMVBSearch<96>;
+// extern template class EMVBSearch<128>;
+// extern template class EMVBSearch<160>;
+// extern template class EMVBSearch<192>;
+// extern template class EMVBSearch<224>;
+// extern template class EMVBSearch<256>;
+// } // namespace infinity
 
 using namespace infinity;
 

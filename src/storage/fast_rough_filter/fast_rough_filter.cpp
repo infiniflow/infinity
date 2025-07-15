@@ -15,16 +15,16 @@
 module;
 
 #include <map> // fix nlohmann::json compile error in release mode
-module fast_rough_filter;
-import stl;
-import value;
-import default_values;
-import probabilistic_data_filter;
-import min_max_data_filter;
-import logger;
-import third_party;
-import infinity_exception;
-import filter_expression_push_down_helper;
+module infinity_core;
+import :stl;
+import :value;
+import :default_values;
+import :probabilistic_data_filter;
+import :min_max_data_filter;
+import :logger;
+import :third_party;
+import :infinity_exception;
+import :filter_expression_push_down_helper;
 
 namespace infinity {
 

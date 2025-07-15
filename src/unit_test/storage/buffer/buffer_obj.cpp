@@ -13,56 +13,19 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity;
-import infinity_exception;
-
-import stl;
-import logger;
-import buffer_manager;
-import buffer_handle;
-import buffer_obj;
-import data_file_worker;
+import infinity_core;
 import global_resource_usage;
-import infinity_context;
-import storage;
 import column_def;
 import logical_type;
 import data_type;
-import data_block;
-import new_txn_manager;
-import table_def;
 import extra_ddl_info;
-import column_vector;
-import value;
-import status;
-import third_party;
-import base_table_ref;
 import compilation_config;
-import index_hnsw;
 import knn_expr;
 import statement_common;
 import embedding_info;
-import bg_task;
-import physical_import;
-import memory_indexer;
-import wal_manager;
 import internal_types;
-import persistence_manager;
-import default_values;
-import txn_state;
-import new_txn;
-import db_meeta;
-import table_meeta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import mem_index;
-import segment_meta;
-import block_meta;
-import column_meta;
-import new_catalog;
 
 using namespace infinity;
 

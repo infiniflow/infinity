@@ -15,10 +15,7 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import third_party;
-import status;
-import kv_store;
+import infinity_core;
 
 using namespace infinity;
 

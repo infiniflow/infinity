@@ -1,21 +1,20 @@
 module;
 
-module column_index_iterator;
+module infinity_core;
 
-import stl;
-
-import byte_slice;
-import byte_slice_reader;
-import file_reader;
-import posting_decoder;
-import posting_list_format;
-import index_defines;
-import term_meta;
-import dict_reader;
-import third_party;
-import infinity_context;
-import persistence_manager;
-import persist_result_handler;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :file_reader;
+import :posting_decoder;
+import :posting_list_format;
+import :index_defines;
+import :term_meta;
+import :dict_reader;
+import :third_party;
+import :infinity_context;
+import :persistence_manager;
+import :persist_result_handler;
 
 namespace infinity {
 

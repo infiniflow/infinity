@@ -15,14 +15,16 @@
 module;
 
 #include <cctype>
+#include <string>
 
-import stl;
+module infinity_core;
 
-import expression_type;
-import special_function;
-import third_party;
-
-module column_expression;
+import :stl;
+import :expression_type;
+import :special_function;
+import :third_party;
+import :column_expression;
+import data_type;
 
 namespace infinity {
 

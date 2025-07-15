@@ -14,32 +14,32 @@
 
 module;
 
-module expression_evaluator;
+module infinity_core;
 
-import stl;
-import base_expression;
-import aggregate_expression;
-import case_expression;
-import cast_expression;
-import column_expression;
-import function_expression;
-import reference_expression;
-import value_expression;
-import in_expression;
-import filter_fulltext_expression;
-import data_block;
-import column_vector;
-import expression_state;
-import status;
-import third_party;
-import infinity_exception;
-import expression_type;
-import bound_cast_func;
-import logger;
+import :stl;
+import :base_expression;
+import :aggregate_expression;
+import :case_expression;
+import :cast_expression;
+import :column_expression;
+import :function_expression;
+import :reference_expression;
+import :value_expression;
+import :in_expression;
+import :filter_fulltext_expression;
+import :data_block;
+import :column_vector;
+import :expression_state;
+import :status;
+import :third_party;
+import :infinity_exception;
+import :expression_type;
+import :bound_cast_func;
+import :logger;
 import logical_type;
 import internal_types;
-import roaring_bitmap;
-import block_index;
+import :roaring_bitmap;
+import :block_index;
 
 namespace infinity {
 

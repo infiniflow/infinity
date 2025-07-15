@@ -14,13 +14,13 @@
 
 module;
 
-export module logical_drop_collection;
+export module infinity_core:logical_drop_collection;
 
-import stl;
+import :stl;
 
-import logical_node;
-import logical_node_type;
-import column_binding;
+import :logical_node;
+import :logical_node_type;
+import :column_binding;
 import internal_types;
 import extra_ddl_info;
 import data_type;

@@ -16,23 +16,24 @@ module;
 
 #include <string>
 
-module table_index_meeta;
+module infinity_core;
 
-import kv_store;
-import table_meeta;
-import kv_code;
-import third_party;
-import logger;
-import index_base;
-import meta_info;
+import :kv_store;
+import :table_meeta;
+import :kv_code;
+import :third_party;
+import :logger;
+import :index_base;
+import :meta_info;
 import create_index_info;
-import new_catalog;
-import infinity_context;
-import new_txn;
-import txn_state;
-import infinity_exception;
-import utility;
-import kv_utility;
+import :new_catalog;
+import :infinity_context;
+import :new_txn;
+import :txn_state;
+import :infinity_exception;
+import :utility;
+import :kv_utility;
+import column_def;
 
 namespace infinity {
 

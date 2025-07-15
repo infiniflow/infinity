@@ -14,17 +14,17 @@
 
 module;
 
-module ivf_index_file_worker;
+module infinity_core;
 
-import stl;
-import index_file_worker;
-import file_worker;
-import logger;
-import index_base;
-import ivf_index_data;
-import infinity_exception;
-import third_party;
-import persistence_manager;
+import :stl;
+import :index_file_worker;
+import :file_worker;
+import :logger;
+import :index_base;
+import :ivf_index_data;
+import :infinity_exception;
+import :third_party;
+import :persistence_manager;
 
 namespace infinity {
 

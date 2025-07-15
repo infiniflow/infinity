@@ -16,40 +16,42 @@ module;
 
 #include <sstream>
 #include <vector>
+#include <memory>
 
-module admin_executor;
+module infinity_core;
 
-import query_context;
-import query_result;
-import stl;
-import status;
-import log_file;
-import third_party;
-import logger;
+import :query_context;
+import :query_result;
+import :stl;
+import :status;
+import :log_file;
+import :third_party;
+import :logger;
 import data_type;
 import logical_type;
 import column_def;
-import table_def;
-import data_table;
-import data_block;
-import value;
-import value_expression;
-import logical_node;
-import virtual_store;
-import wal_entry;
-import buffer_manager;
-import new_catalog;
-import memory_indexer;
-import config;
-import default_values;
-import infinity_context;
-import options;
-import cluster_manager;
-import utility;
-import peer_task;
-import infinity_exception;
-import node_info;
-import persistence_manager;
+import :table_def;
+import :data_table;
+import :data_block;
+import :value;
+import :value_expression;
+import :logical_node;
+import :virtual_store;
+import :wal_entry;
+import :buffer_manager;
+import :new_catalog;
+import :memory_indexer;
+import :config;
+import :default_values;
+import :infinity_context;
+import :options;
+import :cluster_manager;
+import :utility;
+import :peer_task;
+import :infinity_exception;
+import :node_info;
+import :persistence_manager;
+import admin_statement;
 
 namespace infinity {
 

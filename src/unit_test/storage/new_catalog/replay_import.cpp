@@ -16,40 +16,14 @@
 
 import base_test;
 import replay_test;
-
-import stl;
-import third_party;
-import status;
-import new_catalog;
-import new_txn_manager;
-import infinity_context;
-import txn_state;
+import infinity_core;
 import extra_ddl_info;
 import column_def;
 import data_type;
 import logical_type;
-import table_def;
-import data_block;
-import column_vector;
-import value;
-import new_txn;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import table_index_meeta;
-import segment_index_meta;
-import chunk_index_meta;
-import db_meeta;
 import constant_expr;
-import default_values;
 import internal_types;
-
-import index_secondary;
-import index_full_text;
 import statement_common;
-import mem_index;
-import index_base;
 
 class TestTxnReplayImport : public NewReplayTest {
 public:

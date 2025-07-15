@@ -16,14 +16,15 @@ module;
 
 #include <vector>
 
-import stl;
+module infinity_core;
 
-import physical_source;
-import physical_sink;
-import data_table;
-import query_context;
-
-module plan_fragment;
+import :stl;
+import :physical_source;
+import :physical_sink;
+import :data_table;
+import :query_context;
+import :plan_fragment;
+import data_type;
 
 namespace infinity {
 

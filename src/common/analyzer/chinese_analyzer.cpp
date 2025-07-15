@@ -25,14 +25,14 @@ module;
 #include <cstring>
 #include <filesystem>
 
-import stl;
-import term;
-import analyzer;
-import common_analyzer;
-import logger;
-import third_party;
+module infinity_core;
 
-module chinese_analyzer;
+import :stl;
+import :term;
+import :analyzer;
+import :common_analyzer;
+import :logger;
+import :third_party;
 
 namespace fs = std::filesystem;
 

@@ -5,12 +5,9 @@
 #include <iostream>
 #include <limits>
 #include <string>
+
 import base_test;
-
-import infinity_exception;
-
-import third_party;
-import stl;
+import infinity_core;
 import data_type;
 
 using namespace infinity;

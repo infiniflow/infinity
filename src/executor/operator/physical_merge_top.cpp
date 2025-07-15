@@ -16,34 +16,34 @@ module;
 
 #include <memory>
 #include <numeric>
+#include <iterator>
 
-module physical_merge_top;
+module infinity_core;
 
-import stl;
-
-import query_context;
-import operator_state;
-import base_expression;
-import value_expression;
-import expression_state;
-import infinity_exception;
-import expression_evaluator;
-import data_block;
-import column_vector;
-import default_values;
-import physical_top;
-import logger;
+import :stl;
+import :query_context;
+import :operator_state;
+import :base_expression;
+import :value_expression;
+import :expression_state;
+import :infinity_exception;
+import :expression_evaluator;
+import :data_block;
+import :column_vector;
+import :default_values;
+import :physical_top;
+import :logger;
 
 namespace infinity {
 
-struct VectorBlockRawIndex {
+struct VectorBlockRawIndex1 {
     u32 left_row_cnt_{};
     u32 block_id_{};
     u32 block_offset_{};
-    VectorBlockRawIndex() = default;
-    VectorBlockRawIndex(u32 left_row_cnt, u32 block_id, u32 block_offset)
+    VectorBlockRawIndex1() = default;
+    VectorBlockRawIndex1(u32 left_row_cnt, u32 block_id, u32 block_offset)
         : left_row_cnt_(left_row_cnt), block_id_(block_id), block_offset_(block_offset) {}
-    VectorBlockRawIndex &operator++() {
+    VectorBlockRawIndex1 &operator++() {
         if (left_row_cnt_ > 0) {
             --left_row_cnt_;
             if (++block_offset_ == DEFAULT_BLOCK_CAPACITY) {
@@ -97,7 +97,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
         middle_result_count = input_result_count;
     } else {
         // merge in-place can be done by:
-        // 1. merge 2 sorted array by VectorBlockRawIndex
+        // 1. merge 2 sorted array by VectorBlockRawIndex1
         // 2. update middle_data_block_array from the end to the beginning, may avoid allocating extra temp data block
         if (input_result_count > middle_result_count) {
             std::swap(input_data_block_array, middle_data_block_array);
@@ -110,7 +110,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
         u32 result_block_cnt = result_cnt / DEFAULT_BLOCK_CAPACITY + ((result_cnt % DEFAULT_BLOCK_CAPACITY) != 0);
         u32 middle_block_cnt = middle_data_block_array.size();
         // assume that middle and input are both valid
-        auto choose_middle = [&](const VectorBlockRawIndex &middle, const VectorBlockRawIndex &input) -> bool {
+        auto choose_middle = [&](const VectorBlockRawIndex1 &middle, const VectorBlockRawIndex1 &input) -> bool {
             if (!middle) {
                 return false;
             } else if (!input) {
@@ -122,9 +122,9 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
             }
         };
         // 1. get merged top ids
-        auto result_ids = MakeUniqueForOverwrite<VectorBlockRawIndex[]>(result_cnt);
+        auto result_ids = MakeUniqueForOverwrite<VectorBlockRawIndex1[]>(result_cnt);
         {
-            VectorBlockRawIndex middle_id(middle_result_count, 0, 0), input_id(input_result_count, middle_block_cnt, 0);
+            VectorBlockRawIndex1 middle_id(middle_result_count, 0, 0), input_id(input_result_count, middle_block_cnt, 0);
             for (u32 total_i = 0; total_i < result_cnt; ++total_i) {
                 if (choose_middle(middle_id, input_id)) {
                     result_ids[total_i] = middle_id;

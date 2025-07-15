@@ -16,18 +16,19 @@ module;
 
 #include <sstream>
 
-module logical_delete;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import logical_node;
-import logical_node_type;
-import column_binding;
-import base_table_ref;
-import column_binding;
-import logical_node_type;
+import :logical_node;
+import :logical_node_type;
+import :column_binding;
+import :base_table_ref;
+import :column_binding;
+import :logical_node_type;
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

@@ -17,20 +17,22 @@ module;
 #include <sstream>
 #include <string>
 #include <vector>
+#include <memory>
 
-module index_diskann;
+module infinity_core;
 
-import stl;
-import status;
-import index_base;
-import third_party;
-import infinity_exception;
+import :stl;
+import :status;
+import :index_base;
+import :third_party;
+import :infinity_exception;
 import serialize;
-import default_values;
-import index_base;
+import :default_values;
+import :index_base;
 import logical_type;
 import statement_common;
-import logger;
+import :logger;
+import :index_diskann;
 
 namespace infinity {
 

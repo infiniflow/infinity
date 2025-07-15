@@ -17,15 +17,15 @@ module;
 #include "base64.hpp"
 #include <string>
 
-module meta_key;
+module infinity_core;
 
 import column_def;
-import utility;
-import third_party;
-import kv_code;
-import infinity_exception;
-import meta_type;
-import default_values;
+import :utility;
+import :third_party;
+import :kv_code;
+import :infinity_exception;
+import :meta_type;
+import :default_values;
 
 namespace infinity {
 

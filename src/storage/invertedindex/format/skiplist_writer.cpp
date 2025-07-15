@@ -1,16 +1,16 @@
 module;
 #include <cassert>
 
-module skiplist_writer;
-import stl;
-import byte_slice;
+module infinity_core;
+import :stl;
+import :byte_slice;
 
-import file_writer;
-import file_reader;
-import index_defines;
-import posting_field;
-import posting_byte_slice;
-import short_list_optimize_util;
+import :file_writer;
+import :file_reader;
+import :index_defines;
+import :posting_field;
+import :posting_byte_slice;
+import :short_list_optimize_util;
 
 namespace infinity {
 

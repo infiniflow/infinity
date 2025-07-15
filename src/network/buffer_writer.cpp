@@ -17,16 +17,16 @@ module;
 #include <arpa/inet.h>
 #include <boost/asio/write.hpp>
 
-module buffer_writer;
+module infinity_core;
 
-import stl;
-import third_party;
-import pg_message;
-import ring_buffer_iterator;
+import :stl;
+import :third_party;
+import :pg_message;
+import :ring_buffer_iterator;
 
-import infinity_exception;
-import default_values;
-import logger;
+import :infinity_exception;
+import :default_values;
+import :logger;
 
 namespace infinity {
 

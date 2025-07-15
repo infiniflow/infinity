@@ -14,19 +14,19 @@
 
 module;
 
-export module logical_read_cache;
+export module infinity_core:logical_read_cache;
 
-import stl;
-import logical_node;
-import data_block;
-import column_binding;
+import :stl;
+import :logical_node;
+import :data_block;
+import :column_binding;
 import data_type;
-import base_table_ref;
-import logical_node_type;
+import :base_table_ref;
+import :logical_node_type;
 
 namespace infinity {
 
-struct CacheContent;
+export struct CacheContent;
 
 export class LogicalReadCache : public LogicalNode {
 public:

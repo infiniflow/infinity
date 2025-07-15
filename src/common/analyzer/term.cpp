@@ -14,9 +14,10 @@
 
 module;
 
-import stl;
+module infinity_core;
 
-module term;
+import :stl;
+import :term;
 
 namespace infinity {
 

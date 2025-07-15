@@ -17,13 +17,13 @@ module;
 #include <sstream>
 #include <stdexcept>
 
-export module thrift_server;
+export module infinity_core:thrift_server;
 
-import stl;
-import infinity;
-import infinity_thrift_service;
-import query_options;
-import thrift;
+import :stl;
+// import :infinity;
+import :infinity_thrift_service;
+// import query_options;
+import :thrift;
 
 using namespace std;
 

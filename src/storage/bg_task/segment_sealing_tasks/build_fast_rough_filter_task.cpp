@@ -16,29 +16,31 @@ module;
 
 #include <algorithm>
 #include <string_view>
-module build_fast_rough_filter_task;
+#include <cstdlib>
 
-import stl;
-import infinity_exception;
+module infinity_core;
+
+import :stl;
+import :infinity_exception;
 import internal_types;
 import logical_type;
-import logger;
-import buffer_manager;
-import column_vector;
-import value;
-import third_party;
-import block_column_iter;
-import probabilistic_data_filter;
-import min_max_data_filter;
-import fast_rough_filter;
-import filter_value_type_classification;
-import new_catalog;
-import segment_meta;
-import block_meta;
-import column_meta;
-import table_meeta;
-import status;
-import default_values;
+import :logger;
+import :buffer_manager;
+import :column_vector;
+import :value;
+import :third_party;
+import :block_column_iter;
+import :probabilistic_data_filter;
+import :min_max_data_filter;
+import :fast_rough_filter;
+import :filter_value_type_classification;
+import :new_catalog;
+import :segment_meta;
+import :block_meta;
+import :column_meta;
+import :table_meeta;
+import :status;
+import :default_values;
 
 template <>
 class std::numeric_limits<infinity::InnerMinMaxDataFilterVarcharType> {

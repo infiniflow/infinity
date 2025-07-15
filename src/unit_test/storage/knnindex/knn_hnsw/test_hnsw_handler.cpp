@@ -15,32 +15,17 @@
 #include <thread>
 #include "gtest/gtest.h"
 
-import stl;
 import base_test;
+import infinity_core;
 import column_def;
 import embedding_info;
 import logical_type;
 import internal_types;
 import data_type;
 
-import hnsw_alg;
-import hnsw_handler;
-import index_hnsw;
-import index_base;
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
-import data_store;
 #pragma clang diagnostic pop
-
-import dist_func_l2;
-import dist_func_ip;
-import dist_func_cos;
-import vec_store_type;
-import hnsw_common;
-import infinity_exception;
-import virtual_store;
-import local_file_handle;
 
 using namespace infinity;
 
@@ -88,7 +73,7 @@ public:
         return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
     }
 
-    void SearchHnswHandler(HnswHandler* hnsw_handler) {
+    void SearchHnswHandler(HnswHandler* hnsw_handler) const {
         hnsw_handler->Check();
 
         KnnSearchOption search_option{.ef_ = 10};
@@ -96,10 +81,10 @@ public:
         int correct = 0;
         for (SizeT i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            auto [result_n, d_ptr, v_ptr] = hnsw_handler->template SearchIndex<float, LabelT>(query, 1, search_option);
+            auto [result_n, d_ptr, v_ptr] = hnsw_handler->SearchIndex<float, LabelT>(query, 1, search_option);
             Vector<Pair<float, LabelT>> result(result_n);
             for (SizeT i = 0; i < result_n; ++i) {
-                result[i] = {d_ptr[i], hnsw_handler->template GetLabel<LabelT>(v_ptr[i])};
+                result[i] = {d_ptr[i], hnsw_handler->GetLabel<LabelT>(v_ptr[i])};
             }
             std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
             if (result.empty()) {
@@ -109,25 +94,25 @@ public:
                 ++correct;
             }
         }
-        float correct_rate = float(correct) / element_size;
+        auto correct_rate = static_cast<float>(correct) / element_size;
         std::printf("correct rage: %f\n", correct_rate);
         EXPECT_GE(correct_rate, 0.95);
     }
 
 protected:
-    SizeT dim;
-    SizeT M;
-    SizeT ef_construction;
-    SizeT chunk_size;
-    SizeT max_chunk_n;
-    SizeT element_size;
+    SizeT dim{};
+    SizeT M{};
+    SizeT ef_construction{};
+    SizeT chunk_size{};
+    SizeT max_chunk_n{};
+    SizeT element_size{};
 
     SharedPtr<String> index_name;
     String filename;
     Vector<String> column_names;
-    MetricType metric_type;
-    HnswEncodeType encode_type;
-    HnswBuildType build_type;
+    MetricType metric_type{};
+    HnswEncodeType encode_type{};
+    HnswBuildType build_type{};
 
     UniquePtr<float[]> data = nullptr;
     String filepath;

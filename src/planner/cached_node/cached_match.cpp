@@ -14,14 +14,14 @@
 
 module;
 
-module cached_match;
+module infinity_core;
 
-import base_table_ref;
-import match_expression;
-import base_expression;
-import logical_node_type;
-import logical_match;
-import physical_match;
+import :base_table_ref;
+import :match_expression;
+import :base_expression;
+import :logical_node_type;
+import :logical_match;
+import :physical_match;
 
 namespace infinity {
 

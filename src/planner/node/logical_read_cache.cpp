@@ -16,12 +16,13 @@ module;
 
 #include <vector>
 
-module logical_read_cache;
+module infinity_core;
 
-import default_values;
+import :default_values;
 import logical_type;
-import result_cache_manager;
-import infinity_exception;
+import :result_cache_manager;
+import :infinity_exception;
+import data_type;
 
 namespace infinity {
 

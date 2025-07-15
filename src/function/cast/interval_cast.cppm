@@ -14,17 +14,17 @@
 
 module;
 
-export module interval_cast;
+export module infinity_core:interval_cast;
 
-import stl;
-import column_vector;
-import vector_buffer;
-import bound_cast_func;
-import column_vector_cast;
+import :stl;
+import :column_vector;
+import :vector_buffer;
+import :bound_cast_func;
+import :column_vector_cast;
 import logical_type;
-import infinity_exception;
-import third_party;
-import logger;
+import :infinity_exception;
+import :third_party;
+import :logger;
 import internal_types;
 import data_type;
 
@@ -32,18 +32,18 @@ namespace infinity {
 
 export struct IntervalTryCastToVarlen;
 
-export inline BoundCastFunc BindTimeCast(DataType &target) {
-    switch (target.type()) {
-        case LogicalType::kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
-        }
-        default: {
-            String error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
-            UnrecoverableError(error_message);
-        }
-    }
-    return BoundCastFunc(nullptr);
-}
+// export inline BoundCastFunc BindTimeCast(DataType &target) {
+//     switch (target.type()) {
+//         case LogicalType::kVarchar: {
+//             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);
+//         }
+//         default: {
+//             String error_message = fmt::format("Can't cast from Interval type to {}", target.ToString());
+//             UnrecoverableError(error_message);
+//         }
+//     }
+//     return BoundCastFunc(nullptr);
+// }
 
 struct IntervalTryCastToVarlen {
     template <typename SourceType, typename TargetType>

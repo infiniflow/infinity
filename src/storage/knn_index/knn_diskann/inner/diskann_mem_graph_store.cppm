@@ -17,10 +17,10 @@ module;
 #include <cassert>
 #include <ostream>
 
-export module diskann_mem_graph_store;
+export module infinity_core:diskann_mem_graph_store;
 
-import stl;
-import local_file_handle;
+import :stl;
+import :local_file_handle;
 
 namespace infinity {
 export class DiskAnnMemGraphStore {

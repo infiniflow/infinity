@@ -23,51 +23,51 @@ module;
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-
 #include <vector>
 
-module physical_import;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 import internal_types;
 import logical_type;
-import physical_operator_type;
-import operator_state;
-import expression_state;
-import data_block;
-import logger;
-import third_party;
-import defer_op;
+import :physical_operator_type;
+import :operator_state;
+import :expression_state;
+import :data_block;
+import :logger;
+import :third_party;
+import :defer_op;
 
-import buffer_handle;
-import data_file_worker;
+import :buffer_handle;
+import :data_file_worker;
 
-import infinity_exception;
-import zsv;
-import status;
-import column_vector;
-import default_values;
+import :infinity_exception;
+import :zsv;
+import :status;
+import :column_vector;
+import :default_values;
 import embedding_info;
 import sparse_info;
 import array_info;
 import column_def;
 import constant_expr;
-import wal_entry;
+import :wal_entry;
 import knn_expr;
-import value;
-import build_fast_rough_filter_task;
-import stream_reader;
+import :value;
+import :build_fast_rough_filter_task;
+import :stream_reader;
 import parser_assert;
-import virtual_store;
-import local_file_handle;
-import wal_manager;
-import infinity_context;
+import :virtual_store;
+import :local_file_handle;
+import :wal_manager;
+import :infinity_context;
 import statement_common;
-import new_txn;
-import txn_state;
+import :new_txn;
+import :txn_state;
+import data_type;
 
 namespace infinity {
 
@@ -1241,7 +1241,7 @@ void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperato
     if (!build_result.ok()) {
         RecoverableError(Status::ImportFileFormatError(build_result.status().ToString()));
     }
-    std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
+    UniquePtr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
 
     if (Status status = CheckParquetColumns(table_info_.get(), arrow_reader.get()); !status.ok()) {
         RecoverableError(status);

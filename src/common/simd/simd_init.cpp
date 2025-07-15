@@ -14,14 +14,15 @@
 
 module;
 #include "simd_common_intrin_include.h"
-module simd_init;
-import stl;
-import distance_simd_functions;
-import hnsw_simd_func;
-import maxsim_simd_funcs;
-import emvb_simd_funcs;
-import search_top_1_sgemm;
-import batch_bm25_simd_funcs;
+module infinity_core;
+
+import :stl;
+import :distance_simd_functions;
+import :hnsw_simd_func;
+import :maxsim_simd_funcs;
+import :emvb_simd_funcs;
+import :search_top_1_sgemm;
+import :batch_bm25_simd_funcs;
 
 namespace infinity {
 

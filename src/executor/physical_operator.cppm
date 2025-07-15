@@ -14,22 +14,18 @@
 
 module;
 
-export module physical_operator;
+export module infinity_core:physical_operator;
 
-import stl;
-import physical_operator_type;
-import query_context;
-import operator_state;
-
-import data_table;
-import base_table_ref;
-import load_meta;
-import internal_types;
+import :stl;
+import :physical_operator_type;
+import :base_table_ref;
 import data_type;
-import column_binding;
-import global_resource_usage;
 
 namespace infinity {
+class DataTable;
+class OperatorState;
+class QueryContext;
+struct LoadMeta;
 
 export class PhysicalOperator : public EnableSharedFromThis<PhysicalOperator> {
 

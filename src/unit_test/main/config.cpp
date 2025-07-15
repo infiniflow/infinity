@@ -13,16 +13,10 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-import base_test;
 
-import stl;
-import config;
-import infinity_exception;
-import third_party;
-import status;
+import base_test;
+import infinity_core;
 import compilation_config;
-import virtual_store;
-import default_values;
 
 using namespace infinity;
 class ConfigTest : public BaseTest {};

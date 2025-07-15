@@ -16,22 +16,22 @@ module;
 
 #include <tuple>
 
-module physical_optimize;
+module infinity_core;
 
-import stl;
-import query_context;
+import :stl;
+import :query_context;
 
-import operator_state;
-import infinity_exception;
-import table_def;
-import third_party;
-import status;
-import logger;
-import base_table_ref;
+import :operator_state;
+import :infinity_exception;
+import :table_def;
+import :third_party;
+import :status;
+import :logger;
+import :base_table_ref;
 
-import wal_manager;
-import infinity_context;
-import new_txn;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
 
 namespace infinity {
 

@@ -1,18 +1,7 @@
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-
-import file_reader;
-import file_writer;
-import index_defines;
-import position_list_encoder;
-import position_list_decoder;
-import posting_list_format;
-import posting_byte_slice_reader;
-import in_doc_pos_state;
-import posting_byte_slice;
-import byte_slice_reader;
+import infinity_core;
 
 using namespace infinity;
 

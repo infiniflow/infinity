@@ -15,11 +15,14 @@
 module;
 
 #include <sstream>
-import stl;
-import expression_type;
-import aggregate_function;
 
-module aggregate_expression;
+module infinity_core;
+
+import :stl;
+import :expression_type;
+import :aggregate_function;
+import :aggregate_expression;
+import data_type;
 
 namespace infinity {
 

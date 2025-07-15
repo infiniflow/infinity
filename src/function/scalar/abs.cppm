@@ -14,9 +14,9 @@
 
 module;
 
-export module abs;
+export module infinity_core:abs;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
+import base_test;
+import infinity_core;
 import global_resource_usage;
 
 using namespace infinity;

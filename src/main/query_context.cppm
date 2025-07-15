@@ -14,32 +14,30 @@
 
 module;
 
-export module query_context;
+export module infinity_core:query_context;
 
-import logical_node_type;
-import stl;
-import config;
-import session;
-import resource_manager;
-import session_manager;
-import persistence_manager;
-import profiler;
-import storage;
-import data_table;
-import sql_parser;
-import optimizer;
-import status;
-import query_result;
+import :stl;
+import :session;
+import :config;
+import :storage;
+import :query_result;
 import base_statement;
 import admin_statement;
+import :profiler;
+import sql_parser;
 
 namespace infinity {
+enum class QueryPhase : i8;
+class TaskProfiler;
+class Optimizer;
+class SessionManager;
+class ResourceManager;
 
 class NewTxn;
 
 class LogicalPlanner;
 class PhysicalPlanner;
-class FragmentBuilder;
+export class FragmentBuilder;
 class TaskScheduler;
 struct BGQueryState;
 

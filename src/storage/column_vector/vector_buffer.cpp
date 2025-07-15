@@ -14,19 +14,21 @@
 
 module;
 
-module vector_buffer;
+module infinity_core;
 
-import stl;
-import buffer_obj;
-import buffer_manager;
-import buffer_handle;
-import infinity_exception;
-import default_values;
-import logger;
-import third_party;
+import :stl;
+import :buffer_obj;
+import :buffer_manager;
+import :buffer_handle;
+import :infinity_exception;
+import :default_values;
+import :logger;
+import :third_party;
 import serialize;
 import internal_types;
 import logical_type;
+import sparse_info;
+import data_type;
 
 namespace infinity {
 

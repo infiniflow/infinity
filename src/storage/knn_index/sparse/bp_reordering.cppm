@@ -18,10 +18,10 @@ module;
 #include <iostream>
 #include <vector>
 
-export module bp_reordering;
+export module infinity_core:bp_reordering;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
 namespace infinity {
 

@@ -14,22 +14,24 @@
 
 module;
 
-#include "type/complex/row_id.h"
+#include <chrono>
+#include <memory>
 
-module mem_index;
+module infinity_core;
 
-import stl;
-import base_memindex;
-import secondary_index_in_mem;
-import ivf_index_data_in_mem;
-import emvb_index_in_mem;
-import memory_indexer;
+import :stl;
+import :base_memindex;
+import :secondary_index_in_mem;
+import :ivf_index_data_in_mem;
+import :emvb_index_in_mem;
+import :memory_indexer;
+import row_id;
 #ifdef INDEX_HANDLER
-import hnsw_handler;
-import bmp_handler;
+import :hnsw_handler;
+import :bmp_handler;
 #else
-import abstract_hnsw;
-import abstract_bmp;
+import :abstract_hnsw;
+import :abstract_bmp;
 #endif
 
 namespace infinity {

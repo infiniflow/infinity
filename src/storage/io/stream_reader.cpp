@@ -16,13 +16,14 @@ module;
 
 #include <fstream>
 
-module stream_reader;
+module infinity_core;
 
-import stl;
-import logger;
-import status;
-import infinity_exception;
-import third_party;
+import :stl;
+import :logger;
+import :status;
+import :infinity_exception;
+import :third_party;
+import :stream_reader;
 
 namespace infinity {
 

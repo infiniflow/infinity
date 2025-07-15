@@ -15,4 +15,4 @@
 module;
 
 #include "roaring.c"
-module croaring;
+module infinity_core;

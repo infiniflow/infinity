@@ -16,12 +16,15 @@ module;
 
 #include <sstream>
 
-module logical_flush;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import column_binding;
+import :column_binding;
 import internal_types;
+import :logical_flush;
+import flush_statement;
+import data_type;
 
 namespace infinity {
 

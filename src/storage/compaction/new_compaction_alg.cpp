@@ -17,10 +17,10 @@ module;
 #include <cmath>
 #include <vector>
 
-module new_compaction_alg;
+module infinity_core;
 
-import default_values;
-import infinity_exception;
+import :default_values;
+import :infinity_exception;
 
 namespace infinity {
 

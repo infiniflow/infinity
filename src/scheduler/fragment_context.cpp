@@ -16,61 +16,61 @@ module;
 
 #include <vector>
 
-module fragment_context;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import fragment_task;
+import :fragment_task;
 
-import infinity_exception;
-import operator_state;
-import physical_operator;
-import physical_operator_type;
+import :infinity_exception;
+import :operator_state;
+import :physical_operator;
+import :physical_operator_type;
 
-import table_scan_function_data;
-import match_tensor_scan_function_data;
-import match_sparse_scan_function_data;
-import knn_scan_data;
-import physical_table_scan;
-import physical_index_scan;
-import physical_knn_scan;
-import physical_aggregate;
-import physical_explain;
-import physical_create_index_prepare;
-import physical_sort;
-import physical_top;
-import physical_merge_top;
-import physical_match_tensor_scan;
-import physical_match_sparse_scan;
-import physical_compact;
+import :table_scan_function_data;
+import :match_tensor_scan_function_data;
+import :match_sparse_scan_function_data;
+import :knn_scan_data;
+import :physical_table_scan;
+import :physical_index_scan;
+import :physical_knn_scan;
+import :physical_aggregate;
+import :physical_explain;
+import :physical_create_index_prepare;
+import :physical_sort;
+import :physical_top;
+import :physical_merge_top;
+import :physical_match_tensor_scan;
+import :physical_match_sparse_scan;
+import :physical_compact;
 
-import global_block_id;
-import knn_expression;
-import value_expression;
-import column_expression;
-import third_party;
-import query_context;
-import physical_source;
-import physical_sink;
-import data_table;
-import data_block;
-import physical_merge_knn;
-import merge_knn_data;
-import create_index_data;
-import compact_state_data;
-import logger;
-import task_scheduler;
-import plan_fragment;
-import aggregate_expression;
-import expression_state;
+import :global_block_id;
+import :knn_expression;
+import :value_expression;
+import :column_expression;
+import :third_party;
+import :query_context;
+import :physical_source;
+import :physical_sink;
+import :data_table;
+import :data_block;
+import :physical_merge_knn;
+import :merge_knn_data;
+import :create_index_data;
+import :compact_state_data;
+import :logger;
+import :task_scheduler;
+import :plan_fragment;
+import :aggregate_expression;
+import :expression_state;
 import column_def;
 import explain_statement;
 import global_resource_usage;
-import block_index;
+import :block_index;
 
-import table_index_meeta;
-import segment_index_meta;
-import block_meta;
+import :table_index_meeta;
+import :segment_index_meta;
+import :block_meta;
 
 namespace infinity {
 

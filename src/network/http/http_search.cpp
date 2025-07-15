@@ -17,11 +17,12 @@ module;
 #include <cassert>
 #include <string>
 #include <vector>
+#include <memory>
 
-module http_search;
+module infinity_core;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;
@@ -32,14 +33,14 @@ import fusion_expr;
 import column_expr;
 import function_expr;
 import constant_expr;
-import defer_op;
+import :defer_op;
 import expr_parser;
 import expression_parser_result;
 import statement_common;
-import query_result;
-import data_block;
-import value;
-import physical_import;
+import :query_result;
+import :data_block;
+import :value;
+import :physical_import;
 import explain_statement;
 import internal_types;
 import select_statement;

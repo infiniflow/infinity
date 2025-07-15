@@ -14,9 +14,9 @@
 
 module;
 
-export module quarter;
+export module infinity_core:quarter;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

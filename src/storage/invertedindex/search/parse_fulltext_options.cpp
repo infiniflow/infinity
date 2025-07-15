@@ -16,12 +16,12 @@ module;
 
 #include <re2/re2.h>
 #include <vector>
-module parse_fulltext_options;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import status;
-import filter_value_type_classification;
+import :stl;
+import :infinity_exception;
+import :status;
+import :filter_value_type_classification;
 
 namespace infinity {
 

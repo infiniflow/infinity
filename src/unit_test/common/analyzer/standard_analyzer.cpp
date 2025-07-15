@@ -13,13 +13,10 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import term;
-import stemmer;
-import standard_analyzer;
-import tokenizer;
+import base_test;
+import infinity_core;
+
 using namespace infinity;
 
 namespace fs = std::filesystem;

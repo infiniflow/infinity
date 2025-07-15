@@ -14,21 +14,21 @@
 
 module;
 
-export module column_index_reader;
+export module infinity_core:column_index_reader;
 
-import stl;
-import third_party;
-import segment_posting;
-import index_segment_reader;
-import posting_iterator;
-import index_defines;
-// import memory_indexer;
+import :stl;
+import :third_party;
+import :segment_posting;
+import :index_segment_reader;
+import :posting_iterator;
+import :index_defines;
+// import :memory_indexer;
 import internal_types;
-import logger;
-import status;
+import :logger;
+import :status;
 
 namespace infinity {
-class TermDocIterator;
+export class TermDocIterator;
 class NewTxn;
 class MemoryIndexer;
 class TableIndexMeeta;

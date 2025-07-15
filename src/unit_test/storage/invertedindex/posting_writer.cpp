@@ -13,21 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
-import stl;
 
-import index_defines;
-import posting_list_format;
+import base_test;
+import infinity_core;
 import data_type;
-import file_writer;
-import file_reader;
-import posting_writer;
-import term_meta;
 import internal_types;
-import segment_posting;
-import posting_iterator;
-import vector_with_lock;
-import infinity_context;
 
 using namespace infinity;
 

@@ -14,16 +14,16 @@
 
 module;
 
-export module expression_selector;
+export module infinity_core:expression_selector;
 
-import stl;
-import base_expression;
-import expression_state;
-import data_block;
-import selection;
+import :stl;
+import :base_expression;
+import :data_block;
+import :selection;
 
 namespace infinity {
-class ColumnVector;
+class ExpressionState;
+struct ColumnVector;
 
 export class ExpressionSelector {
 public:

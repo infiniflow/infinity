@@ -14,14 +14,15 @@
 
 module;
 
-import stl;
+#include <string>
 
-import logger;
-import base_expression;
-import expression_type;
-import third_party;
+module infinity_core;
 
-module match_expression;
+import :stl;
+import :logger;
+import :base_expression;
+import :expression_type;
+import :third_party;
 
 namespace infinity {
 

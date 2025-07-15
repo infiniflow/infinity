@@ -1,11 +1,7 @@
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-
-import index_defines;
-import posting_field;
-import posting_buffer;
+import infinity_core;
 
 using namespace infinity;
 

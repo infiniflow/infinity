@@ -14,14 +14,14 @@
 
 module;
 
-import stl;
-import plain_vec_store;
-import dist_func_l2;
-import dist_func_ip;
-import dist_func_cos;
-import hnsw_common;
+export module infinity_core:dist_func_lsg_wrapper;
 
-export module dist_func_lsg_wrapper;
+import :stl;
+import :plain_vec_store;
+import :dist_func_l2;
+import :dist_func_ip;
+import :dist_func_cos;
+import :hnsw_common;
 
 namespace infinity {
 

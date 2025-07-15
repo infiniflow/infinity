@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_parallel_aggregate;
+import :query_context;
+import :operator_state;
+import :physical_parallel_aggregate;
 
 namespace infinity {
 
-void PhysicalParallelAggregate::Init(QueryContext* query_context) {}
+void PhysicalParallelAggregate::Init(QueryContext *query_context) {}
 
 bool PhysicalParallelAggregate::Execute(QueryContext *, OperatorState *) { return true; }
 

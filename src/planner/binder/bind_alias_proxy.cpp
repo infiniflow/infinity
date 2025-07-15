@@ -14,18 +14,19 @@
 
 module;
 
-module bind_alias_proxy;
+module infinity_core;
 
-import stl;
-import base_expression;
+import :stl;
+import :base_expression;
 
-import bind_context;
-import expression_binder;
-import status;
-import infinity_exception;
-import third_party;
+import :bind_context;
+import :expression_binder;
+import :status;
+import :infinity_exception;
+import :third_party;
 import parsed_expr;
-import logger;
+import :logger;
+import :bind_alias_proxy;
 
 namespace infinity {
 

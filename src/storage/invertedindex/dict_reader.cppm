@@ -14,11 +14,12 @@
 
 module;
 
-import stl;
-import term_meta;
-import posting_list_format;
-import fst;
-export module dict_reader;
+export module infinity_core:dict_reader;
+
+import :stl;
+import :term_meta;
+import :posting_list_format;
+import :fst.fst;
 
 namespace infinity {
 

@@ -14,17 +14,17 @@
 
 module;
 
-export module deprecated_knn_flat_ip_blas_reservoir;
+export module infinity_core:deprecated_knn_flat_ip_blas_reservoir;
 
-import stl;
-import knn_result_handler;
-import deprecated_knn_distance;
-import mlas_matrix_multiply;
-import roaring_bitmap;
-import logger;
+import :stl;
+import :knn_result_handler;
+import :deprecated_knn_distance;
+import :mlas_matrix_multiply;
+import :roaring_bitmap;
+import :logger;
 
-import infinity_exception;
-import default_values;
+import :infinity_exception;
+import :default_values;
 import knn_expr;
 import internal_types;
 

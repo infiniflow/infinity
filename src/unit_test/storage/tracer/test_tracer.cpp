@@ -15,16 +15,7 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import base_memindex;
-import mem_index;
-import memindex_tracer;
-import bg_task;
-import blocking_queue;
-import third_party;
-import logger;
-import new_txn;
-import infinity_context;
+import infinity_core;
 import compilation_config;
 
 using namespace infinity;

@@ -21,16 +21,7 @@
 #endif
 
 import compilation_config;
-import stl;
-import third_party;
-import pg_server;
-import infinity_exception;
-import infinity_context;
-import thrift_server;
-import peer_thrift_server;
-import http_server;
-import logger;
-import simd_init;
+import infinity_core;
 
 namespace {
 

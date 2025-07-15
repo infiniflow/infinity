@@ -16,11 +16,12 @@ module;
 
 #include <iostream>
 
-module multi_doc_iterator;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import logger;
+import :stl;
+import :infinity_exception;
+import :logger;
+import :multi_doc_iterator;
 
 namespace infinity {
 

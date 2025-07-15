@@ -2,7 +2,7 @@ module;
 
 #include "string.h"
 
-export module string_ref;
+export module infinity_core:string_ref;
 
 namespace infinity {
 export using infinity::StringRef;

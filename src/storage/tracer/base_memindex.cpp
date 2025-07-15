@@ -14,12 +14,12 @@
 
 module;
 
-module base_memindex;
+module infinity_core;
 
-import stl;
-import memindex_tracer;
-import infinity_context;
-import storage;
+import :stl;
+import :memindex_tracer;
+import :infinity_context;
+import :storage;
 
 namespace infinity {
 

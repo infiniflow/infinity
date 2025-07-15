@@ -14,20 +14,20 @@
 
 module;
 
-export module uuid_cast;
+export module infinity_core:uuid_cast;
 
-import stl;
-import column_vector;
-import vector_buffer;
-import bound_cast_func;
+import :stl;
+import :column_vector;
+import :vector_buffer;
+import :bound_cast_func;
 import data_type;
-import column_vector_cast;
+import :column_vector_cast;
 import logical_type;
-import infinity_exception;
-import third_party;
+import :infinity_exception;
+import :third_party;
 import internal_types;
-import status;
-import logger;
+import :status;
+import :logger;
 
 namespace infinity {
 

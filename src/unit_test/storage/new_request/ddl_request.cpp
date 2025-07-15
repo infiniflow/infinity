@@ -15,11 +15,8 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import infinity_context;
+import infinity_core;
 import request_test;
-import query_context;
-import query_result;
 
 using namespace infinity;
 

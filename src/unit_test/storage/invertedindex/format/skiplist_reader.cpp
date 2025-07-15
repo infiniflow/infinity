@@ -1,21 +1,7 @@
 #include "gtest/gtest.h"
+
 import base_test;
-
-import stl;
-
-import posting_byte_slice;
-import in_doc_pos_state;
-import byte_slice;
-import index_defines;
-import skiplist_writer;
-import file_writer;
-import posting_field;
-import posting_byte_slice_reader;
-import skiplist_reader;
-import posting_list_format;
-import third_party;
-import byte_slice_reader;
-import random;
+import infinity_core;
 
 using namespace infinity;
 

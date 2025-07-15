@@ -14,9 +14,9 @@
 
 module;
 
-export module default_values;
+export module infinity_core:default_values;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

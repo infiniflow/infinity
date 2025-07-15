@@ -1,14 +1,14 @@
 module;
 
-export module segment_term_posting;
+export module infinity_core:segment_term_posting;
 
-import stl;
-import file_writer;
-import posting_decoder;
-import index_defines;
-import term_meta;
-import column_index_iterator;
-import index_defines;
+import :stl;
+import :file_writer;
+import :posting_decoder;
+import :index_defines;
+import :term_meta;
+import :column_index_iterator;
+import :index_defines;
 import internal_types;
 
 namespace infinity {

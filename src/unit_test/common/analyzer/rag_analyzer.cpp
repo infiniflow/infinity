@@ -16,14 +16,7 @@
 #include <vector>
 
 import base_test;
-
-import stl;
-import term;
-import analyzer;
-import rag_analyzer;
-import darts_trie;
-import darts;
-import lemmatizer;
+import infinity_core;
 
 using namespace infinity;
 

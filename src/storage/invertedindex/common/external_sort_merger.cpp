@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -21,16 +22,17 @@ module;
 #include <functional>
 #include <queue>
 #include <sys/mman.h>
-#include <unistd.h>
+#include <sched.h>
+#include <pthread.h>
 
-module external_sort_merger;
+module infinity_core;
 
-import stl;
-import third_party;
-import file_writer;
-import profiler;
-import logger;
-import blocking_queue;
+import :stl;
+import :third_party;
+import :file_writer;
+import :profiler;
+import :logger;
+import :blocking_queue;
 
 namespace infinity {
 

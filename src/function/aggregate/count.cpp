@@ -14,16 +14,16 @@
 
 module;
 
-module count;
+module infinity_core;
 
-import stl;
-import new_catalog;
+import :stl;
+import :new_catalog;
 import logical_type;
-import infinity_exception;
-import aggregate_function;
-import aggregate_function_set;
+import :infinity_exception;
+import :aggregate_function;
+import :aggregate_function_set;
 
-import third_party;
+import :third_party;
 import internal_types;
 import data_type;
 
@@ -146,11 +146,11 @@ void RegisterCountFunction(NewCatalog *catalog_ptr) {
             UnaryAggregate<CountState<ArrayT, BigIntT>, ArrayT, BigIntT>(func_name, DataType(LogicalType::kArray), DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
-    {
-        AggregateFunction count_function =
-            UnaryAggregate<CountState<TupleT, BigIntT>, TupleT, BigIntT>(func_name, DataType(LogicalType::kTuple), DataType(LogicalType::kBigInt));
-        function_set_ptr->AddFunction(count_function);
-    }
+    // {
+    //     AggregateFunction count_function =
+    //         UnaryAggregate<CountState<TupleT, BigIntT>, TupleT, BigIntT>(func_name, DataType(LogicalType::kTuple), DataType(LogicalType::kBigInt));
+    //     function_set_ptr->AddFunction(count_function);
+    // }
     {
         AggregateFunction count_function =
             UnaryAggregate<CountState<PointT, BigIntT>, PointT, BigIntT>(func_name, DataType(LogicalType::kPoint), DataType(LogicalType::kBigInt));

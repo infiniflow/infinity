@@ -16,14 +16,15 @@ module;
 
 #include <sstream>
 
-module logical_create_collection;
+module infinity_core;
 
-import stl;
-import column_binding;
+import :stl;
+import :column_binding;
 
-import base_expression;
+import :base_expression;
 import logical_type;
 import internal_types;
+import data_type;
 
 namespace infinity {
 

@@ -2,19 +2,18 @@ module;
 
 #include "common/utility/builtin.h"
 
-import stl;
-import byte_slice;
-import byte_slice_reader;
+module infinity_core;
 
-import in_doc_pos_state;
-import skiplist_reader;
-import position_list_format_option;
-import posting_field;
-import short_list_optimize_util;
-import index_defines;
-import third_party;
-
-module position_list_decoder;
+import :stl;
+import :byte_slice;
+import :byte_slice_reader;
+import :in_doc_pos_state;
+import :skiplist_reader;
+import :position_list_format_option;
+import :posting_field;
+import :short_list_optimize_util;
+import :index_defines;
+import :third_party;
 
 namespace infinity {
 

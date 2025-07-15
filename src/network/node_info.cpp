@@ -14,10 +14,15 @@
 
 module;
 
-module node_info;
+#include <string>
 
-import stl;
-// import third_party;
+module infinity_core;
+
+import :stl;
+import :node_info;
+// import :third_party;
+import admin_statement;
+
 
 namespace infinity {
 

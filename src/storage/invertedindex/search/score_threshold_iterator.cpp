@@ -16,11 +16,11 @@ module;
 
 #include <iostream>
 
-module score_threshold_iterator;
-import stl;
-import doc_iterator;
+module infinity_core;
+import :stl;
+import :doc_iterator;
 import internal_types;
-import index_defines;
+import :index_defines;
 
 namespace infinity {
 

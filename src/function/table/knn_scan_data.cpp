@@ -15,28 +15,30 @@
 module;
 
 #include <string>
-module knn_scan_data;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import third_party;
+import :stl;
+import :infinity_exception;
+import :third_party;
 import logical_type;
-import merge_knn;
-import knn_result_handler;
-import vector_distance;
-import data_block;
-import column_vector;
-import base_expression;
-import expression_state;
+import :merge_knn;
+import :knn_result_handler;
+import :vector_distance;
+import :data_block;
+import :column_vector;
+import :base_expression;
+import :expression_state;
 import internal_types;
 import data_type;
-import status;
-import logger;
-import simd_functions;
+import :status;
+import :logger;
+import :simd_functions;
 
-import table_index_meeta;
-import segment_index_meta;
-import block_meta;
+import :table_index_meeta;
+import :segment_index_meta;
+import :block_meta;
+import knn_expr;
+import statement_common;
 
 namespace infinity {
 

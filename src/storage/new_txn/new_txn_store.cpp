@@ -18,24 +18,24 @@ module;
 #include <string>
 #include <vector>
 
-module new_txn_store;
+module infinity_core;
 
-import stl;
-import third_party;
+import :stl;
+import :third_party;
 
-import status;
-import infinity_exception;
-import data_block;
-import logger;
-import data_access_state;
-import new_txn;
-import default_values;
+import :status;
+import :infinity_exception;
+import :data_block;
+import :logger;
+import :data_access_state;
+import :new_txn;
+import :default_values;
 import internal_types;
 import data_type;
 import compact_statement;
-import persistence_manager;
-import infinity_context;
-import kv_store;
+import :persistence_manager;
+import :infinity_context;
+import :kv_store;
 
 namespace infinity {
 

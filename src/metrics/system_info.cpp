@@ -40,15 +40,15 @@ module;
 #include <string>
 #include <unistd.h>
 
-module system_info;
+module infinity_core;
 
-import stl;
-import defer_op;
-import status;
-import third_party;
-import logger;
-import infinity_exception;
-import default_values;
+import :stl;
+import :defer_op;
+import :status;
+import :third_party;
+import :logger;
+import :infinity_exception;
+import :default_values;
 
 namespace infinity {
 

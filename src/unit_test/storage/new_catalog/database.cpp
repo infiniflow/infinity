@@ -15,19 +15,8 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import third_party;
-import status;
-import new_catalog;
-import new_txn_manager;
-import infinity_context;
-import txn_state;
+import infinity_core;
 import extra_ddl_info;
-import data_block;
-import column_vector;
-import value;
-import new_txn;
-import db_meeta;
 
 using namespace infinity;
 

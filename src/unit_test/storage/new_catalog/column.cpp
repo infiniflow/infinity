@@ -15,29 +15,12 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import third_party;
-import status;
-import new_catalog;
-import new_txn_manager;
-import infinity_context;
-import txn_state;
+import infinity_core;
 import extra_ddl_info;
-import data_block;
-import column_vector;
-import value;
-import new_txn;
-import db_meeta;
-import table_meeta;
-import table_index_meeta;
-import column_meta;
 import column_def;
 import data_type;
 import logical_type;
-import table_def;
 import constant_expr;
-import segment_meta;
-import block_meta;
 
 using namespace infinity;
 

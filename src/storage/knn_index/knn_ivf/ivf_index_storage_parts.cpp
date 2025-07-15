@@ -18,27 +18,27 @@ module;
 #include <cmath>
 #include <vector>
 
-module ivf_index_storage;
+module infinity_core;
 
-import stl;
-import infinity_exception;
-import status;
-import logger;
-import third_party;
-import index_ivf;
-import column_vector;
+import :stl;
+import :infinity_exception;
+import :status;
+import :logger;
+import :third_party;
+import :index_ivf;
+import :column_vector;
 import internal_types;
 import logical_type;
 import data_type;
-import kmeans_partition;
-import search_top_1;
-import search_top_k;
-import column_vector;
-import knn_scan_data;
-import ivf_index_util_func;
-import mlas_matrix_multiply;
-import vector_distance;
-import index_base;
+import :kmeans_partition;
+import :search_top_1;
+import :search_top_k;
+import :column_vector;
+import :knn_scan_data;
+import :ivf_index_util_func;
+import :mlas_matrix_multiply;
+import :vector_distance;
+import :index_base;
 import knn_expr;
 
 namespace infinity {

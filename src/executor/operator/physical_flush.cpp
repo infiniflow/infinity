@@ -14,25 +14,26 @@
 
 module;
 
-module physical_flush;
+module infinity_core;
 
-import stl;
-import new_txn;
-import query_context;
-import table_def;
-import data_table;
-import wal_manager;
-import physical_operator_type;
-import operator_state;
-import logger;
-import bg_task;
-import third_party;
-import status;
-import infinity_context;
-import background_process;
-import new_txn;
-import new_txn_manager;
-import kv_store;
+import :stl;
+import :new_txn;
+import :query_context;
+import :table_def;
+import :data_table;
+import :wal_manager;
+import :physical_operator_type;
+import :operator_state;
+import :logger;
+import :bg_task;
+import :third_party;
+import :status;
+import :infinity_context;
+import :background_process;
+import :new_txn;
+import :new_txn_manager;
+import :kv_store;
+import flush_statement;
 
 namespace infinity {
 

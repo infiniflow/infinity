@@ -13,16 +13,10 @@
 //  limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import search_driver;
-import query_node;
-import infinity_exception;
+import base_test;
+import infinity_core;
 import global_resource_usage;
-import infinity_context;
-import third_party;
-import logger;
 
 using namespace infinity;
 

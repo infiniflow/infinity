@@ -15,28 +15,30 @@
 module;
 
 #include <vector>
+#include <memory>
 
-module snapshot_info;
+module infinity_core;
 
-import stl;
-import status;
+import :stl;
+import :status;
 import command_statement;
-// import index_base;
-import third_party;
+// import :index_base;
+import :third_party;
 import constant_expr;
-import logger;
-import virtual_store;
-import local_file_handle;
-import infinity_exception;
-import infinity_context;
-import config;
-import persistence_manager;
-import persist_result_handler;
-import defer_op;
-import utility;
-import block_version;
+import :logger;
+import :virtual_store;
+import :local_file_handle;
+import :infinity_exception;
+import :infinity_context;
+import :config;
+import :persistence_manager;
+import :persist_result_handler;
+import :defer_op;
+import :utility;
+import :block_version;
 import data_type;
 import parsed_expr;
+import column_def;
 
 namespace infinity {
 

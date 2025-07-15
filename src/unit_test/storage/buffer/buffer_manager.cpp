@@ -15,24 +15,10 @@
 #include <future>
 
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import buffer_manager;
-import buffer_obj;
-import data_file_worker;
-import var_file_worker;
-import var_buffer;
+import infinity_core;
 import compilation_config;
-import third_party;
-import buffer_handle;
-import infinity_context;
-import virtual_store;
-import logger;
-import config;
-import infinity_exception;
-import persistence_manager;
-import default_values;
-import kv_store;
 
 using namespace infinity;
 

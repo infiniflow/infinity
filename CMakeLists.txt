@@ -16,7 +16,9 @@ endif()
 #     message("Can not find ccache")
 # endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
@@ -24,6 +26,8 @@ string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_S
 if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
+
+    add_compile_options(-ftime-trace)
 
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
     set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -130,8 +134,8 @@ option(ENABLE_SANITIZER_THREAD "Enable multi-thread sanitizer" OFF)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Ofast -DNDEBUG")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Ofast -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 

@@ -17,33 +17,33 @@ module;
 #include <ranges>
 #include <thread>
 
-module compaction_process;
+module infinity_core;
 
-import stl;
-import bg_task;
-import logger;
-import infinity_exception;
-import third_party;
-import blocking_queue;
-import infinity_context;
+import :stl;
+import :bg_task;
+import :logger;
+import :infinity_exception;
+import :third_party;
+import :blocking_queue;
+import :infinity_context;
 import compilation_config;
-import defer_op;
-import bg_query_state;
-import base_memindex;
-import status;
-import default_values;
-import wal_manager;
+import :defer_op;
+import :bg_query_state;
+import :base_memindex;
+import :status;
+import :default_values;
+import :wal_manager;
 import global_resource_usage;
-import txn_state;
+import :txn_state;
 
-import new_txn_manager;
-import new_txn;
-import new_compaction_alg;
-import table_meeta;
-import db_meeta;
-import segment_meta;
-import bg_task;
-import base_txn_store;
+import :new_txn_manager;
+import :new_txn;
+import :new_compaction_alg;
+import :table_meeta;
+import :db_meeta;
+import :segment_meta;
+import :bg_task;
+import :base_txn_store;
 
 namespace infinity {
 

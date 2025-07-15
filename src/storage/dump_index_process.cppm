@@ -14,12 +14,12 @@
 
 module;
 
-export module dump_index_process;
+export module infinity_core:dump_index_process;
 
-import stl;
-import bg_task_type;
-import blocking_queue;
-import status;
+import :stl;
+import :bg_task_type;
+import :blocking_queue;
+import :status;
 
 namespace infinity {
 

@@ -19,46 +19,46 @@ module;
 #include <regex>
 #include <string>
 
-module storage;
+module infinity_core;
 
-import config;
-import stl;
-import buffer_manager;
-import default_values;
-import wal_manager;
-import new_catalog;
-import new_txn_manager;
-import builtin_functions;
-import third_party;
-import logger;
-import kv_store;
+import :config;
+import :stl;
+import :buffer_manager;
+import :default_values;
+import :wal_manager;
+import :new_catalog;
+import :new_txn_manager;
+import :builtin_functions;
+import :third_party;
+import :logger;
+import :kv_store;
 
-import new_txn;
-import infinity_exception;
-import status;
-import background_process;
-import dump_index_process;
-import compaction_process;
-import object_storage_process;
-import status;
-import bg_task;
-import periodic_trigger_thread;
-import periodic_trigger;
-import log_file;
+import :new_txn;
+import :infinity_exception;
+import :status;
+import :background_process;
+import :dump_index_process;
+import :compaction_process;
+import :object_storage_process;
+import :status;
+import :bg_task;
+import :periodic_trigger_thread;
+import :periodic_trigger;
+import :log_file;
 
-import query_context;
-import infinity_context;
-import memindex_tracer;
-import persistence_manager;
+// import :query_context;
+import :infinity_context;
+import :memindex_tracer;
+import :persistence_manager;
 import extra_ddl_info;
-import virtual_store;
-import result_cache_manager;
+import :virtual_store;
+import :result_cache_manager;
 import global_resource_usage;
-import txn_state;
-import mem_index_appender;
-import catalog_cache;
+import :txn_state;
+import :mem_index_appender;
+import :catalog_cache;
 
-import wal_entry;
+import :wal_entry;
 
 namespace infinity {
 

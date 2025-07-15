@@ -1,9 +1,7 @@
 #include "gtest/gtest.h"
+
 import base_test;
-import stl;
-import random;
-import third_party;
-import loser_tree;
+import infinity_core;
 
 using namespace infinity;
 

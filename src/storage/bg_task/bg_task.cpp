@@ -14,22 +14,23 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <vector>
+#include <memory>
 
-module bg_task;
+module infinity_core;
 
-import base_memindex;
-import emvb_index_in_mem;
-import infinity_context;
-import storage;
-import new_txn;
-import new_txn_manager;
-import infinity_exception;
-import txn_state;
-import column_vector;
-import mem_index;
-import base_txn_store;
+import :base_memindex;
+import :emvb_index_in_mem;
+import :infinity_context;
+import :storage;
+import :new_txn;
+import :new_txn_manager;
+import :infinity_exception;
+import :txn_state;
+import :column_vector;
+import :mem_index;
+import :base_txn_store;
+import row_id;
 
 namespace infinity {
 

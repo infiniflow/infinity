@@ -13,47 +13,18 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
 #include <iostream>
 #include <unistd.h>
-import stl;
-import analyzer;
-import analyzer_pool;
 
-import index_defines;
-import posting_list_format;
-import column_vector;
+import base_test;
+import infinity_core;
 import data_type;
-import value;
-import memory_indexer;
-import column_index_reader;
-import posting_iterator;
-import column_inverter;
 import internal_types;
 import logical_type;
-import column_index_merger;
-import third_party;
-import inmem_posting_decoder;
-import inmem_position_list_decoder;
-import inmem_index_segment_reader;
-import segment_posting;
 import global_resource_usage;
-import infinity_context;
-import third_party;
-
-import db_meeta;
-import table_meeta;
-import table_index_meeta;
-import new_txn;
-import txn_state;
-import new_txn_manager;
-import data_block;
-import table_def;
 import column_def;
-import index_full_text;
 import extra_ddl_info;
-import status;
 
 using namespace infinity;
 

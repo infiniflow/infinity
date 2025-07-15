@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
-module logical_dummy_scan;
+module infinity_core;
 
-import stl;
-import column_binding;
+import :stl;
+import :column_binding;
 import data_type;
 import internal_types;
+import :logical_dummy_scan;
 
 namespace infinity {
 

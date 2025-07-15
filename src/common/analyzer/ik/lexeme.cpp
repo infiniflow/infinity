@@ -4,7 +4,9 @@ module;
 #include <stdexcept>
 #include <string>
 
-module lexeme;
+module infinity_core;
+
+import :lexeme;
 
 namespace infinity {
 

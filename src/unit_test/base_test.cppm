@@ -24,8 +24,7 @@ module;
 
 export module base_test;
 
-import stl;
-import infinity_context;
+import infinity_core;
 import global_resource_usage;
 
 namespace fs = std::filesystem;

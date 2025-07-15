@@ -14,13 +14,7 @@
 
 module;
 
-module options;
-
-import infinity_exception;
-import third_party;
-import status;
-import default_values;
-import logger;
+module infinity_core;
 
 namespace infinity {
 

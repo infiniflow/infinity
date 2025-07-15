@@ -4,19 +4,19 @@ module;
 #include <cassert>
 #include <cstdlib>
 #include <vector>
-import stl;
 
-import byte_slice_reader;
-import posting_list_format;
-import term_meta;
-import in_doc_pos_iterator;
-import multi_posting_decoder;
-import segment_posting;
-import in_doc_pos_state;
-import index_defines;
+module infinity_core;
+
+import :stl;
+import :byte_slice_reader;
+import :posting_list_format;
+import :term_meta;
+import :in_doc_pos_iterator;
+import :multi_posting_decoder;
+import :segment_posting;
+import :in_doc_pos_state;
+import :index_defines;
 import internal_types;
-
-module posting_iterator;
 
 namespace infinity {
 

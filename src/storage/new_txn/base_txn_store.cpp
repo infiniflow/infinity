@@ -17,13 +17,13 @@ module;
 #include <ranges>
 #include <vector>
 
-module base_txn_store;
+module infinity_core;
 
-import third_party;
-import stl;
-import wal_entry;
-import data_block;
-import default_values;
+import :third_party;
+import :stl;
+import :wal_entry;
+import :data_block;
+import :default_values;
 
 namespace infinity {
 

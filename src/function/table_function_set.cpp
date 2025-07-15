@@ -14,10 +14,10 @@
 
 module;
 
-import stl;
-import table_function;
+module infinity_core;
 
-module table_function_set;
+import :stl;
+import :table_function;
 
 namespace infinity {
 

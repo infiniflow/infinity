@@ -13,20 +13,21 @@
 // limitations under the License.
 module;
 
-module physical_source;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import physical_operator_type;
-import operator_state;
-import data_block;
-import fragment_data;
-import status;
-import infinity_exception;
-import logger;
+import :physical_operator_type;
+import :operator_state;
+import :data_block;
+import :fragment_data;
+import :status;
+import :infinity_exception;
+import :logger;
+import :physical_source;
 
 namespace infinity {
 

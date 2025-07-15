@@ -14,9 +14,9 @@
 
 module;
 
-export module defer_op;
+export module infinity_core:defer_op;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

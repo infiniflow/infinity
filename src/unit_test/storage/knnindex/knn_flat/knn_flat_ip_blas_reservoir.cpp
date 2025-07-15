@@ -13,17 +13,10 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity_exception;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import third_party;
-import logger;
-
-import deprecated_knn_flat_ip_blas_reservoir;
-import infinity_context;
 import knn_expr;
 import internal_types;
 

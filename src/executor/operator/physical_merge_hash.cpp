@@ -14,14 +14,15 @@
 
 module;
 
-import query_context;
-import operator_state;
+module infinity_core;
 
-module physical_merge_hash;
+import :query_context;
+import :operator_state;
+import :physical_merge_hash;
 
 namespace infinity {
 
-void PhysicalMergeHash::Init(QueryContext* query_context) {}
+void PhysicalMergeHash::Init(QueryContext *query_context) {}
 
 bool PhysicalMergeHash::Execute(QueryContext *, OperatorState *) { return true; }
 

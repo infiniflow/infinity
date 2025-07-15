@@ -17,29 +17,30 @@ module;
 #include <tuple>
 #include <vector>
 
-module physical_create_index_prepare;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import physical_operator_type;
-import physical_operator;
-import query_context;
-import operator_state;
-import load_meta;
-import block_index;
-import status;
-import infinity_exception;
-import index_base;
-import index_file_worker;
-import buffer_manager;
-import buffer_handle;
-import index_hnsw;
-import default_values;
-import base_table_ref;
+import :physical_operator_type;
+import :physical_operator;
+import :query_context;
+import :operator_state;
+import :load_meta;
+import :block_index;
+import :status;
+import :infinity_exception;
+import :index_base;
+import :index_file_worker;
+import :buffer_manager;
+import :buffer_handle;
+import :index_hnsw;
+import :default_values;
+import :base_table_ref;
 import extra_ddl_info;
-import wal_manager;
-import infinity_context;
-import new_txn;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
+import data_type;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,

@@ -14,13 +14,13 @@
 
 module;
 
-export module merge_knn_data;
+export module infinity_core:merge_knn_data;
 
-import stl;
-import table_function;
+import :stl;
+import :table_function;
 
-import base_table_ref;
-import merge_knn;
+import :base_table_ref;
+import :merge_knn;
 import knn_expr;
 import internal_types;
 

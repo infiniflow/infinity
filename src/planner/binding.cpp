@@ -14,12 +14,14 @@
 
 module;
 
-module binding;
+module infinity_core;
 
-import stl;
-import block_index;
-import infinity_exception;
-import logger;
+import :stl;
+import :block_index;
+import :infinity_exception;
+import :logger;
+import data_type;
+import :meta_info;
 
 namespace infinity {
 

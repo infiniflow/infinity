@@ -29,16 +29,16 @@ module;
 
 #include "string_utils.h"
 
-module rag_analyzer;
+module infinity_core;
 
-import stl;
-import term;
-import stemmer;
-import analyzer;
-import darts_trie;
-import lemmatizer;
-import stemmer;
-import term;
+import :stl;
+import :term;
+import :stemmer;
+import :analyzer;
+import :darts_trie;
+import :lemmatizer;
+import :stemmer;
+import :term;
 
 namespace fs = std::filesystem;
 

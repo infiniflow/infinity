@@ -13,13 +13,12 @@
 // limitations under the License.
 module;
 
-export module selection;
+export module infinity_core:selection;
 
-import stl;
-import logger;
-import infinity_exception;
+import :stl;
+import :infinity_exception;
 import global_resource_usage;
-import default_values;
+import :default_values;
 
 namespace infinity {
 

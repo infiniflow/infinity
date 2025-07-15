@@ -13,45 +13,48 @@
 // limitations under the License.
 
 module;
+
 #include <bit>
 #include <cassert>
 #include <vector>
-module common_query_filter;
-import stl;
-import roaring_bitmap;
-import base_expression;
-import base_table_ref;
-import block_index;
-import fast_rough_filter;
-import filter_value_type_classification;
-import physical_index_scan;
-import filter_expression_push_down;
-import data_block;
-import buffer_manager;
-import expression_evaluator;
-import default_values;
+#include <memory>
+
+module infinity_core;
+import :stl;
+import :roaring_bitmap;
+import :base_expression;
+import :base_table_ref;
+import :block_index;
+import :fast_rough_filter;
+import :filter_value_type_classification;
+import :physical_index_scan;
+import :filter_expression_push_down;
+import :data_block;
+import :buffer_manager;
+import :expression_evaluator;
+import :default_values;
 import internal_types;
-import column_vector;
-import vector_buffer;
+import :column_vector;
+import :vector_buffer;
 import data_type;
 import logical_type;
-import expression_state;
-import expression_type;
-import reference_expression;
-import in_expression;
-import infinity_exception;
-import third_party;
-import logger;
-import index_defines;
-import logger;
+import :expression_state;
+import :expression_type;
+import :reference_expression;
+import :in_expression;
+import :infinity_exception;
+import :third_party;
+import :logger;
+import :index_defines;
+import :logger;
 
-import new_txn;
-import status;
-import table_meeta;
-import segment_meta;
-import block_meta;
-import column_meta;
-import new_catalog;
+import :new_txn;
+import :status;
+import :table_meeta;
+import :segment_meta;
+import :block_meta;
+import :column_meta;
+import :new_catalog;
 
 namespace infinity {
 

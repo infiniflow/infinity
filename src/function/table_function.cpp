@@ -15,12 +15,14 @@
 module;
 
 #include <sstream>
-import stl;
-import function;
 
-import query_context;
+module infinity_core;
 
-module table_function;
+import :stl;
+import :function;
+import :query_context;
+import logical_type;
+
 namespace infinity {
 
 TableFunction::TableFunction(String name, Vector<LogicalType> argument_types, TableFunctionType function)

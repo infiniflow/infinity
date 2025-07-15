@@ -13,17 +13,9 @@
 //  limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import roaring_bitmap;
-import data_store;
-import vec_store_type;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import knn_filter;
-import hnsw_common;
+import base_test;
+import infinity_core;
 
 using namespace infinity;
 

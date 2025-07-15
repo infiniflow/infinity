@@ -14,17 +14,17 @@
 
 module;
 
-module physical_drop_view;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import wal_manager;
-import infinity_context;
-import status;
-import operator_state;
+import :wal_manager;
+import :infinity_context;
+import :status;
+import :operator_state;
 
 namespace infinity {
 

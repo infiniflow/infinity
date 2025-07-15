@@ -17,16 +17,8 @@
 #include "gtest/gtest.h"
 
 import base_test;
-import stl;
-import bmp_alg;
-import bmp_util;
-import sparse_util;
-import third_party;
+import infinity_core;
 import compilation_config;
-import sparse_test_util;
-import infinity_exception;
-import virtual_store;
-import local_file_handle;
 
 using namespace infinity;
 

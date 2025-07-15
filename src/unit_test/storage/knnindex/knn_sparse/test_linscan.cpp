@@ -14,13 +14,9 @@
 
 #include "gtest/gtest.h"
 #include <cassert>
-import base_test;
 
-import stl;
-import linscan_alg;
-import sparse_util;
-import third_party;
-import sparse_test_util;
+import base_test;
+import infinity_core;
 
 using namespace infinity;
 

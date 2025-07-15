@@ -16,18 +16,18 @@ module;
 
 #include <vector>
 
-module physical_alter;
+module infinity_core;
 
-import query_context;
-import operator_state;
-import third_party;
-import status;
-import infinity_exception;
-import value;
-import defer_op;
-import wal_manager;
-import infinity_context;
-import new_txn;
+import :query_context;
+import :operator_state;
+import :third_party;
+import :status;
+import :infinity_exception;
+import :value;
+import :defer_op;
+import :wal_manager;
+import :infinity_context;
+import :new_txn;
 
 namespace infinity {
 

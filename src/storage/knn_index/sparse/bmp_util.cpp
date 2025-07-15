@@ -17,10 +17,14 @@ module;
 #include <string>
 #include <vector>
 
-module bmp_util;
+module infinity_core;
 
-import logger;
-import third_party;
+import :logger;
+import :third_party;
+import :bmp_util;
+import :stl;
+import :infinity_thrift_types;
+import statement_common;
 
 namespace infinity {
 

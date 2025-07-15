@@ -1,8 +1,8 @@
 module;
 
-export module isfinite;
+export module infinity_core:isfinite;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

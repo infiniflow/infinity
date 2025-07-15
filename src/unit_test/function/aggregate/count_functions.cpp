@@ -13,32 +13,13 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity_exception;
-
+import infinity_core;
 import global_resource_usage;
-import third_party;
-
-import logger;
-import stl;
-import infinity_context;
-import new_catalog;
-import count;
-import function_set;
-import aggregate_function_set;
-import aggregate_function;
-import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
 import internal_types;
 import logical_type;
 import data_type;
-import config;
-import status;
-import kv_store;
 
 using namespace infinity;
 class CountFunctionTest : public BaseTest {};

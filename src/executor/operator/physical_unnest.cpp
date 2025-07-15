@@ -16,30 +16,31 @@ module;
 
 #include <vector>
 
-module physical_unnest;
+module infinity_core;
 
-import stl;
-import query_context;
-import table_def;
-import data_table;
+import :stl;
+import :query_context;
+import :table_def;
+import :data_table;
 
-import physical_operator_type;
-import operator_state;
-import expression_state;
-import expression_selector;
-import data_block;
-import logger;
-import third_party;
+import :physical_operator_type;
+import :operator_state;
+import :expression_state;
+import :expression_selector;
+import :data_block;
+import :logger;
+import :third_party;
 
-import infinity_exception;
+import :infinity_exception;
 import array_info;
-import column_vector;
+import :column_vector;
 import logical_type;
-import status;
+import :status;
 
-import unnest_expression;
-import reference_expression;
-import expression_type;
+import :unnest_expression;
+import :reference_expression;
+import :expression_type;
+import data_type;
 
 namespace infinity {
 

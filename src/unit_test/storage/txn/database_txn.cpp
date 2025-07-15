@@ -13,25 +13,11 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
-
-import infinity_context;
-import infinity_exception;
-
-import stl;
+import infinity_core;
 import global_resource_usage;
-import third_party;
-import logger;
-import table_def;
-import value;
-
-import data_block;
-import default_values;
-import status;
 import extra_ddl_info;
-import txn_state;
-import new_txn_manager;
-import new_txn;
 
 using namespace infinity;
 

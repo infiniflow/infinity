@@ -15,54 +15,55 @@
 module;
 
 #include <string>
+#include <memory>
 
-module expression_binder;
+module infinity_core;
 
-import stl;
-import default_values;
+import :stl;
+import :default_values;
 import type_info;
-import infinity_exception;
-import bind_context;
-import third_party;
-import value;
+import :infinity_exception;
+import :bind_context;
+import :third_party;
+import :value;
 import logical_type;
 import internal_types;
-import base_expression;
-import aggregate_expression;
-import column_expression;
-import in_expression;
-import subquery_expression;
-import knn_expression;
-import cast_expression;
-import case_expression;
-import function_expression;
-import value_expression;
-import fusion_expression;
-import search_expression;
-import match_expression;
-import match_tensor_expression;
-import match_sparse_expression;
-import filter_fulltext_expression;
-import unnest_expression;
-import function;
-import aggregate_function;
-import aggregate_function_set;
+import :base_expression;
+import :aggregate_expression;
+import :column_expression;
+import :in_expression;
+import :subquery_expression;
+import :knn_expression;
+import :cast_expression;
+import :case_expression;
+import :function_expression;
+import :value_expression;
+import :fusion_expression;
+import :search_expression;
+import :match_expression;
+import :match_tensor_expression;
+import :match_sparse_expression;
+import :filter_fulltext_expression;
+import :unnest_expression;
+import :function;
+import :aggregate_function;
+import :aggregate_function_set;
 
-import column_identifer;
+import :column_identifer;
 
-import query_binder;
-import bound_select_statement;
+import :query_binder;
+import :bound_select_statement;
 
-import function_set;
-import scalar_function_set;
-import scalar_function;
-import special_function;
-import cast_function;
-import bound_cast_func;
-import status;
+import :function_set;
+import :scalar_function_set;
+import :scalar_function;
+import :special_function;
+import :cast_function;
+import :bound_cast_func;
+import :status;
 
-import query_context;
-import logger;
+import :query_context;
+import :logger;
 import embedding_info;
 import sparse_info;
 import array_info;
@@ -82,10 +83,10 @@ import match_tensor_expr;
 import match_sparse_expr;
 import fusion_expr;
 import data_type;
-import expression_type;
-import meta_info;
-import column_vector;
-import new_catalog;
+import :expression_type;
+import :meta_info;
+import :column_vector;
+import :new_catalog;
 
 namespace infinity {
 

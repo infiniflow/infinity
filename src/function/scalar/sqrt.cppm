@@ -1,8 +1,8 @@
 module;
 
-export module sqrt;
+export module infinity_core:sqrt;
 
-import stl;
+import :stl;
 
 namespace infinity {
 

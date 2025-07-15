@@ -1,35 +1,10 @@
 #include "gtest/gtest.h"
+
 import base_test;
-
-import posting_merger;
-import stl;
-
-import segment_term_posting;
-import memory_indexer;
-import column_vector;
+import infinity_core;
 import data_type;
-import value;
-import column_inverter;
-import index_defines;
-import column_index_reader;
-import posting_iterator;
-import virtual_store;
-import file_writer;
-import term_meta;
-import index_defines;
-import posting_list_format;
-import column_length_io;
-import posting_decoder;
-import column_index_merger;
 import internal_types;
 import logical_type;
-import infinity_exception;
-import vector_with_lock;
-import logger;
-import infinity_context;
-import persistence_manager;
-import persist_result_handler;
-import local_file_handle;
 
 using namespace infinity;
 

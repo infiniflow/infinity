@@ -1,5 +1,5 @@
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 #find_package(Python)
@@ -252,7 +252,9 @@ target_sources(infinity_core
         ${network_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2 pcre2-8-static rocksdb)
+add_dependencies(infinity_core thrift thriftnb
+        parquet_static
+        snappy re2 pcre2-8-static rocksdb)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")

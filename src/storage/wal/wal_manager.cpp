@@ -18,40 +18,40 @@ module;
 #include <fstream>
 #include <thread>
 
-import stl;
-import logger;
-import new_txn_manager;
-import new_txn;
-import storage;
-import virtual_store;
-import third_party;
-import infinity_context;
-import data_access_state;
-import status;
-import bg_task;
-import background_process;
+module infinity_core;
+
+import :stl;
+import :logger;
+import :new_txn_manager;
+import :new_txn;
+import :storage;
+import :virtual_store;
+import :third_party;
+import :infinity_context;
+import :data_access_state;
+import :status;
+import :bg_task;
+import :background_process;
 import extra_ddl_info;
 
-import infinity_exception;
-import compact_state_data;
-import build_fast_rough_filter_task;
+import :infinity_exception;
+import :compact_state_data;
+import :build_fast_rough_filter_task;
 import column_def;
 
-import log_file;
-import default_values;
-import defer_op;
-import index_base;
-import base_table_ref;
-import cluster_manager;
+import :log_file;
+import :default_values;
+import :defer_op;
+import :index_base;
+import :base_table_ref;
+import :cluster_manager;
 import admin_statement;
 import global_resource_usage;
-import txn_state;
-import meta_info;
-import wal_entry;
-import block_index;
-import bottom_executor;
-
-module wal_manager;
+import :txn_state;
+import :meta_info;
+import :wal_entry;
+import :block_index;
+import :bottom_executor;
 
 namespace infinity {
 

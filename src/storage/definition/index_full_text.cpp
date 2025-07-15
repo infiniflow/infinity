@@ -18,21 +18,21 @@ module;
 #include <string>
 #include <vector>
 
-module index_full_text;
+module infinity_core;
 
-import stl;
-import index_base;
-import third_party;
-import status;
+import :stl;
+import :index_base;
+import :third_party;
+import :status;
 import serialize;
-import infinity_exception;
+import :infinity_exception;
 import statement_common;
-import base_table_ref;
+import :base_table_ref;
 import logical_type;
-import index_defines;
-import analyzer_pool;
-import analyzer;
-import logger;
+import :index_defines;
+import :analyzer_pool;
+import :analyzer;
+import :logger;
 
 namespace infinity {
 

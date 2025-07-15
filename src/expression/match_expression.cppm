@@ -14,11 +14,11 @@
 
 module;
 
-export module match_expression;
+export module infinity_core:match_expression;
 
-import stl;
+import :stl;
 import data_type;
-import base_expression;
+import :base_expression;
 import logical_type;
 import internal_types;
 

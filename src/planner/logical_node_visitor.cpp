@@ -16,46 +16,46 @@ module;
 
 #include <vector>
 
-module logical_node_visitor;
+module infinity_core;
 
-import stl;
-import base_expression;
-import logical_node_type;
-import infinity_exception;
+import :stl;
+import :base_expression;
+import :logical_node_type;
+import :infinity_exception;
 
-import third_party;
-import expression_type;
-import logical_node_type;
-import logical_node;
-import logical_aggregate;
-import logical_join;
-import logical_limit;
-import logical_filter;
-import logical_project;
-import logical_sort;
-import logical_top;
-import logical_insert;
-import logical_update;
-import logical_knn_scan;
-import logical_index_scan;
-import logical_match;
-import logical_match_tensor_scan;
-import logical_match_scan_base;
-import logical_fusion;
-import logical_unnest;
-import logical_unnest_aggregate;
-import aggregate_expression;
-import between_expression;
-import case_expression;
-import cast_expression;
-import column_expression;
-import function_expression;
-import value_expression;
-import in_expression;
-import subquery_expression;
-import knn_expression;
-import conjunction_expression;
-import logger;
+import :third_party;
+import :expression_type;
+import :logical_node_type;
+import :logical_node;
+import :logical_aggregate;
+import :logical_join;
+import :logical_limit;
+import :logical_filter;
+import :logical_project;
+import :logical_sort;
+import :logical_top;
+import :logical_insert;
+import :logical_update;
+import :logical_knn_scan;
+import :logical_index_scan;
+import :logical_match;
+import :logical_match_tensor_scan;
+import :logical_match_scan_base;
+import :logical_fusion;
+import :logical_unnest;
+import :logical_unnest_aggregate;
+import :aggregate_expression;
+import :between_expression;
+import :case_expression;
+import :cast_expression;
+import :column_expression;
+import :function_expression;
+import :value_expression;
+import :in_expression;
+import :subquery_expression;
+import :knn_expression;
+import :conjunction_expression;
+import :logger;
 
 namespace infinity {
 

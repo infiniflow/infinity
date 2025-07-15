@@ -14,25 +14,28 @@
 
 module;
 
-module bind_context;
+module infinity_core;
 
-import stl;
+import :stl;
 
-import binding;
-import third_party;
-import status;
-import infinity_exception;
-import base_expression;
-import column_expression;
-import column_identifer;
+import :binding;
+import :third_party;
+import :status;
+import :infinity_exception;
+import :base_expression;
+import :column_expression;
+import :column_identifer;
 
-import block_index;
+import :block_index;
 import column_expr;
-import logger;
+import :logger;
 import knn_expr;
 import match_sparse_expr;
 import global_resource_usage;
-import meta_info;
+import :meta_info;
+import parsed_expr;
+import search_expr;
+import data_type;
 
 namespace infinity {
 

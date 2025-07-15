@@ -14,14 +14,14 @@
 
 module;
 
-export module index_hnsw;
+export module infinity_core:index_hnsw;
 
-import stl;
-import index_base;
+import :stl;
+import :index_base;
 
-import third_party;
-import index_base;
-import base_table_ref;
+import :third_party;
+import :index_base;
+import :base_table_ref;
 import create_index_info;
 import statement_common;
 

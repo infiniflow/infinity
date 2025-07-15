@@ -16,15 +16,16 @@ module;
 
 #include <sstream>
 
-module unnest_expression;
+module infinity_core;
 
 import logical_type;
 import internal_types;
-import third_party;
-import infinity_exception;
+import :third_party;
+import :infinity_exception;
 import array_info;
-import column_expression;
-import expression_type;
+import :column_expression;
+import :expression_type;
+import data_type;
 
 namespace infinity {
 

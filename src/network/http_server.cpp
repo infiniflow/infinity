@@ -19,24 +19,24 @@ module;
 #include <ranges>
 #include <vector>
 
-module http_server;
+module infinity_core;
 
-import infinity;
-import stl;
-import status;
-import third_party;
-import defer_op;
-import data_block;
-import data_table;
+import :infinity;
+import :stl;
+import :status;
+import :third_party;
+import :defer_op;
+import :data_block;
+import :data_table;
 import data_type;
-import value;
-import infinity_exception;
-import logger;
-import query_result;
-import query_options;
-import column_vector;
-import infinity_context;
-import query_context;
+import :value;
+import :infinity_exception;
+import :logger;
+import :query_result;
+import :query_options;
+import :column_vector;
+import :infinity_context;
+import :query_context;
 import column_def;
 import internal_types;
 import parsed_expr;
@@ -48,7 +48,7 @@ import create_index_info;
 import statement_common;
 import extra_ddl_info;
 import update_statement;
-import http_search;
+import :http_search;
 import knn_expr;
 import function_expr;
 import column_expr;
@@ -58,10 +58,10 @@ import embedding_info;
 import sparse_info;
 import decimal_info;
 import array_info;
-import status;
+import :status;
 import constant_expr;
 import command_statement;
-import physical_import;
+import :physical_import;
 
 namespace {
 
@@ -1155,7 +1155,7 @@ public:
                                 insert_one_row->values_.emplace_back(std::move(const_expr));
                                 break;
                             }
-                            std::unique_ptr<ConstantExpr> const_sparse_expr = {};
+                            UniquePtr<ConstantExpr> const_sparse_expr = {};
                             if (value_obj.count_fields() == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
                                 json_response["error_message"] = "Empty sparse vector, cannot decide type";

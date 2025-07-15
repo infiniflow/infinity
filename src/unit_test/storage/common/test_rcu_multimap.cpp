@@ -13,16 +13,15 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
-import stl;
-import third_party;
-import rcu_multimap;
-import map_with_lock;
+
 #include <atomic>
 #include <chrono>
 #include <iomanip>
 #include <random>
 #include <thread>
+
+import base_test;
+import infinity_core;
 
 using namespace infinity;
 
@@ -33,13 +32,9 @@ public:
     RcuMultiMapTest() = default;
     ~RcuMultiMapTest() = default;
 
-    void SetUp() override {
-        BaseTest::SetUp();
-    }
+    void SetUp() override { BaseTest::SetUp(); }
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 
 protected:
     // Helper function to verify values in vector

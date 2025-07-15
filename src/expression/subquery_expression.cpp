@@ -16,13 +16,15 @@ module;
 
 #include <sstream>
 
-module subquery_expression;
+module infinity_core;
 
-import stl;
-import bound_select_statement;
-import expression_type;
+import :stl;
+import :bound_select_statement;
+import :expression_type;
+import subquery_expr;
 
 import logical_type;
+import data_type;
 
 namespace infinity {
 

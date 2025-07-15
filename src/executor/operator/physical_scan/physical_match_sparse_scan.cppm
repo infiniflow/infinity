@@ -14,26 +14,26 @@
 
 module;
 
-export module physical_match_sparse_scan;
+export module infinity_core:physical_match_sparse_scan;
 
-import stl;
-import query_context;
-import operator_state;
-import physical_operator;
-import match_sparse_expression;
-import base_table_ref;
+import :stl;
+import :query_context;
+import :operator_state;
+import :physical_operator;
+import :match_sparse_expression;
+import :base_table_ref;
 import data_type;
-import common_query_filter;
-import physical_scan_base;
+import :common_query_filter;
+import :physical_scan_base;
 import sparse_info;
 import match_sparse_expr;
-import physical_filter_scan_base;
-import global_block_id;
+import :physical_filter_scan_base;
+import :global_block_id;
 
 namespace infinity {
 struct LoadMeta;
 struct BlockIndex;
-class ColumnVector;
+struct ColumnVector;
 
 export class PhysicalMatchSparseScan final : public PhysicalFilterScanBase {
 public:

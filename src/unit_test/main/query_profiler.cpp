@@ -13,13 +13,10 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-import base_test;
 
-import stl;
-import profiler;
-import infinity_context;
+import base_test;
+import infinity_core;
 import global_resource_usage;
-import infinity_exception;
 
 using namespace infinity;
 class QueryProfilerTest : public BaseTest {

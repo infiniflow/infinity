@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
-module correlated_column_expression;
+module infinity_core;
 
-import stl;
-import expression_type;
+import :stl;
+import :expression_type;
 import data_type;
 import internal_types;
+import :correlated_column_expression;
 
 namespace infinity {
 

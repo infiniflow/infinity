@@ -14,18 +14,19 @@
 
 module;
 
-export module vec_store_type;
+export module infinity_core:vec_store_type;
 
-import stl;
-import plain_vec_store;
-import sparse_vec_store;
-import lvq_vec_store;
-import dist_func_cos;
-import dist_func_l2;
-import dist_func_ip;
-import dist_func_sparse_ip;
-import sparse_util;
-import dist_func_lsg_wrapper;
+import :stl;
+import :plain_vec_store;
+import :sparse_vec_store;
+import :lvq_vec_store;
+import :dist_func_cos;
+import :dist_func_l2;
+import :dist_func_ip;
+import :dist_func_sparse_ip;
+import :sparse_util;
+import :dist_func_lsg_wrapper;
+import data_type;
 
 namespace infinity {
 
@@ -40,6 +41,7 @@ class LVQIPVecStoreType;
 
 export template <typename DataT, bool LSG = false>
 class PlainCosVecStoreType {
+    // friend infinity::DataType;
 public:
     using DataType = DataT;
     using CompressType = void;
