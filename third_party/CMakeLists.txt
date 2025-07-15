@@ -19,9 +19,6 @@ add_subdirectory(magic_enum)
 # Build mlas
 add_subdirectory(mlas)
 
-# Build concurrentqueue
-add_subdirectory(concurrentqueue)
-
 #add_library(libhv INTERFACE)
 #target_include_directories(libhv INTERFACE libhv/include)
 
