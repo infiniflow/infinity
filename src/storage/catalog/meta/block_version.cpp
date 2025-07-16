@@ -126,13 +126,13 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     u32 deleted_row_count = 0;
     for (const auto &ts : deleted_) {
         if (ts <= checkpoint_ts) {
+            ++deleted_row_count;
             file_handle.Append(&ts, sizeof(ts));
         } else {
-            ++deleted_row_count;
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
-    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, 0 delete {}", checkpoint_ts, create_size, deleted_row_count));
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}", checkpoint_ts, create_size, deleted_row_count));
 }
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
