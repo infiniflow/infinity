@@ -273,7 +273,7 @@ void PersistenceManager::CurrentObjFinalizeNoLock(Vector<String> &persist_keys, 
         }
 
         objects_->PutNew(current_object_key_, ObjStat(current_object_size_, current_object_parts_, current_object_ref_count_), drop_keys);
-        LOG_TRACE(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
+        LOG_INFO(fmt::format("CurrentObjFinalizeNoLock added composed object {}", current_object_key_));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
         current_object_parts_ = 0;
@@ -435,6 +435,8 @@ int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) 
 void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size) {
     fs::path src_fp = tmp_file_path;
     fs::path dst_fp = Path(workspace_) / current_object_key_;
+    LOG_INFO(fmt::format("CurrentObjAppendNoLock source {}, destination {}", tmp_file_path, dst_fp.string()));
+
     std::ifstream srcFile(src_fp, std::ios::binary);
     if (!srcFile.is_open()) {
         String error_message = fmt::format("Failed to open source file {}", tmp_file_path);
