@@ -53,7 +53,7 @@ class IndexBase;
 struct WalSegmentInfo;
 struct WalBlockInfo;
 struct WalChunkIndexInfo;
-class Config;
+struct Config;
 struct MemIndexID;
 class TableCache;
 class DbCache;

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 export module infinity_core:python_instance;
+
 #if 0
 
 namespace infinity {

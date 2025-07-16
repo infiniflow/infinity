@@ -82,6 +82,12 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        infinity_impl_cpp
+        CONFIGURE_DEPENDS
+        main/*_impl.cpp
+)
+
+file(GLOB_RECURSE
         infinity_cppm
         CONFIGURE_DEPENDS
         main/*.cppm
@@ -91,6 +97,12 @@ file(GLOB_RECURSE
         network_cpp
         CONFIGURE_DEPENDS
         network/*.cpp
+)
+
+file(GLOB_RECURSE
+        network_impl_cpp
+        CONFIGURE_DEPENDS
+        network/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -106,6 +118,12 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        function_impl_cpp
+        CONFIGURE_DEPENDS
+        function/*_impl.cpp
+)
+
+file(GLOB_RECURSE
         function_cppm
         CONFIGURE_DEPENDS
         function/*.cppm
@@ -115,6 +133,12 @@ file(GLOB_RECURSE
         expression_cpp
         CONFIGURE_DEPENDS
         expression/*.cpp
+)
+
+file(GLOB_RECURSE
+        expression_impl_cpp
+        CONFIGURE_DEPENDS
+        expression/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -130,6 +154,12 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        executor_impl_cpp
+        CONFIGURE_DEPENDS
+        executor/*_impl.cpp
+)
+
+file(GLOB_RECURSE
         executor_cppm
         CONFIGURE_DEPENDS
         executor/*.cppm
@@ -139,6 +169,12 @@ file(GLOB_RECURSE
         metrics_cpp
         CONFIGURE_DEPENDS
         metrics/*.cpp
+)
+
+file(GLOB_RECURSE
+        metrics_impl_cpp
+        CONFIGURE_DEPENDS
+        metrics/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -154,6 +190,12 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        planner_impl_cpp
+        CONFIGURE_DEPENDS
+        planner/*_impl.cpp
+)
+
+file(GLOB_RECURSE
         planner_cppm
         CONFIGURE_DEPENDS
         planner/*.cppm
@@ -163,6 +205,12 @@ file(GLOB_RECURSE
         scheduler_cpp
         CONFIGURE_DEPENDS
         scheduler/*.cpp
+)
+
+file(GLOB_RECURSE
+        scheduler_impl_cpp
+        CONFIGURE_DEPENDS
+        scheduler/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -178,6 +226,12 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        storage_impl_cpp
+        CONFIGURE_DEPENDS
+        storage/*_impl.cpp
+)
+
+file(GLOB_RECURSE
         storage_cppm
         CONFIGURE_DEPENDS
         storage/*.cppm
@@ -187,6 +241,12 @@ file(GLOB_RECURSE
         common_cpp
         CONFIGURE_DEPENDS
         common/*.cpp
+)
+
+file(GLOB_RECURSE
+        common_impl_cpp
+        CONFIGURE_DEPENDS
+        common/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -202,15 +262,21 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        third_party_cpp
+        CONFIGURE_DEPENDS
+        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
+)
+
+file(GLOB_RECURSE
         admin_cpp
         CONFIGURE_DEPENDS
         admin/*.cpp
 )
 
 file(GLOB_RECURSE
-        third_party_cpp
+        admin_impl_cpp
         CONFIGURE_DEPENDS
-        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
+        admin/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -250,6 +316,18 @@ target_sources(infinity_core
         ${metrics_cppm}
         ${admin_cppm}
         ${network_cppm}
+
+        ${infinity_impl_cpp}
+        ${planner_impl_cpp}
+        ${scheduler_impl_cpp}
+        ${storage_impl_cpp}
+        ${function_impl_cpp}
+        ${expression_impl_cpp}
+        ${executor_impl_cpp}
+        ${metrics_impl_cpp}
+        ${common_impl_cpp}
+        ${admin_impl_cpp}
+        ${network_impl_cpp}
 )
 
 add_dependencies(infinity_core thrift thriftnb

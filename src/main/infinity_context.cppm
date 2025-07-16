@@ -22,15 +22,15 @@ import :status;
 import :singleton;
 import admin_statement;
 import :storage;
+import :task_scheduler;
+import :cluster_manager;
 
 namespace infinity {
 struct DefaultConfig;
-class ClusterManager;
 class SessionManager;
 class ResourceManager;
 class PersistenceManager;
-class Config;
-class TaskScheduler;
+struct Config;
 
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
