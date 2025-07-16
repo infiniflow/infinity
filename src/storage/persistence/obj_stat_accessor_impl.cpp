@@ -198,15 +198,14 @@ ObjectStatAccessor_LocalStorage::~ObjectStatAccessor_LocalStorage() {
     assert(sum_ref_count == 0);
 }
 
-ObjStat *ObjectStatAccessor_LocalStorage::Get(const String &key) {
+Optional<ObjStat> ObjectStatAccessor_LocalStorage::Get(const String &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return nullptr;
+        return None;
     }
-    ObjStat *obj_stat = &map_iter->second;
-    ++obj_stat->ref_count_;
-    return obj_stat;
+    ++map_iter->second.ref_count_;
+    return map_iter->second;
 }
 
 ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
@@ -219,18 +218,17 @@ ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
     return obj_stat;
 }
 
-ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<String> &drop_keys) {
+Optional<ObjStat> ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<String> &drop_keys) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return nullptr;
+        return None;
     }
-    ObjStat *obj_stat = &map_iter->second;
-    if (obj_stat->ref_count_ <= 0) {
-        UnrecoverableError(fmt::format("Release object {} ref count is {}", key, obj_stat->ref_count_));
+    if (map_iter->second.ref_count_ <= 0) {
+        UnrecoverableError(fmt::format("Release object {} ref count is {}", key, map_iter->second.ref_count_));
     }
-    --obj_stat->ref_count_;
-    return obj_stat;
+    --map_iter->second.ref_count_;
+    return map_iter->second;
 }
 
 void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
@@ -247,14 +245,15 @@ void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat
 
 void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_stat) {
     obj_stat.cached_ = ObjCached::kCached;
-
     this->AddObjStatToKVStore(key, obj_stat);
 
     std::unique_lock<std::mutex> lock(mutex_);
-    auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
-    if (!insert_ok) {
+    auto map_iter = obj_map_.find(key);
+    if (map_iter != obj_map_.end()) {
+        obj_stat.ref_count_ = map_iter->second.ref_count_;
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
     }
+    obj_map_.insert_or_assign(key, std::move(obj_stat));
 }
 
 Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key) {
@@ -340,17 +339,17 @@ ObjectStatAccessor_ObjectStorage::ObjectStatAccessor_ObjectStorage(SizeT disk_ca
 
 ObjectStatAccessor_ObjectStorage::~ObjectStatAccessor_ObjectStorage() = default;
 
-ObjStat *ObjectStatAccessor_ObjectStorage::Get(const String &key) {
+Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Get(const String &key) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     ObjStat *obj_stat = obj_map_.Get(key);
     if (obj_stat == nullptr) {
-        return nullptr;
+        return None;
     }
     if (disk_used_ < obj_stat->obj_size_) {
         UnrecoverableError(fmt::format("Object {} size {} is larger than disk used {}", key, obj_stat->obj_size_, disk_used_));
     }
     disk_used_ -= obj_stat->obj_size_;
-    return obj_stat;
+    return *obj_stat;
 }
 
 ObjStat *ObjectStatAccessor_ObjectStorage::GetNoCount(const String &key) {
@@ -358,17 +357,17 @@ ObjStat *ObjectStatAccessor_ObjectStorage::GetNoCount(const String &key) {
     return obj_map_.GetNoCount(key);
 }
 
-ObjStat *ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<String> &drop_keys) {
+Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<String> &drop_keys) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     auto [release_ok, obj_stat] = obj_map_.Release(key);
     if (!release_ok) {
-        return obj_stat;
+        return *obj_stat;
     }
     disk_used_ += obj_stat->obj_size_;
     if (disk_used_ > disk_capacity_limit_) {
         EnvictNoLock(drop_keys);
     }
-    return obj_stat;
+    return *obj_stat;
 }
 
 void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
