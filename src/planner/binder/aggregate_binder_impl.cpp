@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:aggregate_binder.impl;
 
+import :aggregate_binder;
 import :stl;
 import :base_expression;
 

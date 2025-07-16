@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:where_binder.impl;
 
+import :where_binder;
 import :stl;
 import :base_expression;
 

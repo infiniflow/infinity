@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:bind_alias_proxy.impl;
 
+import :bind_alias_proxy;
 import :stl;
 import :base_expression;
 

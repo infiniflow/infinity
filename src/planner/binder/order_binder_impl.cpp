@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:order_binder.impl;
 
+import :order_binder;
 import :stl;
 import :base_expression;
 

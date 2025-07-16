@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:having_binder.impl;
 
+import :having_binder;
 import :stl;
 import :base_expression;
 
@@ -33,6 +34,7 @@ import parsed_expr;
 import column_expr;
 import function_expr;
 import knn_expr;
+import :query_context;
 
 namespace infinity {
 

@@ -16,8 +16,9 @@ module;
 
 #include <string>
 
-module infinity_core;
+module infinity_core:project_binder.impl;
 
+import :project_binder;
 import :stl;
 import :base_expression;
 
@@ -37,6 +38,7 @@ import logical_type;
 import array_info;
 import data_type;
 import :new_catalog;
+import :query_context;
 
 namespace {
 
@@ -187,7 +189,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildColExpr(const ColumnExpr &expr, Bi
     return bound_column_expr;
 }
 
-SharedPtr<BaseExpression> ProjectBinder::BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) { 
+SharedPtr<BaseExpression> ProjectBinder::BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     auto col_expr = ExpressionBinder::BuildUnnestExpr(expr, bind_context_ptr, depth, root);
 
     bound_select_statement_->unnest_expressions_.push_back(col_expr);

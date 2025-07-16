@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:insert_binder.impl;
 
+import :insert_binder;
 import :stl;
 import :base_expression;
 

@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:group_binder.impl;
 
+import :group_binder;
 import :stl;
 import :base_expression;
 import :subquery_expression;
@@ -36,6 +37,7 @@ import function_expr;
 import subquery_expr;
 import knn_expr;
 import :new_catalog;
+import :query_context;
 
 namespace infinity {
 
