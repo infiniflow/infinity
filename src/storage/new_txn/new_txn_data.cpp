@@ -407,6 +407,20 @@ Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, 
                                  import_cmd->db_name_,
                                  commit_ts,
                                  txn_id));
+            const WalSegmentInfo &segment_info = import_cmd->segment_info_;
+            TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta_opt;
+            status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+            if (!status.ok()) {
+                return status;
+            }
+            TableMeeta &table_meta = *table_meta_opt;
+            status = NewCatalog::LoadImportedSegment(table_meta, segment_info, fake_commit_ts);
+            if (!status.ok()) {
+                return status;
+            }
             return Status::OK();
         } else {
             LOG_ERROR(fmt::format("Replay import: Segment {} already exists in table {} of database {} with commit ts {}, but replaying with commit "
