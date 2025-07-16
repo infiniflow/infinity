@@ -89,6 +89,7 @@ import internal_types;
 import data_type;
 import trunc;
 import logical_type;
+import fixed_dimensional_encoding;
 
 namespace infinity {
 
@@ -189,6 +190,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterQuarterFunction(catalog_ptr_);
     RegisterWeekdayFunction(catalog_ptr_);
     RegisterWeekOfYearFunction(catalog_ptr_);
+
+    // Machine learning functions
+    RegisterFDEFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}

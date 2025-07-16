@@ -25,6 +25,7 @@ namespace infinity {
 
 class HashTableBase {
 public:
+    virtual ~HashTableBase() = default;
     bool Initialized() const { return !types_.empty(); }
 
     void Init(Vector<SharedPtr<DataType>> types);

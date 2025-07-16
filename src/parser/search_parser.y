@@ -16,13 +16,15 @@
 
 /* code snippet copied to generated search_parser.tab.hh */
 %code requires{
-    // unique_ptr<QueryNode> requires sizeof(QueryNode)
-    #ifndef QUERY_NODE_H
-    #include "query_node.h"
-    #endif
+    #include <memory>
+    #include <string>
+
+    // Import modules to get complete type definitions
+    import query_node;
+    import search_driver;
 
     namespace infinity {
-        class SearchDriver;
+        // Forward declaration for SearchScanner (defined in .h file)
         class SearchScanner;
 
         class InfString {
@@ -40,17 +42,18 @@
 
 /* code snippet copied to generated search_parser.tab.cc */
 %code{
-    #include "search_driver.h"
-    #include "search_scanner.h"
-
-    #undef yylex
-    #define yylex scanner.yylex
-
     #include <iostream>
     #include <sstream>
     #include <string>
     #include <vector>
-    #include "query_node.h"
+
+    // Import modules for implementation
+    import search_driver;
+    import search_scanner;
+    import query_node;
+
+    #undef yylex
+    #define yylex scanner.yylex
 
     // Avoid warnings with the error counter.
     #if defined(__GNUC__) || defined(__clang__)

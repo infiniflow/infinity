@@ -6,10 +6,6 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
-### Parser
-
-add_subdirectory(parser)
-
 ### Infinity
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
@@ -270,7 +266,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
@@ -334,6 +329,9 @@ add_executable(infinity
 #        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
 #        ${network_cppm}
 #)
+
+### Parser (built after infinity_core so it can access modules)
+add_subdirectory(parser)
 
 add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
 
@@ -638,7 +636,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tom
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")

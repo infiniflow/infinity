@@ -99,7 +99,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
             EXPECT_EQ(v.value_.tiny_int, static_cast<i8>(i));
         }
@@ -141,7 +141,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, static_cast<i16>(i));
         }
@@ -183,7 +183,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
             EXPECT_EQ(v.value_.integer, static_cast<i32>(i));
         }
@@ -225,7 +225,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, static_cast<i64>(i));
         }
@@ -268,7 +268,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kHugeInt);
             EXPECT_EQ(v.value_.huge_int.lower, static_cast<i64>(i));
             EXPECT_EQ(v.value_.huge_int.upper, static_cast<i64>(i));
@@ -311,7 +311,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
             EXPECT_FLOAT_EQ(v.value_.float32, static_cast<f32>(i));
         }
@@ -353,7 +353,7 @@ TEST_F(PlusFunctionsTest, plus_func) {
         func.function_(data_block, result);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            Value v = result->GetValue(i);
+            Value v = result->GetValueByIndex(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
             EXPECT_FLOAT_EQ(v.value_.float64, static_cast<f64>(i));
         }

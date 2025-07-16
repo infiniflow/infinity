@@ -566,7 +566,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     UnrecoverableError(status.message());
                 }
                 ColumnVector column_vector;
-                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, column_vector);
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, column_vector);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
@@ -784,7 +784,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                             auto [block_row_cnt, status] = block_meta->GetRowCnt1();
                                             ColumnMeta column_meta(knn_column_id, *block_meta);
                                             status =
-                                                NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
+                                                NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorMode::kReadOnly, column_vector);
                                             if (!status.ok()) {
                                                 UnrecoverableError(status.message());
                                             }

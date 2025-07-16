@@ -73,11 +73,11 @@ TEST_P(TestIndexRequest, index_scan) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
         {
             SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
-            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("def"));
+            EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("def"));
         }
     }
 }
@@ -117,11 +117,11 @@ TEST_P(TestIndexRequest, fulltext_index_scan) {
         SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
         {
             SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
-            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("def"));
+            EXPECT_EQ(col1->GetValueByIndex(0), Value::MakeVarchar("def"));
         }
     }
 }
@@ -157,7 +157,7 @@ TEST_P(TestIndexRequest, vector_index_scan) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
     };
     search_vec();
@@ -206,7 +206,7 @@ TEST_P(TestIndexRequest, sparse_index_scan) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(1));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(1));
         }
     };
     search_vec();
@@ -232,7 +232,7 @@ TEST_P(TestIndexRequest, tensor_index_scan) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
     };
     auto test = [&](bool use_index) {
@@ -310,7 +310,7 @@ TEST_P(TestIndexRequest, test_optimize_index) {
 
         {
             SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
-            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValueByIndex(0), Value::MakeInt(2));
         }
     }
 }

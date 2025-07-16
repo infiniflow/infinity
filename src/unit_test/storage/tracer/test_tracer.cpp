@@ -54,6 +54,7 @@ private:
 };
 
 Vector<SharedPtr<MemIndexDetail>> TestCatalog::GetMemIndexes() {
+    std::unique_lock<std::mutex> lock(mtx_);
     Vector<SharedPtr<MemIndexDetail>> ret;
     for (auto &iter : memindexes_) {
         SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
@@ -116,11 +117,11 @@ public:
         dump_thread_ = Thread([this] { DumpRoutine(); });
     }
 
-    virtual ~TestMemIndexTracer() {
+    ~TestMemIndexTracer() override {
         task_queue_.Enqueue(nullptr);
         dump_thread_.join();
         catalog_.reset();
-        EXPECT_EQ(this->cur_index_memory(), 0ul);
+        EXPECT_EQ(cur_index_memory_, 0ul);
     }
 
     void TriggerDump(SharedPtr<DumpMemIndexTask> task) override {

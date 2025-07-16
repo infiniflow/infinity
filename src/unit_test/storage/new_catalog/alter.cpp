@@ -135,11 +135,11 @@ TEST_P(TestTxnAlter, add_column0) {
         auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_count; ++i) {
-                EXPECT_EQ(col.GetValue(i), v);
+                EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
 
@@ -264,11 +264,11 @@ TEST_P(TestTxnAlter, drop_column0) {
         auto check_column = [&](ColumnMeta &column_meta, const Value &v, SizeT row_count) {
             ColumnVector col;
 
-            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorMode::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             for (SizeT i = 0; i < row_count; ++i) {
-                EXPECT_EQ(col.GetValue(i), v);
+                EXPECT_EQ(col.GetValueByIndex(i), v);
             }
         };
 

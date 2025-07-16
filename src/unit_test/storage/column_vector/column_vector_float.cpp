@@ -63,7 +63,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -77,10 +77,10 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -96,7 +96,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
     }
@@ -122,7 +122,7 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -136,19 +136,19 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         FloatT f = static_cast<FloatT>(i) + 0.5f;
         column_vector.AppendByPtr((ptr_t)(&f));
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
         column_constant.Reset();
     }
@@ -168,7 +168,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -183,13 +183,13 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
     }
@@ -211,7 +211,7 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -225,10 +225,10 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -245,7 +245,7 @@ TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
     }
@@ -261,7 +261,7 @@ TEST_F(ColumnVectorFloatTest, float_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(2 * i) + 0.5f);
     }
@@ -280,7 +280,7 @@ TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
     }
@@ -295,7 +295,7 @@ TEST_F(ColumnVectorFloatTest, float_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(src_idx) + 0.5f);
     }
@@ -313,7 +313,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -327,10 +327,10 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -346,7 +346,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
     }
@@ -366,7 +366,7 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -380,19 +380,19 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DoubleT f = static_cast<DoubleT>(i) + 0.8f;
         column_vector.AppendByPtr((ptr_t)(&f));
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
         column_constant.Reset();
     }
@@ -412,7 +412,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -427,13 +427,13 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
     }
@@ -455,7 +455,7 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -469,10 +469,10 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -489,7 +489,7 @@ TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
     }
@@ -505,7 +505,7 @@ TEST_F(ColumnVectorFloatTest, double_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(2 * i) + 0.8f);
     }
@@ -524,7 +524,7 @@ TEST_F(ColumnVectorFloatTest, double_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
     }
@@ -539,7 +539,7 @@ TEST_F(ColumnVectorFloatTest, double_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(src_idx) + 0.8f);
     }

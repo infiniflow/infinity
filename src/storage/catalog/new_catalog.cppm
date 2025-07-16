@@ -61,7 +61,7 @@ class SystemCache;
 class FunctionSet;
 class SpecialFunction;
 
-enum class ColumnVectorTipe;
+enum class ColumnVectorMode;
 
 template <bool init_all_true>
 struct RoaringBitmap;
@@ -175,6 +175,7 @@ private:
 public:
     SharedPtr<MemIndex> GetMemIndex(const String &mem_index_key);
     SharedPtr<MemIndex> PopMemIndex(const String &mem_index_key);
+    bool HasMemIndex(const String &mem_index_key);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
     Vector<Pair<String, String>> GetAllMemIndexInfo();
 
@@ -346,7 +347,7 @@ public:
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
 
-    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
+    static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorMode &tipe, ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, NewTxnGetVisibleRangeState &state);
 

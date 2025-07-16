@@ -43,6 +43,10 @@ Status NewCheckpointTask::ExecuteWithinTxn() {
 Status NewCheckpointTask::ExecuteWithNewTxn() {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto new_txn_shared = new_txn_mgr->BeginTxnShared(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
+    if (new_txn_shared == nullptr) {
+        // System is checkpointing
+        return Status::OK();
+    }
     new_txn_shared->SetWalSize(wal_size_);
     TxnTimeStamp last_checkpoint_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
     Status status = new_txn_shared->Checkpoint(last_checkpoint_ts);

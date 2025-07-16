@@ -2286,14 +2286,12 @@ String WalCmdDelete::ToString() const {
 }
 
 String WalCmdDeleteV2::ToString() const {
-    std::stringstream ss;
-    ss << "Delete: " << std::endl;
-    ss << "db name: " << db_name_ << std::endl;
-    ss << "db id: " << db_id_ << std::endl;
-    ss << "table name: " << table_name_ << std::endl;
-    ss << "table id: " << table_id_ << std::endl;
-    ss << "delete row cout: " << row_ids_.size() << std::endl;
-    return std::move(ss).str();
+    return fmt::format("Delete: db name: {}, db id: {}, table name: {}, table id: {}, delete row count: {}",
+                       db_name_,
+                       db_id_,
+                       table_name_,
+                       table_id_,
+                       row_ids_.size());
 }
 
 String WalCmdSetSegmentStatusSealed::ToString() const {

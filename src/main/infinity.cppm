@@ -17,8 +17,6 @@ export module infinity;
 
 import stl;
 import config;
-import resource_manager;
-import task_scheduler;
 import storage;
 import status;
 import query_result;
@@ -86,7 +84,7 @@ public:
 
     QueryResult DropSnapshot(const String &snapshot_name);
 
-    QueryResult Flush(const String &flush_type = "");
+    QueryResult Flush(const String &flush_type = "data");
 
     QueryResult Compact(const String &db_name, const String &table_name);
 

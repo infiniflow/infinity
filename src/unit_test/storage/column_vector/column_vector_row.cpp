@@ -63,7 +63,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -79,12 +79,12 @@ TEST_F(ColumnVectorRowTest, flat_row) {
         Value v = Value::MakeRow(row_id);
 
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
 
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -100,7 +100,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
@@ -127,7 +127,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -141,20 +141,20 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
         column_vector.AppendByPtr((ptr_t)(&row_id));
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.SetValueByIndex(0, column_vector.GetValueByIndex(i));
         column_constant.Finalize(1);
 
-        Value vx = column_constant.GetValue(0);
+        Value vx = column_constant.GetValueByIndex(0);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         column_constant.Reset();
@@ -175,7 +175,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
@@ -191,14 +191,14 @@ TEST_F(ColumnVectorRowTest, contant_row) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
@@ -221,7 +221,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
+    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
@@ -236,11 +236,11 @@ TEST_F(ColumnVectorRowTest, contant_row) {
         RowID row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
+        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -258,7 +258,7 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
@@ -275,7 +275,7 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        Value vx = target_column_vector.GetValue(i);
+        Value vx = target_column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(2 * i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(2 * i));
@@ -296,7 +296,7 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
@@ -311,7 +311,7 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < count; ++i) {
-        Value vx = column_vector.GetValue(i);
+        Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));

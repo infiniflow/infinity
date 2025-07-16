@@ -54,7 +54,6 @@ IVFIndexInMem::IVFIndexInMem(const RowID begin_row_id,
       ivf_index_storage_{new IVF_Index_Storage(ivf_option, column_logical_type, embedding_data_type, embedding_dimension)} {}
 
 IVFIndexInMem::~IVFIndexInMem() {
-    std::unique_lock lock(rw_mutex_);
     if (own_ivf_index_storage_) {
         delete ivf_index_storage_;
     }
@@ -107,11 +106,9 @@ public:
         }
     }
 
-    ~IVFIndexInMemT() {
-        std::unique_lock lock(rw_mutex_);
-        if (own_ivf_index_storage_) {
-            DecreaseMemoryUsageBase(MemoryUsed());
-        }
+    ~IVFIndexInMemT() override {
+        SizeT mem_used = MemoryUsed();
+        DecreaseMemoryUsageBase(mem_used);
     }
 
     MemIndexTracerInfo GetInfo() const override {
@@ -186,13 +183,12 @@ public:
             }
         }
         SizeT mem2 = MemoryUsed();
-        LOG_TRACE(fmt::format("ivf mem usage = {}", mem2));
-        LOG_TRACE(fmt::format("ivf mem added = {}", mem2 - mem1));
+        LOG_TRACE(fmt::format("ivf mem usage {} -> {}", mem1, mem2));
         IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
     void BuildIndex() {
-        LOG_TRACE("Start building in-memory IVF index");
+        SizeT mem1 = MemoryUsed();
         if (have_ivf_index_.test(std::memory_order_acquire)) {
             UnrecoverableError("Already have index");
         }
@@ -217,6 +213,9 @@ public:
         }
         // fin
         have_ivf_index_.test_and_set(std::memory_order_release);
+        SizeT mem2 = MemoryUsed();
+        LOG_TRACE(fmt::format("ivf mem usage {} -> {}", mem1, mem2));
+        IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
     void Dump(BufferObj *buffer_obj, SizeT *p_dump_size) override {

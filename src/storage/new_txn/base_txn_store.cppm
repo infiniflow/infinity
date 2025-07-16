@@ -77,6 +77,7 @@ export struct BaseTxnStore {
 // DummyTxnStore is only used in test
 export struct DummyTxnStore : public BaseTxnStore {
     DummyTxnStore() : BaseTxnStore(TransactionType::kNormal) {}
+    ~DummyTxnStore() override = default;
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -84,6 +85,7 @@ export struct DummyTxnStore : public BaseTxnStore {
 
 export struct CreateDBTxnStore : public BaseTxnStore {
     CreateDBTxnStore() : BaseTxnStore(TransactionType::kCreateDB) {}
+    ~CreateDBTxnStore() override = default;
 
     String db_name_{};
     u64 db_id_{};
@@ -96,6 +98,7 @@ export struct CreateDBTxnStore : public BaseTxnStore {
 
 export struct DropDBTxnStore : public BaseTxnStore {
     DropDBTxnStore() : BaseTxnStore(TransactionType::kDropDB) {}
+    ~DropDBTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -108,6 +111,7 @@ export struct DropDBTxnStore : public BaseTxnStore {
 
 export struct CreateTableTxnStore : public BaseTxnStore {
     CreateTableTxnStore() : BaseTxnStore(TransactionType::kCreateTable) {}
+    ~CreateTableTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -167,6 +171,7 @@ export struct RestoreDatabaseTxnStore : public BaseTxnStore {
 
 export struct DropTableTxnStore : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
+    ~DropTableTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -177,12 +182,13 @@ export struct DropTableTxnStore : public BaseTxnStore {
     TxnTimeStamp create_ts_{};
     String table_key_{};
 
-    String ToString() const final;
+    String ToString() const final;\
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct RenameTableTxnStore : public BaseTxnStore {
     RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
+    ~RenameTableTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -197,6 +203,7 @@ export struct RenameTableTxnStore : public BaseTxnStore {
 
 export struct CreateIndexTxnStore : public BaseTxnStore {
     CreateIndexTxnStore() : BaseTxnStore(TransactionType::kCreateIndex) {}
+    ~CreateIndexTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -214,6 +221,7 @@ export struct CreateIndexTxnStore : public BaseTxnStore {
 
 export struct DropIndexTxnStore : public BaseTxnStore {
     DropIndexTxnStore() : BaseTxnStore(TransactionType::kDropIndex) {}
+    ~DropIndexTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -249,6 +257,7 @@ export struct OptimizeIndexStoreEntry {
 
 export struct OptimizeIndexTxnStore : public BaseTxnStore {
     OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
+    ~OptimizeIndexTxnStore() override = default;
 
     Vector<String> db_names_{};
     Map<String, Vector<String>> table_names_in_db_{};
@@ -260,6 +269,7 @@ export struct OptimizeIndexTxnStore : public BaseTxnStore {
 
 export struct AppendTxnStore : public BaseTxnStore {
     AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
+    ~AppendTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -285,6 +295,7 @@ export struct AppendTxnStore : public BaseTxnStore {
 
 export struct ImportTxnStore : public BaseTxnStore {
     ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
+    ~ImportTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -312,6 +323,7 @@ export struct ImportTxnStore : public BaseTxnStore {
 
 export struct DumpMemIndexTxnStore : public BaseTxnStore {
     DumpMemIndexTxnStore() : BaseTxnStore(TransactionType::kDumpMemIndex) {}
+    ~DumpMemIndexTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -333,6 +345,7 @@ export struct DumpMemIndexTxnStore : public BaseTxnStore {
 
 export struct AddColumnsTxnStore : public BaseTxnStore {
     AddColumnsTxnStore() : BaseTxnStore(TransactionType::kAddColumn) {}
+    ~AddColumnsTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -350,6 +363,7 @@ export struct AddColumnsTxnStore : public BaseTxnStore {
 
 export struct DropColumnsTxnStore : public BaseTxnStore {
     DropColumnsTxnStore() : BaseTxnStore(TransactionType::kDropColumn) {}
+    ~DropColumnsTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -369,6 +383,7 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
 
 export struct CompactTxnStore : public BaseTxnStore {
     CompactTxnStore() : BaseTxnStore(TransactionType::kCompact) {}
+    ~CompactTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -395,6 +410,7 @@ export struct CompactTxnStore : public BaseTxnStore {
 
 export struct DeleteTxnStore : public BaseTxnStore {
     DeleteTxnStore() : BaseTxnStore(TransactionType::kDelete) {}
+    ~DeleteTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -411,6 +427,7 @@ export struct DeleteTxnStore : public BaseTxnStore {
 
 export struct UpdateTxnStore : public BaseTxnStore {
     UpdateTxnStore() : BaseTxnStore(TransactionType::kUpdate) {}
+    ~UpdateTxnStore() override = default;
 
     String db_name_{};
     String db_id_str_{};
@@ -448,6 +465,7 @@ export struct FlushDataEntry {
 };
 export struct CheckpointTxnStore : public BaseTxnStore {
     CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
+    ~CheckpointTxnStore() override = default;
 
     Vector<SharedPtr<FlushDataEntry>> entries_{};
     i64 max_commit_ts_{};
@@ -458,6 +476,7 @@ export struct CheckpointTxnStore : public BaseTxnStore {
 
 export struct CleanupTxnStore : public BaseTxnStore {
     CleanupTxnStore() : BaseTxnStore(TransactionType::kCleanup) {}
+    ~CleanupTxnStore() override = default;
 
     i64 timestamp_{};
 

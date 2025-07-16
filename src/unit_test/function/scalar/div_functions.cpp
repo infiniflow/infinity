@@ -110,7 +110,7 @@ TEST_F(DivFunctionsTest, div_func) {
             if (i % 256 == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result->GetValue(i);
+                Value v = result->GetValueByIndex(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_EQ(v.value_.float64, 1);
@@ -164,7 +164,7 @@ TEST_F(DivFunctionsTest, div_func) {
             if (i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result->GetValue(i);
+                Value v = result->GetValueByIndex(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_EQ(v.value_.float64, 2);
@@ -218,7 +218,7 @@ TEST_F(DivFunctionsTest, div_func) {
             if (i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result->GetValue(i);
+                Value v = result->GetValueByIndex(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_EQ(v.value_.float64, 3);
@@ -272,7 +272,7 @@ TEST_F(DivFunctionsTest, div_func) {
             if (i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result->GetValue(i);
+                Value v = result->GetValueByIndex(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_EQ(v.value_.float64, 4);
@@ -343,7 +343,7 @@ TEST_F(DivFunctionsTest, div_func) {
             if (i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result->GetValue(i);
+                Value v = result->GetValueByIndex(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_FLOAT_EQ(v.value_.float64, 5);
@@ -397,7 +397,7 @@ TEST_F(DivFunctionsTest, div_func) {
             if (i == 0) {
                 EXPECT_FALSE(result->nulls_ptr_->IsTrue(i));
             } else {
-                Value v = result->GetValue(i);
+                Value v = result->GetValueByIndex(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
                 EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
                 EXPECT_EQ(v.value_.float64, 6);
