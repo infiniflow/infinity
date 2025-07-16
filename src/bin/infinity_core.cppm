@@ -658,7 +658,7 @@ export import :lower;
 export import :regex;
 export import :extract;
 export import :pow;
-export import :substract;
+export import :subtract;
 export import :char_length;
 export import :multiply;
 export import :position;

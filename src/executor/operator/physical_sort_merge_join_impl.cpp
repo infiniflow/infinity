@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_sort_merge_join.impl;
 
-import :stl;
+import :physical_sort_merge_join;
+
+import :query_context;
+import :operator_state;
+import :physical_sort_merge_join;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalSortMergeJoin::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalSortMergeJoin::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

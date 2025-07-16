@@ -14,14 +14,17 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:table_function_set.impl;
+
+import :table_function_set;
 
 import :stl;
+import :table_function;
 
 namespace infinity {
 
-class NewCatalog;
+TableFunctionSet::~TableFunctionSet() { functions_.clear(); }
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+void TableFunctionSet::AddFunction(TableFunction func) { functions_.emplace_back(func); }
 
 } // namespace infinity

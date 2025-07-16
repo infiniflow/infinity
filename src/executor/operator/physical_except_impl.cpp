@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_except.impl;
 
-import :stl;
+import :physical_except;
+
+import :query_context;
+import :operator_state;
+import :physical_except;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalExcept::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalExcept::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

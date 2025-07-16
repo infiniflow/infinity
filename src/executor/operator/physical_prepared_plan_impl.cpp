@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_prepared_plan.impl;
 
-import :stl;
+import :physical_prepared_plan;
+
+import :query_context;
+import :operator_state;
+import :physical_prepared_plan;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalPreparedPlan::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalPreparedPlan::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

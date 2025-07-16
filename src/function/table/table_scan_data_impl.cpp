@@ -14,14 +14,19 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:table_scan_data.impl;
+
+import :table_scan_function_data;
 
 import :stl;
+import :global_block_id;
+import :block_index;
 
 namespace infinity {
 
-class NewCatalog;
-
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+TableScanFunctionData::TableScanFunctionData(const BlockIndex *block_index,
+                                             const SharedPtr<Vector<GlobalBlockID>> &global_block_ids,
+                                             const Vector<SizeT> &column_ids)
+    : block_index_(block_index), global_block_ids_(global_block_ids), column_ids_(column_ids) {}
 
 } // namespace infinity

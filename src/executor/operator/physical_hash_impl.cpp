@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_hash.impl;
 
-import :stl;
+import :physical_hash;
+
+import :query_context;
+import :operator_state;
+import :physical_hash;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalHash::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalHash::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

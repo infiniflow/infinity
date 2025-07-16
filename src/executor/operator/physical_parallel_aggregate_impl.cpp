@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_parallel_aggregate.impl;
 
-import :stl;
+import :physical_parallel_aggregate;
+
+import :query_context;
+import :operator_state;
+import :physical_parallel_aggregate;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalParallelAggregate::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalParallelAggregate::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

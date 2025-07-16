@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_union_all.impl;
 
-import :stl;
+import :physical_union_all;
+
+import :query_context;
+import :operator_state;
+import :physical_union_all;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalUnionAll::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalUnionAll::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

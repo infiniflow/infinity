@@ -14,14 +14,17 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_dummy_scan.impl;
 
-import :stl;
+import :physical_dummy_scan;
+
+import :query_context;
+import :operator_state;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalDummyScan::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalDummyScan::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

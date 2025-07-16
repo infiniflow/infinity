@@ -14,14 +14,18 @@
 
 module;
 
-export module infinity_core:subtract;
+module infinity_core:physical_intersect.impl;
 
-import :stl;
+import :physical_intersect;
+
+import :query_context;
+import :operator_state;
+import :physical_intersect;
 
 namespace infinity {
 
-class NewCatalog;
+void PhysicalIntersect::Init(QueryContext *query_context) {}
 
-export void RegisterSubtractFunction(NewCatalog *catalog_ptr);
+bool PhysicalIntersect::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity
