@@ -14,12 +14,12 @@
 
 module;
 
-export module infinity_core:batch_or_iterator;
+export module batch_or_iterator;
 
-import :stl;
-import :index_defines;
-import :doc_iterator;
-import :multi_doc_iterator;
+import stl;
+import index_defines;
+import doc_iterator;
+import multi_doc_iterator;
 import internal_types;
 
 namespace infinity {

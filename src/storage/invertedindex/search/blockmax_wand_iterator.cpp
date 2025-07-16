@@ -16,15 +16,15 @@ module;
 
 #include <cassert>
 
-module infinity_core;
-import :stl;
-import :third_party;
-import :index_defines;
-import :blockmax_leaf_iterator;
-import :multi_doc_iterator;
+module blockmax_wand_iterato;
+import stl;
+import third_party;
+import index_defines;
+import blockmax_leaf_iterator;
+import multi_doc_iterator;
 import internal_types;
-import :logger;
-import :infinity_exception;
+import logger;
+import infinity_exception;
 
 namespace infinity {
 

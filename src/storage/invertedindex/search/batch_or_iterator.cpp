@@ -19,17 +19,17 @@ module;
 #include <tuple>
 #include <vector>
 
-module infinity_core;
+module batch_or_iterato;
 
-import :stl;
-import :third_party;
-import :index_defines;
-import :term_doc_iterator;
-import :multi_doc_iterator;
+import stl;
+import third_party;
+import index_defines;
+import term_doc_iterator;
+import multi_doc_iterator;
 import internal_types;
-import :logger;
-import :infinity_exception;
-import :simd_functions;
+import logger;
+import infinity_exception;
+import simd_functions;
 
 namespace infinity {
 
