@@ -26,7 +26,7 @@ export class NGramAnalyzer : public Analyzer {
 public:
     NGramAnalyzer(u32 ngram) : ngram_(ngram) {}
 
-    ~NGramAnalyzer() = default;
+    virtual ~NGramAnalyzer() = default;
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;

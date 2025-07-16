@@ -1425,7 +1425,6 @@ TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
 }
 
 Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts) {
-    DeferFn defer1([&] { LOG_FLUSH(); });
     TransactionType txn_type = GetTxnType();
     if (txn_type != TransactionType::kNewCheckpoint) {
         UnrecoverableError(fmt::format("Expected transaction type is checkpoint."));
@@ -4125,7 +4124,7 @@ void NewTxn::CommitBottom() {
             }
             case WalCommandType::DUMP_INDEX_V2: {
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndexV2 *>(command.get());
-                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex && !IsReplay()) {
                     Status status = CommitBottomDumpMemIndex(dump_index_cmd);
                     if (!status.ok()) {
                         UnrecoverableError(fmt::format("CommitBottomDumpMemIndex failed: {}", status.message()));
