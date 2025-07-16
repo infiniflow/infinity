@@ -15,8 +15,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAK
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
 
-if(APPLE)
-    if(X86_64)
+if (APPLE)
+    if (X86_64)
         execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA"
                 RESULT_VARIABLE SUPPORT_FMA
                 OUTPUT_QUIET
@@ -36,10 +36,10 @@ if(APPLE)
                 RESULT_VARIABLE SUPPORT_AVX512
                 OUTPUT_QUIET
                 ERROR_QUIET)
-    endif()
-else()
+    endif ()
+else ()
     #Linux
-    if(X86_64)
+    if (X86_64)
         execute_process(COMMAND grep -q fma /proc/cpuinfo
                 RESULT_VARIABLE SUPPORT_FMA
                 OUTPUT_QUIET
@@ -59,8 +59,8 @@ else()
                 RESULT_VARIABLE SUPPORT_AVX512
                 OUTPUT_QUIET
                 ERROR_QUIET)
-    endif()
-endif()
+    endif ()
+endif ()
 
 
 file(GLOB_RECURSE
@@ -80,6 +80,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         main/*.cpp
 )
+list(FILTER infinity_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         infinity_impl_cpp
@@ -98,6 +99,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         network/*.cpp
 )
+list(FILTER network_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         network_impl_cpp
@@ -116,6 +118,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         function/*.cpp
 )
+list(FILTER function_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         function_impl_cpp
@@ -134,6 +137,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         expression/*.cpp
 )
+list(FILTER expression_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         expression_impl_cpp
@@ -152,6 +156,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         executor/*.cpp
 )
+list(FILTER executor_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         executor_impl_cpp
@@ -170,6 +175,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         metrics/*.cpp
 )
+list(FILTER metrics_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         metrics_impl_cpp
@@ -188,6 +194,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         planner/*.cpp
 )
+list(FILTER planner_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         planner_impl_cpp
@@ -206,6 +213,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         scheduler/*.cpp
 )
+list(FILTER scheduler_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         scheduler_impl_cpp
@@ -224,6 +232,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         storage/*.cpp
 )
+list(FILTER storage_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         storage_impl_cpp
@@ -242,6 +251,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         common/*.cpp
 )
+list(FILTER common_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         common_impl_cpp
@@ -272,6 +282,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         admin/*.cpp
 )
+list(FILTER admin_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
         admin_impl_cpp
@@ -286,7 +297,7 @@ file(GLOB_RECURSE
 )
 
 add_library(infinity_core
-        ${infinity_cpp}
+        #${infinity_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -373,7 +384,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
 
 
-if(X86_64)
+if (X86_64)
     if (NOT SUPPORT_FMA EQUAL 0)
         message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
     endif ()
@@ -396,12 +407,12 @@ endif ()
 add_executable(infinity
         ${main_cpp}
 
-#        network/http_server.cppm
-#        network/http_server.cpp
-#        network/http/http_search.cppm
-#        network/http/http_search.cpp
-#        network/infinity_thrift_service.cpp
-#        network/infinity_thrift_service.cppm
+        #        network/http_server.cppm
+        #        network/http_server.cpp
+        #        network/http/http_search.cppm
+        #        network/http/http_search.cpp
+        #        network/infinity_thrift_service.cpp
+        #        network/infinity_thrift_service.cppm
 )
 
 #target_sources(infinity
@@ -522,7 +533,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 #            rocksdb.a
 #    )
 
-    # WARN: python modules shall not link to static libstdc++!!!
+# WARN: python modules shall not link to static libstdc++!!!
 #    target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
 #    set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
 #
@@ -635,6 +646,7 @@ add_executable(unit_test
         ${ut_planner_cpp}
         ${ut_function_cpp}
         ${ut_parallel_cpp}
+
         ${infinity_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
@@ -647,14 +659,14 @@ add_executable(unit_test
         ${network_cpp}
 )
 
-set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
+#set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb)
 
 target_link_libraries(unit_test
+        infinity_core
         gtest
         gtest_main
         sql_parser
-        infinity_core
         onnxruntime_mlas
         zsv_parser
         newpfor
@@ -704,6 +716,18 @@ target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
+
+        #        ${infinity_impl_cpp}
+        #        ${planner_impl_cpp}
+        #        ${scheduler_impl_cpp}
+        #        ${storage_impl_cpp}
+        #        ${function_impl_cpp}
+        #        ${expression_impl_cpp}
+        #        ${executor_impl_cpp}
+        #        ${metrics_impl_cpp}
+        #        ${common_impl_cpp}
+        #        ${admin_impl_cpp}
+        #        ${network_impl_cpp}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -730,7 +754,7 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcr
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-if(X86_64)
+if (X86_64)
     if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
         message("Compiled by AVX2 or AVX512")
         add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
@@ -740,7 +764,7 @@ if(X86_64)
         add_definitions(-msse4.2 -mfma)
         target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
     endif ()
-else()
+else ()
     add_definitions(-march=native)
 endif ()
 
