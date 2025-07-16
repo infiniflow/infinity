@@ -167,6 +167,7 @@ UniquePtr<NewTxn> NewTxnManager::BeginRecoveryTxn() {
         UnrecoverableError(error_message);
     }
 
+    std::lock_guard guard(locker_);
     //    current_ts_ += 2;
     prepare_commit_ts_ = current_ts_ + 2;
     TxnTimeStamp commit_ts = current_ts_ + 2; // Will not be used
@@ -293,6 +294,7 @@ void NewTxnManager::CommitReplayTxn(NewTxn *txn) {
         UnrecoverableError(fmt::format("Fail to commit replay txn: {}", status.message()));
     }
 
+    std::lock_guard guard(locker_);
     current_ts_ = txn->CommitTS();
     prepare_commit_ts_ = txn->CommitTS();
 }
