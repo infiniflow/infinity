@@ -16,7 +16,9 @@ module;
 
 #include <string>
 
-module infinity_core;
+module infinity_core:match_expression.impl;
+
+import :match_expression;
 
 import :stl;
 import :logger;

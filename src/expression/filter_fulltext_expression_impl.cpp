@@ -14,7 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:filter_fulltext_expression.impl;
+
+import :filter_fulltext_expression;
 
 import :base_expression;
 import :expression_type;

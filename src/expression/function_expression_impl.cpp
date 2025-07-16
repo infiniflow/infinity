@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:function_expression.impl;
+
+import :function_expression;
 
 import :stl;
 import :expression_type;

@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:between_expression.impl;
+
+import :between_expression;
 
 import :stl;
 import :expression_type;

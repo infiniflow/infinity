@@ -17,7 +17,9 @@ module;
 #include <cctype>
 #include <string>
 
-module infinity_core;
+module infinity_core:reference_expression.impl;
+
+import :reference_expression;
 
 import :stl;
 import :third_party;

@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:unnest_expression.impl;
+
+import :unnest_expression;
 
 import logical_type;
 import internal_types;

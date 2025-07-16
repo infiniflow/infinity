@@ -17,7 +17,9 @@ module;
 #include <sstream>
 #include <vector>
 
-module infinity_core;
+module infinity_core:match_sparse_expression.impl;
+
+import :match_sparse_expression;
 
 import :stl;
 import logical_type;

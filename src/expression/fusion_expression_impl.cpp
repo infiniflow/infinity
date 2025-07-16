@@ -14,24 +14,31 @@
 
 module;
 
-module infinity_core;
+#include <sstream>
+
+module infinity_core:fusion_expression.impl;
+
+import :fusion_expression;
 
 import :stl;
 import :expression_type;
-import :value_expression;
+
+import :scalar_function;
+import search_options;
+import :infinity_exception;
+import :third_party;
 
 namespace infinity {
 
-String ValueExpression::ToString() const { return value_.ToString(); }
+FusionExpression::FusionExpression(const String &method, SharedPtr<SearchOptions> options)
+    : BaseExpression(ExpressionType::kFusion, Vector<SharedPtr<BaseExpression>>()), method_(method), options_(std::move(options)) {}
 
-u64 ValueExpression::Hash() const { return 0; }
-
-bool ValueExpression::Eq(const BaseExpression &other_base) const {
-    if (other_base.type() != ExpressionType::kValue) {
-        return false;
+String FusionExpression::ToString() const {
+    if (!alias_.empty()) {
+        return alias_;
     }
-    const auto &other = static_cast<const ValueExpression &>(other_base);
-    return value_ == other.value_;
+    String expr_str = fmt::format("FUSION('{}', '{}')", method_, options_ ? options_->ToString() : "");
+    return expr_str;
 }
 
 } // namespace infinity

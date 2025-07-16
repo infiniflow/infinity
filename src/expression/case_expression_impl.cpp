@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:case_expression.impl;
+
+import :case_expression;
 
 import :stl;
 import :expression_type;

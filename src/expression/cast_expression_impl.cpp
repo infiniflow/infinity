@@ -14,7 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:cast_expression.impl;
+
+import :cast_expression;
 
 import :base_expression;
 import logical_type;

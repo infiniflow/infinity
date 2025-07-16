@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:subquery_expression.impl;
+
+import :subquery_expression;
 
 import :stl;
 import :bound_select_statement;

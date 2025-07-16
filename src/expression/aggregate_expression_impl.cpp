@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:aggregate_expression.impl;
+
+import :aggregate_expression;
 
 import :stl;
 import :expression_type;

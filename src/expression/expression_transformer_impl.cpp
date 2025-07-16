@@ -16,7 +16,9 @@ module;
 
 #include <vector>
 
-module infinity_core;
+module infinity_core:expression_transformer.impl;
+
+import :expression_transformer;
 
 import :stl;
 import :base_expression;

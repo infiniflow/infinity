@@ -17,7 +17,9 @@ module;
 #include <sstream>
 #include <vector>
 
-module infinity_core;
+module infinity_core:knn_expression.impl;
+
+import :knn_expression;
 
 import :stl;
 import :expression_type;

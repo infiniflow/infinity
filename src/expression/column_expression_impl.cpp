@@ -17,7 +17,9 @@ module;
 #include <cctype>
 #include <string>
 
-module infinity_core;
+module infinity_core:column_expression.impl;
+
+import :column_expression;
 
 import :stl;
 import :expression_type;
