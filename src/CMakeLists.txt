@@ -659,7 +659,7 @@ add_executable(unit_test
         ${network_cpp}
 )
 
-#set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
+set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb)
 
 target_link_libraries(unit_test
