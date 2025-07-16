@@ -25,9 +25,9 @@ import :stemmer;
 import :analyzer;
 import :tokenizer;
 import :common_analyzer;
+import :default_values;
 
 namespace infinity {
-constexpr int MAX_TUPLE_LENGTH = 1024;
 
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),

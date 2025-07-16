@@ -71,9 +71,9 @@ import :mem_usage_change;
 import :bg_task;
 import row_id;
 import :fst.build;
+import :default_values;
 
 namespace infinity {
-constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
 bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
     int ret = strcmp(lhs.c_str(), rhs.c_str());
     return ret < 0;

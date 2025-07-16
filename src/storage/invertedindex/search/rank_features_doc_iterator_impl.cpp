@@ -33,10 +33,9 @@ import :logger;
 import :infinity_exception;
 import :simd_functions;
 import :smallfloat;
+import :default_values;
 
 namespace infinity {
-
-constexpr u32 BATCH_OR_LEN = 128;
 
 RankFeaturesDocIterator::RankFeaturesDocIterator(Vector<UniquePtr<DocIterator>> &&iterators) : MultiDocIterator(std::move(iterators)) {
     estimate_iterate_cost_ = {};

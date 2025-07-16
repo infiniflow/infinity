@@ -32,10 +32,9 @@ import internal_types;
 import :logger;
 import :infinity_exception;
 import :simd_functions;
+import :default_values;
 
 namespace infinity {
-
-constexpr u32 BATCH_OR_LEN = 128;
 
 // aligned_buffer_: tf * child_num, doc_len * child_num, match_cnt, bm25_score_sum
 // vector of f1, f2, bm25_common_score
