@@ -19,7 +19,7 @@ module;
 #include <tuple>
 #include <vector>
 
-module batch_or_iterato;
+module batch_or_iterator;
 
 import stl;
 import third_party;

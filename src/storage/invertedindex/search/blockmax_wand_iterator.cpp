@@ -16,7 +16,7 @@ module;
 
 #include <cassert>
 
-module blockmax_wand_iterato;
+module blockmax_wand_iterator;
 import stl;
 import third_party;
 import index_defines;
