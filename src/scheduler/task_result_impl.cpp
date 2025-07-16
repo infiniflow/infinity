@@ -14,7 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:task_result.impl;
+
+import :task_result;
 
 import :stl;
 import :data_block;

@@ -16,7 +16,9 @@ module;
 
 #include <sstream>
 
-module infinity_core;
+module infinity_core:fragment_task.impl;
+
+import :fragment_task;
 
 import :profiler;
 import :plan_fragment;

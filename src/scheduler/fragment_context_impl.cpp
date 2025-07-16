@@ -16,7 +16,9 @@ module;
 
 #include <vector>
 
-module infinity_core;
+module infinity_core:fragment_context.impl;
+
+import :fragment_context;
 
 import :stl;
 

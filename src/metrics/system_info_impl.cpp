@@ -40,7 +40,9 @@ module;
 #include <string>
 #include <unistd.h>
 
-module infinity_core;
+module infinity_core:system_info.impl;
+
+import :system_info;
 
 import :stl;
 import :defer_op;

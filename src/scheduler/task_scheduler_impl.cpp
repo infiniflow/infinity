@@ -18,7 +18,9 @@ module;
 #include <sched.h>
 #include <vector>
 
-module infinity_core;
+module infinity_core:task_scheduler.impl;
+
+import :task_scheduler;
 
 import :stl;
 import :config;
