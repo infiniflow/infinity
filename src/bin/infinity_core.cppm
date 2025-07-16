@@ -572,7 +572,7 @@ export import :subquery_unnest;
 export import :dependent_join_flattener;
 export import :bound_statement;
 export import :load_meta;
-export import :column_identifer;
+export import :column_identifier;
 export import :multi_vector_cast;
 export import :empty_array_cast;
 export import :float_cast;
