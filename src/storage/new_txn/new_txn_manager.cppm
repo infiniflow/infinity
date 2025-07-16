@@ -94,11 +94,20 @@ public:
 
     void SetCurrentTransactionID(TransactionID latest_transaction_id);
 
-    TransactionID current_transaction_id() const { return current_transaction_id_; }
+    TransactionID current_transaction_id() const {
+        std::lock_guard guard(locker_);
+        return current_transaction_id_;
+    }
 
-    TxnTimeStamp CurrentTS() const { return current_ts_; }
+    TxnTimeStamp CurrentTS() const {
+        std::lock_guard guard(locker_);
+        return current_ts_;
+    }
 
-    TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
+    TxnTimeStamp PrepareCommitTS() const {
+        std::lock_guard guard(locker_);
+        return prepare_commit_ts_;
+    }
 
     TxnTimeStamp GetOldestAliveTS();
 
@@ -124,7 +133,10 @@ private:
 
 public:
     // Only used by follower and learner when received the replicated log from leader
-    void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
+    void SetStartTS(TxnTimeStamp new_start_ts) {
+        std::lock_guard guard(locker_);
+        current_ts_ = new_start_ts;
+    }
 
     void PrintAllKeyValue() const;
 
