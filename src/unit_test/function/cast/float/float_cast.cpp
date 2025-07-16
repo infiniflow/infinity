@@ -42,11 +42,7 @@ import data_type;
 
 using namespace infinity;
 
-class FloatCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class FloatCastTest : public BaseTest {};
 
 TEST_F(FloatCastTest, float_cast0) {
     using namespace infinity;

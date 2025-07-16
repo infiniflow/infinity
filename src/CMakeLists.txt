@@ -252,13 +252,12 @@ target_sources(infinity_core
         ${network_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2 pcre2-8-static rocksdb)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy re2 pcre2-8-static rocksdb cpptrace-lib)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-#target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cli11")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
@@ -291,6 +290,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cpptrace/include")
 
 
 if(X86_64)
@@ -368,6 +368,8 @@ target_link_libraries(infinity
         re2.a
         pcre2-8-static
         rocksdb.a
+        cpptrace.a
+        backtrace.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -381,6 +383,7 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/cpptrace/")
 target_link_directories(infinity PUBLIC "/usr/local/openssl30/lib64")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -568,7 +571,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb cpptrace-lib)
 
 target_link_libraries(unit_test
         gtest
@@ -604,6 +607,8 @@ target_link_libraries(unit_test
         ssl.a
         crypto.a
         rocksdb.a
+        cpptrace.a
+        backtrace.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -617,6 +622,7 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/"
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/cpptrace/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 
@@ -628,8 +634,7 @@ target_sources(unit_test
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-#target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
@@ -648,6 +653,7 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/dar
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cpptrace/include")
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if(X86_64)

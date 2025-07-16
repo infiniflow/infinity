@@ -1,0 +1,15 @@
+.vscode/
+.idea/
+.cache
+
+a.out
+build*/
+out/
+repro*/
+__pycache__/
+scratch
+tmp/
+bazel-*/
+cmake-build-*/
+
+test/jank/data
