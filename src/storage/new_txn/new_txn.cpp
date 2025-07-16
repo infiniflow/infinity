@@ -2307,38 +2307,7 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
     return Status::OK();
 }
 
-// Get indexes for specific table only
-Vector<SharedPtr<MemIndexDetail>> NewTxn::GetTableMemIndexes(const String &db_name, const String &table_name) {
-    Vector<SharedPtr<MemIndexDetail>> mem_index_details;
-    Vector<SharedPtr<MemIndex>> mem_indexes;
-    Vector<MemIndexID> mem_index_ids;
-    Status status = NewCatalog::GetAllMemIndexes(this, mem_indexes, mem_index_ids);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
 
-    for (SizeT i = 0; i < mem_indexes.size(); ++i) {
-        if (mem_index_ids[i].db_name_ == db_name && mem_index_ids[i].table_name_ == table_name) {
-            SharedPtr<MemIndexDetail> detail = MakeShared<MemIndexDetail>();
-            auto &mem_index = mem_indexes[i];
-            auto &mem_index_id = mem_index_ids[i];
-            const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-            detail->mem_index_ = mem_index;
-            detail->is_emvb_index_ = base_mem_index == nullptr;
-            detail->db_name_ = mem_index_id.db_name_;
-            detail->table_name_ = mem_index_id.table_name_;
-            detail->index_name_ = mem_index_id.index_name_;
-            detail->segment_id_ = mem_index_id.segment_id_;
-            if (!detail->is_emvb_index_) {
-                MemIndexTracerInfo info = base_mem_index->GetInfo();
-                detail->mem_used_ = info.mem_used_;
-                detail->row_count_ = info.row_count_;
-            }
-            mem_index_details.push_back(detail);
-        }
-    }
-    return mem_index_details;
-}
 
 Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
     //check if duplicate snapshot name
@@ -2611,7 +2580,7 @@ Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpointV2 *ch
     return Status::OK();
 }
 
-Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
+Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files) {
 
 
     const String &db_name = restore_table_snapshot_cmd->db_name_;
@@ -2624,7 +2593,7 @@ Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapsho
         return status;
     }
 
-    status = RestoreTableFromSnapshot(restore_table_snapshot_cmd, *db_meta);
+    status = RestoreTableFromSnapshot(restore_table_snapshot_cmd, *db_meta, is_link_files);
     if (!status.ok()) {
         return status;
     }
@@ -2632,24 +2601,26 @@ Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapsho
     return Status::OK();
 }
 
-Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta) {
+Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta, bool is_link_files) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     Status status;  
     Optional<TableMeeta> table_meta;
-    status = NewCatalog::AddNewTable(db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
-    // table with the same name already exists
-    if (!status.ok()) {
-        return status;
+    if (!is_link_files) {
+        status = NewCatalog::AddNewTable(db_meta, restore_table_snapshot_cmd->table_id_, begin_ts, commit_ts, restore_table_snapshot_cmd->table_def_, table_meta);
+        // table with the same name already exists
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     //restore meta data of the table 
-    status = table_meta->RestoreFromSnapshot(const_cast<WalCmdRestoreTableSnapshot*>(restore_table_snapshot_cmd));
+    status = table_meta->RestoreFromSnapshot(const_cast<WalCmdRestoreTableSnapshot*>(restore_table_snapshot_cmd), is_link_files);
     if (!status.ok()) {
         return status;
     }
 
-    status = RestoreTableIndexesFromSnapshot(*table_meta, restore_table_snapshot_cmd->index_cmds_);
+    status = RestoreTableIndexesFromSnapshot(*table_meta, restore_table_snapshot_cmd->index_cmds_, is_link_files);
     if (!status.ok()) {
         return status;
     }
@@ -2669,7 +2640,7 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
         return status;
     }
     for (const auto &restore_table_snapshot_cmd : restore_database_snapshot_cmd->restore_table_wal_cmds_) {
-        status = RestoreTableFromSnapshot(&restore_table_snapshot_cmd, *db_meta);
+        status = RestoreTableFromSnapshot(&restore_table_snapshot_cmd, *db_meta, false);
         if (!status.ok()) {
             return status;
         }
@@ -5910,17 +5881,20 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     String table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
     String table_id;
     Status status = kv_instance_->Get(table_key, table_id);
+    bool is_link_files = false;
     if (status.ok()) {
         if (table_id == restore_table_cmd->table_id_) {
             if (table_id == "24") {
                 return Status::UnexpectedError("Table ID 24 already exists");
             }
+                
+            
             LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
                                  *restore_table_cmd->table_def_->table_name(),
                                  restore_table_cmd->table_id_,
                                  commit_ts,
                                  txn_id));
-            return Status::OK();
+            is_link_files = true;
         } else {
             LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
                                   *restore_table_cmd->table_def_->table_name(),
@@ -5969,12 +5943,13 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     }
 
 
-    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd);
+    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd, is_link_files);
 
     if (!status.ok()) {
         return status;
     }
-
+    
+    
 
 
     // String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();

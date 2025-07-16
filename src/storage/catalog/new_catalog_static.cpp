@@ -1094,7 +1094,8 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                      SizeT row_count,
                                      const String &base_name,
                                      SizeT index_size,
-                                     Optional<ChunkIndexMeta> &chunk_index_meta) {
+                                     Optional<ChunkIndexMeta> &chunk_index_meta,
+                                     bool is_link_files) {
     ChunkIndexMetaInfo chunk_info;
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
@@ -1107,7 +1108,7 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
             return status;
         }
     }
-    {
+    if (!is_link_files) {
         Status status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
         if (!status.ok()) {
             return status;

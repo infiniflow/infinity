@@ -115,7 +115,7 @@ public:
 
     Status RestoreSet();
 
-    Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info);
+    Status RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files = false);
 
 private:
     // Status LoadBlockIDs();

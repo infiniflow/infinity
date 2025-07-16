@@ -28,7 +28,7 @@ import snapshot_info;
 import column_def;
 import column_vector;
 import fast_rough_filter;
-import memindex_tracer;
+
 
 namespace infinity {
 
@@ -269,7 +269,7 @@ public:
     Status RestoreTableSnapshot(const String &db_name, const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
 
-    Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds);
+    Status RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files = false);
 
     Status DropTableSnapShot(const String &db_name, const String &table_name);
 
@@ -527,7 +527,6 @@ public:
 
     Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
-    Vector<SharedPtr<MemIndexDetail>> GetTableMemIndexes(const String &db_name, const String &table_name);
 
 private:
     Status PrepareCommitCreateDB(const WalCmdCreateDatabaseV2 *create_db_cmd);
@@ -551,7 +550,7 @@ private:
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpointV2 *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
     Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
-    Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
+    Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
@@ -636,7 +635,7 @@ public:
                                              const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
                                              const String &snapshot_name,
                                              RestoreTableTxnStore *txn_store);
-    Status RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta);
+    Status RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, DBMeeta &db_meta, bool is_link_files = false);
     Status ManualDumpIndex(const String &db_name, const String &table_name);
 
 

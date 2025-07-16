@@ -2180,9 +2180,9 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     return Status::OK();
 }
 
-Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds) {
-    NewTxnManager *new_txn_manager = InfinityContext::instance().storage()->new_txn_manager();
-    new_txn_manager->PrintAllKeyValue();
+Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vector<WalCmdCreateIndexV2> &index_cmds, bool is_link_files) {
+    // NewTxnManager *new_txn_manager = InfinityContext::instance().storage()->new_txn_manager();
+    // new_txn_manager->PrintAllKeyValue();
     u64 max_index_id = 0;
     Status status;
     for (const auto &index_cmd : index_cmds) {
@@ -2191,15 +2191,16 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
             max_index_id = index_id;
         }
         Optional<TableIndexMeeta> table_index_meta;
-        status = new_catalog_->AddNewTableIndex(table_meta, 
-                                                    index_cmd.index_id_, 
-                                                    txn_context_ptr_->commit_ts_, 
-                                                    index_cmd.index_base_, 
-                                                    table_index_meta);
-        if (!status.ok()) {
-            return status;
+        if (!is_link_files) {
+            status = new_catalog_->AddNewTableIndex(table_meta, 
+                                                        index_cmd.index_id_, 
+                                                        txn_context_ptr_->commit_ts_, 
+                                                        index_cmd.index_base_, 
+                                                        table_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
         }
-
         
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
             Optional<SegmentIndexMeta> segment_index_meta;
@@ -2213,10 +2214,11 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
                                                    return a.chunk_id_ < b.chunk_id_;
                                                })->chunk_id_ + 1;
             }
-            
-            status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);
-            if (!status.ok()) {
-                return status;
+            if (!is_link_files) {
+                status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);
+                    if (!status.ok()) {
+                        return status;
+                    }
             }
             
             for (const auto &chunk_index : segment_index.chunk_infos_) {
@@ -2226,16 +2228,19 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
                                                       chunk_index.row_count_,
                                                       chunk_index.base_name_,
                                                       chunk_index.index_size_,
-                                                      chunk_index_meta);
+                                                      chunk_index_meta,
+                                                      is_link_files);
                 if (!status.ok()) {
                     return status;
                 }
             }
         }
     }
-    status = table_meta.SetNextIndexID(std::to_string(max_index_id + 1));
-    if (!status.ok()) {
-        return status;
+    if (!is_link_files) {
+        status = table_meta.SetNextIndexID(std::to_string(max_index_id + 1));
+        if (!status.ok()) {
+            return status;
+        }
     }
     return Status::OK();
 }

@@ -1046,14 +1046,16 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableMeeta::MapMetaToSnapShotInfo(co
     return {table_snapshot_info, Status::OK()};
 }
 
-Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd) {
+Status TableMeeta::RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd,bool is_link_files) {
     for (const WalSegmentInfoV2 &segment_info : restore_table_snapshot_cmd->segment_infos_) {
-        Status status = AddSegmentWithID(commit_ts(), segment_info.segment_id_);
-        if (!status.ok()) {
-            return status;
+        if (!is_link_files) {
+            Status status = AddSegmentWithID(commit_ts(), segment_info.segment_id_);
+            if (!status.ok()) {
+                return status;
+            }
         }
         SegmentMeta segment_meta(segment_info.segment_id_, *this);
-        status = segment_meta.RestoreFromSnapshot(segment_info);
+        Status status = segment_meta.RestoreFromSnapshot(segment_info, is_link_files);
         if (!status.ok()) {
             return status;
         }

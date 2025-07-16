@@ -339,7 +339,8 @@ public:
                                         SizeT row_count,
                                         const String &base_name,
                                         SizeT index_size,
-                                        Optional<ChunkIndexMeta> &chunk_index_meta);
+                                        Optional<ChunkIndexMeta> &chunk_index_meta,
+                                        bool is_link_files = false);
 
     static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
 

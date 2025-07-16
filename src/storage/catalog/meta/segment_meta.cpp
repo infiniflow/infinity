@@ -611,19 +611,22 @@ Tuple<SharedPtr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToSnapShotInfo
     return {std::move(segment_snapshot_info), Status::OK()};
 }
 
-Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info){
-
-    Status status = RestoreSet();
-    if (!status.ok()) {
-        return status;
-    }
-    for (const BlockID &block_id : segment_info.block_ids_) {
-        status = AddBlockWithID(commit_ts(), block_id);
+Status SegmentMeta::RestoreFromSnapshot(const WalSegmentInfoV2 &segment_info, bool is_link_files){
+    if (!is_link_files) {
+        Status status = RestoreSet();
         if (!status.ok()) {
             return status;
         }
+    }
+    for (const BlockID &block_id : segment_info.block_ids_) {
+        if (!is_link_files) {
+            Status status = AddBlockWithID(commit_ts(), block_id);
+            if (!status.ok()) {
+                return status;
+            }
+        }
         BlockMeta block_meta(block_id, *this);
-        status = block_meta.RestoreFromSnapshot();
+        Status status = block_meta.RestoreFromSnapshot();
         if (!status.ok()) {
             return status;
         }

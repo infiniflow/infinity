@@ -144,7 +144,7 @@ public:
     Status GetNextColumnID(ColumnID &next_column_id);
 
     Status SetNextColumnID(ColumnID next_column_id);
-
+    
     Status UpdateFulltextSegmentTS(TxnTimeStamp ts, SegmentUpdateTS &segment_update_ts);
 
     Status GetNextRowID(RowID &next_row_id);
@@ -156,7 +156,7 @@ public:
     Tuple<SharedPtr<TableSnapshotInfo>, Status> MapMetaToSnapShotInfo(const String &db_name, const String &table_name);
 
 
-    Status RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd);
+    Status RestoreFromSnapshot(WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
 
     Status SetBeginTS(TxnTimeStamp begin_ts);
 
