@@ -167,6 +167,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
 }
 
 Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
+    std::unique_lock lock(mtx_);
     if (!version_buffer_) {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 

@@ -239,6 +239,7 @@ void PersistenceManager::CheckValid() {
             LOG_ERROR(error_message);
         }
     }
+    std::lock_guard<std::mutex> lock(mtx_);
     const auto part2_begin = std::chrono::high_resolution_clock::now();
     objects_->CheckValid(current_object_size_);
     const auto part2_end = std::chrono::high_resolution_clock::now();

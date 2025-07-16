@@ -91,6 +91,8 @@ private:
 
     BufferObj *version_buffer_ = nullptr;
     SharedPtr<FastRoughFilter> fast_rough_filter_;
+
+    std::mutex mtx_;
 };
 
 } // namespace infinity

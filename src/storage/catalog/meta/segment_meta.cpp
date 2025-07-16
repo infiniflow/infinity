@@ -242,6 +242,7 @@ Status SegmentMeta::LoadFirstDeleteTS() {
     if (!status.ok()) {
         return status;
     }
+    std::unique_lock lock(mtx_);
     first_delete_ts_ = std::stoull(first_delete_ts_str);
     return Status::OK();
 }
@@ -409,6 +410,7 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
         return {*row_cnt_, Status::OK()};
     }
     Status status;
+    std::unique_lock lock(mtx_);
 #if 1
     row_cnt_ = infinity::GetSegmentRowCount(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
     return {*row_cnt_, Status::OK()};
@@ -445,6 +447,7 @@ Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {
 }
 
 Status SegmentMeta::GetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
+    std::unique_lock lock(mtx_);
     if (!first_delete_ts_) {
         Status status = LoadFirstDeleteTS();
         if (!status.ok()) {
