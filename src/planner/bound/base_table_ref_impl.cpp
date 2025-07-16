@@ -14,8 +14,9 @@
 
 module;
 
-module infinity_core;
+module infinity_core:base_table_ref.impl;
 
+import :base_table_ref;
 import :stl;
 import :table_ref;
 import :table_function;
