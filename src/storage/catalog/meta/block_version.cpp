@@ -55,6 +55,7 @@ CreateField CreateField::LoadFromFile(LocalFileHandle *file_handle) {
 }
 
 bool BlockVersion::operator==(const BlockVersion &rhs) const {
+    std::shared_lock<std::shared_mutex> lock_created(rw_mutex_);
     if (this->created_.size() != rhs.created_.size() || this->deleted_.size() != rhs.deleted_.size())
         return false;
     for (SizeT i = 0; i < this->created_.size(); i++) {
@@ -72,6 +73,7 @@ Pair<BlockOffset, i32> BlockVersion::GetCommitRowCount(TxnTimeStamp commit_ts) c
     if (commit_ts == MAX_TIMESTAMP) {
         return {};
     }
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     auto iter = std::lower_bound(created_.begin(), created_.end(), commit_ts, [](const CreateField &field, TxnTimeStamp ts) { return field.create_ts_ < ts; });
     if (iter == created_.end() || iter->create_ts_ != commit_ts) {
         return {};
@@ -86,6 +88,7 @@ Pair<BlockOffset, i32> BlockVersion::GetCommitRowCount(TxnTimeStamp commit_ts) c
 
 i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     // use binary search find the last create_field that has create_ts_ <= check_ts
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     auto iter =
         std::upper_bound(created_.begin(), created_.end(), begin_ts, [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
     if (iter == created_.begin()) {
@@ -96,12 +99,14 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
 }
 
 i64 BlockVersion::GetRowCount() const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     i64 row_count = created_.empty() ? 0 : created_.back().row_count_;
     return row_count;
 }
 
 Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
     // check read-write conflict
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     if (!created_.empty() && created_.back().create_ts_ >= begin_ts) {
         return {0, Status::TxnConflict(0, fmt::format("Append conflict, begin_ts: {}, last_create_ts: {}", begin_ts, created_.back().create_ts_))};
     }
@@ -110,6 +115,7 @@ Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) con
 }
 
 void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
         --create_size;
@@ -136,6 +142,7 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
 }
 
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     BlockOffset create_size = created_.size();
     Status status = file_handle->Append(&create_size, sizeof(create_size));
     if (!status.ok()) {
@@ -177,6 +184,7 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(LocalFileHandle *file_handle)
 
 void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const {
     // find the first create_field that has row_count_ >= offset
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     auto iter = std::lower_bound(created_.begin(), created_.end(), static_cast<i64>(offset), [](const CreateField &field, const i64 offset_cp) {
         return field.row_count_ < offset_cp;
     });
@@ -197,17 +205,20 @@ void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) cons
 }
 
 void BlockVersion::GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     for (SizeT i = offset; i < offset + size; ++i) {
         res.AppendByPtr(reinterpret_cast<const char *>(&deleted_[i]));
     }
 }
 
 void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     created_.emplace_back(commit_ts, row_count);
     latest_change_ts_ = commit_ts;
 }
 
 void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     for (auto &[create_ts, row_count] : created_) {
         if (create_ts == save_ts) {
             create_ts = commit_ts;
@@ -217,6 +228,7 @@ void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
 }
 
 Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     if (deleted_[offset] != 0) {
         return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
     }
@@ -225,9 +237,13 @@ Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
     return Status::OK();
 }
 
-void BlockVersion::RollbackDelete(i32 offset) { deleted_[offset] = 0; } // FIXME latest_change_ts_ ?
+void BlockVersion::RollbackDelete(i32 offset) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    deleted_[offset] = 0;
+} // FIXME latest_change_ts_ ?
 
 bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
     if (SizeT(offset) >= deleted_.size()) {
         return false;
     }
@@ -236,6 +252,7 @@ bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
 
 Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) {
     i32 row_count = 0;
+    std::shared_lock<std::shared_mutex> lock_created(rw_mutex_);
     for (const auto &created_range : created_) {
         if (offset < row_count + created_range.row_count_) {
             if (ignore_invisible) {
