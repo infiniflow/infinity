@@ -38,9 +38,6 @@ module;
 
 #include "magic_enum.hpp"
 
-#include "blockingconcurrentqueue.h"
-#include "concurrentqueue.h"
-
 #include "parallel_hashmap/phmap.h"
 #include "pgm/pgm_index.hpp"
 

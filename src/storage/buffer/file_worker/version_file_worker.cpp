@@ -73,16 +73,14 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
         UnrecoverableError(error_message);
     }
     auto *data = static_cast<BlockVersion *>(data_);
-    TxnTimeStamp latest_change_ts = data->latest_change_ts();
 
     if (to_spill) {
         data->SpillToFile(file_handle_.get());
-        return true;
     } else {
         const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
         data->SaveToFile(ctx.checkpoint_ts_, *file_handle_);
-        return ctx.checkpoint_ts_ >= latest_change_ts;
     }
+    return true;
 }
 
 void VersionFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
