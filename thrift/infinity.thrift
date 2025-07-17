@@ -662,37 +662,6 @@ struct DumpIndexRequest {
 4:  i64 session_id,
 }
 
-struct CreateTableSnapshotRequest {
-1:  string db_name,
-2:  string table_name,
-3:  string snapshot_name,
-4:  i64 session_id,
-}
-
-struct RestoreTableSnapshotRequest {
-1:  string db_name,
-2:  string table_name,
-3:  string snapshot_name,
-4:  i64 session_id,
-}
-
-struct DropSnapshotRequest {
-1:  string db_name,
-2:  string snapshot_name,
-3:  i64 session_id,
-}
-
-struct ShowSnapshotsRequest {
-1:  string db_name,
-2:  i64 session_id,
-}
-
-struct ShowSnapshotsResponse {
-1:  i64 error_code,
-2:  string error_msg,
-3:  list<string> snapshot_names,
-}
-
 struct ShowTablesRequest{
 1: i64 session_id,
 2: string db_name,
@@ -906,11 +875,6 @@ CommonResponse DropColumns(1:DropColumnsRequest request),
 
 CommonResponse Cleanup(1:CommonRequest request),
 CommonResponse DumpIndex(1:DumpIndexRequest request),
-
-CommonResponse CreateSnapshot(1:CreateSnapshotRequest request),
-CommonResponse RestoreTableSnapshot(1:RestoreTableSnapshotRequest request),
-CommonResponse DropSnapshot(1:DropSnapshotRequest request),
-ShowSnapshotsResponse ShowSnapshots(1:ShowSnapshotsRequest request),
 
 CommonResponse Command(1: CommandRequest request),
 
