@@ -420,7 +420,10 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
     } else {
         Optional<ObjStat> obj_stat = objects_->Release(obj_addr.obj_key_, result.drop_keys_);
         if (obj_stat) {
-            LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
+            for (auto &drop_key : result.drop_keys_) {
+                LOG_INFO(fmt::format("Abc PutObjCache drop object {}", drop_key));
+            }
+            LOG_TRACE(fmt::format("Abc PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
         } else {
             LOG_WARN(fmt::format("PutObjCache object {} unknown ref count", obj_addr.obj_key_));
         }
@@ -547,7 +550,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         UnrecoverableError(error_message);
     }
 
-    LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
+    LOG_TRACE(fmt::format("Abc Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
     SizeT obj_size = (obj_stat->obj_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
     if (range.start_ == 0 && range.end_ == obj_size && object_addr.obj_key_ != current_object_key_) {
         if (object_addr.obj_key_.empty()) {
@@ -562,7 +565,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         }
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
         objects_->Invalidate(object_addr.obj_key_);
-        LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
+        LOG_TRACE(fmt::format("Abc Deleted object {}", object_addr.obj_key_));
     } else {
         objects_->PutNoCount(object_addr.obj_key_, *obj_stat);
     }

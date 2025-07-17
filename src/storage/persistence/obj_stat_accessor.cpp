@@ -472,6 +472,7 @@ bool ObjectStatAccessor_ObjectStorage::EnvictNoLock(Vector<String> &drop_keys) {
         if (lru_entry == nullptr) {
             break;
         }
+        LOG_INFO(fmt::format("Abc EnvictNoLock: {}", lru_entry->key_));
         drop_keys.push_back(lru_entry->key_);
         disk_used_ -= lru_entry->obj_stat_.obj_size_;
     }
