@@ -14,7 +14,7 @@ from threading import Lock
 TEST_DATA_DIR = "/test/data/"
 fulltext_file_path = os.getcwd() + TEST_DATA_DIR + "csv/enwiki_99.csv"
 vector_file_path = os.getcwd() + TEST_DATA_DIR + "csv/pysdk_test_knn.csv"
-kRunningTime = 10
+kRunningTime = 30
 kNumThread = 4
 data_size = 100000
 insert_delete_size = 100
@@ -309,12 +309,18 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
     infinity_obj = connection_pool.get_conn()
     db_obj = infinity_obj.get_database("default_db")
     
+    # Track start time for timing logic
+    start_time = time.time()
+    test_duration = kRunningTime
+    
     # Try to get the table, restore from snapshot if it doesn't exist
     
     
     while time.time() < end_time:
-        # Then perform random operations (excluding restore)
-        rand_v = random.randint(0, 5)  # Reduced range since create_snapshot and drop_table are combined
+        # Calculate elapsed time
+        elapsed_time = time.time() - start_time
+        rand_v = random.randint(0, 5)
+
         
         try:
             try:
@@ -354,19 +360,22 @@ def random_exec(connection_pool: ConnectionPool, data, end_time, thread_id):
             elif rand_v == 4:
                 search_vector(table_obj)
                 time.sleep(0.01)
-            else:  # rand_v == 5
+            elif rand_v == 5:  # Only in first 10 seconds
                 # Combined operation: create snapshot then drop table
-                # First create snapshot
-                snapshot_name = f"chaos_snapshot_{thread_id}_{random.randint(1, 1000)}"
-                res = db_obj.create_table_snapshot(snapshot_name, "chaos_test")
-                if res.error_code == ErrorCode.OK:
-                    with snapshot_stats_lock:
-                        snapshot_stats['create_success'] += 1
-                    # Only drop table if snapshot creation succeeded
-                    drop_table(db_obj, thread_id)
+                if(elapsed_time <= 20):
+                    # First create snapshot
+                    snapshot_name = f"chaos_snapshot_{thread_id}_{random.randint(1, 1000)}"
+                    res = db_obj.create_table_snapshot(snapshot_name, "chaos_test")
+                    if res.error_code == ErrorCode.OK:
+                        with snapshot_stats_lock:
+                            snapshot_stats['create_success'] += 1
+                        # Only drop table if snapshot creation succeeded
+                        drop_table(db_obj, thread_id)
+                    else:
+                        with snapshot_stats_lock:
+                            snapshot_stats['create_failed'] += 1
                 else:
-                    with snapshot_stats_lock:
-                        snapshot_stats['create_failed'] += 1
+                    drop_table(db_obj, thread_id)
         except Exception as e:
             # If any operation fails, try to get the table object again
             try:

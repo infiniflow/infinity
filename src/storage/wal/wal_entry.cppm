@@ -1131,8 +1131,8 @@ export struct WalCmdCleanup : public WalCmd {
 };
 
 export struct WalCmdCreateTableSnapshot : public WalCmd {
-    WalCmdCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name)
-        : WalCmd(WalCommandType::CREATE_TABLE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name) {}
+    WalCmdCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, TxnTimeStamp max_commit_ts)
+        : WalCmd(WalCommandType::CREATE_TABLE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name), max_commit_ts_(max_commit_ts) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1144,6 +1144,7 @@ export struct WalCmdCreateTableSnapshot : public WalCmd {
     String db_name_{};
     String table_name_{};
     String snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
 };
 
 
@@ -1228,6 +1229,9 @@ export struct WalEntry : WalEntryHeader {
     // Return if the entry is a checkpoint.
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpointV2 *&checkpoint_cmd) const;
+
+    // Return if the entry is either a checkpoint or create snapshot (returns base WalCmd pointer)
+    [[nodiscard]] bool IsCheckPointOrSnapshot(WalCmd *&cmd) const;
 
     [[nodiscard]] String ToString() const;
     [[nodiscard]] String CompactInfo() const;

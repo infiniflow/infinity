@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 import stl;
 
 import logger;

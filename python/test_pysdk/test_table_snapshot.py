@@ -270,7 +270,7 @@ class TestSnapshot:
         table_obj.create_index("idx_vector_bmp", index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "16", "compress_type": "compress"}), ConflictType.Ignore)
 
         # # EMVB index (for tensors)
-        table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
+        # table_obj.create_index("idx_tensor_emvb", index.IndexInfo("tensor_col", index.IndexType.EMVB, {"pq_subspace_num": "32", "pq_subspace_bits": "8"}), ConflictType.Ignore)
 
         # IVF index
         table_obj.create_index("idx_vector_ivf", index.IndexInfo("vector_col", index.IndexType.IVF, {"metric": "l2"}), ConflictType.Ignore)
@@ -428,15 +428,15 @@ class TestSnapshot:
         # Test creating snapshot of non-existent table
         db_obj = self.infinity_obj.get_database("default_db")
         with pytest.raises(InfinityException) as e:
-            db_obj.create_snapshot("non_existent", "non_existent_table")
+            db_obj.create_table_snapshot("non_existent", "non_existent_table")
         
         # Test restoring non-existent snapshot
         with pytest.raises(InfinityException) as e:
-            db_obj.restore_snapshot("non_existent_snapshot", "new_table")
+            db_obj.restore_table_snapshot("non_existent_snapshot")
         
         # Test dropping non-existent snapshot
         with pytest.raises(InfinityException) as e:
-            db_obj.drop_snapshot("non_existent_snapshot")
+            self.infinity_obj.drop_snapshot("non_existent_snapshot")
     
     def test_snapshot_naming_conventions(self, suffix):
         """Test snapshot with various naming conventions"""

@@ -131,6 +131,7 @@ export struct CreateTableSnapshotTxnStore : public BaseTxnStore {
     String db_name_{};
     String table_name_{};
     String snapshot_name_{};
+    TxnTimeStamp max_commit_ts_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

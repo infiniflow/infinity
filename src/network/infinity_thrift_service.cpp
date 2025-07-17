@@ -3599,8 +3599,8 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSnapshot
                     if (key_column->data_type()->type() == LogicalType::kVarchar &&
                         value_column->data_type()->type() == LogicalType::kVarchar) {
                         
-                        auto key_value = key_column->GetValue(row_idx);
-                        auto value_value = value_column->GetValue(row_idx + 1);
+                        auto key_value = key_column->GetValueByIndex(row_idx);
+                        auto value_value = value_column->GetValueByIndex(row_idx + 1);
                         
                         String key = key_value.GetVarchar();
                         String value = value_value.GetVarchar();
@@ -3657,35 +3657,35 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListSnapshot
                 // Extract snapshot name (column 0)
                 auto &name_column = data_block->column_vectors[0];
                 if (name_column->data_type()->type() == LogicalType::kVarchar) {
-                    auto varchar_value = name_column->GetValue(row_idx);
+                    auto varchar_value = name_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_name(varchar_value.GetVarchar());
                 }
                 
                 // Extract scope (column 1)
                 auto &scope_column = data_block->column_vectors[1];
                 if (scope_column->data_type()->type() == LogicalType::kVarchar) {
-                    auto scope_value = scope_column->GetValue(row_idx);
+                    auto scope_value = scope_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_scope(scope_value.GetVarchar());
                 }
                 
                 // Extract create time (column 2)
                 auto &time_column = data_block->column_vectors[2];
                 if (time_column->data_type()->type() == LogicalType::kVarchar) {
-                    auto time_value = time_column->GetValue(row_idx);
+                    auto time_value = time_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_time(time_value.GetVarchar());
                 }
                 
                 // Extract commit timestamp (column 3)
                 auto &commit_column = data_block->column_vectors[3];
                 if (commit_column->data_type()->type() == LogicalType::kBigInt) {
-                    auto commit_value = commit_column->GetValue(row_idx);
+                    auto commit_value = commit_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_commit(commit_value.GetValue<BigIntT>());
                 }
                 
                 // Extract size (column 4)
                 auto &size_column = data_block->column_vectors[4];
                 if (size_column->data_type()->type() == LogicalType::kVarchar) {
-                    auto size_value = size_column->GetValue(row_idx);
+                    auto size_value = size_column->GetValueByIndex(row_idx);
                     snapshot_info.__set_size(size_value.GetVarchar());
                 }
                 

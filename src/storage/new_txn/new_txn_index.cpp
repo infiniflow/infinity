@@ -2200,6 +2200,8 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
             if (!status.ok()) {
                 return status;
             }
+        } else {
+            table_index_meta.emplace(index_cmd.index_id_, table_meta);
         }
         
         for (const auto &segment_index : index_cmd.segment_index_infos_) {
@@ -2219,6 +2221,8 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeeta &table_meta, const Vec
                     if (!status.ok()) {
                         return status;
                     }
+            } else {
+                segment_index_meta.emplace(segment_index.segment_id_, *table_index_meta);
             }
             
             for (const auto &chunk_index : segment_index.chunk_infos_) {
@@ -2288,6 +2292,8 @@ Status NewTxn::ManualDumpIndex(const String &db_name, const String &table_name) 
                 continue;
             }
             
+            // 4.5. Additional check for EMVB index - ensure it's built before dumping
+
             // 5. Allocate new chunk ID for this dump
             ChunkID chunk_id = 0;
             status = segment_index_meta.GetNextChunkID(chunk_id);

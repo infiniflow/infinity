@@ -314,7 +314,8 @@ Tuple<SharedPtr<TableIndexSnapshotInfo>, Status> TableIndexMeeta::MapMetaToSnapS
                                                        table_meta_.db_id_str(),
                                                        table_meta_.table_id_str(),
                                                        index_id_str_,
-                                                       table_meta_.begin_ts());
+                                                       table_meta_.begin_ts(),
+                                                       table_meta_.commit_ts());
     }
     for (const auto &segment_id : *segment_ids_) {
         SegmentIndexMeta segment_index_meta(segment_id, *this);

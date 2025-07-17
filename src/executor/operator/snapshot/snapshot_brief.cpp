@@ -47,10 +47,38 @@ Vector<String> find_files_with_suffix(const String &path, const String &suffix) 
 
 Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
     Vector<SnapshotBrief> briefs;
-    Vector<String> snapshot_meta_array = find_files_with_suffix(dir, ".json");
-    for (const String &snapshot_path : snapshot_meta_array) {
+
+    // Debug: Check if directory exists and log the path
+    LOG_INFO(fmt::format("Scanning snapshot directory: {}", dir));
+    
+    if (!VirtualStore::Exists(dir)) {
+        LOG_ERROR(fmt::format("Snapshot directory does not exist: {}", dir));
+        return briefs;
+    }
+    
+    // Scan for snapshot directories instead of JSON files directly
+    for (const auto &entry : std::filesystem::directory_iterator(dir)) {
+        if (!entry.is_directory()) {
+            continue; // Skip non-directory entries
+        }
+        
+        String dir_name = entry.path().filename().string();
+        
+        // Skip deleted directories (directories starting with "deleted_")
+        if (dir_name.starts_with("deleted_") || dir_name.starts_with("tmp_")) {
+            continue; // Skip deleted snapshots
+        }
+        
+        // Look for JSON file inside the snapshot directory
+        String snapshot_dir_path = entry.path().string();
+        String expected_json_path = fmt::format("{}/{}.json", snapshot_dir_path, dir_name);
+        
+        if (!VirtualStore::Exists(expected_json_path)) {
+            LOG_WARN(fmt::format("Snapshot directory {} does not contain expected JSON file", dir_name));
+            continue;
+        }
         try {
-            auto [snapshot_file_handle, status] = VirtualStore::Open(snapshot_path, FileAccessMode::kRead);
+            auto [snapshot_file_handle, status] = VirtualStore::Open(expected_json_path, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -58,12 +86,6 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
             i64 file_size = snapshot_file_handle->FileSize();
             String json_str(file_size, 0);
             auto [n_bytes, status_read] = snapshot_file_handle->Read(json_str.data(), file_size);
-            if (!status_read.ok()) {
-                UnrecoverableError(status_read.message());
-            }
-            if ((SizeT)file_size != n_bytes) {
-                UnrecoverableError(status_read.message());
-            }
 
             simdjson::padded_string json_pad(json_str);
             simdjson::parser parser;
@@ -76,11 +98,11 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
 
 //            std::filesystem::path compressed_file(snapshot_path);
 //            compressed_file.replace_extension("lz4");
-            snapshot_brief.size_ = VirtualStore::GetDirectorySize(dir);
+            snapshot_brief.size_ = VirtualStore::GetDirectorySize(snapshot_dir_path);
 
 
             struct stat statbuf;
-            stat(snapshot_path.c_str(), &statbuf);
+            stat(snapshot_dir_path.c_str(), &statbuf);
             std::time_t creationTime = statbuf.st_ctime;
             std::tm *ptm = std::localtime(&creationTime);
             char time_buffer[80];
@@ -88,7 +110,7 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
             snapshot_brief.create_time_ = time_buffer;
             briefs.emplace_back(snapshot_brief);
         } catch (const std::exception &e) {
-            LOG_WARN(fmt::format("Fail to parse file: {}", snapshot_path));
+            LOG_WARN(fmt::format("Fail to parse file: {}", snapshot_dir_path));
         }
     }
     return briefs;

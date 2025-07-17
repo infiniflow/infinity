@@ -912,7 +912,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String snapshot_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCreateTableSnapshot>(db_name, table_name, snapshot_name);
+            TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            cmd = MakeShared<WalCmdCreateTableSnapshot>(db_name, table_name, snapshot_name, max_commit_ts);
             break;
         }
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
@@ -1327,7 +1328,7 @@ bool WalCmdCleanup::operator==(const WalCmd &other) const {
 
 bool WalCmdCreateTableSnapshot::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateTableSnapshot *>(&other);
-    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && snapshot_name_ == other_cmd->snapshot_name_;
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && snapshot_name_ == other_cmd->snapshot_name_ && max_commit_ts_ == other_cmd->max_commit_ts_;
 }
 
 
@@ -1643,7 +1644,7 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
 }
 
 i32 WalCmdCreateTableSnapshot::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size();
+    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_);
 }
 
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
@@ -1802,6 +1803,7 @@ void WalCmdCreateTableSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->snapshot_name_);
+    WriteBufAdv(buf, this->max_commit_ts_);
 }
 
 
@@ -2879,11 +2881,12 @@ String WalCmdDropColumnsV2::CompactInfo() const {
 String WalCmdCleanup::CompactInfo() const { return fmt::format("{}: timestamp: {}", WalCmd::WalCommandTypeToString(GetType()), timestamp_); }
 
 String WalCmdCreateTableSnapshot::CompactInfo() const {
-    return fmt::format("{}: database: {}, table: {}, snapshot: {}",
+    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
                        db_name_,
                        table_name_,
-                       snapshot_name_);
+                       snapshot_name_,
+                       max_commit_ts_);
 }
 
 String WalCmdRestoreTableSnapshot::CompactInfo() const {
@@ -2901,7 +2904,7 @@ String WalCmdRestoreTableSnapshot::CompactInfo() const {
 
 String WalCmdCreateTableSnapshot::ToString() const {
     std::stringstream ss;
-    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << std::endl;
+    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -3079,6 +3082,38 @@ bool WalEntry::IsCheckPoint(WalCmdCheckpointV2 *&last_checkpoint_cmd) const {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 last_checkpoint_cmd = checkpoint_cmd;
                 found = true;
+            }
+        }
+    }
+    return found;
+}
+
+bool WalEntry::IsCheckPointOrSnapshot(WalCmd *&cmd) const {
+    TxnTimeStamp max_commit_ts = 0;
+    bool found = false;
+    for (auto &command : cmds_) {
+        if (command->GetType() == WalCommandType::CLEANUP) {
+            LOG_INFO("CLEANUP command found");
+        }
+        if (command->GetType() == WalCommandType::CHECKPOINT_V2 || 
+            command->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
+            // For checkpoint, check max_commit_ts
+            if (command->GetType() == WalCommandType::CHECKPOINT_V2) {
+                auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
+                if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
+                    max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                    cmd = command.get();
+                    found = true;
+                }
+            }
+            // For snapshot, check max_commit_ts
+            else if (command->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
+                auto snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());
+                if (!found || TxnTimeStamp(snapshot_cmd->max_commit_ts_) > max_commit_ts) {
+                    max_commit_ts = snapshot_cmd->max_commit_ts_;
+                    cmd = command.get();
+                    found = true;
+                }
             }
         }
     }
@@ -3343,8 +3378,8 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
                 {
-                    WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
-                    if (entry->IsCheckPoint(checkpoint_cmd)) {
+                    WalCmd* cmd = nullptr;
+                    if (entry->IsCheckPointOrSnapshot(cmd)) {
                         found_checkpoint = true;
                     }
                 }

@@ -1446,6 +1446,7 @@ Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_na
     txn_store->db_name_ = db_name;
     txn_store->table_name_ = table_name;
     txn_store->snapshot_name_ = snapshot_name;
+    txn_store->max_commit_ts_ = txn_context_ptr_->begin_ts_;
 
     return Status::OK(); // Success
 }
@@ -2317,8 +2318,6 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     if (std::filesystem::exists(snapshot_path)) {
         return Status::SnapshotAlreadyExists(snapshot_name);
     }
-    const String &db_name = create_table_snapshot_cmd->db_name_;
-    const String &table_name = create_table_snapshot_cmd->table_name_;
     
 
     // // dump indexes for snapshot
@@ -2366,13 +2365,6 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     } else {
         LOG_INFO("No checkpoint transaction found");
     }
-
-    base_txn_store_ = MakeShared<CreateTableSnapshotTxnStore>();
-    CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
-    txn_store->db_name_ = db_name;
-    txn_store->table_name_ = table_name;
-    txn_store->snapshot_name_ = snapshot_name;
-
     return Status::OK();
 }
 
@@ -2612,6 +2604,8 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
         if (!status.ok()) {
             return status;
         }
+    } else {
+        table_meta.emplace(db_meta.db_id_str(), restore_table_snapshot_cmd->table_id_, this);
     }
 
     //restore meta data of the table 
@@ -5884,9 +5878,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     bool is_link_files = false;
     if (status.ok()) {
         if (table_id == restore_table_cmd->table_id_) {
-            if (table_id == "24") {
-                return Status::UnexpectedError("Table ID 24 already exists");
-            }
                 
             
             LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
@@ -5911,7 +5902,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_), "tbl_" + restore_table_cmd->table_id_);
     if (!VirtualStore::Exists(table_data_dir)) {
         LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
-        return Status::OK();
+        //return Status::OK();
     }
     
     // if exist proceed
