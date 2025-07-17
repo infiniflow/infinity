@@ -78,9 +78,13 @@ export struct BlockVersion {
 
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
-    TxnTimeStamp latest_change_ts() const { return latest_change_ts_; }
+    TxnTimeStamp latest_change_ts() const {
+        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+        return latest_change_ts_;
+    }
 
 private:
+    mutable std::shared_mutex rw_mutex_{};
     Vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
                                     // risk to write uninitialized buffer. (ts, rows)
     Vector<TxnTimeStamp> deleted_{};

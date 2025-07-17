@@ -162,10 +162,7 @@ BufferObj *BufferManager::GetBufferObject(const String &file_path) {
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         return iter->second.get();
     }
-    // Print all keys
-    for (auto it = buffer_map_.begin(); it != buffer_map_.end(); ++it) {
-        std::cout << it->first << std::endl;
-    }
+    LOG_TRACE(fmt::format("BufferManager::GetBufferObject: file {} not found.", file_path));
     return nullptr;
 }
 
