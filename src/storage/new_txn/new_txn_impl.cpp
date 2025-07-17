@@ -4468,6 +4468,8 @@ Status NewTxn::Cleanup() {
     TxnTimeStamp begin_ts = BeginTS();
     TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
 
+    LOG_INFO(std::format("Cleaning  ts < {} dropped entities...", visible_ts));
+
     Vector<String> dropped_keys;
     Vector<UniquePtr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
@@ -4533,6 +4535,7 @@ Status NewTxn::CleanupInner(const Vector<UniquePtr<MetaKey>> &metas) {
             }
             case MetaType::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
+                LOG_INFO(fmt::format("********** table {}", table_meta_key->ToString()));
                 String table_key = KeyEncode::CatalogTableKey(table_meta_key->db_id_str_, table_meta_key->table_name_, table_meta_key->commit_ts_);
                 Status status = kv_instance->Delete(table_key);
                 if (!status.ok()) {
