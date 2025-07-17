@@ -160,17 +160,20 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
 
             break;
         }
-        case SIGSEGV: {
+        case SIGSEGV:
+        case SIGABRT: {
             // Print back strace
+            const char *signal_name = (signal_number == SIGSEGV) ? "SEGMENT FAULTS" : "ABORT SIGNAL";
             infinity::PrintTransactionHistory();
-            infinity::PrintStacktrace("SEGMENT FAULTS");
+            infinity::PrintStacktrace(signal_name);
 
             // Restore default behavior and raise again to generate a coredump
             struct sigaction sa;
             sa.sa_handler = SIG_DFL;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = 0;
-            sigaction(SIGSEGV, &sa, nullptr);
+            sigaction(signal_number, &sa, nullptr);
+            raise(signal_number);
             break;
         }
 #if defined(ENABLE_JEMALLOC_PROF) && !defined(__APPLE__)
@@ -203,6 +206,7 @@ void RegisterSignal() {
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
     sigaction(SIGSEGV, &sig_action, NULL);
+    sigaction(SIGABRT, &sig_action, NULL);
 }
 
 void TerminateHandler() {
