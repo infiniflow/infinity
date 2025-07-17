@@ -297,7 +297,7 @@ file(GLOB_RECURSE
 )
 
 add_library(infinity_core
-        #${infinity_cpp}
+        ${infinity_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -647,20 +647,20 @@ add_executable(unit_test
         ${ut_function_cpp}
         ${ut_parallel_cpp}
 
-        ${infinity_cpp}
-        ${planner_cpp}
-        ${scheduler_cpp}
-        ${storage_cpp}
-        ${expression_cpp}
-        ${function_cpp}
-        ${common_cpp}
-        ${executor_cpp}
-        ${admin_cpp}
-        ${network_cpp}
+        #        ${infinity_cpp}
+        #        ${planner_cpp}
+        #        ${scheduler_cpp}
+        #        ${storage_cpp}
+        #        ${expression_cpp}
+        #        ${function_cpp}
+        #        ${common_cpp}
+        #        ${executor_cpp}
+        #        ${admin_cpp}
+        #        ${network_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb)
+add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb infinity_core)
 
 target_link_libraries(unit_test
         infinity_core
