@@ -1959,7 +1959,7 @@ Status NewTxn::PrepareCommit() {
                 auto *checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
                 Status status = PrepareCommitCheckpoint(checkpoint_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to checkpoint");
+                    UnrecoverableError(fmt::format("Fail to checkpoint: {}", status.message()));
                 }
                 break;
             }
