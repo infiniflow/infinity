@@ -382,35 +382,44 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
     }
     TxnTimeStamp commit_ts = txn->CommitTS();
     TransactionID txn_id = txn->TxnID();
-    std::lock_guard guard(locker_);
-    auto iter = bottom_txns_.find(commit_ts);
-    if (iter == bottom_txns_.end()) {
-        String error_message = fmt::format("NewTxn: {} not found in bottom txn", txn_id);
-        UnrecoverableError(error_message);
-    }
-    if (iter->second == nullptr) {
-        String error_message = fmt::format("NewTxn {} has already done bottom", txn_id);
-        UnrecoverableError(error_message);
-    }
-    if (iter->second->TxnID() != txn_id) {
-        String error_message = fmt::format("NewTxn {} and {} have the same commit ts {}", iter->second->TxnID(), txn_id, commit_ts);
-        UnrecoverableError(error_message);
-    }
-    iter->second->SetTxnBottomDone();
 
-    // ensure notify top half orderly per commit_ts
-    while (!bottom_txns_.empty()) {
-        iter = bottom_txns_.begin();
-        TxnTimeStamp it_ts = iter->first;
-        SharedPtr<NewTxn> it_txn = iter->second;
-        if (current_ts_ > it_ts || it_ts > prepare_commit_ts_) {
-            UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, it_ts, prepare_commit_ts_));
+    Vector<SharedPtr<NewTxn>> txns_to_update;
+    {
+        std::lock_guard guard(locker_);
+        auto iter = bottom_txns_.find(commit_ts);
+        if (iter == bottom_txns_.end()) {
+            String error_message = fmt::format("NewTxn: {} not found in bottom txn", txn_id);
+            UnrecoverableError(error_message);
         }
-        if (it_txn->GetTxnBottomDone() == false) {
-            break;
+        if (iter->second == nullptr) {
+            String error_message = fmt::format("NewTxn {} has already done bottom", txn_id);
+            UnrecoverableError(error_message);
         }
-        bottom_txns_.erase(iter);
-        current_ts_ = it_ts;
+        if (iter->second->TxnID() != txn_id) {
+            String error_message = fmt::format("NewTxn {} and {} have the same commit ts {}", iter->second->TxnID(), txn_id, commit_ts);
+            UnrecoverableError(error_message);
+        }
+        iter->second->SetTxnBottomDone();
+
+        // ensure notify top half orderly per commit_ts
+        while (!bottom_txns_.empty()) {
+            iter = bottom_txns_.begin();
+            TxnTimeStamp it_ts = iter->first;
+            SharedPtr<NewTxn> it_txn = iter->second;
+            if (current_ts_ > it_ts || it_ts > prepare_commit_ts_) {
+                UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, it_ts, prepare_commit_ts_));
+            }
+            if (it_txn->GetTxnBottomDone() == false) {
+                break;
+            }
+            bottom_txns_.erase(iter);
+            current_ts_ = it_ts;
+            txns_to_update.push_back(it_txn);
+        }
+    }
+
+    // Update catalog cache outside of locker_ to avoid lock-order-inversion
+    for (auto &it_txn : txns_to_update) {
         UpdateCatalogCache(it_txn.get());
         it_txn->NotifyTopHalf();
     }

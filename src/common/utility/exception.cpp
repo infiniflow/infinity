@@ -72,11 +72,18 @@ std::string_view GetErrorMsg(const String &message) {
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
-    auto *storage = InfinityContext::instance().storage();
-    if (storage != nullptr) {
-        if (storage->new_txn_manager() != nullptr) {
-            infinity::PrintTransactionHistory();
+    // Use thread-local variable to prevent recursive calls and potential deadlock
+    static thread_local bool in_error_handling = false;
+
+    if (!in_error_handling) {
+        in_error_handling = true;
+        auto *storage = InfinityContext::instance().storage();
+        if (storage != nullptr) {
+            if (storage->new_txn_manager() != nullptr) {
+                infinity::PrintTransactionHistory();
+            }
         }
+        in_error_handling = false;
     }
     // if (storage != nullptr) {
     //     CleanupInfoTracer *cleanup_tracer = storage->cleanup_info_tracer();

@@ -1469,7 +1469,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     if (!status.ok()) {
         return status;
     }
-    Vector<TableIndexMeeta> table_index_metas;
+    Vector<SharedPtr<TableIndexMeeta>> table_index_metas;
     Vector<String> *index_name_strs = nullptr;
     if (!this->IsReplay()) {
         Vector<String> *index_id_strs = nullptr;
@@ -1481,7 +1481,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         }
         for (SizeT i = 0; i < index_id_strs->size(); ++i) {
             const String &index_id_str = (*index_id_strs)[i];
-            table_index_metas.emplace_back(index_id_str, table_meta);
+            table_index_metas.push_back(MakeShared<TableIndexMeeta>(index_id_str, table_meta));
         }
     }
 
@@ -1550,7 +1550,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             return status;
         }
         for (auto &table_index_meta : table_index_metas) {
-            status = this->AppendIndex(table_index_meta, range);
+            status = this->AppendIndex(*table_index_meta, range);
             if (!status.ok()) {
                 return status;
             }

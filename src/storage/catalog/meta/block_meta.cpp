@@ -167,6 +167,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
 }
 
 Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!version_buffer_) {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
@@ -189,6 +190,7 @@ Vector<String> BlockMeta::FilePaths() {
 }
 
 SharedPtr<String> BlockMeta::GetBlockDir() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (block_dir_ == nullptr) {
         TableMeeta &table_meta = segment_meta_.table_meta();
         block_dir_ = MakeShared<String>(
@@ -315,6 +317,7 @@ Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID
 }
 
 Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filter) {
+    std::lock_guard<std::mutex> lock(mtx_);
     fast_rough_filter.reset();
     if (fast_rough_filter_) {
         fast_rough_filter = fast_rough_filter_;
@@ -335,6 +338,7 @@ Status BlockMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_filt
 }
 
 Status BlockMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
+    std::lock_guard<std::mutex> lock(mtx_);
     String filter_key = GetBlockTag("fast_rough_filter");
     String filter_str = fast_rough_filter->SerializeToString();
     Status status = kv_instance_.Put(filter_key, filter_str);
