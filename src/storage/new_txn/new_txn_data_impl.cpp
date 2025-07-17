@@ -399,11 +399,51 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 }
 
 Status NewTxn::ReplayImport(WalCmdImportV2 *import_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    String segment_id_key = KeyEncode::CatalogTableSegmentKey(import_cmd->db_id_, import_cmd->table_id_, import_cmd->segment_info_.segment_id_);
+    String commit_ts_str;
+    Status status = kv_instance_->Get(segment_id_key, commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp commit_ts_from_kv = std::stoull(commit_ts_str);
+        if (commit_ts == commit_ts_from_kv) {
+            LOG_WARN(fmt::format("Skipping replay import: Segment {} already exists in table {} of database {} with commit ts {}, txn: {}.",
+                                 import_cmd->segment_info_.segment_id_,
+                                 import_cmd->table_name_,
+                                 import_cmd->db_name_,
+                                 commit_ts,
+                                 txn_id));
+            const WalSegmentInfo &segment_info = import_cmd->segment_info_;
+            TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta_opt;
+            status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+            if (!status.ok()) {
+                return status;
+            }
+            TableMeeta &table_meta = *table_meta_opt;
+            status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
+            if (!status.ok()) {
+                return status;
+            }
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay import: Segment {} already exists in table {} of database {} with commit ts {}, but replaying with commit "
+                                  "ts {}, txn: {}.",
+                                  import_cmd->segment_info_.segment_id_,
+                                  import_cmd->table_name_,
+                                  import_cmd->db_name_,
+                                  commit_ts_from_kv,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Segment already exists with different commit timestamp");
+        }
+    }
+
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    Status status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
@@ -792,6 +832,59 @@ Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd) {
 }
 
 Status NewTxn::ReplayCompact(WalCmdCompactV2 *compact_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+
+    Optional<bool> skip_cmd = None;
+    for(const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+        String segment_id_key = KeyEncode::CatalogTableSegmentKey(compact_cmd->db_id_, compact_cmd->table_id_, segment_info.segment_id_);
+        String commit_ts_str;
+        Status status = kv_instance_->Get(segment_id_key, commit_ts_str);
+        if (status.ok()) {
+            TxnTimeStamp commit_ts_from_kv = std::stoull(commit_ts_str);
+            if (commit_ts == commit_ts_from_kv) {
+                if(skip_cmd.has_value() && !skip_cmd.value()) {
+                    return Status::UnexpectedError("Compact segments replay are mismatched in timestamp");
+                }
+                LOG_WARN(fmt::format("Skipping replay compact: Segment {} already exists in table {} of database {} with commit ts {}, txn: {}.",
+                                     segment_info.segment_id_,
+                                     compact_cmd->table_name_,
+                                     compact_cmd->db_name_,
+                                     commit_ts,
+                                     txn_id));
+
+                for(const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+                    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
+
+                    Optional<DBMeeta> db_meta;
+                    Optional<TableMeeta> table_meta_opt;
+                    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    TableMeeta &table_meta = *table_meta_opt;
+                    status = NewCatalog::LoadImportedOrCompactedSegment(table_meta, segment_info, fake_commit_ts);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                }
+                skip_cmd = true;
+            } else {
+                LOG_ERROR(fmt::format("Replay compact: Segment {} already exists in table {} of database {} with commit ts {}, but replaying with commit "
+                                      "ts {}, txn: {}.",
+                                      segment_info.segment_id_,
+                                      compact_cmd->table_name_,
+                                      compact_cmd->db_name_,
+                                      commit_ts_from_kv,
+                                      commit_ts,
+                                      txn_id));
+                return Status::UnexpectedError("Segment already exists with different commit timestamp");
+            }
+        }
+    }
+    // TODO: check if the removed segments and segment indexes are created.
+    if(skip_cmd) {
+        return Status::OK();
+    }
+
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
