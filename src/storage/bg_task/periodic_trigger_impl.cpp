@@ -35,9 +35,10 @@ bool PeriodicTrigger::Check() {
         return false;
     }
     const auto now = std::chrono::system_clock::now();
-    i64 duration = (now - last_check_).count() / 1000000;
-    duration_.store(duration);
-    if (duration < interval_) {
+    const auto duration_s = std::chrono::duration_cast<seconds>(now - last_check_);
+    const auto duration_tick_cnt = duration_s.count();
+    duration_.store(duration_tick_cnt);
+    if (duration_tick_cnt < static_cast<long>(interval_)) {
         return false;
     }
     last_check_ = now;
