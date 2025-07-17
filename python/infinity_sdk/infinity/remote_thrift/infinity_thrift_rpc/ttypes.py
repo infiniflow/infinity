@@ -9130,9 +9130,10 @@ class CreateTableSnapshotRequest(object):
      - snapshot_name
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None, db_name=None, table_name=None, snapshot_name=None,):
+    def __init__(self, session_id = None, db_name = None, table_name = None, snapshot_name = None,):
         self.session_id = session_id
         self.db_name = db_name
         self.table_name = table_name
@@ -9173,6 +9174,7 @@ class CreateTableSnapshotRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9219,9 +9221,10 @@ class CreateDatabaseSnapshotRequest(object):
      - snapshot_name
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None, db_name=None, snapshot_name=None,):
+    def __init__(self, session_id = None, db_name = None, snapshot_name = None,):
         self.session_id = session_id
         self.db_name = db_name
         self.snapshot_name = snapshot_name
@@ -9256,6 +9259,7 @@ class CreateDatabaseSnapshotRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9297,9 +9301,10 @@ class CreateSystemSnapshotRequest(object):
      - snapshot_name
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None, snapshot_name=None,):
+    def __init__(self, session_id = None, snapshot_name = None,):
         self.session_id = session_id
         self.snapshot_name = snapshot_name
 
@@ -9328,6 +9333,7 @@ class CreateSystemSnapshotRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9366,9 +9372,10 @@ class RestoreSnapshotRequest(object):
      - scope
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None, snapshot_name=None, scope=None,):
+    def __init__(self, session_id = None, snapshot_name = None, scope = None,):
         self.session_id = session_id
         self.snapshot_name = snapshot_name
         self.scope = scope
@@ -9403,6 +9410,7 @@ class RestoreSnapshotRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9447,9 +9455,10 @@ class SnapshotInfo(object):
      - size
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, name=None, scope=None, time=None, commit=None, size=None,):
+    def __init__(self, name = None, scope = None, time = None, commit = None, size = None,):
         self.name = name
         self.scope = scope
         self.time = time
@@ -9496,6 +9505,7 @@ class SnapshotInfo(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9545,9 +9555,10 @@ class ShowSnapshotRequest(object):
      - snapshot_name
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None, snapshot_name=None,):
+    def __init__(self, session_id = None, snapshot_name = None,):
         self.session_id = session_id
         self.snapshot_name = snapshot_name
 
@@ -9576,6 +9587,7 @@ class ShowSnapshotRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9614,9 +9626,10 @@ class ShowSnapshotResponse(object):
      - snapshot
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, error_code=None, error_msg=None, snapshot=None,):
+    def __init__(self, error_code = None, error_msg = None, snapshot = None,):
         self.error_code = error_code
         self.error_msg = error_msg
         self.snapshot = snapshot
@@ -9652,6 +9665,7 @@ class ShowSnapshotResponse(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9692,9 +9706,10 @@ class ListSnapshotsRequest(object):
      - session_id
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None,):
+    def __init__(self, session_id = None,):
         self.session_id = session_id
 
     def read(self, iprot):
@@ -9717,6 +9732,7 @@ class ListSnapshotsRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9751,9 +9767,10 @@ class ListSnapshotsResponse(object):
      - snapshots
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, error_code=None, error_msg=None, snapshots=[
+    def __init__(self, error_code = None, error_msg = None, snapshots = [
     ],):
         self.error_code = error_code
         self.error_msg = error_msg
@@ -9798,6 +9815,7 @@ class ListSnapshotsResponse(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
@@ -9842,9 +9860,10 @@ class DropSnapshotRequest(object):
      - snapshot_name
 
     """
+    thrift_spec = None
 
 
-    def __init__(self, session_id=None, snapshot_name=None,):
+    def __init__(self, session_id = None, snapshot_name = None,):
         self.session_id = session_id
         self.snapshot_name = snapshot_name
 
@@ -9873,6 +9892,7 @@ class DropSnapshotRequest(object):
         iprot.readStructEnd()
 
     def write(self, oprot):
+        self.validate()
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return

@@ -15626,6 +15626,12 @@ void CompactRequest::printTo(std::ostream& out) const {
 CreateTableSnapshotRequest::~CreateTableSnapshotRequest() noexcept {
 }
 
+CreateTableSnapshotRequest::CreateTableSnapshotRequest() noexcept
+   : session_id(0),
+     db_name(),
+     table_name(),
+     snapshot_name() {
+}
 
 void CreateTableSnapshotRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -15749,6 +15755,19 @@ void swap(CreateTableSnapshotRequest &a, CreateTableSnapshotRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool CreateTableSnapshotRequest::operator==(const CreateTableSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(db_name == rhs.db_name))
+    return false;
+  if (!(table_name == rhs.table_name))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
 CreateTableSnapshotRequest::CreateTableSnapshotRequest(const CreateTableSnapshotRequest& other556) {
   session_id = other556.session_id;
   db_name = other556.db_name;
@@ -15778,6 +15797,11 @@ void CreateTableSnapshotRequest::printTo(std::ostream& out) const {
 CreateDatabaseSnapshotRequest::~CreateDatabaseSnapshotRequest() noexcept {
 }
 
+CreateDatabaseSnapshotRequest::CreateDatabaseSnapshotRequest() noexcept
+   : session_id(0),
+     db_name(),
+     snapshot_name() {
+}
 
 void CreateDatabaseSnapshotRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -15884,6 +15908,17 @@ void swap(CreateDatabaseSnapshotRequest &a, CreateDatabaseSnapshotRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool CreateDatabaseSnapshotRequest::operator==(const CreateDatabaseSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(db_name == rhs.db_name))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
 CreateDatabaseSnapshotRequest::CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest& other558) {
   session_id = other558.session_id;
   db_name = other558.db_name;
@@ -15910,6 +15945,10 @@ void CreateDatabaseSnapshotRequest::printTo(std::ostream& out) const {
 CreateSystemSnapshotRequest::~CreateSystemSnapshotRequest() noexcept {
 }
 
+CreateSystemSnapshotRequest::CreateSystemSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name() {
+}
 
 void CreateSystemSnapshotRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -15999,6 +16038,15 @@ void swap(CreateSystemSnapshotRequest &a, CreateSystemSnapshotRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool CreateSystemSnapshotRequest::operator==(const CreateSystemSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
 CreateSystemSnapshotRequest::CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest& other560) {
   session_id = other560.session_id;
   snapshot_name = other560.snapshot_name;
@@ -16022,6 +16070,11 @@ void CreateSystemSnapshotRequest::printTo(std::ostream& out) const {
 RestoreSnapshotRequest::~RestoreSnapshotRequest() noexcept {
 }
 
+RestoreSnapshotRequest::RestoreSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name(),
+     scope() {
+}
 
 void RestoreSnapshotRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -16128,6 +16181,17 @@ void swap(RestoreSnapshotRequest &a, RestoreSnapshotRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool RestoreSnapshotRequest::operator==(const RestoreSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  if (!(scope == rhs.scope))
+    return false;
+  return true;
+}
+
 RestoreSnapshotRequest::RestoreSnapshotRequest(const RestoreSnapshotRequest& other562) {
   session_id = other562.session_id;
   snapshot_name = other562.snapshot_name;
@@ -16154,6 +16218,13 @@ void RestoreSnapshotRequest::printTo(std::ostream& out) const {
 SnapshotInfo::~SnapshotInfo() noexcept {
 }
 
+SnapshotInfo::SnapshotInfo() noexcept
+   : name(),
+     scope(),
+     time(),
+     commit(0),
+     size() {
+}
 
 void SnapshotInfo::__set_name(const std::string& val) {
   this->name = val;
@@ -16294,6 +16365,21 @@ void swap(SnapshotInfo &a, SnapshotInfo &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool SnapshotInfo::operator==(const SnapshotInfo & rhs) const
+{
+  if (!(name == rhs.name))
+    return false;
+  if (!(scope == rhs.scope))
+    return false;
+  if (!(time == rhs.time))
+    return false;
+  if (!(commit == rhs.commit))
+    return false;
+  if (!(size == rhs.size))
+    return false;
+  return true;
+}
+
 SnapshotInfo::SnapshotInfo(const SnapshotInfo& other564) {
   name = other564.name;
   scope = other564.scope;
@@ -16326,6 +16412,10 @@ void SnapshotInfo::printTo(std::ostream& out) const {
 ShowSnapshotRequest::~ShowSnapshotRequest() noexcept {
 }
 
+ShowSnapshotRequest::ShowSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name() {
+}
 
 void ShowSnapshotRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -16415,6 +16505,15 @@ void swap(ShowSnapshotRequest &a, ShowSnapshotRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool ShowSnapshotRequest::operator==(const ShowSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
 ShowSnapshotRequest::ShowSnapshotRequest(const ShowSnapshotRequest& other566) {
   session_id = other566.session_id;
   snapshot_name = other566.snapshot_name;
@@ -16438,6 +16537,10 @@ void ShowSnapshotRequest::printTo(std::ostream& out) const {
 ShowSnapshotResponse::~ShowSnapshotResponse() noexcept {
 }
 
+ShowSnapshotResponse::ShowSnapshotResponse() noexcept
+   : error_code(0),
+     error_msg() {
+}
 
 void ShowSnapshotResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
@@ -16544,6 +16647,17 @@ void swap(ShowSnapshotResponse &a, ShowSnapshotResponse &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool ShowSnapshotResponse::operator==(const ShowSnapshotResponse & rhs) const
+{
+  if (!(error_code == rhs.error_code))
+    return false;
+  if (!(error_msg == rhs.error_msg))
+    return false;
+  if (!(snapshot == rhs.snapshot))
+    return false;
+  return true;
+}
+
 ShowSnapshotResponse::ShowSnapshotResponse(const ShowSnapshotResponse& other568) {
   error_code = other568.error_code;
   error_msg = other568.error_msg;
@@ -16570,6 +16684,9 @@ void ShowSnapshotResponse::printTo(std::ostream& out) const {
 ListSnapshotsRequest::~ListSnapshotsRequest() noexcept {
 }
 
+ListSnapshotsRequest::ListSnapshotsRequest() noexcept
+   : session_id(0) {
+}
 
 void ListSnapshotsRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -16642,6 +16759,13 @@ void swap(ListSnapshotsRequest &a, ListSnapshotsRequest &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool ListSnapshotsRequest::operator==(const ListSnapshotsRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  return true;
+}
+
 ListSnapshotsRequest::ListSnapshotsRequest(const ListSnapshotsRequest& other570) noexcept {
   session_id = other570.session_id;
   __isset = other570.__isset;
@@ -16662,6 +16786,11 @@ void ListSnapshotsRequest::printTo(std::ostream& out) const {
 ListSnapshotsResponse::~ListSnapshotsResponse() noexcept {
 }
 
+ListSnapshotsResponse::ListSnapshotsResponse() noexcept
+   : error_code(0),
+     error_msg() {
+
+}
 
 void ListSnapshotsResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
@@ -16788,6 +16917,17 @@ void swap(ListSnapshotsResponse &a, ListSnapshotsResponse &b) {
   swap(a.__isset, b.__isset);
 }
 
+bool ListSnapshotsResponse::operator==(const ListSnapshotsResponse & rhs) const
+{
+  if (!(error_code == rhs.error_code))
+    return false;
+  if (!(error_msg == rhs.error_msg))
+    return false;
+  if (!(snapshots == rhs.snapshots))
+    return false;
+  return true;
+}
+
 ListSnapshotsResponse::ListSnapshotsResponse(const ListSnapshotsResponse& other578) {
   error_code = other578.error_code;
   error_msg = other578.error_msg;
@@ -16814,6 +16954,10 @@ void ListSnapshotsResponse::printTo(std::ostream& out) const {
 DropSnapshotRequest::~DropSnapshotRequest() noexcept {
 }
 
+DropSnapshotRequest::DropSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name() {
+}
 
 void DropSnapshotRequest::__set_session_id(const int64_t val) {
   this->session_id = val;
@@ -16901,6 +17045,15 @@ void swap(DropSnapshotRequest &a, DropSnapshotRequest &b) {
   swap(a.session_id, b.session_id);
   swap(a.snapshot_name, b.snapshot_name);
   swap(a.__isset, b.__isset);
+}
+
+bool DropSnapshotRequest::operator==(const DropSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
 }
 
 DropSnapshotRequest::DropSnapshotRequest(const DropSnapshotRequest& other580) {

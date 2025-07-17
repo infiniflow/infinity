@@ -4303,8 +4303,7 @@ class InfinityService_CreateTableSnapshot_args {
 
   InfinityService_CreateTableSnapshot_args(const InfinityService_CreateTableSnapshot_args&);
   InfinityService_CreateTableSnapshot_args& operator=(const InfinityService_CreateTableSnapshot_args&);
-  InfinityService_CreateTableSnapshot_args() noexcept {
-  }
+  InfinityService_CreateTableSnapshot_args() noexcept;
 
   virtual ~InfinityService_CreateTableSnapshot_args() noexcept;
   CreateTableSnapshotRequest request;
@@ -4313,12 +4312,7 @@ class InfinityService_CreateTableSnapshot_args {
 
   void __set_request(const CreateTableSnapshotRequest& val);
 
-  bool operator == (const InfinityService_CreateTableSnapshot_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_CreateTableSnapshot_args & rhs) const;
   bool operator != (const InfinityService_CreateTableSnapshot_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4352,8 +4346,7 @@ class InfinityService_CreateTableSnapshot_result {
 
   InfinityService_CreateTableSnapshot_result(const InfinityService_CreateTableSnapshot_result&);
   InfinityService_CreateTableSnapshot_result& operator=(const InfinityService_CreateTableSnapshot_result&);
-  InfinityService_CreateTableSnapshot_result() noexcept {
-  }
+  InfinityService_CreateTableSnapshot_result() noexcept;
 
   virtual ~InfinityService_CreateTableSnapshot_result() noexcept;
   CommonResponse success;
@@ -4362,12 +4355,7 @@ class InfinityService_CreateTableSnapshot_result {
 
   void __set_success(const CommonResponse& val);
 
-  bool operator == (const InfinityService_CreateTableSnapshot_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_CreateTableSnapshot_result & rhs) const;
   bool operator != (const InfinityService_CreateTableSnapshot_result &rhs) const {
     return !(*this == rhs);
   }
@@ -4407,8 +4395,7 @@ class InfinityService_CreateDatabaseSnapshot_args {
 
   InfinityService_CreateDatabaseSnapshot_args(const InfinityService_CreateDatabaseSnapshot_args&);
   InfinityService_CreateDatabaseSnapshot_args& operator=(const InfinityService_CreateDatabaseSnapshot_args&);
-  InfinityService_CreateDatabaseSnapshot_args() noexcept {
-  }
+  InfinityService_CreateDatabaseSnapshot_args() noexcept;
 
   virtual ~InfinityService_CreateDatabaseSnapshot_args() noexcept;
   CreateDatabaseSnapshotRequest request;
@@ -4417,12 +4404,7 @@ class InfinityService_CreateDatabaseSnapshot_args {
 
   void __set_request(const CreateDatabaseSnapshotRequest& val);
 
-  bool operator == (const InfinityService_CreateDatabaseSnapshot_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_CreateDatabaseSnapshot_args & rhs) const;
   bool operator != (const InfinityService_CreateDatabaseSnapshot_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4456,8 +4438,7 @@ class InfinityService_CreateDatabaseSnapshot_result {
 
   InfinityService_CreateDatabaseSnapshot_result(const InfinityService_CreateDatabaseSnapshot_result&);
   InfinityService_CreateDatabaseSnapshot_result& operator=(const InfinityService_CreateDatabaseSnapshot_result&);
-  InfinityService_CreateDatabaseSnapshot_result() noexcept {
-  }
+  InfinityService_CreateDatabaseSnapshot_result() noexcept;
 
   virtual ~InfinityService_CreateDatabaseSnapshot_result() noexcept;
   CommonResponse success;
@@ -4466,12 +4447,7 @@ class InfinityService_CreateDatabaseSnapshot_result {
 
   void __set_success(const CommonResponse& val);
 
-  bool operator == (const InfinityService_CreateDatabaseSnapshot_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_CreateDatabaseSnapshot_result & rhs) const;
   bool operator != (const InfinityService_CreateDatabaseSnapshot_result &rhs) const {
     return !(*this == rhs);
   }
@@ -4511,8 +4487,7 @@ class InfinityService_CreateSystemSnapshot_args {
 
   InfinityService_CreateSystemSnapshot_args(const InfinityService_CreateSystemSnapshot_args&);
   InfinityService_CreateSystemSnapshot_args& operator=(const InfinityService_CreateSystemSnapshot_args&);
-  InfinityService_CreateSystemSnapshot_args() noexcept {
-  }
+  InfinityService_CreateSystemSnapshot_args() noexcept;
 
   virtual ~InfinityService_CreateSystemSnapshot_args() noexcept;
   CreateSystemSnapshotRequest request;
@@ -4521,12 +4496,7 @@ class InfinityService_CreateSystemSnapshot_args {
 
   void __set_request(const CreateSystemSnapshotRequest& val);
 
-  bool operator == (const InfinityService_CreateSystemSnapshot_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_CreateSystemSnapshot_args & rhs) const;
   bool operator != (const InfinityService_CreateSystemSnapshot_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4560,8 +4530,7 @@ class InfinityService_CreateSystemSnapshot_result {
 
   InfinityService_CreateSystemSnapshot_result(const InfinityService_CreateSystemSnapshot_result&);
   InfinityService_CreateSystemSnapshot_result& operator=(const InfinityService_CreateSystemSnapshot_result&);
-  InfinityService_CreateSystemSnapshot_result() noexcept {
-  }
+  InfinityService_CreateSystemSnapshot_result() noexcept;
 
   virtual ~InfinityService_CreateSystemSnapshot_result() noexcept;
   CommonResponse success;
@@ -4570,12 +4539,7 @@ class InfinityService_CreateSystemSnapshot_result {
 
   void __set_success(const CommonResponse& val);
 
-  bool operator == (const InfinityService_CreateSystemSnapshot_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_CreateSystemSnapshot_result & rhs) const;
   bool operator != (const InfinityService_CreateSystemSnapshot_result &rhs) const {
     return !(*this == rhs);
   }
@@ -4615,8 +4579,7 @@ class InfinityService_RestoreSnapshot_args {
 
   InfinityService_RestoreSnapshot_args(const InfinityService_RestoreSnapshot_args&);
   InfinityService_RestoreSnapshot_args& operator=(const InfinityService_RestoreSnapshot_args&);
-  InfinityService_RestoreSnapshot_args() noexcept {
-  }
+  InfinityService_RestoreSnapshot_args() noexcept;
 
   virtual ~InfinityService_RestoreSnapshot_args() noexcept;
   RestoreSnapshotRequest request;
@@ -4625,12 +4588,7 @@ class InfinityService_RestoreSnapshot_args {
 
   void __set_request(const RestoreSnapshotRequest& val);
 
-  bool operator == (const InfinityService_RestoreSnapshot_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_RestoreSnapshot_args & rhs) const;
   bool operator != (const InfinityService_RestoreSnapshot_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4664,8 +4622,7 @@ class InfinityService_RestoreSnapshot_result {
 
   InfinityService_RestoreSnapshot_result(const InfinityService_RestoreSnapshot_result&);
   InfinityService_RestoreSnapshot_result& operator=(const InfinityService_RestoreSnapshot_result&);
-  InfinityService_RestoreSnapshot_result() noexcept {
-  }
+  InfinityService_RestoreSnapshot_result() noexcept;
 
   virtual ~InfinityService_RestoreSnapshot_result() noexcept;
   CommonResponse success;
@@ -4674,12 +4631,7 @@ class InfinityService_RestoreSnapshot_result {
 
   void __set_success(const CommonResponse& val);
 
-  bool operator == (const InfinityService_RestoreSnapshot_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_RestoreSnapshot_result & rhs) const;
   bool operator != (const InfinityService_RestoreSnapshot_result &rhs) const {
     return !(*this == rhs);
   }
@@ -4719,8 +4671,7 @@ class InfinityService_ShowSnapshot_args {
 
   InfinityService_ShowSnapshot_args(const InfinityService_ShowSnapshot_args&);
   InfinityService_ShowSnapshot_args& operator=(const InfinityService_ShowSnapshot_args&);
-  InfinityService_ShowSnapshot_args() noexcept {
-  }
+  InfinityService_ShowSnapshot_args() noexcept;
 
   virtual ~InfinityService_ShowSnapshot_args() noexcept;
   ShowSnapshotRequest request;
@@ -4729,12 +4680,7 @@ class InfinityService_ShowSnapshot_args {
 
   void __set_request(const ShowSnapshotRequest& val);
 
-  bool operator == (const InfinityService_ShowSnapshot_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_ShowSnapshot_args & rhs) const;
   bool operator != (const InfinityService_ShowSnapshot_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4768,8 +4714,7 @@ class InfinityService_ShowSnapshot_result {
 
   InfinityService_ShowSnapshot_result(const InfinityService_ShowSnapshot_result&);
   InfinityService_ShowSnapshot_result& operator=(const InfinityService_ShowSnapshot_result&);
-  InfinityService_ShowSnapshot_result() noexcept {
-  }
+  InfinityService_ShowSnapshot_result() noexcept;
 
   virtual ~InfinityService_ShowSnapshot_result() noexcept;
   ShowSnapshotResponse success;
@@ -4778,12 +4723,7 @@ class InfinityService_ShowSnapshot_result {
 
   void __set_success(const ShowSnapshotResponse& val);
 
-  bool operator == (const InfinityService_ShowSnapshot_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_ShowSnapshot_result & rhs) const;
   bool operator != (const InfinityService_ShowSnapshot_result &rhs) const {
     return !(*this == rhs);
   }
@@ -4823,8 +4763,7 @@ class InfinityService_ListSnapshots_args {
 
   InfinityService_ListSnapshots_args(const InfinityService_ListSnapshots_args&) noexcept;
   InfinityService_ListSnapshots_args& operator=(const InfinityService_ListSnapshots_args&) noexcept;
-  InfinityService_ListSnapshots_args() noexcept {
-  }
+  InfinityService_ListSnapshots_args() noexcept;
 
   virtual ~InfinityService_ListSnapshots_args() noexcept;
   ListSnapshotsRequest request;
@@ -4833,12 +4772,7 @@ class InfinityService_ListSnapshots_args {
 
   void __set_request(const ListSnapshotsRequest& val);
 
-  bool operator == (const InfinityService_ListSnapshots_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_ListSnapshots_args & rhs) const;
   bool operator != (const InfinityService_ListSnapshots_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4872,8 +4806,7 @@ class InfinityService_ListSnapshots_result {
 
   InfinityService_ListSnapshots_result(const InfinityService_ListSnapshots_result&);
   InfinityService_ListSnapshots_result& operator=(const InfinityService_ListSnapshots_result&);
-  InfinityService_ListSnapshots_result() noexcept {
-  }
+  InfinityService_ListSnapshots_result() noexcept;
 
   virtual ~InfinityService_ListSnapshots_result() noexcept;
   ListSnapshotsResponse success;
@@ -4882,12 +4815,7 @@ class InfinityService_ListSnapshots_result {
 
   void __set_success(const ListSnapshotsResponse& val);
 
-  bool operator == (const InfinityService_ListSnapshots_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_ListSnapshots_result & rhs) const;
   bool operator != (const InfinityService_ListSnapshots_result &rhs) const {
     return !(*this == rhs);
   }
@@ -4927,8 +4855,7 @@ class InfinityService_DropSnapshot_args {
 
   InfinityService_DropSnapshot_args(const InfinityService_DropSnapshot_args&);
   InfinityService_DropSnapshot_args& operator=(const InfinityService_DropSnapshot_args&);
-  InfinityService_DropSnapshot_args() noexcept {
-  }
+  InfinityService_DropSnapshot_args() noexcept;
 
   virtual ~InfinityService_DropSnapshot_args() noexcept;
   DropSnapshotRequest request;
@@ -4937,12 +4864,7 @@ class InfinityService_DropSnapshot_args {
 
   void __set_request(const DropSnapshotRequest& val);
 
-  bool operator == (const InfinityService_DropSnapshot_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_DropSnapshot_args & rhs) const;
   bool operator != (const InfinityService_DropSnapshot_args &rhs) const {
     return !(*this == rhs);
   }
@@ -4976,8 +4898,7 @@ class InfinityService_DropSnapshot_result {
 
   InfinityService_DropSnapshot_result(const InfinityService_DropSnapshot_result&);
   InfinityService_DropSnapshot_result& operator=(const InfinityService_DropSnapshot_result&);
-  InfinityService_DropSnapshot_result() noexcept {
-  }
+  InfinityService_DropSnapshot_result() noexcept;
 
   virtual ~InfinityService_DropSnapshot_result() noexcept;
   CommonResponse success;
@@ -4986,12 +4907,7 @@ class InfinityService_DropSnapshot_result {
 
   void __set_success(const CommonResponse& val);
 
-  bool operator == (const InfinityService_DropSnapshot_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
+  bool operator == (const InfinityService_DropSnapshot_result & rhs) const;
   bool operator != (const InfinityService_DropSnapshot_result &rhs) const {
     return !(*this == rhs);
   }

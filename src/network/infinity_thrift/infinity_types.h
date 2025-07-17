@@ -6235,12 +6235,7 @@ class CreateTableSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   CreateTableSnapshotRequest(const CreateTableSnapshotRequest&);
   CreateTableSnapshotRequest& operator=(const CreateTableSnapshotRequest&);
-  CreateTableSnapshotRequest() noexcept
-                             : session_id(0),
-                               db_name(),
-                               table_name(),
-                               snapshot_name() {
-  }
+  CreateTableSnapshotRequest() noexcept;
 
   virtual ~CreateTableSnapshotRequest() noexcept;
   int64_t session_id;
@@ -6258,18 +6253,7 @@ class CreateTableSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   void __set_snapshot_name(const std::string& val);
 
-  bool operator == (const CreateTableSnapshotRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(db_name == rhs.db_name))
-      return false;
-    if (!(table_name == rhs.table_name))
-      return false;
-    if (!(snapshot_name == rhs.snapshot_name))
-      return false;
-    return true;
-  }
+  bool operator == (const CreateTableSnapshotRequest & rhs) const;
   bool operator != (const CreateTableSnapshotRequest &rhs) const {
     return !(*this == rhs);
   }
@@ -6298,11 +6282,7 @@ class CreateDatabaseSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest&);
   CreateDatabaseSnapshotRequest& operator=(const CreateDatabaseSnapshotRequest&);
-  CreateDatabaseSnapshotRequest() noexcept
-                                : session_id(0),
-                                  db_name(),
-                                  snapshot_name() {
-  }
+  CreateDatabaseSnapshotRequest() noexcept;
 
   virtual ~CreateDatabaseSnapshotRequest() noexcept;
   int64_t session_id;
@@ -6317,16 +6297,7 @@ class CreateDatabaseSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   void __set_snapshot_name(const std::string& val);
 
-  bool operator == (const CreateDatabaseSnapshotRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(db_name == rhs.db_name))
-      return false;
-    if (!(snapshot_name == rhs.snapshot_name))
-      return false;
-    return true;
-  }
+  bool operator == (const CreateDatabaseSnapshotRequest & rhs) const;
   bool operator != (const CreateDatabaseSnapshotRequest &rhs) const {
     return !(*this == rhs);
   }
@@ -6354,10 +6325,7 @@ class CreateSystemSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest&);
   CreateSystemSnapshotRequest& operator=(const CreateSystemSnapshotRequest&);
-  CreateSystemSnapshotRequest() noexcept
-                              : session_id(0),
-                                snapshot_name() {
-  }
+  CreateSystemSnapshotRequest() noexcept;
 
   virtual ~CreateSystemSnapshotRequest() noexcept;
   int64_t session_id;
@@ -6369,14 +6337,7 @@ class CreateSystemSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   void __set_snapshot_name(const std::string& val);
 
-  bool operator == (const CreateSystemSnapshotRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(snapshot_name == rhs.snapshot_name))
-      return false;
-    return true;
-  }
+  bool operator == (const CreateSystemSnapshotRequest & rhs) const;
   bool operator != (const CreateSystemSnapshotRequest &rhs) const {
     return !(*this == rhs);
   }
@@ -6405,11 +6366,7 @@ class RestoreSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   RestoreSnapshotRequest(const RestoreSnapshotRequest&);
   RestoreSnapshotRequest& operator=(const RestoreSnapshotRequest&);
-  RestoreSnapshotRequest() noexcept
-                         : session_id(0),
-                           snapshot_name(),
-                           scope() {
-  }
+  RestoreSnapshotRequest() noexcept;
 
   virtual ~RestoreSnapshotRequest() noexcept;
   int64_t session_id;
@@ -6424,16 +6381,7 @@ class RestoreSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   void __set_scope(const std::string& val);
 
-  bool operator == (const RestoreSnapshotRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(snapshot_name == rhs.snapshot_name))
-      return false;
-    if (!(scope == rhs.scope))
-      return false;
-    return true;
-  }
+  bool operator == (const RestoreSnapshotRequest & rhs) const;
   bool operator != (const RestoreSnapshotRequest &rhs) const {
     return !(*this == rhs);
   }
@@ -6464,13 +6412,7 @@ class SnapshotInfo : public virtual ::apache::thrift::TBase {
 
   SnapshotInfo(const SnapshotInfo&);
   SnapshotInfo& operator=(const SnapshotInfo&);
-  SnapshotInfo() noexcept
-               : name(),
-                 scope(),
-                 time(),
-                 commit(0),
-                 size() {
-  }
+  SnapshotInfo() noexcept;
 
   virtual ~SnapshotInfo() noexcept;
   std::string name;
@@ -6491,20 +6433,7 @@ class SnapshotInfo : public virtual ::apache::thrift::TBase {
 
   void __set_size(const std::string& val);
 
-  bool operator == (const SnapshotInfo & rhs) const
-  {
-    if (!(name == rhs.name))
-      return false;
-    if (!(scope == rhs.scope))
-      return false;
-    if (!(time == rhs.time))
-      return false;
-    if (!(commit == rhs.commit))
-      return false;
-    if (!(size == rhs.size))
-      return false;
-    return true;
-  }
+  bool operator == (const SnapshotInfo & rhs) const;
   bool operator != (const SnapshotInfo &rhs) const {
     return !(*this == rhs);
   }
@@ -6532,10 +6461,7 @@ class ShowSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   ShowSnapshotRequest(const ShowSnapshotRequest&);
   ShowSnapshotRequest& operator=(const ShowSnapshotRequest&);
-  ShowSnapshotRequest() noexcept
-                      : session_id(0),
-                        snapshot_name() {
-  }
+  ShowSnapshotRequest() noexcept;
 
   virtual ~ShowSnapshotRequest() noexcept;
   int64_t session_id;
@@ -6547,14 +6473,7 @@ class ShowSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   void __set_snapshot_name(const std::string& val);
 
-  bool operator == (const ShowSnapshotRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(snapshot_name == rhs.snapshot_name))
-      return false;
-    return true;
-  }
+  bool operator == (const ShowSnapshotRequest & rhs) const;
   bool operator != (const ShowSnapshotRequest &rhs) const {
     return !(*this == rhs);
   }
@@ -6583,10 +6502,7 @@ class ShowSnapshotResponse : public virtual ::apache::thrift::TBase {
 
   ShowSnapshotResponse(const ShowSnapshotResponse&);
   ShowSnapshotResponse& operator=(const ShowSnapshotResponse&);
-  ShowSnapshotResponse() noexcept
-                       : error_code(0),
-                         error_msg() {
-  }
+  ShowSnapshotResponse() noexcept;
 
   virtual ~ShowSnapshotResponse() noexcept;
   int64_t error_code;
@@ -6601,16 +6517,7 @@ class ShowSnapshotResponse : public virtual ::apache::thrift::TBase {
 
   void __set_snapshot(const SnapshotInfo& val);
 
-  bool operator == (const ShowSnapshotResponse & rhs) const
-  {
-    if (!(error_code == rhs.error_code))
-      return false;
-    if (!(error_msg == rhs.error_msg))
-      return false;
-    if (!(snapshot == rhs.snapshot))
-      return false;
-    return true;
-  }
+  bool operator == (const ShowSnapshotResponse & rhs) const;
   bool operator != (const ShowSnapshotResponse &rhs) const {
     return !(*this == rhs);
   }
@@ -6637,9 +6544,7 @@ class ListSnapshotsRequest : public virtual ::apache::thrift::TBase {
 
   ListSnapshotsRequest(const ListSnapshotsRequest&) noexcept;
   ListSnapshotsRequest& operator=(const ListSnapshotsRequest&) noexcept;
-  ListSnapshotsRequest() noexcept
-                       : session_id(0) {
-  }
+  ListSnapshotsRequest() noexcept;
 
   virtual ~ListSnapshotsRequest() noexcept;
   int64_t session_id;
@@ -6648,12 +6553,7 @@ class ListSnapshotsRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  bool operator == (const ListSnapshotsRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    return true;
-  }
+  bool operator == (const ListSnapshotsRequest & rhs) const;
   bool operator != (const ListSnapshotsRequest &rhs) const {
     return !(*this == rhs);
   }
@@ -6682,11 +6582,7 @@ class ListSnapshotsResponse : public virtual ::apache::thrift::TBase {
 
   ListSnapshotsResponse(const ListSnapshotsResponse&);
   ListSnapshotsResponse& operator=(const ListSnapshotsResponse&);
-  ListSnapshotsResponse() noexcept
-                        : error_code(0),
-                          error_msg() {
-
-  }
+  ListSnapshotsResponse() noexcept;
 
   virtual ~ListSnapshotsResponse() noexcept;
   int64_t error_code;
@@ -6701,16 +6597,7 @@ class ListSnapshotsResponse : public virtual ::apache::thrift::TBase {
 
   void __set_snapshots(const std::vector<SnapshotInfo> & val);
 
-  bool operator == (const ListSnapshotsResponse & rhs) const
-  {
-    if (!(error_code == rhs.error_code))
-      return false;
-    if (!(error_msg == rhs.error_msg))
-      return false;
-    if (!(snapshots == rhs.snapshots))
-      return false;
-    return true;
-  }
+  bool operator == (const ListSnapshotsResponse & rhs) const;
   bool operator != (const ListSnapshotsResponse &rhs) const {
     return !(*this == rhs);
   }
@@ -6738,10 +6625,7 @@ class DropSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   DropSnapshotRequest(const DropSnapshotRequest&);
   DropSnapshotRequest& operator=(const DropSnapshotRequest&);
-  DropSnapshotRequest() noexcept
-                      : session_id(0),
-                        snapshot_name() {
-  }
+  DropSnapshotRequest() noexcept;
 
   virtual ~DropSnapshotRequest() noexcept;
   int64_t session_id;
@@ -6753,14 +6637,7 @@ class DropSnapshotRequest : public virtual ::apache::thrift::TBase {
 
   void __set_snapshot_name(const std::string& val);
 
-  bool operator == (const DropSnapshotRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(snapshot_name == rhs.snapshot_name))
-      return false;
-    return true;
-  }
+  bool operator == (const DropSnapshotRequest & rhs) const;
   bool operator != (const DropSnapshotRequest &rhs) const {
     return !(*this == rhs);
   }
