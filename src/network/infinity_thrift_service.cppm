@@ -162,6 +162,20 @@ public:
 
     void Compact(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CompactRequest &request) final;
 
+    void ShowSnapshot(infinity_thrift_rpc::ShowSnapshotResponse &response, const infinity_thrift_rpc::ShowSnapshotRequest &request) final;
+
+    void ListSnapshots(infinity_thrift_rpc::ListSnapshotsResponse &response, const infinity_thrift_rpc::ListSnapshotsRequest &request) final;
+
+    void CreateTableSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateTableSnapshotRequest &request) final;
+
+    void CreateDatabaseSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseSnapshotRequest &request) final;
+
+    void CreateSystemSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateSystemSnapshotRequest &request) final;
+
+    void DropSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropSnapshotRequest &request) final;
+
+    void RestoreSnapshot(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::RestoreSnapshotRequest &request) final;
+
     template <typename T>
     static void
     HandleArrayTypeRecursively(String &output_str, const DataType &data_type, const T &data_value, const SharedPtr<ColumnVector> &column_vector);

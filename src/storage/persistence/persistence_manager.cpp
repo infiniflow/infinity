@@ -240,7 +240,15 @@ void PersistenceManager::CheckValid() {
         }
     }
     const auto part2_begin = std::chrono::high_resolution_clock::now();
-    objects_->CheckValid(current_object_size_);
+
+    // Protect access to current_object_size_ with mutex
+    SizeT current_size;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        current_size = current_object_size_;
+    }
+    objects_->CheckValid(current_size);
+
     const auto part2_end = std::chrono::high_resolution_clock::now();
     LOG_INFO(fmt::format("PersistenceManager::CheckValid part 1: {} ms, part2: {} ms",
                          static_cast<TimeDurationType>(part2_begin - part1_begin).count(),
