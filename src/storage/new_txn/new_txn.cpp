@@ -1421,32 +1421,40 @@ NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, Segm
 
 
 
-Status NewTxn::CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
-    // Check if the DB is valid
-    this->SetTxnType(TransactionType::kCreateTableSnapshot);
-    this->CheckTxn(db_name);
+Status NewTxn::CreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, const String &snapshot_type) {
+    this->SetTxnType(TransactionType::kCreateSnapshot);
+    if (snapshot_type == "table") {
+        // Check if the DB is valid
+        this->CheckTxn(db_name);
 
-    SharedPtr<TableSnapshotInfo> table_snapshot_info;
+        //check if the table exists
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta_opt;
+        String table_key;
+        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+        if (!status.ok()) {
+            return status;
+        }
 
-    // First, get the meta info of the table
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta_opt;
-    Optional<SegmentMeta> segment_meta_opt;
-    String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
-    
-    if (!status.ok()) {
-        return status;
+    } else if (snapshot_type == "database") {
+        //check if the db exists
+        Optional<DBMeeta> db_meta;
+        TxnTimeStamp db_create_ts;
+        Status status = GetDBMeta(db_name, db_meta, db_create_ts);
+        if (!status.ok()) {
+            return status;
+        }        
+    } else {
+        return Status::UnexpectedError("Invalid snapshot type");
     }
 
-   
-
-    base_txn_store_ = MakeShared<CreateTableSnapshotTxnStore>();
-    CreateTableSnapshotTxnStore *txn_store = static_cast<CreateTableSnapshotTxnStore *>(base_txn_store_.get());
+    base_txn_store_ = MakeShared<CreateSnapshotTxnStore>();
+    CreateSnapshotTxnStore *txn_store = static_cast<CreateSnapshotTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->table_name_ = table_name;
     txn_store->snapshot_name_ = snapshot_name;
     txn_store->max_commit_ts_ = txn_context_ptr_->begin_ts_;
+    txn_store->snapshot_type_ = snapshot_type;
 
     return Status::OK(); // Success
 }
@@ -2175,14 +2183,14 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::CLEANUP: {
                 break;
             }
-            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+            case WalCommandType::CREATE_SNAPSHOT: {
                 if (this->IsReplay()) {
-                    // Skip replay of CREATE_TABLE_SNAPSHOT command.
-                    LOG_TRACE("Skip replay of CREATE_TABLE_SNAPSHOT command.");
+                    // Skip replay of CREATE_SNAPSHOT command.
+                    LOG_TRACE("Skip replay of CREATE_SNAPSHOT command.");
                     break;
                 }
-                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());
-                Status status = PrepareCommitCreateTableSnapshot(create_table_snapshot_cmd);
+                auto *create_snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(command.get());
+                Status status = PrepareCommitCreateSnapshot(create_snapshot_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -2310,10 +2318,10 @@ NewTxn::GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Opti
 
 
 
-Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
+Status NewTxn::PrepareCommitTableSnapshot(const WalCmdCreateSnapshot *create_snapshot_cmd) {
     //check if duplicate snapshot name
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    String snapshot_name = create_table_snapshot_cmd->snapshot_name_;
+    String snapshot_name = create_snapshot_cmd->snapshot_name_;
     String snapshot_path = snapshot_dir + "/" + snapshot_name;
     if (std::filesystem::exists(snapshot_path)) {
         return Status::SnapshotAlreadyExists(snapshot_name);
@@ -4750,14 +4758,21 @@ void NewTxn::CommitBottom() {
                 }
                 break;
             }
-            case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+            case WalCommandType::CREATE_SNAPSHOT: {
                 if (this->IsReplay()) {
                     break;
                 }
-                auto *create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());                
-                Status status = CommitBottomCreateTableSnapshot(create_table_snapshot_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("CommitBottomCreateTableSnapshot failed: {}", status.message()));
+                auto *create_snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(command.get());
+                if (create_snapshot_cmd->snapshot_type_ == "table") {
+                    Status status = CommitBottomCreateTableSnapshot(create_snapshot_cmd->db_name_, create_snapshot_cmd->table_name_, create_snapshot_cmd->snapshot_name_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("CommitBottomCreateTableSnapshot failed: {}", status.message()));
+                    }`
+                } else if (create_snapshot_cmd->snapshot_type_ == "database") {
+                    Status status = CommitBottomCreateDatabaseSnapshot(create_snapshot_cmd->db_name_, create_snapshot_cmd->snapshot_name_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("CommitBottomCreateDatabaseSnapshot failed: {}", status.message()));
+                    }
                 }
                 break;
             }
@@ -5960,25 +5975,25 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     return Status::OK();
 }
 
-Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd) {
+Status NewTxn::CommitBottomCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name) {
 
-    ManualDumpIndex(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
+    ManualDumpIndex(db_name, table_name);
 
     // create a new snapshot
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
-    Status status = GetTableMeta(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_, db_meta, table_meta);
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
         return status;
     }
     table_meta->SetBeginTS(txn_context_ptr_->commit_ts_);
 
     SharedPtr<TableSnapshotInfo> table_snapshot_info;
-    std::tie(table_snapshot_info, status) = table_meta->MapMetaToSnapShotInfo(create_table_snapshot_cmd->db_name_, create_table_snapshot_cmd->table_name_);
+    std::tie(table_snapshot_info, status) = table_meta->MapMetaToSnapShotInfo(db_name, table_name);
     if (!status.ok()) {
         return status;
     }
-    table_snapshot_info->snapshot_name_ = create_table_snapshot_cmd->snapshot_name_;
+    table_snapshot_info->snapshot_name_ = snapshot_name;
 
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     status = table_snapshot_info->Serialize(snapshot_dir, this->TxnID());
@@ -5988,6 +6003,55 @@ Status NewTxn::CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create
 
     return Status::OK();
 }
+
+Status NewTxn::CommitBottomCreateDatabaseSnapshot(const String &db_name, const String &snapshot_name) {
+
+    //create a new snapshot
+    Optional<DBMeeta> db_meta;
+    TxnTimeStamp db_create_ts;
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    db_meta->SetBeginTS(txn_context_ptr_->commit_ts_);
+
+    SharedPtr<DatabaseSnapshotInfo> database_snapshot_info;
+    database_snapshot_info = MakeShared<DatabaseSnapshotInfo>();
+    database_snapshot_info->db_name_ = db_name;
+    database_snapshot_info->db_id_str_ = db_meta->db_id_str();
+    database_snapshot_info->snapshot_name_ = snapshot_name;
+
+    Vector<String> *table_ids_ptr = nullptr;
+    Vector<String> *table_names_ptr = nullptr;
+    status = db_meta->GetTableIDs(table_ids_ptr, &table_names_ptr);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    database_snapshot_info->db_next_table_id_str_ = std::to_string(std::stoull(table_ids_ptr->back()) + 1);
+    for (size_t i = 0; i < table_ids_ptr->size(); i++) {
+        Optional<TableMeeta> table_meta;
+        status = GetTableMeta(table_names_ptr->at(i), *db_meta, table_meta);
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+        SharedPtr<TableSnapshotInfo> table_snapshot_info;
+        std::tie(table_snapshot_info, status) = table_meta->MapMetaToSnapShotInfo(db_name, table_names_ptr->at(i));
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+        database_snapshot_info->table_snapshots_.push_back(table_snapshot_info);
+    }
+
+    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    status = database_snapshot_info->Serialize(snapshot_dir, this->TxnID());
+    if (!status.ok()) {
+        return status;
+    }
+    
+    return Status::OK();
+}
+
 
 Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store) {
     TransactionType txn_type = GetTxnType();

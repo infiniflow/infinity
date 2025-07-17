@@ -88,7 +88,7 @@ export enum class TransactionType {
     kAddColumn,
     kDropColumn,
     kCleanup,
-    kCreateTableSnapshot
+    kCreateSnapshot
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {

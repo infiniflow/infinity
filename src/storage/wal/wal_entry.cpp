@@ -908,12 +908,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = MakeShared<WalCmdCleanup>(timestamp);
             break;
         }
-        case WalCommandType::CREATE_TABLE_SNAPSHOT: {
+        case WalCommandType::CREATE_SNAPSHOT: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String snapshot_name = ReadBufAdv<String>(ptr);
             TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            cmd = MakeShared<WalCmdCreateTableSnapshot>(db_name, table_name, snapshot_name, max_commit_ts);
+            String snapshot_type = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCreateSnapshot>(db_name, table_name, snapshot_name, max_commit_ts, snapshot_type);
             break;
         }
         case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
@@ -1326,9 +1327,9 @@ bool WalCmdCleanup::operator==(const WalCmd &other) const {
     return other_cmd != nullptr && timestamp_ == other_cmd->timestamp_;
 }
 
-bool WalCmdCreateTableSnapshot::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdCreateTableSnapshot *>(&other);
-    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && snapshot_name_ == other_cmd->snapshot_name_ && max_commit_ts_ == other_cmd->max_commit_ts_;
+bool WalCmdCreateSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCreateSnapshot *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && snapshot_name_ == other_cmd->snapshot_name_ && max_commit_ts_ == other_cmd->max_commit_ts_ && snapshot_type_ == other_cmd->snapshot_type_;
 }
 
 
@@ -1643,8 +1644,8 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
     return size;
 }
 
-i32 WalCmdCreateTableSnapshot::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_);
+i32 WalCmdCreateSnapshot::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_) + sizeof(i32) + snapshot_type_.size();
 }
 
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
@@ -1798,12 +1799,13 @@ void WalCmdRestoreTableSnapshot::WriteAdv(char *&buf) const {
     }
 }
 
-void WalCmdCreateTableSnapshot::WriteAdv(char *&buf) const {
+void WalCmdCreateSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE_SNAPSHOT);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->snapshot_name_);
     WriteBufAdv(buf, this->max_commit_ts_);
+    WriteBufAdv(buf, this->snapshot_type_);
 }
 
 
@@ -2880,13 +2882,14 @@ String WalCmdDropColumnsV2::CompactInfo() const {
 
 String WalCmdCleanup::CompactInfo() const { return fmt::format("{}: timestamp: {}", WalCmd::WalCommandTypeToString(GetType()), timestamp_); }
 
-String WalCmdCreateTableSnapshot::CompactInfo() const {
-    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}",
+String WalCmdCreateSnapshot::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}, snapshot_type: {}",
                        WalCmd::WalCommandTypeToString(GetType()),
                        db_name_,
                        table_name_,
                        snapshot_name_,
-                       max_commit_ts_);
+                       max_commit_ts_,
+                       snapshot_type_);
 }
 
 String WalCmdRestoreTableSnapshot::CompactInfo() const {
@@ -2902,9 +2905,9 @@ String WalCmdRestoreTableSnapshot::CompactInfo() const {
                        files_.size());
 }
 
-String WalCmdCreateTableSnapshot::ToString() const {
+String WalCmdCreateSnapshot::ToString() const {
     std::stringstream ss;
-    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << std::endl;
+    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << ", snapshot_type: " << snapshot_type_ << std::endl;
     return std::move(ss).str();
 }
 
@@ -3108,7 +3111,7 @@ bool WalEntry::IsCheckPointOrSnapshot(WalCmd *&cmd) const {
             }
             // For snapshot, check max_commit_ts
             else if (command->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
-                auto snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(command.get());
+                auto snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(command.get());
                 if (!found || TxnTimeStamp(snapshot_cmd->max_commit_ts_) > max_commit_ts) {
                     max_commit_ts = snapshot_cmd->max_commit_ts_;
                     cmd = command.get();

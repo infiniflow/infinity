@@ -125,13 +125,14 @@ export struct CreateTableTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateTableSnapshotTxnStore : public BaseTxnStore {
-    CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
+export struct CreateSnapshotTxnStore : public BaseTxnStore {
+    CreateSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSnapshot) {}
 
     String db_name_{};
     String table_name_{};
     String snapshot_name_{};
     TxnTimeStamp max_commit_ts_{};
+    String snapshot_type_{};
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
