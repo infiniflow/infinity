@@ -4462,6 +4462,8 @@ Status NewTxn::Cleanup() {
     TxnTimeStamp begin_ts = BeginTS();
     TxnTimeStamp visible_ts = std::min(begin_ts, last_checkpoint_ts);
 
+    LOG_INFO(fmt::format("Cleaning ts < {} dropped entities...", visible_ts));
+
     Vector<String> dropped_keys;
     Vector<UniquePtr<MetaKey>> metas;
     Status status = new_catalog_->GetCleanedMeta(visible_ts, kv_instance, metas, dropped_keys);
