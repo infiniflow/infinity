@@ -43,8 +43,6 @@ NodeRole InfinityContext::GetServerRole() const {
 }
 
 void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
-    std::vector<int> v;
-    std::println("{}", v[0]);
     if (GetServerRole() != NodeRole::kUnInitialized) {
         LOG_ERROR("Infinity is already initialized.");
         return;
