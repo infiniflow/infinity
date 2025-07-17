@@ -171,8 +171,13 @@ Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
     if (!version_buffer_) {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
-        SharedPtr<String> block_dir_ptr = this->GetBlockDir();
-        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        // Get block directory without acquiring lock again (avoid recursive lock)
+        if (block_dir_ == nullptr) {
+            TableMeeta &table_meta = segment_meta_.table_meta();
+            block_dir_ = MakeShared<String>(
+                fmt::format("db_{}/tbl_{}/seg_{}/blk_{}", table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
+        }
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ + "/" + String(BlockVersion::PATH);
         version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
         if (version_buffer_ == nullptr) {
             return {nullptr, Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath))};
