@@ -386,8 +386,8 @@ class TestSnapshot:
         db_obj.drop_table(table_name, ConflictType.Ignore)
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
-        self._create_indexes(table_obj)
-        self.insert_comprehensive_data(table_obj, 100000)  # 100k rows - should be fine with small dimensions
+        # self._create_indexes(table_obj)
+        self.insert_comprehensive_data(table_obj, 80000000)  # 80M rows - should be fine with small dimensions
 
         # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
 

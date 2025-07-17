@@ -171,8 +171,8 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         case TransactionType::kInvalid: {
             return "Invalid";
         }
-        case TransactionType::kCreateTableSnapshot: {
-            return "CreateTableSnapshot";
+        case TransactionType::kCreateSnapshot: {
+            return "CreateSnapshot";
         }
     }
     return "Normal";
