@@ -758,36 +758,62 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     return Status::OK();
 }
 
-Status NewCatalog::LoadImportedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) { return Status::OK(); }
+Status NewCatalog::LoadImportedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        BlockID block_id = block_info.block_id_;
+        SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
+        Optional<BlockMeta> block_meta;
+        block_meta.emplace(block_id, segment_meta);
+        Status status = block_meta->LoadSet(commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
 
-Status NewCatalog::LoadBlock(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, BlockID block_id, Optional<BlockMeta> &block_meta) {
-    //    Status status;
-    //
-    //    BlockID block_id;
-    //    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
-    //    if (!status.ok()) {
-    //        return status;
-    //    }
-    //    block_meta.emplace(block_id, segment_meta);
-    //    status = block_meta->InitSet();
-    //    if (!status.ok()) {
-    //        return status;
-    //    }
-    //    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-    //    {
-    //        TableMeeta &table_meta = segment_meta.table_meta();
-    //        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
-    //        if (!status.ok()) {
-    //            return status;
-    //        }
-    //    }
-    //    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
-    //        ColumnMeta column_meta(column_idx, *block_meta);
-    //        status = column_meta.InitSet();
-    //        if (!status.ok()) {
-    //            return status;
-    //        }
-    //    }
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        {
+            TableMeeta &table_meta = segment_meta.table_meta();
+            std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        for (const auto &column_def : *column_defs_ptr) {
+            ColumnMeta column_meta(column_def->id(), *block_meta);
+            status = column_meta.LoadSet();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+
+    // Load segment index
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (const String &index_id_str : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
+        status = segment_index_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
+
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+        if (!chunk_status.ok()) {
+            return status;
+        }
+        for (ChunkID chunk_id : *chunk_ids_ptr) {
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+            status = chunk_index_meta.LoadSet();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+
     return Status::OK();
 }
 
