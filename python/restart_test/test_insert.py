@@ -2,7 +2,7 @@ import random
 import pytest
 from common import common_values
 from infinity.common import ConflictType
-from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory, infinity_runner_decorator_factory2
 import time
 import threading
 from restart_util import *
@@ -236,7 +236,9 @@ class TestInsert:
         uri = common_values.TEST_LOCAL_HOST
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
-
+        decorator2 = infinity_runner_decorator_factory2(
+            config, uri, infinity_runner, shutdown_out=True
+        )
         line_num = 0
 
         @decorator
@@ -244,10 +246,12 @@ class TestInsert:
             db_obj = infinity_obj.get_database("default_db")
             db_obj.create_table("test_insert_checkpoint", {"c1": {"type": "int"}})
 
-        @decorator
-        def part1(infinity_obj, test_i: int):
+        @decorator2
+        def part1(infinity_pool, test_i: int):
+            infinity_obj = infinity_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert_checkpoint")
+            infinity_obj2 = infinity_pool.get_conn()
 
             data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
@@ -279,7 +283,7 @@ class TestInsert:
 
             t1 = RtnThread(target=insert_func, args=(table_obj,))
             t1.start()
-            checkpoint_func(infinity_obj)
+            checkpoint_func(infinity_obj2)
             t1.join()
             print(f"join end {test_i}")
 
