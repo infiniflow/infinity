@@ -85,5 +85,3 @@ target_compile_options(
         -O3 -Wno-sign-compare
         -fPIC
 )
-
-add_subdirectory(rocksdb)
