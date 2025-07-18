@@ -2623,6 +2623,7 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
     }
 
     // Initialize full-text index cache after table and indexes are restored
+    table_meta->SetBeginTS(commit_ts);
     status = table_meta->LoadSet();
     if (!status.ok()) {
         return status;
