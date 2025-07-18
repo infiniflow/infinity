@@ -1,10 +1,5 @@
 add_compile_options(-Wno-everything)
 
-################################################################################
-### snappy
-################################################################################
-add_subdirectory(snappy)
-
 # Build doctest
 add_subdirectory(googletest)
 
