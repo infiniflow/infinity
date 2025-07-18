@@ -74,7 +74,8 @@ void TxnAllocator::Process() {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
                         SizeT row_count = txn_store->input_block_->row_count();
-                        LOG_TRACE(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
+                        LOG_TRACE(fmt::format("TxnAllocator: Append txn {}: db: {}, {}, table: {}, {}, data size: {}",
+                                              txn->TxnID(),
                                               txn_store->db_name_,
                                               txn_store->db_id_,
                                               txn_store->table_name_,
@@ -88,7 +89,8 @@ void TxnAllocator::Process() {
                     case TransactionType::kUpdate: {
                         UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
                         SizeT row_count = txn_store->RowCount();
-                        LOG_TRACE(fmt::format("TxnAllocator: Update txn: db: {}, {}, table: {}, {}, data size: {}",
+                        LOG_TRACE(fmt::format("TxnAllocator: Update txn {}: db: {}, {}, table: {}, {}, data size: {}",
+                                              txn->TxnID(),
                                               txn_store->db_name_,
                                               txn_store->db_id_,
                                               txn_store->table_name_,

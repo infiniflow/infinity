@@ -2020,6 +2020,7 @@ Status NewTxn::GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional
     if (!status.ok()) {
         return status;
     }
+    LOG_DEBUG(fmt::format("GetTableMeta: txn_id: {} table_id: {}", TxnID(), table_id_str));
     table_meta.emplace(db_meta.db_id_str(), table_id_str, this);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
@@ -4240,7 +4241,7 @@ void NewTxn::PostCommit() {
         }
     }
 
-    if(!this->IsReplay()) {
+    if (!this->IsReplay()) {
         // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
         base_txn_store_->ClearData();
     }
@@ -4429,7 +4430,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     //    }
 
     // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
-    if(base_txn_store_ != nullptr) {
+    if (base_txn_store_ != nullptr) {
         base_txn_store_->ClearData();
     }
 
