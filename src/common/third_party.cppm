@@ -33,7 +33,7 @@ module;
 #include "json.hpp"
 #include "simdjson.h"
 
-#include "toml.hpp"
+#include <toml++/toml.hpp>
 
 #include "magic_enum.hpp"
 
