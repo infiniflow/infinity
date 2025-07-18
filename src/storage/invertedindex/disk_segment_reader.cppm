@@ -15,6 +15,7 @@
 module;
 
 export module infinity_core:disk_index_segment_reader;
+
 import :stl;
 
 import :segment_posting;

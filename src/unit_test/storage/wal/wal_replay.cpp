@@ -69,7 +69,7 @@ TEST_P(WalReplayTest, wal_replay_database) {
         infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
-        NewTxnManager *txn_mgr = storage->new_txn_manager();
+        auto *txn_mgr = storage->new_txn_manager();
         WalManager *wal_manager = storage->wal_manager();
 
         {

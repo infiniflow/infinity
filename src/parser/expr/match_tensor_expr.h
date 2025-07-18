@@ -16,6 +16,7 @@
 
 #include "constant_expr.h"
 #include "parsed_expr.h"
+#include "parser/type/complex/embedding_type.h"
 #include <memory>
 
 namespace infinity {

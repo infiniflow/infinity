@@ -23,6 +23,7 @@
 #include "type/info/sparse_info.h"
 #include "type/serialize.h"
 #include "simdjson.h"
+#include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 
@@ -58,7 +59,7 @@ ColumnType::GetDataTypeFromColumnType(const ColumnType &column_type, const std::
             }
             const auto [element_result, fail_reason] = GetDataTypeFromColumnType(*(column_type.element_types_.front()), index_param_list);
             if (!element_result) {
-                return {nullptr, std::format("Fail to create element type for array. Reason: {}", fail_reason)};
+                return {nullptr, fmt::format("Fail to create element type for array. Reason: {}", fail_reason)};
             }
             type_info_ptr = ArrayInfo::Make(std::move(*element_result));
             break;

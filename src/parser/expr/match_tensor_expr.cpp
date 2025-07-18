@@ -14,6 +14,7 @@
 
 #include "match_tensor_expr.h"
 #include "spdlog/fmt/fmt.h"
+#include "type/internal_types.h"
 
 namespace infinity {
 

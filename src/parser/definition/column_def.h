@@ -19,6 +19,7 @@
 #include "expr/parsed_expr.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
+#include "type/data_type.h"
 
 #include <memory>
 #include <set>
@@ -27,7 +28,6 @@
 
 namespace infinity {
 
-class DataType;
 struct InitParameter;
 
 enum class TableElementType {

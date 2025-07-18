@@ -21,6 +21,7 @@ import :wal_manager;
 import :log_file;
 import :status;
 import :buffer_manager;
+import :config;
 
 namespace infinity {
 
@@ -36,7 +37,7 @@ class MemIndexAppender;
 class BGTaskProcessor;
 class BGMemIndexTracer;
 class ObjectStorageProcess;
-class Config;
+// export class Config;
 class PersistenceManager;
 
 export enum class ReaderInitPhase {

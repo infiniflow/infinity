@@ -1,6 +1,6 @@
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+#set(CMAKE_CXX_STANDARD 23)
+#set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 #find_package(Python)
 
@@ -15,8 +15,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAK
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
 
-if(APPLE)
-    if(X86_64)
+if (APPLE)
+    if (X86_64)
         execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep FMA"
                 RESULT_VARIABLE SUPPORT_FMA
                 OUTPUT_QUIET
@@ -36,10 +36,10 @@ if(APPLE)
                 RESULT_VARIABLE SUPPORT_AVX512
                 OUTPUT_QUIET
                 ERROR_QUIET)
-    endif()
-else()
+    endif ()
+else ()
     #Linux
-    if(X86_64)
+    if (X86_64)
         execute_process(COMMAND grep -q fma /proc/cpuinfo
                 RESULT_VARIABLE SUPPORT_FMA
                 OUTPUT_QUIET
@@ -59,8 +59,8 @@ else()
                 RESULT_VARIABLE SUPPORT_AVX512
                 OUTPUT_QUIET
                 ERROR_QUIET)
-    endif()
-endif()
+    endif ()
+endif ()
 
 
 file(GLOB_RECURSE
@@ -80,6 +80,13 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         main/*.cpp
 )
+list(FILTER infinity_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        infinity_impl_cpp
+        CONFIGURE_DEPENDS
+        main/*_impl.cpp
+)
 
 file(GLOB_RECURSE
         infinity_cppm
@@ -91,6 +98,13 @@ file(GLOB_RECURSE
         network_cpp
         CONFIGURE_DEPENDS
         network/*.cpp
+)
+list(FILTER network_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        network_impl_cpp
+        CONFIGURE_DEPENDS
+        network/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -104,6 +118,13 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         function/*.cpp
 )
+list(FILTER function_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        function_impl_cpp
+        CONFIGURE_DEPENDS
+        function/*_impl.cpp
+)
 
 file(GLOB_RECURSE
         function_cppm
@@ -115,6 +136,13 @@ file(GLOB_RECURSE
         expression_cpp
         CONFIGURE_DEPENDS
         expression/*.cpp
+)
+list(FILTER expression_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        expression_impl_cpp
+        CONFIGURE_DEPENDS
+        expression/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -128,6 +156,13 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         executor/*.cpp
 )
+list(FILTER executor_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        executor_impl_cpp
+        CONFIGURE_DEPENDS
+        executor/*_impl.cpp
+)
 
 file(GLOB_RECURSE
         executor_cppm
@@ -139,6 +174,13 @@ file(GLOB_RECURSE
         metrics_cpp
         CONFIGURE_DEPENDS
         metrics/*.cpp
+)
+list(FILTER metrics_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        metrics_impl_cpp
+        CONFIGURE_DEPENDS
+        metrics/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -152,6 +194,13 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         planner/*.cpp
 )
+list(FILTER planner_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        planner_impl_cpp
+        CONFIGURE_DEPENDS
+        planner/*_impl.cpp
+)
 
 file(GLOB_RECURSE
         planner_cppm
@@ -163,6 +212,13 @@ file(GLOB_RECURSE
         scheduler_cpp
         CONFIGURE_DEPENDS
         scheduler/*.cpp
+)
+list(FILTER scheduler_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        scheduler_impl_cpp
+        CONFIGURE_DEPENDS
+        scheduler/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -176,6 +232,13 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         storage/*.cpp
 )
+list(FILTER storage_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        storage_impl_cpp
+        CONFIGURE_DEPENDS
+        storage/*_impl.cpp
+)
 
 file(GLOB_RECURSE
         storage_cppm
@@ -187,6 +250,13 @@ file(GLOB_RECURSE
         common_cpp
         CONFIGURE_DEPENDS
         common/*.cpp
+)
+list(FILTER common_cpp EXCLUDE REGEX .*_impl.cpp)
+
+file(GLOB_RECURSE
+        common_impl_cpp
+        CONFIGURE_DEPENDS
+        common/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -202,15 +272,22 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        third_party_cpp
+        CONFIGURE_DEPENDS
+        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
+)
+
+file(GLOB_RECURSE
         admin_cpp
         CONFIGURE_DEPENDS
         admin/*.cpp
 )
+list(FILTER admin_cpp EXCLUDE REGEX .*_impl.cpp)
 
 file(GLOB_RECURSE
-        third_party_cpp
+        admin_impl_cpp
         CONFIGURE_DEPENDS
-        ${CMAKE_SOURCE_DIR}/third_party/simdjson/*.cpp
+        admin/*_impl.cpp
 )
 
 file(GLOB_RECURSE
@@ -250,21 +327,26 @@ target_sources(infinity_core
         ${metrics_cppm}
         ${admin_cppm}
         ${network_cppm}
+
+        ${infinity_impl_cpp}
+        ${planner_impl_cpp}
+        ${scheduler_impl_cpp}
+        ${storage_impl_cpp}
+        ${function_impl_cpp}
+        ${expression_impl_cpp}
+        ${executor_impl_cpp}
+        ${metrics_impl_cpp}
+        ${common_impl_cpp}
+        ${admin_impl_cpp}
+        ${network_impl_cpp}
 )
 
-add_dependencies(infinity_core thrift thriftnb
-        parquet_static
-        snappy re2 pcre2-8-static rocksdb)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-#target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cli11")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
@@ -282,20 +364,14 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
-target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
-target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/minio-cpp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts/")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
-target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
 
 
-if(X86_64)
+if (X86_64)
     if (NOT SUPPORT_FMA EQUAL 0)
         message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
     endif ()
@@ -317,13 +393,6 @@ endif ()
 
 add_executable(infinity
         ${main_cpp}
-
-#        network/http_server.cppm
-#        network/http_server.cpp
-#        network/http/http_search.cppm
-#        network/http/http_search.cpp
-#        network/infinity_thrift_service.cpp
-#        network/infinity_thrift_service.cppm
 )
 
 #target_sources(infinity
@@ -335,7 +404,7 @@ add_executable(infinity
 ### Parser (built after infinity_core so it can access modules)
 add_subdirectory(parser)
 
-add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
+add_dependencies(infinity oatpp miniocpp curlpp_static inih libcurl_static)
 
 target_link_libraries(infinity
         infinity_core
@@ -349,45 +418,42 @@ target_link_libraries(infinity
         dl
         thrift.a
         thriftnb.a
-        lz4.a
+        lz4
+        zstd
+        bz2
+        brotlicommon
+        brotlidec
+        brotlienc
+        mimalloc
         atomic.a
         event.a
-        c++.a
-        c++abi.a
-        #        profiler
         oatpp.a
         parquet.a
         arrow.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         re2.a
-        pcre2-8-static
+        pcre2-8.a
         rocksdb.a
+        stdc++exp.a
+        stdc++.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(infinity PUBLIC "/usr/local/openssl30/lib64")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
-target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
 # if (SKBUILD)
 #    add_library(embedded_infinity_ext MODULE
@@ -407,7 +473,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 #    set(libname "nanobind-static-abi3")
 #    nanobind_build_library(${libname})
 #    nanobind_extension_abi3(embedded_infinity_ext)
-#    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static)
+#    add_dependencies(embedded_infinity_ext oatpp miniocpp curlpp_static inih libcurl_static)
 
 #    target_link_libraries(embedded_infinity_ext PRIVATE
 #            ${libname}
@@ -433,33 +499,28 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 #            snappy.a
 #            ${JEMALLOC_STATIC_LIB}
 #            miniocpp.a
-#            pugixml-static
+#            pugixml.a
 #            curlpp_static
 #            inih.a
 #            libcurl_static
 #            ssl.a
 #            crypto.a
 #            re2.a
-#            pcre2-8-static
+#            pcre2-8.a
 #            rocksdb.a
 #    )
 
-    # WARN: python modules shall not link to static libstdc++!!!
+# WARN: python modules shall not link to static libstdc++!!!
 #    target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
 #    set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
 #
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
 #    nanobind_disable_stack_protector(embedded_infinity_ext)
 #    nanobind_opt_size(embedded_infinity_ext)
@@ -557,26 +618,16 @@ add_executable(unit_test
         ${ut_planner_cpp}
         ${ut_function_cpp}
         ${ut_parallel_cpp}
-        ${infinity_cpp}
-        ${planner_cpp}
-        ${scheduler_cpp}
-        ${storage_cpp}
-        ${expression_cpp}
-        ${function_cpp}
-        ${common_cpp}
-        ${executor_cpp}
-        ${admin_cpp}
-        ${network_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static re2 pcre2-8-static rocksdb)
+add_dependencies(unit_test oatpp miniocpp curlpp_static inih libcurl_static infinity_core)
 
 target_link_libraries(unit_test
+        infinity_core
         gtest
         gtest_main
         sql_parser
-        infinity_core
         onnxruntime_mlas
         zsv_parser
         newpfor
@@ -584,10 +635,14 @@ target_link_libraries(unit_test
         jma
         opencc
         dl
-        lz4.a
+        lz4
+        zstd
+        bz2
+        brotlicommon
+        brotlidec
+        brotlienc
+        mimalloc
         atomic.a
-        c++.a
-        c++abi.a
         parquet.a
         arrow.a
         snappy.a
@@ -598,27 +653,23 @@ target_link_libraries(unit_test
         event.a
         miniocpp.a
         re2.a
-        pcre2-8-static
-        pugixml-static
+        pcre2-8.a
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
 target_link_directories(unit_test PUBLIC "/usr/local/openssl30/lib64")
 
@@ -630,29 +681,22 @@ target_sources(unit_test
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-#target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
-target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curlpp/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/curl/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/darts")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/re2")
-target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-if(X86_64)
+if (X86_64)
     if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
         message("Compiled by AVX2 or AVX512")
         add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
@@ -662,7 +706,7 @@ if(X86_64)
         add_definitions(-msse4.2 -mfma)
         target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
     endif ()
-else()
+else ()
     add_definitions(-march=native)
 endif ()
 

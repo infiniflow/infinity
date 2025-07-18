@@ -15,6 +15,7 @@
 module;
 
 #include "simd_init_h.h"
+
 export module infinity_core:simd_init;
 
 import :stl;

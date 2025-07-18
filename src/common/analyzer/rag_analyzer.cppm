@@ -15,6 +15,7 @@
 module;
 
 #include <re2/re2.h>
+#include "opencc/openccxx.h"
 
 export module infinity_core:rag_analyzer;
 
@@ -26,7 +27,6 @@ import :lemmatizer;
 import :stemmer;
 import :analyzer;
 
-class OpenCC;
 namespace infinity {
 
 // C++ reimplementation of

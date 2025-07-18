@@ -49,8 +49,6 @@ private:
 
     Atomic<u64> task_count_{};
 
-    mutable std::mutex task_mutex_;
-
     SystemCache* system_cache_{};
 };
 

@@ -1,18 +1,5 @@
 add_compile_options(-Wno-everything)
 
-################################################################################
-### snappy
-################################################################################
-add_subdirectory(snappy)
-
-################################################################################
-### arrow
-################################################################################
-add_subdirectory(arrow)
-
-# Build doctest
-add_subdirectory(googletest)
-
 # Build magic_enum
 add_subdirectory(magic_enum)
 
@@ -46,12 +33,7 @@ if (ARCH_AARCH64)
 endif ()
 
 ################################################################################
-### thrift
-################################################################################
-add_subdirectory(thrift)
-
-################################################################################
-### thrift
+### otapp
 ################################################################################
 add_subdirectory(oatpp)
 
@@ -72,7 +54,6 @@ add_subdirectory(opencc)
 
 add_subdirectory(minio-cpp)
 add_subdirectory(curlpp)
-add_subdirectory(pugixml)
 
 add_library(inih STATIC
         inih/cpp/INIReader.cpp
@@ -81,14 +62,9 @@ add_library(inih STATIC
 
 add_subdirectory(curl)
 
-add_subdirectory(re2)
-
-add_subdirectory(pcre2)
 target_compile_options(
         inih
         PRIVATE
         -O3 -Wno-sign-compare
         -fPIC
 )
-
-add_subdirectory(rocksdb)

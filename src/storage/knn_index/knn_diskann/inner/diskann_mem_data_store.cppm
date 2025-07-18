@@ -17,6 +17,8 @@ module;
 #include <cassert>
 #include <fstream>
 #include <ostream>
+#include <memory>
+#include <cstring>
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <xmmintrin.h>
 #elif defined(__GNUC__) && defined(__aarch64__)

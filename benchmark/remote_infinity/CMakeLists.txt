@@ -8,19 +8,11 @@ add_executable(remote_query_benchmark
 
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")
-target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
-target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/re2/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pcre2/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/rocksdb/")
 target_link_directories(remote_query_benchmark PUBLIC "/usr/local/openssl30/lib64")
 
 target_link_libraries(
@@ -38,16 +30,16 @@ target_link_libraries(
         lz4.a
         atomic.a
         thrift.a
-        c++.a
-        c++abi.a
+        libstdc++exp.a
+        libstdc++.a
         parquet.a
         arrow.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
         re2.a
-        pcre2-8-static
-        pugixml-static
+        pcre2-8.a
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static

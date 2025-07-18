@@ -23,7 +23,7 @@ import :third_party;
 
 import :infinity_exception;
 import :column_expression;
-import :column_identifer;
+import :column_identifier;
 import :binding;
 import :base_expression;
 import :meta_info;

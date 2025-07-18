@@ -27,8 +27,8 @@ target_link_libraries(
         infinity_client
         thrift.a
         thriftnb.a
-        c++.a
-        c++abi.a
+        libstdc++exp.a
+        libstdc++.a
 )
 
 target_include_directories(infinity_client_test PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")

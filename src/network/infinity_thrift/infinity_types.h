@@ -425,6 +425,26 @@ class FlushRequest;
 
 class CompactRequest;
 
+class CreateTableSnapshotRequest;
+
+class CreateDatabaseSnapshotRequest;
+
+class CreateSystemSnapshotRequest;
+
+class RestoreSnapshotRequest;
+
+class SnapshotInfo;
+
+class ShowSnapshotRequest;
+
+class ShowSnapshotResponse;
+
+class ListSnapshotsRequest;
+
+class ListSnapshotsResponse;
+
+class DropSnapshotRequest;
+
 typedef struct _Property__isset {
   _Property__isset() : key(false), value(false) {}
   bool key :1;
@@ -4706,6 +4726,438 @@ class CompactRequest : public virtual ::apache::thrift::TBase {
 void swap(CompactRequest &a, CompactRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const CompactRequest& obj);
+
+typedef struct _CreateTableSnapshotRequest__isset {
+  _CreateTableSnapshotRequest__isset() : session_id(false), db_name(false), table_name(false), snapshot_name(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+  bool snapshot_name :1;
+} _CreateTableSnapshotRequest__isset;
+
+class CreateTableSnapshotRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  CreateTableSnapshotRequest(const CreateTableSnapshotRequest&);
+  CreateTableSnapshotRequest& operator=(const CreateTableSnapshotRequest&);
+  CreateTableSnapshotRequest() noexcept;
+
+  virtual ~CreateTableSnapshotRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+  std::string snapshot_name;
+
+  _CreateTableSnapshotRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_snapshot_name(const std::string& val);
+
+  bool operator == (const CreateTableSnapshotRequest & rhs) const;
+  bool operator != (const CreateTableSnapshotRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const CreateTableSnapshotRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(CreateTableSnapshotRequest &a, CreateTableSnapshotRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const CreateTableSnapshotRequest& obj);
+
+typedef struct _CreateDatabaseSnapshotRequest__isset {
+  _CreateDatabaseSnapshotRequest__isset() : session_id(false), db_name(false), snapshot_name(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool snapshot_name :1;
+} _CreateDatabaseSnapshotRequest__isset;
+
+class CreateDatabaseSnapshotRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest&);
+  CreateDatabaseSnapshotRequest& operator=(const CreateDatabaseSnapshotRequest&);
+  CreateDatabaseSnapshotRequest() noexcept;
+
+  virtual ~CreateDatabaseSnapshotRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string snapshot_name;
+
+  _CreateDatabaseSnapshotRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_snapshot_name(const std::string& val);
+
+  bool operator == (const CreateDatabaseSnapshotRequest & rhs) const;
+  bool operator != (const CreateDatabaseSnapshotRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const CreateDatabaseSnapshotRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(CreateDatabaseSnapshotRequest &a, CreateDatabaseSnapshotRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const CreateDatabaseSnapshotRequest& obj);
+
+typedef struct _CreateSystemSnapshotRequest__isset {
+  _CreateSystemSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
+  bool session_id :1;
+  bool snapshot_name :1;
+} _CreateSystemSnapshotRequest__isset;
+
+class CreateSystemSnapshotRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest&);
+  CreateSystemSnapshotRequest& operator=(const CreateSystemSnapshotRequest&);
+  CreateSystemSnapshotRequest() noexcept;
+
+  virtual ~CreateSystemSnapshotRequest() noexcept;
+  int64_t session_id;
+  std::string snapshot_name;
+
+  _CreateSystemSnapshotRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_snapshot_name(const std::string& val);
+
+  bool operator == (const CreateSystemSnapshotRequest & rhs) const;
+  bool operator != (const CreateSystemSnapshotRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const CreateSystemSnapshotRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(CreateSystemSnapshotRequest &a, CreateSystemSnapshotRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const CreateSystemSnapshotRequest& obj);
+
+typedef struct _RestoreSnapshotRequest__isset {
+  _RestoreSnapshotRequest__isset() : session_id(false), snapshot_name(false), scope(false) {}
+  bool session_id :1;
+  bool snapshot_name :1;
+  bool scope :1;
+} _RestoreSnapshotRequest__isset;
+
+class RestoreSnapshotRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  RestoreSnapshotRequest(const RestoreSnapshotRequest&);
+  RestoreSnapshotRequest& operator=(const RestoreSnapshotRequest&);
+  RestoreSnapshotRequest() noexcept;
+
+  virtual ~RestoreSnapshotRequest() noexcept;
+  int64_t session_id;
+  std::string snapshot_name;
+  std::string scope;
+
+  _RestoreSnapshotRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_snapshot_name(const std::string& val);
+
+  void __set_scope(const std::string& val);
+
+  bool operator == (const RestoreSnapshotRequest & rhs) const;
+  bool operator != (const RestoreSnapshotRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const RestoreSnapshotRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(RestoreSnapshotRequest &a, RestoreSnapshotRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const RestoreSnapshotRequest& obj);
+
+typedef struct _SnapshotInfo__isset {
+  _SnapshotInfo__isset() : name(false), scope(false), time(false), commit(false), size(false) {}
+  bool name :1;
+  bool scope :1;
+  bool time :1;
+  bool commit :1;
+  bool size :1;
+} _SnapshotInfo__isset;
+
+class SnapshotInfo : public virtual ::apache::thrift::TBase {
+ public:
+
+  SnapshotInfo(const SnapshotInfo&);
+  SnapshotInfo& operator=(const SnapshotInfo&);
+  SnapshotInfo() noexcept;
+
+  virtual ~SnapshotInfo() noexcept;
+  std::string name;
+  std::string scope;
+  std::string time;
+  int64_t commit;
+  std::string size;
+
+  _SnapshotInfo__isset __isset;
+
+  void __set_name(const std::string& val);
+
+  void __set_scope(const std::string& val);
+
+  void __set_time(const std::string& val);
+
+  void __set_commit(const int64_t val);
+
+  void __set_size(const std::string& val);
+
+  bool operator == (const SnapshotInfo & rhs) const;
+  bool operator != (const SnapshotInfo &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const SnapshotInfo & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(SnapshotInfo &a, SnapshotInfo &b);
+
+std::ostream& operator<<(std::ostream& out, const SnapshotInfo& obj);
+
+typedef struct _ShowSnapshotRequest__isset {
+  _ShowSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
+  bool session_id :1;
+  bool snapshot_name :1;
+} _ShowSnapshotRequest__isset;
+
+class ShowSnapshotRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowSnapshotRequest(const ShowSnapshotRequest&);
+  ShowSnapshotRequest& operator=(const ShowSnapshotRequest&);
+  ShowSnapshotRequest() noexcept;
+
+  virtual ~ShowSnapshotRequest() noexcept;
+  int64_t session_id;
+  std::string snapshot_name;
+
+  _ShowSnapshotRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_snapshot_name(const std::string& val);
+
+  bool operator == (const ShowSnapshotRequest & rhs) const;
+  bool operator != (const ShowSnapshotRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowSnapshotRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowSnapshotRequest &a, ShowSnapshotRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowSnapshotRequest& obj);
+
+typedef struct _ShowSnapshotResponse__isset {
+  _ShowSnapshotResponse__isset() : error_code(false), error_msg(false), snapshot(false) {}
+  bool error_code :1;
+  bool error_msg :1;
+  bool snapshot :1;
+} _ShowSnapshotResponse__isset;
+
+class ShowSnapshotResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowSnapshotResponse(const ShowSnapshotResponse&);
+  ShowSnapshotResponse& operator=(const ShowSnapshotResponse&);
+  ShowSnapshotResponse() noexcept;
+
+  virtual ~ShowSnapshotResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
+  SnapshotInfo snapshot;
+
+  _ShowSnapshotResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_snapshot(const SnapshotInfo& val);
+
+  bool operator == (const ShowSnapshotResponse & rhs) const;
+  bool operator != (const ShowSnapshotResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowSnapshotResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowSnapshotResponse &a, ShowSnapshotResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowSnapshotResponse& obj);
+
+typedef struct _ListSnapshotsRequest__isset {
+  _ListSnapshotsRequest__isset() : session_id(false) {}
+  bool session_id :1;
+} _ListSnapshotsRequest__isset;
+
+class ListSnapshotsRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ListSnapshotsRequest(const ListSnapshotsRequest&) noexcept;
+  ListSnapshotsRequest& operator=(const ListSnapshotsRequest&) noexcept;
+  ListSnapshotsRequest() noexcept;
+
+  virtual ~ListSnapshotsRequest() noexcept;
+  int64_t session_id;
+
+  _ListSnapshotsRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const ListSnapshotsRequest & rhs) const;
+  bool operator != (const ListSnapshotsRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ListSnapshotsRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ListSnapshotsRequest &a, ListSnapshotsRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ListSnapshotsRequest& obj);
+
+typedef struct _ListSnapshotsResponse__isset {
+  _ListSnapshotsResponse__isset() : error_code(false), error_msg(false), snapshots(true) {}
+  bool error_code :1;
+  bool error_msg :1;
+  bool snapshots :1;
+} _ListSnapshotsResponse__isset;
+
+class ListSnapshotsResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ListSnapshotsResponse(const ListSnapshotsResponse&);
+  ListSnapshotsResponse& operator=(const ListSnapshotsResponse&);
+  ListSnapshotsResponse() noexcept;
+
+  virtual ~ListSnapshotsResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
+  std::vector<SnapshotInfo>  snapshots;
+
+  _ListSnapshotsResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_snapshots(const std::vector<SnapshotInfo> & val);
+
+  bool operator == (const ListSnapshotsResponse & rhs) const;
+  bool operator != (const ListSnapshotsResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ListSnapshotsResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ListSnapshotsResponse &a, ListSnapshotsResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ListSnapshotsResponse& obj);
+
+typedef struct _DropSnapshotRequest__isset {
+  _DropSnapshotRequest__isset() : session_id(false), snapshot_name(false) {}
+  bool session_id :1;
+  bool snapshot_name :1;
+} _DropSnapshotRequest__isset;
+
+class DropSnapshotRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  DropSnapshotRequest(const DropSnapshotRequest&);
+  DropSnapshotRequest& operator=(const DropSnapshotRequest&);
+  DropSnapshotRequest() noexcept;
+
+  virtual ~DropSnapshotRequest() noexcept;
+  int64_t session_id;
+  std::string snapshot_name;
+
+  _DropSnapshotRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_snapshot_name(const std::string& val);
+
+  bool operator == (const DropSnapshotRequest & rhs) const;
+  bool operator != (const DropSnapshotRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DropSnapshotRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DropSnapshotRequest &a, DropSnapshotRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const DropSnapshotRequest& obj);
 
 } // namespace
 

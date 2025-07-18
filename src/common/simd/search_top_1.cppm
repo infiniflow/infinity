@@ -14,7 +14,9 @@
 
 module;
 
-#include "simd_common_intrin_include.h"
+// #include "simd_common_intrin_include.h"
+// #include <immintrin.h>
+
 export module infinity_core:search_top_1;
 
 import :stl;

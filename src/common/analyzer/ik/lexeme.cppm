@@ -1,6 +1,7 @@
 module;
 
 #include <string>
+#include <stdexcept>
 
 export module infinity_core:lexeme;
 
