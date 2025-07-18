@@ -99,9 +99,10 @@ TEST_F(TestTxnManagerTest, test_ts) {
 
         {
             auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db2"), TransactionType::kNormal);
-            Status status = txn2->DropDatabase(*db_name, ConflictType::kError);
+            status = txn2->DropDatabase(*db_name, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
         }
 
         txn4_begin_ts = txn->BeginTS();
