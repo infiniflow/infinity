@@ -10,67 +10,105 @@ import file_reader;
 
 namespace infinity {
 
-PostingByteSlice::PostingByteSlice() : buffer_(), posting_writer_() {}
+// Constructor implementation - initialize with empty buffer and writer
+PostingByteSlice::PostingByteSlice() : data_buffer_(), slice_writer_() {}
 
-void PostingByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
+// Initialize the posting byte slice with field configuration
+void PostingByteSlice::Init(const PostingFields *field_config) { data_buffer_.Init(field_config); }
 
+// Internal flush implementation - encode all posting fields to writer
 SizeT PostingByteSlice::DoFlush() {
-    u32 flush_size = 0;
-    const PostingFields *posting_fields = buffer_.GetPostingFields();
-    for (SizeT i = 0; i < posting_fields->GetSize(); ++i) {
-        PostingField *posting_field = posting_fields->GetValue(i);
-        u8 *buffer = buffer_.GetRow(posting_field->location_);
-        flush_size += posting_field->Encode(posting_writer_, buffer, buffer_.Size() * posting_field->GetSize());
+    u32 total_flush_size = 0;
+    const PostingFields *field_definitions = data_buffer_.GetPostingFields();
+
+    // Iterate through all posting fields and encode them
+    for (SizeT field_index = 0; field_index < field_definitions->GetSize(); ++field_index) {
+        PostingField *current_field = field_definitions->GetValue(field_index);
+        u8 *row_buffer = data_buffer_.GetRow(current_field->location_);
+        SizeT encoded_size = current_field->Encode(slice_writer_, row_buffer, data_buffer_.Size() * current_field->GetSize());
+        total_flush_size += encoded_size;
     }
-    return flush_size;
+    return total_flush_size;
 }
 
+// Main flush operation - flush buffer to persistent storage
 SizeT PostingByteSlice::Flush() {
-    if (buffer_.Size() == 0) {
+    // Early return if buffer is empty
+    if (data_buffer_.Size() == 0) {
         return 0;
     }
-    SizeT flush_size = DoFlush();
-    FlushInfo flush_info;
-    flush_info.SetFlushCount(flush_info_.GetFlushCount() + buffer_.Size());
-    flush_info.SetFlushLength(flush_info_.GetFlushLength() + flush_size);
-    flush_info.SetIsValidPostingBuffer(false);
-    flush_info_ = flush_info;
 
-    buffer_.Clear();
-    return flush_size;
+    // Perform the actual flush operation
+    SizeT bytes_flushed = DoFlush();
+
+    // Update flush metadata
+    FlushInfo updated_flush_info;
+    updated_flush_info.SetFlushCount(flush_metadata_.GetFlushCount() + data_buffer_.Size());
+    updated_flush_info.SetFlushLength(flush_metadata_.GetFlushLength() + bytes_flushed);
+    updated_flush_info.SetIsValidPostingBuffer(false);
+    flush_metadata_ = updated_flush_info;
+
+    // Clear the buffer after successful flush
+    data_buffer_.Clear();
+    return bytes_flushed;
 }
 
-void PostingByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
-    if (spill) {
-        buffer_.Dump(file);
-        file->WriteVLong(flush_info_.flush_info_);
-        u32 byte_slice_size = posting_writer_.GetSize();
-        file->WriteVInt(byte_slice_size);
-        if (byte_slice_size == 0)
+// Dump operation - write data to file with optional spill handling
+void PostingByteSlice::Dump(const SharedPtr<FileWriter> &output_file, bool enable_spill) {
+    if (enable_spill) {
+        // Write buffer data first
+        data_buffer_.Dump(output_file);
+
+        // Write flush metadata
+        output_file->WriteVLong(flush_metadata_.flush_info_);
+
+        // Write slice size information
+        u32 slice_data_size = slice_writer_.GetSize();
+        output_file->WriteVInt(slice_data_size);
+
+        // Early return if no slice data to write
+        if (slice_data_size == 0)
             return;
     }
-    posting_writer_.Dump(file);
+
+    // Write the actual slice data
+    slice_writer_.Dump(output_file);
 }
 
-void PostingByteSlice::Load(const SharedPtr<FileReader> &file) {
-    buffer_.Load(file);
-    flush_info_.flush_info_ = file->ReadVLong();
-    u32 byte_slice_size = file->ReadVInt();
-    if (byte_slice_size == 0)
+// Load operation - read data from file
+void PostingByteSlice::Load(const SharedPtr<FileReader> &input_file) {
+    // Load buffer data
+    data_buffer_.Load(input_file);
+
+    // Load flush metadata
+    flush_metadata_.flush_info_ = input_file->ReadVLong();
+
+    // Load slice size and data
+    u32 slice_data_size = input_file->ReadVInt();
+    if (slice_data_size == 0)
         return;
-    posting_writer_.Load(file, byte_slice_size);
+
+    slice_writer_.Load(input_file, slice_data_size);
 }
 
-void PostingByteSlice::SnapShot(PostingByteSlice *buffer) const {
-    buffer->Init(GetPostingFields());
-    buffer->flush_info_ = flush_info_;
-    posting_writer_.SnapShot(buffer->posting_writer_);
-    buffer_.SnapShot(buffer->buffer_);
+// Snapshot operation - create a copy of current state
+void PostingByteSlice::SnapShot(PostingByteSlice *target_buffer) const {
+    // Initialize target with same field configuration
+    target_buffer->Init(GetPostingFields());
 
-    if (flush_info_.GetFlushLength() > buffer->flush_info_.GetFlushLength()) {
-        buffer->buffer_.Clear();
-        buffer->flush_info_ = flush_info_;
-        posting_writer_.SnapShot(buffer->posting_writer_);
+    // Copy flush metadata
+    target_buffer->flush_metadata_ = flush_metadata_;
+
+    // Create snapshots of writer and buffer
+    slice_writer_.SnapShot(target_buffer->slice_writer_);
+    data_buffer_.SnapShot(target_buffer->data_buffer_);
+
+    // Handle case where flush length has increased
+    if (flush_metadata_.GetFlushLength() > target_buffer->flush_metadata_.GetFlushLength()) {
+        target_buffer->data_buffer_.Clear();
+        target_buffer->flush_metadata_ = flush_metadata_;
+        slice_writer_.SnapShot(target_buffer->slice_writer_);
     }
 }
+
 } // namespace infinity
