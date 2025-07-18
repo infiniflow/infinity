@@ -466,7 +466,7 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     }
     // Write any remaining bytes from the last read
     if (srcFile.gcount() > 0) {
-        dstFile.write(buffer, srcFile.gcount());
+    dstFile.write(buffer, srcFile.gcount());
     }
     srcFile.close();
     current_object_size_ += file_size;
