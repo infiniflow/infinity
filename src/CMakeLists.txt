@@ -635,7 +635,13 @@ target_link_libraries(unit_test
         jma
         opencc
         dl
-        lz4.a
+        lz4
+        zstd
+        bz2
+        brotlicommon
+        brotlidec
+        brotlienc
+        mimalloc
         atomic.a
         parquet.a
         arrow.a
