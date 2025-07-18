@@ -449,6 +449,12 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
     txn_store->table_id_str_ = table_id_str;
     txn_store->table_id_ = std::stoull(table_id_str);
     txn_store->table_def_ = table_def;
+
+    // Add operation record with table_id for traceability
+    String operation_msg =
+        fmt::format("CREATE TABLE {}.{} (db_id: {}, table_id: {})", db_name, *table_def->table_name(), db_meta->db_id_str(), table_id_str);
+    txn_context_ptr_->AddOperation(MakeShared<String>(operation_msg));
+
     LOG_TRACE("NewTxn::CreateTable created table entry is inserted.");
     return Status::OK();
 }
@@ -561,6 +567,11 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     txn_store->table_id_ = std::stoull(table_id_str);
     txn_store->create_ts_ = table_create_ts;
     txn_store->table_key_ = table_key;
+
+    // Add operation record with table_id for traceability
+    String operation_msg = fmt::format("DROP TABLE {}.{} (db_id: {}, table_id: {})", db_name, table_name, db_meta->db_id_str(), table_id_str);
+    txn_context_ptr_->AddOperation(MakeShared<String>(operation_msg));
+
     LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
     return Status::OK();
 }

@@ -38,11 +38,13 @@ void PrintTransactionHistory() {
     }
     Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
+    OStringStream oss;
     SizeT history_count = txn_contexts.size();
     for (SizeT idx = 0; idx < history_count; ++idx) {
         SharedPtr<TxnContext> txn_history = txn_contexts[idx];
-        LOG_CRITICAL(txn_history->ToString());
+        oss << txn_history->ToString();
     }
+    LOG_CRITICAL(oss.str());
 }
 
 void PrintStacktrace(const String &err_msg) {
