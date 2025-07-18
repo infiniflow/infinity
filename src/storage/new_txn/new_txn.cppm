@@ -98,7 +98,7 @@ struct RenameTableTxnStore;
 struct RestoreTableTxnStore;
 struct RestoreDatabaseTxnStore;
 struct UpdateTxnStore;
-struct CreateTableSnapshotTxnStore;
+struct CreateSnapshotTxnStore;
 class BufferManager;
 class IndexBase;
 struct DataBlock;
@@ -262,7 +262,7 @@ public:
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
     // // Snapshot OPs
-    Status CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
+    Status CreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, SnapshotScope scope);
 
     // Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const String &db_name, const String &table_name);
 
@@ -598,7 +598,7 @@ private:
     bool CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
-    bool CheckConflictTxnStore(const CreateTableSnapshotTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const CreateSnapshotTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     bool IsReplay() const;

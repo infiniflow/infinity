@@ -498,7 +498,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             const String &db_name = query_context->schema_name();
                             // Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
                             NewTxn *new_txn = query_context->GetNewTxn();
-                            Status snapshot_status = new_txn->CreateTableSnapshot(db_name, table_name, snapshot_name);
+                            Status snapshot_status = new_txn->CreateSnapshot(db_name, table_name, snapshot_name,);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }

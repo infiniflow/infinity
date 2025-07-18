@@ -33,21 +33,21 @@ import logger;
 namespace infinity {
 
 Status Snapshot::CreateDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name, const String &db_name) {
-    auto *txn_ptr = query_context->GetNewTxn();
-    auto *txn_mgr = txn_ptr->txn_mgr();
+    // auto *txn_ptr = query_context->GetNewTxn();
+    // auto *txn_mgr = txn_ptr->txn_mgr();
 
-    SharedPtr<DatabaseSnapshotInfo> database_snapshot;
-    Status status;
-    std::tie(database_snapshot, status) = txn_ptr->GetDatabaseSnapshotInfo(db_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    database_snapshot->snapshot_name_ = snapshot_name;
-    String snapshot_dir = query_context->global_config()->SnapshotDir();
-    status = database_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
-    if (!status.ok()) {
-        return status;
-    }
+    // SharedPtr<DatabaseSnapshotInfo> database_snapshot;
+    // Status status;
+    // std::tie(database_snapshot, status) = txn_ptr->GetDatabaseSnapshotInfo(db_name);
+    // if (!status.ok()) {
+    //     RecoverableError(status);
+    // }
+    // database_snapshot->snapshot_name_ = snapshot_name;
+    // String snapshot_dir = query_context->global_config()->SnapshotDir();
+    // status = database_snapshot->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(txn_ptr));
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     return Status::OK();
 }

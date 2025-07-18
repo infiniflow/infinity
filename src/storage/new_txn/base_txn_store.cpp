@@ -80,7 +80,7 @@ String CreateSnapshotTxnStore::ToString() const {
 SharedPtr<WalEntry> CreateSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTableSnapshot>(db_name_, table_name_, snapshot_name_, max_commit_ts_);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateSnapshot>(db_name_, table_name_, snapshot_name_, max_commit_ts_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }
