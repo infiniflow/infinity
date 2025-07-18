@@ -4246,6 +4246,11 @@ void NewTxn::PostCommit() {
         }
     }
 
+    if(!this->IsReplay()) {
+        // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
+        base_txn_store_->ClearData();
+    }
+
     SetCompletion();
 }
 
@@ -4428,6 +4433,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     //        // Wait for dependent transaction finished
     //        conflicted_txn_->WaitForCompletion();
     //    }
+
+    // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
+    if(base_txn_store_ != nullptr) {
+        base_txn_store_->ClearData();
+    }
 
     SetCompletion();
 
