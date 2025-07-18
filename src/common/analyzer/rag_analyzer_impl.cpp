@@ -26,6 +26,7 @@ module;
 #include <pcre2.h>
 #include <re2/re2.h>
 #include <sstream>
+#include "spdlog/fmt/fmt.h"
 
 #include "string_utils.h"
 
@@ -1009,7 +1010,7 @@ void compare_score_and_tokens(const Vector<String> &dfs_tokens,
                               const String &prefix) {
     std::ostringstream oss;
     const auto b_score_eq = dp_score == dfs_score;
-    oss << std::format("\n{} {} DFS and DP score {}:\nDFS: {}\nDP : {}\n", print_1(b_score_eq), prefix, print_2(b_score_eq), dfs_score, dp_score);
+    oss << fmt::format("\n{} {} DFS and DP score {}:\nDFS: {}\nDP : {}\n", print_1(b_score_eq), prefix, print_2(b_score_eq), dfs_score, dp_score);
     bool vec_equal = true;
     if (dp_tokens.size() != dfs_tokens.size()) {
         vec_equal = false;
@@ -1021,7 +1022,7 @@ void compare_score_and_tokens(const Vector<String> &dfs_tokens,
             }
         }
     }
-    oss << std::format("{} {} DFS and DP result {}:\nDFS: {}\nDP : {}\n",
+    oss << fmt::format("{} {} DFS and DP result {}:\nDFS: {}\nDP : {}\n",
                        print_1(vec_equal),
                        prefix,
                        print_2(vec_equal),
