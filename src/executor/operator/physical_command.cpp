@@ -542,9 +542,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kTable: {
                             Status snapshot_status = Snapshot::RestoreTableSnapshot(query_context, snapshot_name);
-                            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
-
-                            // new_txn_mgr->PrintAllKeyValue();
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }

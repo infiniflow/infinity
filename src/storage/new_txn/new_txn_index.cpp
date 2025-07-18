@@ -2042,8 +2042,11 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
         if (status.code() == ErrorCode::kCatalogError) {
             ft_index_cache = MakeShared<TableIndexReaderCache>(table_meta->db_id_str(), table_meta->table_id_str());
             status = table_meta->AddFtIndexCache(ft_index_cache);
-            if (!status.ok()) {
-                return status;
+            if (status.code() == ErrorCode::kCatalogError) {
+                status = table_meta->GetFtIndexCache(ft_index_cache);
+                if (!status.ok()) {
+                    return status;
+                }
             }
         } else {
             return status;

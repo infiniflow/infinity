@@ -326,6 +326,7 @@ Status TableMeeta::LoadSet() {
     if (!status.ok()) {
         return status;
     }
+    LOG_DEBUG(fmt::format("LoadSet for table: {} with number of indexes: {}", table_id_str_, index_id_strs_ptr->size()));
     for (const String &index_id_str : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id_str, *this);
         auto [index_def, status] = table_index_meta.GetIndexBase();
@@ -337,6 +338,7 @@ Status TableMeeta::LoadSet() {
             String ft_index_cache_key = GetTableTag("ft_index_cache");
             auto ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
             status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
+            LOG_DEBUG(fmt::format("Add ft index cache for table: {}, commit ts: {}", table_id_str_, commit_ts_));
             if (!status.ok()) {
                 return status;
             }

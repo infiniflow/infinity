@@ -259,9 +259,9 @@ Tuple<Vector<ColumnID> *, Status> BlockMeta::GetBlockColumnIDs1() {
                                                              block_id_,
                                                              begin_ts_);
     }
-    auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
+    // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
 
-    new_txn_mgr->PrintAllKeyValue();
+    // new_txn_mgr->PrintAllKeyValue();
 
     return {&*column_ids1_, Status::OK()};
 }

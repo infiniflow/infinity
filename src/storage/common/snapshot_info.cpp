@@ -38,8 +38,80 @@ import utility;
 import block_version;
 import data_type;
 import parsed_expr;
+import fst;
+
+
 
 namespace infinity {
+
+    // Simple FST validation function
+bool ValidateFstFile(const String &file_path) {
+    try {
+        LOG_DEBUG("FST validation: Starting validation for " + file_path);
+        
+        // Try to memory map the file
+        u8 *data_ptr = nullptr;
+        SizeT data_len = 0;
+        int rc = VirtualStore::MmapFile(file_path, data_ptr, data_len);
+        LOG_DEBUG("FST validation: MmapFile result=" + std::to_string(rc) + ", data_len=" + std::to_string(data_len));
+        
+        if (rc < 0 || data_ptr == nullptr || data_len < 36) {
+            LOG_WARN("FST validation: Failed to mmap file or file too small. rc=" + std::to_string(rc) + 
+                     ", data_ptr=" + (data_ptr ? "valid" : "null") + ", data_len=" + std::to_string(data_len));
+            return false;
+        }
+        
+        // For dictionary files, the FST is embedded at the end
+        // Read the FST root address from the end of the file
+        SizeT fst_root_addr = ReadU64LE(data_ptr + data_len - 4 - 8);
+        SizeT fst_len;
+        if (fst_root_addr == 0UL) {
+            fst_len = 36;
+        } else {
+            fst_len = fst_root_addr + 21;
+        }
+        
+        // Calculate the start of FST data
+        u8 *fst_data = data_ptr + (data_len - fst_len);
+        
+        // Now read the version from the FST data (not the beginning of the file)
+        u64 version = ReadU64LE(fst_data);
+        LOG_DEBUG("FST validation: Version=" + std::to_string(version) + ", expected=3");
+        
+        if (version != 3) { // FST VERSION should be 3
+            LOG_WARN("FST validation: Version mismatch. Got=" + std::to_string(version) + ", expected=3");
+            VirtualStore::MunmapFile(file_path);
+            return false;
+        }
+        
+        // Check if we can read the root address from FST data
+        SizeT end = fst_len - 4;
+        SizeT root_addr = ReadU64LE(fst_data + end - 8);
+        SizeT len = ReadU64LE(fst_data + end - 16);
+        
+        LOG_DEBUG("FST validation: root_addr=" + std::to_string(root_addr) + 
+                  ", len=" + std::to_string(len) + ", fst_len=" + std::to_string(fst_len));
+        
+        // Basic sanity checks
+        if (root_addr >= fst_len || len > fst_len) {
+            LOG_WARN("FST validation: Invalid addresses. root_addr=" + std::to_string(root_addr) + 
+                     " >= fst_len=" + std::to_string(fst_len) + " OR len=" + std::to_string(len) + 
+                     " > fst_len=" + std::to_string(fst_len));
+            VirtualStore::MunmapFile(file_path);
+            return false;
+        }
+        
+        LOG_DEBUG("FST validation: Validation passed for " + file_path);
+        VirtualStore::MunmapFile(file_path);
+        return true;
+    } catch (const std::exception &e) {
+        LOG_ERROR("FST validation: Exception during validation: " + String(e.what()));
+        return false;
+    } catch (...) {
+        LOG_ERROR("FST validation: Unknown exception during validation");
+        return false;
+    }
+}
 
 nlohmann::json BlockColumnSnapshotInfo::Serialize() {
     nlohmann::json json_res;
@@ -274,6 +346,16 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
                 return write_status;
             }
             write_file_handle->Sync();
+            // Validate FST files after copying to catch corruption early
+            if (dst_file_path.find(".dic") != String::npos) {
+                bool is_valid = ValidateFstFile(dst_file_path);
+                if (!is_valid) {
+                    LOG_WARN("FST validation failed during snapshot creation for file: " + dst_file_path);
+                    // Continue with snapshot creation but log the warning
+                } else {
+                    LOG_DEBUG("FST validation passed during snapshot creation for file: " + dst_file_path);
+                }
+            }
         }
     } else {
         String data_dir = config->DataDir();
@@ -286,7 +368,7 @@ Status TableSnapshotInfo::Serialize(const String &save_dir, TransactionID txn_id
                 VirtualStore::RemoveDirectory(temp_snapshot_dir);
                 return copy_status;
             }
-        }
+        }       
     }
 
     // End timing for data copying
@@ -568,8 +650,10 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir,
                            const Vector<String>& files_to_restore,
                            const String& new_table_id_str,
                            const String& new_db_id_str,
+                           Vector<String>& restored_file_paths,
                            bool ignore_table_id) {
     Config* config = InfinityContext::instance().config();
+    PersistenceManager* persistence_manager = InfinityContext::instance().persistence_manager();
     
     // Start timing for file restoration
     auto file_restore_start = std::chrono::high_resolution_clock::now();
@@ -611,18 +695,58 @@ Status SnapshotInfo::RestoreSnapshotFiles(const String& snapshot_dir,
         
         String dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
         
-        // Create destination directory 
-        // no race as unique table/db_id_str
-        String dst_dir = VirtualStore::GetParentPath(dst_file_path);
-        if (!VirtualStore::Exists(dst_dir)) {
-            VirtualStore::MakeDirectory(dst_dir);
-        }
-        // there exists empty files getting deleted, so we need to ignore them
-        Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
-        if (!copy_status.ok()) {
-            LOG_WARN(fmt::format("Failed to copy file: {}", copy_status.message()));
+        if (persistence_manager != nullptr) {
+            // Use persistence manager to restore files
+            // Create a temporary file path for the source file
+            String tmp_file_path = fmt::format("{}/{}", config->TempDir(), 
+                                             StringTransform(src_file_path, "/", "_"));
+            
+            // Copy source file to temporary location first
+            Status copy_status = VirtualStore::Copy(tmp_file_path, src_file_path);
+            if (!copy_status.ok()) {
+                LOG_WARN(fmt::format("Failed to copy file to temp: {}", copy_status.message()));
+                continue;
+            }
+            
+           
+            
+            // Use persistence manager to persist the file
+            PersistResultHandler handler(persistence_manager);
+            
+            // Check if this is an index file (in idx_* subdirectory) and disable composition
+            bool try_compose = true;
+            if (dst_file_path.find("/idx_") != String::npos) {
+                try_compose = false;
+                LOG_DEBUG(fmt::format("Index file detected, disabling composition: {}", dst_file_path));
+            }
+            
+            PersistWriteResult persist_result = persistence_manager->Persist(dst_file_path, tmp_file_path, try_compose);
+            handler.HandleWriteResult(persist_result);
+            
+            // Add the destination file path to the output vector
+            restored_file_paths.push_back(modified_file);
+             
+            LOG_TRACE(fmt::format("Restored file via persistence manager: {} -> {}", 
+                                 src_file_path, dst_file_path));
+        } else {
+            // Fallback to direct file copying when no persistence manager
+            // Create destination directory 
+            // no race as unique table/db_id_str
+            String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+            if (!VirtualStore::Exists(dst_dir)) {
+                VirtualStore::MakeDirectory(dst_dir);
+            }
+            // there exists empty files getting deleted, so we need to ignore them
+            Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+            if (!copy_status.ok()) {
+                LOG_WARN(fmt::format("Failed to copy file: {}", copy_status.message()));
+            } else {
+                // Add the destination file path to the output vector
+                restored_file_paths.push_back(modified_file);
+            }
         }
     }
+    
     
     // End timing for file restoration
     auto file_restore_end = std::chrono::high_resolution_clock::now();

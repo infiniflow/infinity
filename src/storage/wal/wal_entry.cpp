@@ -940,7 +940,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             for (i32 i = 0; i < file_n; ++i) {
                 files.push_back(ReadBufAdv<String>(ptr));
             }
-            cmd = MakeShared<WalCmdRestoreTableSnapshot>(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
+            AddrSerializer addr_serializer;
+            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+            bool use_object_cache = pm != nullptr;
+            if (use_object_cache) {
+                addr_serializer.ReadBufAdv(ptr);
+            }
+            cmd = MakeShared<WalCmdRestoreTableSnapshot>(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files, addr_serializer);
             break;
         }
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
@@ -1014,7 +1020,13 @@ WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char 
     for (i32 i = 0; i < files_n; ++i) {
         files.push_back(ReadBufAdv<String>(ptr));
     }
-    return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
+    AddrSerializer addr_serializer;
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        addr_serializer.ReadBufAdv(ptr);
+    }
+    return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files, addr_serializer);
 }
 
 bool WalCmdCreateDatabase::operator==(const WalCmd &other) const {
@@ -1639,7 +1651,12 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
     for (const auto& file : files_) {
         size += sizeof(i32) + file.size();
     }
-    
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        SizeT pm_size = addr_serializer_.GetSizeInBytes();
+        size += pm_size;
+    }
     return size;
 }
 
@@ -1795,6 +1812,11 @@ void WalCmdRestoreTableSnapshot::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, static_cast<i32>(files_.size()));
     for (const auto &file : files_) {
         WriteBufAdv(buf, file);
+    }
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr; 
+    if (use_object_cache) {
+        addr_serializer_.WriteBufAdv(buf);
     }
 }
 

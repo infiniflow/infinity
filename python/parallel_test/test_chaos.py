@@ -103,14 +103,14 @@ class TestIndexParallel:
         res = db_obj.drop_table("chaos_test", ConflictType.Error)
         
         # Clean up any snapshots created during the test
-        try:
-            snapshots_res = infinity_obj.list_snapshots()
-            if snapshots_res.error_code == ErrorCode.OK:
-                for snapshot in snapshots_res.snapshots:
-                    if snapshot.name.startswith("chaos_snapshot_"):
-                        infinity_obj.drop_snapshot(snapshot.name)
-        except Exception as e:
-            pass
+        # try:
+        #     snapshots_res = infinity_obj.list_snapshots()
+        #     if snapshots_res.error_code == ErrorCode.OK:
+        #         for snapshot in snapshots_res.snapshots:
+        #             if snapshot.name.startswith("chaos_snapshot_"):
+        #                 infinity_obj.drop_snapshot(snapshot.name)
+        # except Exception as e:
+        #     pass
         
         # Print final statistics
         print("\n" + "="*60)

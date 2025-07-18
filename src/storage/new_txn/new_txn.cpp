@@ -1527,14 +1527,17 @@ Status NewTxn::RestoreTableSnapshot(const String &db_name, const SharedPtr<Table
     // copy files from snapshot to data dir
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     String snapshot_name = table_snapshot_info->snapshot_name_;
-    Vector<String> files_to_restore = table_snapshot_info->GetFiles();
-    status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, table_id_str, db_meta->db_id_str());
+    Vector<String> restored_file_paths;
+
+    status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot_info->GetFiles(), table_id_str, db_meta->db_id_str(), restored_file_paths,false);
+
     if (!status.ok()) {
         return status;
     }
 
     base_txn_store_ = MakeShared<RestoreTableTxnStore>();
     RestoreTableTxnStore *txn_store = static_cast<RestoreTableTxnStore *>(base_txn_store_.get());
+    txn_store->files_ = restored_file_paths;
     
     // Use the helper function to process snapshot restoration data
     status = ProcessSnapshotRestorationData(db_name, db_meta->db_id_str(), table_name, table_id_str, table_def, table_snapshot_info, snapshot_name, txn_store);
@@ -1582,7 +1585,8 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     String snapshot_name = database_snapshot_info->snapshot_name_;
     Vector<String> files_to_restore = database_snapshot_info->GetFiles();
-    status = database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, true);
+    Vector<String> restored_file_paths;
+    status = database_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, files_to_restore, db_id_str, db_id_str, restored_file_paths, true);
     if (!status.ok()) {
         return status;
     }
@@ -1947,7 +1951,6 @@ Status NewTxn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
     PostCommit();
-
     return Status::OK();
 }
 
@@ -2619,6 +2622,12 @@ Status NewTxn::RestoreTableFromSnapshot(const WalCmdRestoreTableSnapshot *restor
         return status;
     }
 
+    // Initialize full-text index cache after table and indexes are restored
+    status = table_meta->LoadSet();
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
     
     
@@ -2729,10 +2738,10 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, String &cause, bool &re
         case TransactionType::kRestoreDatabase: {
             return CheckConflictTxnStore(static_cast<const RestoreDatabaseTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
-        case TransactionType::kNewCheckpoint: 
         case TransactionType::kCreateTableSnapshot: {
             return CheckConflictTxnStore(static_cast<const CreateTableSnapshotTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
+        case TransactionType::kNewCheckpoint: 
         default: {
             return false;
         }
@@ -5899,12 +5908,33 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         }
     }
 
-    // check if the data still exist in the system
-    String data_dir = InfinityContext::instance().config()->DataDir();
-    String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_), "tbl_" + restore_table_cmd->table_id_);
-    if (!VirtualStore::Exists(table_data_dir)) {
-        LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
-        //return Status::OK();
+    // Check persistence manager state during restore replay
+    PersistenceManager* persistence_manager = InfinityContext::instance().persistence_manager();
+    if (persistence_manager != nullptr) {
+        restore_table_cmd->addr_serializer_.AddToPersistenceManager(persistence_manager);
+        HashMap<String, ObjAddr> all_files = persistence_manager->GetAllFiles();
+        LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}", 
+                              all_files.size(), commit_ts, txn_id));
+        
+        // Check if any files from this table are registered
+        String table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
+        SizeT table_file_count = 0;
+        for (const auto& [file_path, obj_addr] : all_files) {
+            if (file_path.find(table_prefix) != String::npos) {
+                table_file_count++;
+                LOG_DEBUG(fmt::format("Found registered table file: {} -> obj_addr: ({}, {}, {})", 
+                                      file_path, obj_addr.obj_key_, obj_addr.part_offset_, obj_addr.part_size_));
+            }
+        }
+        LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", 
+                              restore_table_cmd->table_id_, table_file_count));
+    }else {    // check if the data still exist in the system
+        String data_dir = InfinityContext::instance().config()->DataDir();
+        String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_), "tbl_" + restore_table_cmd->table_id_);
+        if (!VirtualStore::Exists(table_data_dir)) {
+            LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
+            //return Status::OK();
+        }
     }
     
     // if exist proceed
