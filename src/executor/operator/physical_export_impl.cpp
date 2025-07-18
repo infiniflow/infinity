@@ -1108,7 +1108,7 @@ SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const Colum
 
     SharedPtr<arrow::Array> array;
     if (auto status = array_builder->Finish(&array); !status.ok()) {
-        UnrecoverableError(fmt::format("Failed to build arrow array: {}", status.message()));
+        // UnrecoverableError(fmt::format("Failed to build arrow array: {}", status.message()));
     }
     return array;
 }

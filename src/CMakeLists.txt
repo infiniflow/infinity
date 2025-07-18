@@ -342,7 +342,6 @@ target_sources(infinity_core
 )
 
 add_dependencies(infinity_core thrift thriftnb
-        parquet_static
         snappy re2 pcre2-8-static rocksdb)
 target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -371,7 +370,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
@@ -406,13 +404,6 @@ endif ()
 
 add_executable(infinity
         ${main_cpp}
-
-        #        network/http_server.cppm
-        #        network/http_server.cpp
-        #        network/http/http_search.cppm
-        #        network/http/http_search.cpp
-        #        network/infinity_thrift_service.cpp
-        #        network/infinity_thrift_service.cppm
 )
 
 #target_sources(infinity
@@ -438,10 +429,15 @@ target_link_libraries(infinity
         dl
         thrift.a
         thriftnb.a
-        lz4.a
+        lz4
+        zstd
+        bz2
+        brotlicommon
+        brotlidec
+        brotlienc
+        mimalloc
         atomic.a
         event.a
-        #        profiler
         oatpp.a
         parquet.a
         arrow.a
@@ -457,12 +453,11 @@ target_link_libraries(infinity
         re2.a
         pcre2-8-static
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
@@ -539,7 +534,6 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 #
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
 #    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
@@ -646,17 +640,6 @@ add_executable(unit_test
         ${ut_planner_cpp}
         ${ut_function_cpp}
         ${ut_parallel_cpp}
-
-        #        ${infinity_cpp}
-        #        ${planner_cpp}
-        #        ${scheduler_cpp}
-        #        ${storage_cpp}
-        #        ${expression_cpp}
-        #        ${function_cpp}
-        #        ${common_cpp}
-        #        ${executor_cpp}
-        #        ${admin_cpp}
-        #        ${network_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -699,7 +682,6 @@ target_link_libraries(unit_test
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
