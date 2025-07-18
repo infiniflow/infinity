@@ -66,7 +66,6 @@ add_library(inih STATIC
 
 add_subdirectory(curl)
 
-add_subdirectory(pcre2)
 target_compile_options(
         inih
         PRIVATE
