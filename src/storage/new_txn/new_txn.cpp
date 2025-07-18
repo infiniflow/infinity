@@ -4241,7 +4241,7 @@ void NewTxn::PostCommit() {
     }
 
     // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
-    base_txn_store_.reset();
+    base_txn_store_->ClearData();
 
     SetCompletion();
 }
@@ -4427,7 +4427,9 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     //    }
 
     // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
-    base_txn_store_.reset();
+    if(base_txn_store_ != nullptr) {
+        base_txn_store_->ClearData();
+    }
 
     SetCompletion();
 
