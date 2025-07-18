@@ -1,8 +1,5 @@
 add_compile_options(-Wno-everything)
 
-# Build doctest
-add_subdirectory(googletest)
-
 # Build magic_enum
 add_subdirectory(magic_enum)
 
