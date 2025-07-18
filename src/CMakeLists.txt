@@ -404,7 +404,7 @@ add_executable(infinity
 ### Parser (built after infinity_core so it can access modules)
 add_subdirectory(parser)
 
-add_dependencies(infinity oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
+add_dependencies(infinity oatpp miniocpp curlpp_static inih libcurl_static)
 
 target_link_libraries(infinity
         infinity_core
@@ -433,7 +433,7 @@ target_link_libraries(infinity
         snappy.a
         ${JEMALLOC_STATIC_LIB}
         miniocpp.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
@@ -448,7 +448,6 @@ target_link_libraries(infinity
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -474,7 +473,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 #    set(libname "nanobind-static-abi3")
 #    nanobind_build_library(${libname})
 #    nanobind_extension_abi3(embedded_infinity_ext)
-#    add_dependencies(embedded_infinity_ext oatpp miniocpp pugixml-static curlpp_static inih libcurl_static)
+#    add_dependencies(embedded_infinity_ext oatpp miniocpp curlpp_static inih libcurl_static)
 
 #    target_link_libraries(embedded_infinity_ext PRIVATE
 #            ${libname}
@@ -500,7 +499,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 #            snappy.a
 #            ${JEMALLOC_STATIC_LIB}
 #            miniocpp.a
-#            pugixml-static
+#            pugixml.a
 #            curlpp_static
 #            inih.a
 #            libcurl_static
@@ -622,7 +621,7 @@ add_executable(unit_test
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
-add_dependencies(unit_test oatpp miniocpp pugixml-static curlpp_static inih libcurl_static infinity_core)
+add_dependencies(unit_test oatpp miniocpp curlpp_static inih libcurl_static infinity_core)
 
 target_link_libraries(unit_test
         infinity_core
@@ -649,7 +648,7 @@ target_link_libraries(unit_test
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
@@ -663,7 +662,6 @@ target_link_libraries(unit_test
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")

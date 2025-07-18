@@ -57,7 +57,6 @@ add_subdirectory(opencc)
 
 add_subdirectory(minio-cpp)
 add_subdirectory(curlpp)
-add_subdirectory(pugixml)
 
 add_library(inih STATIC
         inih/cpp/INIReader.cpp

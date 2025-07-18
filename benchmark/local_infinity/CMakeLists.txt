@@ -28,20 +28,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -80,20 +79,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -129,20 +127,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -179,20 +176,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -227,20 +223,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -274,20 +269,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -321,20 +315,19 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        stdc++exp.a
+        stdc++.a
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")

@@ -10,7 +10,6 @@ target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/sr
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
@@ -40,7 +39,7 @@ target_link_libraries(
         miniocpp.a
         re2.a
         pcre2-8.a
-        pugixml-static
+        pugixml.a
         curlpp_static
         inih.a
         libcurl_static
