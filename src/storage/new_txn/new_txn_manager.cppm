@@ -69,6 +69,8 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
 
+    TxnTimeStamp GetCurrentTS();
+
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
     bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
@@ -123,6 +125,7 @@ public:
     Storage *storage() const { return storage_; }
 
     void CommitBottom(NewTxn *txn);
+    void CommitKVInstance(NewTxn *txn);
 
 private:
     void UpdateCatalogCache(NewTxn *txn);

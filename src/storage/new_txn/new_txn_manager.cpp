@@ -202,6 +202,11 @@ TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
+TxnTimeStamp NewTxnManager::GetCurrentTS() {
+    std::lock_guard guard(locker_);
+    return current_ts_;
+}
+
 // Prepare to commit WriteTxn
 TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     std::lock_guard guard(locker_);
@@ -425,6 +430,20 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
     }
 }
 
+void NewTxnManager::CommitKVInstance(NewTxn *txn) {
+    Status status = txn->kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+    }
+    TxnTimeStamp kv_commit_ts;
+    {
+        std::lock_guard guard(locker_);
+        current_ts_ += 2;
+        kv_commit_ts = current_ts_;
+    }
+    txn->SetTxnKVCommitTS(kv_commit_ts);
+}
+
 void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
     switch (txn->GetTxnType()) {
         case TransactionType::kCreateDB: {
@@ -558,7 +577,7 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
     }
 
     TxnTimeStamp first_begin_ts = begin_txn_map_.begin()->first;
-    while (!check_txn_map_.empty() && check_txn_map_.begin()->first < first_begin_ts) {
+    while (!check_txn_map_.empty() && check_txn_map_.begin()->second->KVCommitTS() < first_begin_ts) {
         LOG_TRACE(fmt::format("Pop check txn, id: {}, with commit_ts: {} < begin_ts: {}",
                               check_txn_map_.begin()->second->TxnID(),
                               check_txn_map_.begin()->first,
@@ -590,11 +609,11 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID thi
             if (this_txn_id == other_txn->TxnID()) {
                 continue;
             }
-            TxnTimeStamp other_commit_ts = other_txn->CommitTS();
+            TxnTimeStamp other_kv_commit_ts = other_txn->KVCommitTS();
             TxnTimeStamp other_begin_ts = other_txn->BeginTS();
             TxnState other_txn_state = other_txn->GetTxnState();
             bool is_rollback = (other_txn_state == TxnState::kRollbacking) || (other_txn_state == TxnState::kRollbacked);
-            if (other_commit_ts < this_begin_ts || is_rollback) {
+            if (other_kv_commit_ts < this_begin_ts || is_rollback) {
                 // SKIP, other txn is committed before this txn begin
                 continue;
             }

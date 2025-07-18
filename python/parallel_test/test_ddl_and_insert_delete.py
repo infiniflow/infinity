@@ -1,6 +1,5 @@
 import time
 import infinity.index as index
-import pytest
 import random
 from threading import Thread
 from infinity.common import ConflictType
@@ -37,14 +36,14 @@ class TestInsertDeleteUpdate:
 def create_table(db_obj: Database):
     try:
         db_obj.create_table(table_name, {"tag": {"type": "int"}, "c1": {"type": "vector,4,float"}}, ConflictType.Error)
-    except Exception as e:
+    except Exception:
         return
 
 
 def drop_table(db_obj: Database):
     try:
         db_obj.drop_table(table_name, ConflictType.Ignore)
-    except Exception as e:
+    except Exception:
         return
 
 
@@ -57,7 +56,7 @@ def create_index(db_obj: Database):
                                    "ef_construction": "50",
                                    "metric": "l2"
                                }), ConflictType.Error)
-    except Exception as e:
+    except Exception:
         return
 
 
@@ -65,7 +64,7 @@ def drop_index(db_obj: Database):
     try:
         table_obj = db_obj.get_table(table_name)
         table_obj.drop_index(index_name)
-    except Exception as e:
+    except Exception:
         return
 
 
@@ -79,7 +78,7 @@ def insert(db_obj: Database):
         table_obj.insert(value)
         res, extra_result = table_obj.output(['*']).to_df()
         print(res)
-    except Exception as e:
+    except Exception:
         return
 
 
@@ -87,7 +86,7 @@ def delete(db_obj: Database):
     try:
         table_obj = db_obj.get_table(table_name)
         table_obj.delete(f"tag = {random.randint(0, 9)}")
-    except Exception as e:
+    except Exception:
         return
 
 
@@ -95,7 +94,7 @@ def update(db_obj: Database):
     try:
         table_obj = db_obj.get_table(table_name)
         table_obj.update(f"tag = {random.randint(0, 9)}", [{"tag": 0, "c1": [0.0, 0.0, 0.0, 0.0]}])
-    except Exception as e:
+    except Exception:
         return
 
 
