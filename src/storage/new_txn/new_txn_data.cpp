@@ -481,6 +481,10 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     append_txn_store->input_block_ = input_block;
     // append_txn_store->row_ranges_ will be populated after conflict check
 
+    String operation_msg =
+        fmt::format("APPEND table {}.{} (db_id: {}, table_id: {})", db_name, table_name, db_meta->db_id_str(), table_meta->table_id_str());
+    txn_context_ptr_->AddOperation(MakeShared<String>(operation_msg));
+
     return AppendInner(db_name, table_name, table_key, *table_meta, input_block);
 }
 
@@ -616,6 +620,10 @@ Status NewTxn::Update(const String &db_name, const String &table_name, const Sha
         update_txn_store->row_ids_.reserve(update_txn_store->row_ids_.size() + row_ids.size());
         update_txn_store->row_ids_.insert(update_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
     }
+
+    String operation_msg =
+        fmt::format("UPDATE table {}.{} (db_id: {}, table_id: {})", db_name, table_name, db_meta->db_id_str(), table_meta->table_id_str());
+    txn_context_ptr_->AddOperation(MakeShared<String>(operation_msg));
 
     status = AppendInner(db_name, table_name, table_key, *table_meta, input_block);
     if (!status.ok()) {
@@ -1469,7 +1477,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     if (!status.ok()) {
         return status;
     }
-    Vector<TableIndexMeeta> table_index_metas;
+    Vector<SharedPtr<TableIndexMeeta>> table_index_metas;
     Vector<String> *index_name_strs = nullptr;
     if (!this->IsReplay()) {
         Vector<String> *index_id_strs = nullptr;
@@ -1481,7 +1489,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         }
         for (SizeT i = 0; i < index_id_strs->size(); ++i) {
             const String &index_id_str = (*index_id_strs)[i];
-            table_index_metas.emplace_back(index_id_str, table_meta);
+            table_index_metas.push_back(MakeShared<TableIndexMeeta>(index_id_str, table_meta));
         }
     }
 
@@ -1550,7 +1558,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
             return status;
         }
         for (auto &table_index_meta : table_index_metas) {
-            status = this->AppendIndex(table_index_meta, range);
+            status = this->AppendIndex(*table_index_meta, range);
             if (!status.ok()) {
                 return status;
             }

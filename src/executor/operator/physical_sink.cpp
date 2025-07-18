@@ -480,7 +480,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         }
         return;
     }
-    queue_sink_state->sent_data_ = true;
+    {
+        std::lock_guard<std::mutex> lock(queue_sink_state->sent_data_mutex_);
+        queue_sink_state->sent_data_ = true;
+    }
     for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
         auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
                                                       std::move(task_operator_state->data_block_array_[idx]),

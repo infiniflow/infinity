@@ -98,6 +98,7 @@ Status DBMeeta::UninitSet(UsageFlag usage_flag) {
 }
 
 Status DBMeeta::GetComment(String *&comment) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!comment_) {
         String comment_str;
         String db_comment_key = GetDBTag("comment");
@@ -113,6 +114,7 @@ Status DBMeeta::GetComment(String *&comment) {
 }
 
 Status DBMeeta::GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!table_id_strs_ || !table_names_) {
         Status status = LoadTableIDs();
         if (!status.ok()) {
