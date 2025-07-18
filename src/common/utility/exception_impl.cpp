@@ -14,7 +14,6 @@
 
 module;
 
-#include <print>
 #include <stacktrace>
 
 module infinity_core:infinity_exception.impl;
@@ -46,7 +45,7 @@ void PrintTransactionHistory() {
 
 void PrintStacktrace(const String &err_msg) {
     LOG_CRITICAL(fmt::format("Error: {}", err_msg));
-    std::println("{}", std::stacktrace::current());
+    fmt::print("{}\n", std::stacktrace::current());
 }
 
 #define ADD_LOG_INFO
