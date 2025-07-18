@@ -101,7 +101,7 @@ jobs:
         run: |
           failure="${{ steps.run_restart_test_sanitizer.outcome == 'failure'}}"
           sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=restart_tsan.log
-          sudo rm restart_tsan.log*
+          sudo rm -f restart_tsan.log*
 
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() && steps.choose_test_type.outputs.RUN_TSAN_TEST == 'true' }}
