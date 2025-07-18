@@ -4240,8 +4240,10 @@ void NewTxn::PostCommit() {
         }
     }
 
-    // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
-    base_txn_store_->ClearData();
+    if(!this->IsReplay()) {
+        // To avoid the txn is hold by other object and the data in base_txn_store can't be released.
+        base_txn_store_->ClearData();
+    }
 
     SetCompletion();
 }
