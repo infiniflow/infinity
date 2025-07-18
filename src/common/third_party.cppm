@@ -21,7 +21,7 @@ module;
 #pragma clang diagnostic ignored "-W#pragma-messages"
 #pragma clang diagnostic ignored "-Wpessimizing-move"
 
-#include "CLI11.hpp"
+#include <CLI/CLI.hpp>
 
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
