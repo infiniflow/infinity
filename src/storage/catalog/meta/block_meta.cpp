@@ -83,9 +83,6 @@ Status BlockMeta::InitSet() {
     {
         String block_lock_key = GetBlockTag("lock");
         Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
-        if (!status.ok()) {
-            return status;
-        }
     }
     SharedPtr<String> block_dir_ptr = this->GetBlockDir();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();

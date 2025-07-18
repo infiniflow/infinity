@@ -56,7 +56,7 @@ struct WalSegmentInfo;
 struct WalCmdCheckpointV2;
 struct WalCmdOptimizeV2;
 struct WalCmdCleanup;
-struct WalCmdCreateTableSnapshot;
+struct WalCmdCreateSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
 
