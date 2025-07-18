@@ -342,6 +342,7 @@ void TableCache::DropTableIndexCacheNolock(u64 index_id) {
     auto iter = index_cache_map_.find(index_id);
     if (iter == index_cache_map_.end()) {
         LOG_ERROR(fmt::format("Table index cache with id: {} not found", index_id));
+        return;
     }
     index_cache_map_.erase(iter);
 }
@@ -365,6 +366,7 @@ void DbCache::DropTableCacheNolock(u64 table_id) {
     auto iter = table_cache_map_.find(table_id);
     if (iter == table_cache_map_.end()) {
         LOG_ERROR(fmt::format("Table cache with id: {} not found", table_id));
+        return;
     }
     table_cache_map_.erase(iter);
 }
