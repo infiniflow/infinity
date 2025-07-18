@@ -70,6 +70,20 @@ public:
 
     QueryResult ShowDatabase(const String &db_name);
 
+    QueryResult CreateDatabaseSnapshot(const String &db_name, const String &snapshot_name);
+
+    QueryResult RestoreDatabaseSnapshot(const String &snapshot_name);
+
+    QueryResult CreateSystemSnapshot(const String &snapshot_name);
+
+    QueryResult RestoreSystemSnapshot(const String &snapshot_name);
+
+    QueryResult ShowSnapshot(const String &snapshot_name);
+
+    QueryResult ListSnapshots();
+
+    QueryResult DropSnapshot(const String &snapshot_name);
+
     QueryResult Flush(const String &flush_type = "data");
 
     QueryResult Compact(const String &db_name, const String &table_name);
@@ -114,6 +128,10 @@ public:
 
     QueryResult GetTable(const String &db_name, const String &table_name);
 
+    QueryResult CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
+
+    QueryResult RestoreTableSnapshot(const String &snapshot_name);
+
     // Table related functions
     QueryResult CreateIndex(const String &db_name,
                             const String &table_name,
@@ -140,6 +158,15 @@ public:
 
     QueryResult
     ShowBlockColumn(const String &db_name, const String &table_name, const SegmentID &segment_id, const BlockID &block_id, const SizeT &column_id);
+
+    // TODO: ask whether need to add snapshot related functions
+    // QueryResult CreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
+
+    // QueryResult RestoreTableSnapshot(const String &snapshot_name);
+
+    // QueryResult ShowSnapshots();
+
+    // QueryResult DropSnapshot(const String &snapshot_name);
 
     // Metrics
     QueryResult ShowBuffer();

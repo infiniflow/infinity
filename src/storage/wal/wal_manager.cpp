@@ -627,13 +627,20 @@ Tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(St
             }
             LOG_TRACE(wal_entry->ToString());
 
-            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
-            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
-                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+            WalCmd *cmd = nullptr;
+            if (wal_entry->IsCheckPointOrSnapshot(cmd)) {
+                if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
+                    auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
+                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;                    
+                } else if (cmd->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
+                    auto create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(cmd);
+                    max_checkpoint_ts = create_table_snapshot_cmd->max_commit_ts_;
+                }
                 last_commit_ts = wal_entry->commit_ts_;
                 max_transaction_id = wal_entry->txn_id_;
                 break;
             }
+            
             replay_entries.push_back(wal_entry);
         }
         LOG_INFO(fmt::format("Find and set checkpoint max commit ts: {}", max_checkpoint_ts));
@@ -774,10 +781,16 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
 
             LOG_TRACE(wal_entry->ToString());
 
-            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
+            WalCmd *cmd = nullptr;
             wal_entries.push_back(wal_entry);
-            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
-                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+            if (wal_entry->IsCheckPointOrSnapshot(cmd)) {
+                if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
+                    auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
+                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+                } else if (cmd->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
+                    auto create_table_snapshot_cmd = static_cast<WalCmdCreateTableSnapshot *>(cmd);
+                    max_checkpoint_ts = create_table_snapshot_cmd->max_commit_ts_;
+                }
                 system_start_ts = wal_entry->commit_ts_;
                 break;
             }

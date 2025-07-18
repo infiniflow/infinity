@@ -76,6 +76,8 @@ export enum class TransactionType {
     kCompact,
     kCreateDB,
     kCreateTable,
+    kRestoreTable,
+    kRestoreDatabase,
     kDropDB,
     kDropTable,
     kRenameTable,
@@ -85,7 +87,8 @@ export enum class TransactionType {
     kOptimizeIndex,
     kAddColumn,
     kDropColumn,
-    kCleanup
+    kCleanup,
+    kCreateTableSnapshot
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -138,6 +141,12 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         case TransactionType::kCreateTable: {
             return "CreateTable";
         }
+        case TransactionType::kRestoreTable: {
+            return "RestoreTable";
+        }
+        case TransactionType::kRestoreDatabase: {
+            return "RestoreDatabase";
+        }
         case TransactionType::kRenameTable: {
             return "RenameTable";
         }
@@ -161,6 +170,9 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kInvalid: {
             return "Invalid";
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            return "CreateTableSnapshot";
         }
     }
     return "Normal";

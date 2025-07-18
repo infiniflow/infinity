@@ -316,6 +316,12 @@ private:
     static void
     ProcessStatus(infinity_thrift_rpc::ShowCurrentNodeResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
+    static void
+    ProcessStatus(infinity_thrift_rpc::ShowSnapshotResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
+
+    static void
+    ProcessStatus(infinity_thrift_rpc::ListSnapshotsResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
+
     static void ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
@@ -365,6 +371,14 @@ private:
                                    const std::string_view error_header = ErrorMsgHeader);
 
     static void ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
+                                   const QueryResult &result,
+                                   const std::string_view error_header = ErrorMsgHeader);
+
+    static void ProcessQueryResult(infinity_thrift_rpc::ShowSnapshotResponse &response,
+                                   const QueryResult &result,
+                                   const std::string_view error_header = ErrorMsgHeader);
+
+    static void ProcessQueryResult(infinity_thrift_rpc::ListSnapshotsResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
 };

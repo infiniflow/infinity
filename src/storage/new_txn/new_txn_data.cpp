@@ -1852,6 +1852,7 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     return Status::OK();
 }
 
+
 Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     Status status;
 

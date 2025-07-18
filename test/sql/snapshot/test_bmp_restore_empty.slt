@@ -1,0 +1,51 @@
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_bmp;
+
+statement ok
+CREATE TABLE sqllogic_test_bmp (col1 INT, col2 SPARSE(FLOAT,30000));
+
+statement ok
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16);
+
+statement ok
+SHOW TABLE sqllogic_test_bmp INDEX idx1;
+
+statement ok
+CREATE SNAPSHOT sqllogic_test_bmp_backup ON TABLE sqllogic_test_bmp;
+
+statement ok
+DROP TABLE sqllogic_test_bmp;
+
+statement ok
+RESTORE TABLE SNAPSHOT sqllogic_test_bmp_backup;
+
+statement ok
+SELECT * FROM sqllogic_test_bmp LIMIT 1;
+
+statement ok
+SHOW TABLE sqllogic_test_bmp INDEX idx1;
+
+#drop and restore again
+statement ok
+DROP TABLE sqllogic_test_bmp;
+
+statement ok
+RESTORE TABLE SNAPSHOT sqllogic_test_bmp_backup;
+
+statement ok
+SELECT * FROM sqllogic_test_bmp LIMIT 1;
+
+statement ok
+SHOW TABLE sqllogic_test_bmp INDEX idx1;
+
+statement ok
+DROP INDEX idx1 ON sqllogic_test_bmp;
+
+statement ok
+DROP TABLE sqllogic_test_bmp;
+
+statement ok
+DROP SNAPSHOT sqllogic_test_bmp_backup;
+
+statement error
+DROP SNAPSHOT sqllogic_test_bmp_backup;
