@@ -387,12 +387,14 @@ void SystemCache::DropDbCache(u64 db_id) {
     auto cache_iter = db_cache_map_.find(db_id);
     if (cache_iter == db_cache_map_.end()) {
         LOG_ERROR(fmt::format("Db cache with id: {} not found", db_id));
+        return;
     }
     String db_name = cache_iter->second->db_name();
     db_cache_map_.erase(cache_iter);
     auto name_iter = db_name_map_.find(db_name);
     if (name_iter == db_name_map_.end()) {
-        LOG_ERROR(fmt::format("Db name cache with name: {} not found", cache_iter->second->db_name()));
+        LOG_ERROR(fmt::format("Db name cache with name: {} not found", db_name));
+        return;
     }
     db_name_map_.erase(name_iter);
 }
