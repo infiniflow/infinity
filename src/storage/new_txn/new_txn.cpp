@@ -85,6 +85,7 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
                TransactionID txn_id,
                TxnTimeStamp begin_ts,
                TxnTimeStamp last_kv_commit_ts,
+               TxnTimeStamp last_commit_ts,
                UniquePtr<KVInstance> kv_instance,
                SharedPtr<String> txn_text,
                TransactionType txn_type)
@@ -98,6 +99,7 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
     txn_context_ptr_->txn_id_ = txn_id;
     txn_context_ptr_->begin_ts_ = begin_ts;
     txn_context_ptr_->last_kv_commit_ts_ = last_kv_commit_ts;
+    txn_context_ptr_->last_commit_ts_ = last_commit_ts;
     txn_context_ptr_->text_ = txn_text_;
     txn_context_ptr_->txn_type_ = txn_type;
 }
@@ -121,15 +123,16 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
 
 UniquePtr<NewTxn>
 NewTxn::NewReplayTxn(NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts, UniquePtr<KVInstance> kv_instance) {
-    TxnTimeStamp last_kv_commit_ts = commit_ts + 1; // The last kv commit ts is commit_ts - 1
-    auto txn = MakeUnique<NewTxn>(txn_mgr, txn_id, begin_ts, last_kv_commit_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
+    TxnTimeStamp last_kv_commit_ts = commit_ts + 1; // The last kv commit ts is commit_ts + 1
+    auto txn = MakeUnique<NewTxn>(txn_mgr, txn_id, begin_ts, last_kv_commit_ts, commit_ts, std::move(kv_instance), nullptr, TransactionType::kReplay);
     txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;
 }
 
 UniquePtr<NewTxn> NewTxn::NewRecoveryTxn(NewTxnManager *txn_mgr, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     KVStore *kv_code = txn_mgr->kv_store();
-    UniquePtr<NewTxn> txn = MakeUnique<NewTxn>(txn_mgr, 0, begin_ts, kv_code->GetInstance(), nullptr, TransactionType::kRecovery);
+    UniquePtr<NewTxn> txn =
+        MakeUnique<NewTxn>(txn_mgr, 0, begin_ts, commit_ts + 1, commit_ts, kv_code->GetInstance(), nullptr, TransactionType::kRecovery);
     txn->txn_context_ptr_->commit_ts_ = commit_ts;
     return txn;
 }

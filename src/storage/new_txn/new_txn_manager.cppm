@@ -180,6 +180,7 @@ private:
     TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
     TxnTimeStamp last_kv_commit_ts_{};        // record last kv commit ts, used for conflict check
+    TxnTimeStamp last_commit_ts_{};           // record last commit ts, used for conflict check
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager

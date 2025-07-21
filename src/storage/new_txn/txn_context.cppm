@@ -35,6 +35,7 @@ export struct TxnContext {
     TxnTimeStamp commit_ts_{};
     TxnTimeStamp kv_commit_ts_{UNCOMMIT_TS};
     TxnTimeStamp last_kv_commit_ts_{};
+    TxnTimeStamp last_commit_ts_{};
     TxnState state_{TxnState::kStarted};
     TransactionType txn_type_{TransactionType::kRead};
 

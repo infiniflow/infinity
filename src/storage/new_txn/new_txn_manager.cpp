@@ -132,7 +132,8 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     }
 
     // Create txn instance
-    auto new_txn = MakeShared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
+    auto new_txn =
+        MakeShared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, last_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -435,11 +436,13 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
     }
+    TxnTimeStamp commit_ts = txn->CommitTS();
     TxnTimeStamp kv_commit_ts;
     {
         std::lock_guard guard(locker_);
         kv_commit_ts = current_ts_ + 1;
         last_kv_commit_ts_ = kv_commit_ts;
+        last_commit_ts_ = commit_ts;
     }
     txn->SetTxnKVCommitTS(kv_commit_ts);
 }
