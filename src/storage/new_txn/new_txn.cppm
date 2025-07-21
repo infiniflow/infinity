@@ -332,6 +332,10 @@ public:
 
     TxnTimeStamp KVCommitTS() const;
 
+    TxnTimeStamp LastSystemKVCommitTS() const;
+
+    TxnTimeStamp LastSystemCommitTS() const;
+
     void SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts);
 
     TxnState GetTxnState() const;

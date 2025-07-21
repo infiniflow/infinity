@@ -1545,6 +1545,16 @@ TxnTimeStamp NewTxn::KVCommitTS() const {
     return txn_context_ptr_->kv_commit_ts_;
 }
 
+TxnTimeStamp NewTxn::LastSystemKVCommitTS() const {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return txn_context_ptr_->last_kv_commit_ts_;
+}
+
+TxnTimeStamp NewTxn::LastSystemCommitTS() const {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return txn_context_ptr_->last_commit_ts_;
+}
+
 [[maybe_unused]] void NewTxn::SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     txn_context_ptr_->kv_commit_ts_ = kv_commit_ts;

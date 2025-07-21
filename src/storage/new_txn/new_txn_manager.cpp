@@ -224,10 +224,8 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
 }
 
 bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query) {
-    TxnTimeStamp begin_ts = txn->BeginTS();
-    TxnTimeStamp commit_ts = txn->CommitTS();
 
-    Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn->TxnID(), begin_ts, commit_ts);
+    Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
@@ -597,7 +595,18 @@ void NewTxnManager::PrintAllKeyValue() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID this_txn_id, TxnTimeStamp this_begin_ts, TxnTimeStamp this_commit_ts) {
+//
+//
+//
+//
+Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
+
+    TxnTimeStamp this_begin_ts = this_txn->BeginTS();
+    TxnTimeStamp this_kv_commit_ts = this_txn->KVCommitTS();
+    TransactionID this_txn_id = this_txn->TxnID();
+    TxnTimeStamp this_last_system_kv_commit_ts = this_txn->LastSystemKVCommitTS();
+    TxnTimeStamp this_last_system_commit_ts = this_txn->LastSystemCommitTS();
+
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
@@ -613,6 +622,7 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID thi
                 continue;
             }
             TxnTimeStamp other_kv_commit_ts = other_txn->KVCommitTS();
+            TxnTimeStamp other_commit_ts = other_txn->CommitTS();
             TxnTimeStamp other_begin_ts = other_txn->BeginTS();
             TxnState other_txn_state = other_txn->GetTxnState();
             bool is_rollback = (other_txn_state == TxnState::kRollbacking) || (other_txn_state == TxnState::kRollbacked);
@@ -620,7 +630,48 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID thi
                 // SKIP, other txn is committed before this txn begin
                 continue;
             }
-            if (other_begin_ts > this_commit_ts) {
+
+            if (other_kv_commit_ts == this_begin_ts) {
+                if (other_kv_commit_ts < this_last_system_kv_commit_ts) {
+                    // other txn kv commit before this txn begin
+                    // case 1
+                    //  t1               commit     kv commit (509) -- no conflicts
+                    //  |-------------------|----------|
+                    //                                  |---------------------------------|------------|
+                    //                              t3 begin (begin_ts 511) (last_kv_commit 511)
+                    // t2 must begin after t1 kv commit, no conflict
+                    // SKIP
+                    continue;
+                } else if (other_kv_commit_ts == this_last_system_kv_commit_ts) {
+                    // other txn kv commit ts same as this txn begin ts
+                    // case 2
+                    //        t2        commit (512)  kv commit(513) -- conflicts
+                    //        |-----------|--------------|
+                    //  t1            commit (510)  kv commit (513) -- no conflicts
+                    //  |---------------|---------------|
+                    //                                  |---------------------------------|------------|
+                    //                              t3 begin (begin_ts 513) (last_kv_commit 513) (last_commit_ts 510)
+                    if (other_commit_ts <= this_last_system_commit_ts) {
+                        // not conflicts, SKIP
+                        continue;
+                    } else {
+                        // conflicts
+                        ;
+                    }
+                } else {
+                    // other_kv_commit_ts > this_last_system_kv_commit_ts
+                    // case 3
+                    //  t1               commit        kv commit (515) -- conflicts
+                    //  |-------------------|------------|
+                    //                                  |---------------------------------|------------|
+                    //                              t3 begin (begin_ts 513) (last_kv_commit 513)
+                    // t2 must begin before t1 kv commit, no conflict
+                    // conflicts
+                    ;
+                }
+            }
+
+            if (other_begin_ts > this_kv_commit_ts) {
                 // SKIP, other txn is started after this txn commit
                 break;
             }
