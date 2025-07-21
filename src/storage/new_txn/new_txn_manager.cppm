@@ -69,6 +69,8 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
 
+    TxnTimeStamp GetCurrentTS();
+
     // Optional<String> CheckTxnConflict(NewTxn *txn);
 
     bool CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query);
@@ -123,6 +125,7 @@ public:
     Storage *storage() const { return storage_; }
 
     void CommitBottom(NewTxn *txn);
+    void CommitKVInstance(NewTxn *txn);
 
 private:
     void UpdateCatalogCache(NewTxn *txn);
@@ -144,7 +147,7 @@ public:
 
     KVStore *kv_store() const { return kv_store_; }
 
-    Vector<SharedPtr<NewTxn>> GetCheckCandidateTxns(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Vector<SharedPtr<NewTxn>> GetCheckCandidateTxns(NewTxn *this_txn);
 
     void SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocator_task);
 
@@ -176,6 +179,8 @@ private:
     TransactionID current_transaction_id_{0}; // The current transaction id, used for new txn
     TxnTimeStamp current_ts_{};               // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
+    TxnTimeStamp last_kv_commit_ts_{};        // record last kv commit ts, used for conflict check
+    TxnTimeStamp last_commit_ts_{};           // record last commit ts, used for conflict check
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
