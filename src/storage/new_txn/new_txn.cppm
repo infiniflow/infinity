@@ -130,6 +130,7 @@ public:
     explicit NewTxn(NewTxnManager *txn_manager,
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts,
+                    TxnTimeStamp last_kv_commit_ts,
                     UniquePtr<KVInstance> kv_instance,
                     SharedPtr<String> txn_text,
                     TransactionType txn_type);

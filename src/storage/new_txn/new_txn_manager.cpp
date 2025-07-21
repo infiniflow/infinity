@@ -132,7 +132,7 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     }
 
     // Create txn instance
-    auto new_txn = MakeShared<NewTxn>(this, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
+    auto new_txn = MakeShared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -438,8 +438,8 @@ void NewTxnManager::CommitKVInstance(NewTxn *txn) {
     TxnTimeStamp kv_commit_ts;
     {
         std::lock_guard guard(locker_);
-        current_ts_ += 2;
-        kv_commit_ts = current_ts_;
+        kv_commit_ts = current_ts_ + 1;
+        last_kv_commit_ts_ = kv_commit_ts;
     }
     txn->SetTxnKVCommitTS(kv_commit_ts);
 }
