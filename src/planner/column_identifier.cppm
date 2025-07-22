@@ -14,7 +14,7 @@
 
 module;
 
-export module infinity_core:column_identifer;
+export module infinity_core:column_identifier;
 
 import :stl;
 // import query_context

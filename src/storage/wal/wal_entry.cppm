@@ -37,6 +37,7 @@ class ChunkIndexMeta;
 class BlockMeta;
 class SegmentMeta;
 
+
 export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------

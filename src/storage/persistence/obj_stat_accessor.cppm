@@ -81,11 +81,11 @@ export class ObjectStatAccessorBase {
 public:
     virtual ~ObjectStatAccessorBase() = default;
 
-    virtual ObjStat *Get(const String &key) = 0;
+    virtual Optional<ObjStat> Get(const String &key) = 0;
 
-    virtual ObjStat *GetNoCount(const String &key) = 0;
+    virtual Optional<ObjStat> GetNoCount(const String &key) = 0;
 
-    virtual ObjStat *Release(const String &key, Vector<String> &drop_keys) = 0;
+    virtual Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) = 0;
 
     virtual void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) = 0;
 
@@ -113,11 +113,11 @@ export class ObjectStatAccessor_LocalStorage : public ObjectStatAccessorBase {
 public:
     ~ObjectStatAccessor_LocalStorage() override;
 
-    ObjStat *Get(const String &key) override;
+    Optional<ObjStat> Get(const String &key) override;
 
-    ObjStat *GetNoCount(const String &key) override;
+    Optional<ObjStat> GetNoCount(const String &key) override;
 
-    ObjStat *Release(const String &key, Vector<String> &drop_keys) override;
+    Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) override;
 
     void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
 
@@ -147,11 +147,11 @@ public:
 
     ~ObjectStatAccessor_ObjectStorage() override;
 
-    ObjStat *Get(const String &key) override;
+    Optional<ObjStat> Get(const String &key) override;
 
-    ObjStat *GetNoCount(const String &key) override;
+    Optional<ObjStat> GetNoCount(const String &key) override;
 
-    ObjStat *Release(const String &key, Vector<String> &drop_keys) override;
+    Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) override;
 
     void PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) override;
 

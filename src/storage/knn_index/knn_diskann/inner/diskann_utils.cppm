@@ -17,6 +17,7 @@ module;
 #include <boost/dynamic_bitset.hpp>
 #include <cassert>
 #include <cstdlib>
+#include <queue>
 
 export module infinity_core:diskann_utils;
 

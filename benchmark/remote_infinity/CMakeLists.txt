@@ -38,8 +38,8 @@ target_link_libraries(
         lz4.a
         atomic.a
         thrift.a
-        c++.a
-        c++abi.a
+        libstdc++exp.a
+        libstdc++.a
         parquet.a
         arrow.a
         snappy.a

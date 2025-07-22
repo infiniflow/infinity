@@ -11,8 +11,8 @@ TEST_F(ObjectStatMapTest, test1) {
     SizeT disk_capacity_limit = 10;
     ObjectStatAccessor_ObjectStorage obj_map(disk_capacity_limit);
 
-    ObjStat *obj_stat = obj_map.Get("key1");
-    EXPECT_EQ(obj_stat, nullptr);
+    Optional<ObjStat> obj_stat = obj_map.Get("key1");
+    EXPECT_EQ(obj_stat, None);
 
     Vector<String> drop_keys;
     obj_map.PutNew("key1", ObjStat(4, 1, 0), drop_keys);
@@ -21,10 +21,10 @@ TEST_F(ObjectStatMapTest, test1) {
     obj_map.PutNew("key2", ObjStat(4, 1, 0), drop_keys);
     EXPECT_EQ(drop_keys.size(), 0);
 
-    ObjStat *stat1 = obj_map.Get("key1");
+    Optional<ObjStat> stat1 = obj_map.Get("key1");
     EXPECT_EQ(stat1->obj_size_, 4);
     EXPECT_EQ(stat1->ref_count_, 1);
-    obj_map.Release("key1", drop_keys);
+    stat1 = obj_map.Release("key1", drop_keys);
     EXPECT_EQ(stat1->ref_count_, 0);
     EXPECT_EQ(drop_keys.size(), 0);
 
@@ -34,11 +34,11 @@ TEST_F(ObjectStatMapTest, test1) {
     drop_keys.clear();
     EXPECT_EQ(obj_map.disk_used(), 8);
 
-    ObjStat *stat2 = obj_map.GetNoCount("key2");
-    EXPECT_NE(stat2, nullptr);
+    Optional<ObjStat> stat2 = obj_map.GetNoCount("key2");
+    EXPECT_NE(stat2, None);
     EXPECT_EQ(stat2->cached_, ObjCached::kNotCached);
     Optional<ObjStat> stat2_opt = obj_map.Invalidate("key2");
     EXPECT_TRUE(stat2_opt.has_value());
     stat2 = obj_map.GetNoCount("key2");
-    EXPECT_EQ(stat2, nullptr);
+    EXPECT_EQ(stat2, None);
 }
