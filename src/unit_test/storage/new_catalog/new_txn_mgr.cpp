@@ -99,9 +99,10 @@ TEST_F(TestTxnManagerTest, test_ts) {
 
         {
             auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db2"), TransactionType::kNormal);
-            Status status = txn2->DropDatabase(*db_name, ConflictType::kError);
+            status = txn2->DropDatabase(*db_name, ConflictType::kError);
             EXPECT_TRUE(status.ok());
             status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
         }
 
         txn4_begin_ts = txn->BeginTS();
@@ -203,8 +204,8 @@ TEST_F(TestTxnManagerTest, test_check_txns) {
     Vector<NewTxn *> check_txns;
 
     auto get_check_txns = [&](NewTxn *txn) {
-        TxnTimeStamp fake_commit_ts = new_txn_mgr->CurrentTS() + 1;
-        Vector<SharedPtr<NewTxn>> check_txn_ptrs = new_txn_mgr->GetCheckCandidateTxns(txn->TxnID(), txn->BeginTS(), fake_commit_ts);
+        //        TxnTimeStamp fake_commit_ts = new_txn_mgr->CurrentTS() + 1;
+        Vector<SharedPtr<NewTxn>> check_txn_ptrs = new_txn_mgr->GetCheckCandidateTxns(txn);
         Vector<NewTxn *> check_txns;
         for (auto &check_txn : check_txn_ptrs) {
             check_txns.push_back(check_txn.get());

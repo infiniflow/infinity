@@ -46,6 +46,7 @@ SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_
 SegmentIndexMeta::~SegmentIndexMeta() = default;
 
 Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!chunk_ids_) {
         Status status = LoadChunkIDs();
         if (!status.ok()) {
@@ -56,6 +57,7 @@ Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs() {
 }
 
 Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!next_chunk_id_) {
         Status status = LoadNextChunkID();
         if (!status.ok()) {
@@ -129,6 +131,7 @@ Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
 }
 
 Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!chunk_ids_) {
         Status status = LoadChunkIDs();
         if (!status.ok()) {

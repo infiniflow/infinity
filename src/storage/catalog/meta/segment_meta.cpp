@@ -413,6 +413,7 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
 // }
 
 Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!block_ids1_) {
         block_ids1_ =
             infinity::GetTableSegmentBlocks(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, begin_ts_, commit_ts_);
@@ -439,6 +440,7 @@ Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp commit_t
 // }
 
 Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (row_cnt_) {
         return {*row_cnt_, Status::OK()};
     }
@@ -479,6 +481,7 @@ Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {
 }
 
 Status SegmentMeta::GetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!first_delete_ts_) {
         Status status = LoadFirstDeleteTS();
         if (!status.ok()) {
@@ -563,6 +566,7 @@ Status SegmentMeta::GetFastRoughFilter(SharedPtr<FastRoughFilter> &fast_rough_fi
 Status SegmentMeta::SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter) {
     String filter_key = GetSegmentTag("fast_rough_filter");
     String filter_str = fast_rough_filter->SerializeToString();
+    std::lock_guard<std::mutex> lock(mtx_);
     Status status = kv_instance_.Put(filter_key, filter_str);
     if (!status.ok()) {
         return status;

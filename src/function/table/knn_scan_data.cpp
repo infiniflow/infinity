@@ -52,7 +52,7 @@ UniquePtr<KnnDistanceBase1> InitDistanceBase(KnnDistanceType distance_type) {
 KnnScanSharedData::KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                                      UniquePtr<Vector<BlockMeta *>> block_metas,
                                      SharedPtr<TableIndexMeeta> table_index_meta,
-                                     UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
+                                     UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas,
                                      Vector<InitParameter> opt_params,
                                      i64 topk,
                                      i64 dimension,

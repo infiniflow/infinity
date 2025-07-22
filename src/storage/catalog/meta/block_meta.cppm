@@ -87,6 +87,8 @@ public:
     Tuple<SharedPtr<BlockSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
+    mutable std::mutex mtx_;
+
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;

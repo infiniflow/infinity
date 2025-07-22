@@ -862,6 +862,7 @@ SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_i
 // }
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids1_) {
         segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
