@@ -207,14 +207,13 @@ Optional<ObjStat> ObjectStatAccessor_LocalStorage::Get(const String &key) {
     return map_iter->second;
 }
 
-ObjStat *ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
+Optional<ObjStat> ObjectStatAccessor_LocalStorage::GetNoCount(const String &key) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto map_iter = obj_map_.find(key);
     if (map_iter == obj_map_.end()) {
-        return nullptr;
+        return None;
     }
-    ObjStat *obj_stat = &map_iter->second;
-    return obj_stat;
+    return map_iter->second;
 }
 
 Optional<ObjStat> ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<String> &drop_keys) {
@@ -351,9 +350,13 @@ Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Get(const String &key) {
     return *obj_stat;
 }
 
-ObjStat *ObjectStatAccessor_ObjectStorage::GetNoCount(const String &key) {
+Optional<ObjStat> ObjectStatAccessor_ObjectStorage::GetNoCount(const String &key) {
     std::shared_lock<std::shared_mutex> lock(mutex_);
-    return obj_map_.GetNoCount(key);
+    ObjStat *obj_stat = obj_map_.GetNoCount(key);
+    if (obj_stat == nullptr) {
+        return None;
+    }
+    return *obj_stat;
 }
 
 Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<String> &drop_keys) {

@@ -223,6 +223,7 @@ String BlockMeta::GetBlockTag(const String &tag) const {
 }
 
 Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (row_cnt_) {
         return {*row_cnt_, Status::OK()};
     }
