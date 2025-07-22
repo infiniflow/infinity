@@ -4,13 +4,14 @@ import subprocess
 import sys
 import time
 
+python_executable = sys.executable
 
 def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
     args = [
-        "python",
+        python_executable,
         "-m",
         "pytest",
         "-W",

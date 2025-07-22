@@ -61,6 +61,13 @@ class InfinityServiceIf {
   virtual void Command(CommonResponse& _return, const CommandRequest& request) = 0;
   virtual void Flush(CommonResponse& _return, const FlushRequest& request) = 0;
   virtual void Compact(CommonResponse& _return, const CompactRequest& request) = 0;
+  virtual void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) = 0;
+  virtual void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) = 0;
+  virtual void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) = 0;
+  virtual void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) = 0;
+  virtual void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) = 0;
+  virtual void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) = 0;
+  virtual void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) = 0;
 };
 
 class InfinityServiceIfFactory {
@@ -205,6 +212,27 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Compact(CommonResponse& /* _return */, const CompactRequest& /* request */) override {
+    return;
+  }
+  void CreateTableSnapshot(CommonResponse& /* _return */, const CreateTableSnapshotRequest& /* request */) override {
+    return;
+  }
+  void CreateDatabaseSnapshot(CommonResponse& /* _return */, const CreateDatabaseSnapshotRequest& /* request */) override {
+    return;
+  }
+  void CreateSystemSnapshot(CommonResponse& /* _return */, const CreateSystemSnapshotRequest& /* request */) override {
+    return;
+  }
+  void RestoreSnapshot(CommonResponse& /* _return */, const RestoreSnapshotRequest& /* request */) override {
+    return;
+  }
+  void ShowSnapshot(ShowSnapshotResponse& /* _return */, const ShowSnapshotRequest& /* request */) override {
+    return;
+  }
+  void ListSnapshots(ListSnapshotsResponse& /* _return */, const ListSnapshotsRequest& /* request */) override {
+    return;
+  }
+  void DropSnapshot(CommonResponse& /* _return */, const DropSnapshotRequest& /* request */) override {
     return;
   }
 };
@@ -3797,6 +3825,650 @@ class InfinityService_Compact_presult {
 
 };
 
+typedef struct _InfinityService_CreateTableSnapshot_args__isset {
+  _InfinityService_CreateTableSnapshot_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_CreateTableSnapshot_args__isset;
+
+class InfinityService_CreateTableSnapshot_args {
+ public:
+
+  InfinityService_CreateTableSnapshot_args(const InfinityService_CreateTableSnapshot_args&);
+  InfinityService_CreateTableSnapshot_args& operator=(const InfinityService_CreateTableSnapshot_args&);
+  InfinityService_CreateTableSnapshot_args() noexcept;
+
+  virtual ~InfinityService_CreateTableSnapshot_args() noexcept;
+  CreateTableSnapshotRequest request;
+
+  _InfinityService_CreateTableSnapshot_args__isset __isset;
+
+  void __set_request(const CreateTableSnapshotRequest& val);
+
+  bool operator == (const InfinityService_CreateTableSnapshot_args & rhs) const;
+  bool operator != (const InfinityService_CreateTableSnapshot_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_CreateTableSnapshot_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_CreateTableSnapshot_pargs {
+ public:
+
+
+  virtual ~InfinityService_CreateTableSnapshot_pargs() noexcept;
+  const CreateTableSnapshotRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_CreateTableSnapshot_result__isset {
+  _InfinityService_CreateTableSnapshot_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_CreateTableSnapshot_result__isset;
+
+class InfinityService_CreateTableSnapshot_result {
+ public:
+
+  InfinityService_CreateTableSnapshot_result(const InfinityService_CreateTableSnapshot_result&);
+  InfinityService_CreateTableSnapshot_result& operator=(const InfinityService_CreateTableSnapshot_result&);
+  InfinityService_CreateTableSnapshot_result() noexcept;
+
+  virtual ~InfinityService_CreateTableSnapshot_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_CreateTableSnapshot_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_CreateTableSnapshot_result & rhs) const;
+  bool operator != (const InfinityService_CreateTableSnapshot_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_CreateTableSnapshot_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_CreateTableSnapshot_presult__isset {
+  _InfinityService_CreateTableSnapshot_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_CreateTableSnapshot_presult__isset;
+
+class InfinityService_CreateTableSnapshot_presult {
+ public:
+
+
+  virtual ~InfinityService_CreateTableSnapshot_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_CreateTableSnapshot_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_CreateDatabaseSnapshot_args__isset {
+  _InfinityService_CreateDatabaseSnapshot_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_CreateDatabaseSnapshot_args__isset;
+
+class InfinityService_CreateDatabaseSnapshot_args {
+ public:
+
+  InfinityService_CreateDatabaseSnapshot_args(const InfinityService_CreateDatabaseSnapshot_args&);
+  InfinityService_CreateDatabaseSnapshot_args& operator=(const InfinityService_CreateDatabaseSnapshot_args&);
+  InfinityService_CreateDatabaseSnapshot_args() noexcept;
+
+  virtual ~InfinityService_CreateDatabaseSnapshot_args() noexcept;
+  CreateDatabaseSnapshotRequest request;
+
+  _InfinityService_CreateDatabaseSnapshot_args__isset __isset;
+
+  void __set_request(const CreateDatabaseSnapshotRequest& val);
+
+  bool operator == (const InfinityService_CreateDatabaseSnapshot_args & rhs) const;
+  bool operator != (const InfinityService_CreateDatabaseSnapshot_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_CreateDatabaseSnapshot_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_CreateDatabaseSnapshot_pargs {
+ public:
+
+
+  virtual ~InfinityService_CreateDatabaseSnapshot_pargs() noexcept;
+  const CreateDatabaseSnapshotRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_CreateDatabaseSnapshot_result__isset {
+  _InfinityService_CreateDatabaseSnapshot_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_CreateDatabaseSnapshot_result__isset;
+
+class InfinityService_CreateDatabaseSnapshot_result {
+ public:
+
+  InfinityService_CreateDatabaseSnapshot_result(const InfinityService_CreateDatabaseSnapshot_result&);
+  InfinityService_CreateDatabaseSnapshot_result& operator=(const InfinityService_CreateDatabaseSnapshot_result&);
+  InfinityService_CreateDatabaseSnapshot_result() noexcept;
+
+  virtual ~InfinityService_CreateDatabaseSnapshot_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_CreateDatabaseSnapshot_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_CreateDatabaseSnapshot_result & rhs) const;
+  bool operator != (const InfinityService_CreateDatabaseSnapshot_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_CreateDatabaseSnapshot_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_CreateDatabaseSnapshot_presult__isset {
+  _InfinityService_CreateDatabaseSnapshot_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_CreateDatabaseSnapshot_presult__isset;
+
+class InfinityService_CreateDatabaseSnapshot_presult {
+ public:
+
+
+  virtual ~InfinityService_CreateDatabaseSnapshot_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_CreateDatabaseSnapshot_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_CreateSystemSnapshot_args__isset {
+  _InfinityService_CreateSystemSnapshot_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_CreateSystemSnapshot_args__isset;
+
+class InfinityService_CreateSystemSnapshot_args {
+ public:
+
+  InfinityService_CreateSystemSnapshot_args(const InfinityService_CreateSystemSnapshot_args&);
+  InfinityService_CreateSystemSnapshot_args& operator=(const InfinityService_CreateSystemSnapshot_args&);
+  InfinityService_CreateSystemSnapshot_args() noexcept;
+
+  virtual ~InfinityService_CreateSystemSnapshot_args() noexcept;
+  CreateSystemSnapshotRequest request;
+
+  _InfinityService_CreateSystemSnapshot_args__isset __isset;
+
+  void __set_request(const CreateSystemSnapshotRequest& val);
+
+  bool operator == (const InfinityService_CreateSystemSnapshot_args & rhs) const;
+  bool operator != (const InfinityService_CreateSystemSnapshot_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_CreateSystemSnapshot_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_CreateSystemSnapshot_pargs {
+ public:
+
+
+  virtual ~InfinityService_CreateSystemSnapshot_pargs() noexcept;
+  const CreateSystemSnapshotRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_CreateSystemSnapshot_result__isset {
+  _InfinityService_CreateSystemSnapshot_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_CreateSystemSnapshot_result__isset;
+
+class InfinityService_CreateSystemSnapshot_result {
+ public:
+
+  InfinityService_CreateSystemSnapshot_result(const InfinityService_CreateSystemSnapshot_result&);
+  InfinityService_CreateSystemSnapshot_result& operator=(const InfinityService_CreateSystemSnapshot_result&);
+  InfinityService_CreateSystemSnapshot_result() noexcept;
+
+  virtual ~InfinityService_CreateSystemSnapshot_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_CreateSystemSnapshot_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_CreateSystemSnapshot_result & rhs) const;
+  bool operator != (const InfinityService_CreateSystemSnapshot_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_CreateSystemSnapshot_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_CreateSystemSnapshot_presult__isset {
+  _InfinityService_CreateSystemSnapshot_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_CreateSystemSnapshot_presult__isset;
+
+class InfinityService_CreateSystemSnapshot_presult {
+ public:
+
+
+  virtual ~InfinityService_CreateSystemSnapshot_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_CreateSystemSnapshot_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_RestoreSnapshot_args__isset {
+  _InfinityService_RestoreSnapshot_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_RestoreSnapshot_args__isset;
+
+class InfinityService_RestoreSnapshot_args {
+ public:
+
+  InfinityService_RestoreSnapshot_args(const InfinityService_RestoreSnapshot_args&);
+  InfinityService_RestoreSnapshot_args& operator=(const InfinityService_RestoreSnapshot_args&);
+  InfinityService_RestoreSnapshot_args() noexcept;
+
+  virtual ~InfinityService_RestoreSnapshot_args() noexcept;
+  RestoreSnapshotRequest request;
+
+  _InfinityService_RestoreSnapshot_args__isset __isset;
+
+  void __set_request(const RestoreSnapshotRequest& val);
+
+  bool operator == (const InfinityService_RestoreSnapshot_args & rhs) const;
+  bool operator != (const InfinityService_RestoreSnapshot_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_RestoreSnapshot_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_RestoreSnapshot_pargs {
+ public:
+
+
+  virtual ~InfinityService_RestoreSnapshot_pargs() noexcept;
+  const RestoreSnapshotRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_RestoreSnapshot_result__isset {
+  _InfinityService_RestoreSnapshot_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_RestoreSnapshot_result__isset;
+
+class InfinityService_RestoreSnapshot_result {
+ public:
+
+  InfinityService_RestoreSnapshot_result(const InfinityService_RestoreSnapshot_result&);
+  InfinityService_RestoreSnapshot_result& operator=(const InfinityService_RestoreSnapshot_result&);
+  InfinityService_RestoreSnapshot_result() noexcept;
+
+  virtual ~InfinityService_RestoreSnapshot_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_RestoreSnapshot_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_RestoreSnapshot_result & rhs) const;
+  bool operator != (const InfinityService_RestoreSnapshot_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_RestoreSnapshot_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_RestoreSnapshot_presult__isset {
+  _InfinityService_RestoreSnapshot_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_RestoreSnapshot_presult__isset;
+
+class InfinityService_RestoreSnapshot_presult {
+ public:
+
+
+  virtual ~InfinityService_RestoreSnapshot_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_RestoreSnapshot_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_ShowSnapshot_args__isset {
+  _InfinityService_ShowSnapshot_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_ShowSnapshot_args__isset;
+
+class InfinityService_ShowSnapshot_args {
+ public:
+
+  InfinityService_ShowSnapshot_args(const InfinityService_ShowSnapshot_args&);
+  InfinityService_ShowSnapshot_args& operator=(const InfinityService_ShowSnapshot_args&);
+  InfinityService_ShowSnapshot_args() noexcept;
+
+  virtual ~InfinityService_ShowSnapshot_args() noexcept;
+  ShowSnapshotRequest request;
+
+  _InfinityService_ShowSnapshot_args__isset __isset;
+
+  void __set_request(const ShowSnapshotRequest& val);
+
+  bool operator == (const InfinityService_ShowSnapshot_args & rhs) const;
+  bool operator != (const InfinityService_ShowSnapshot_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowSnapshot_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_ShowSnapshot_pargs {
+ public:
+
+
+  virtual ~InfinityService_ShowSnapshot_pargs() noexcept;
+  const ShowSnapshotRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowSnapshot_result__isset {
+  _InfinityService_ShowSnapshot_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowSnapshot_result__isset;
+
+class InfinityService_ShowSnapshot_result {
+ public:
+
+  InfinityService_ShowSnapshot_result(const InfinityService_ShowSnapshot_result&);
+  InfinityService_ShowSnapshot_result& operator=(const InfinityService_ShowSnapshot_result&);
+  InfinityService_ShowSnapshot_result() noexcept;
+
+  virtual ~InfinityService_ShowSnapshot_result() noexcept;
+  ShowSnapshotResponse success;
+
+  _InfinityService_ShowSnapshot_result__isset __isset;
+
+  void __set_success(const ShowSnapshotResponse& val);
+
+  bool operator == (const InfinityService_ShowSnapshot_result & rhs) const;
+  bool operator != (const InfinityService_ShowSnapshot_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowSnapshot_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowSnapshot_presult__isset {
+  _InfinityService_ShowSnapshot_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowSnapshot_presult__isset;
+
+class InfinityService_ShowSnapshot_presult {
+ public:
+
+
+  virtual ~InfinityService_ShowSnapshot_presult() noexcept;
+  ShowSnapshotResponse* success;
+
+  _InfinityService_ShowSnapshot_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_ListSnapshots_args__isset {
+  _InfinityService_ListSnapshots_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_ListSnapshots_args__isset;
+
+class InfinityService_ListSnapshots_args {
+ public:
+
+  InfinityService_ListSnapshots_args(const InfinityService_ListSnapshots_args&) noexcept;
+  InfinityService_ListSnapshots_args& operator=(const InfinityService_ListSnapshots_args&) noexcept;
+  InfinityService_ListSnapshots_args() noexcept;
+
+  virtual ~InfinityService_ListSnapshots_args() noexcept;
+  ListSnapshotsRequest request;
+
+  _InfinityService_ListSnapshots_args__isset __isset;
+
+  void __set_request(const ListSnapshotsRequest& val);
+
+  bool operator == (const InfinityService_ListSnapshots_args & rhs) const;
+  bool operator != (const InfinityService_ListSnapshots_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ListSnapshots_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_ListSnapshots_pargs {
+ public:
+
+
+  virtual ~InfinityService_ListSnapshots_pargs() noexcept;
+  const ListSnapshotsRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ListSnapshots_result__isset {
+  _InfinityService_ListSnapshots_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ListSnapshots_result__isset;
+
+class InfinityService_ListSnapshots_result {
+ public:
+
+  InfinityService_ListSnapshots_result(const InfinityService_ListSnapshots_result&);
+  InfinityService_ListSnapshots_result& operator=(const InfinityService_ListSnapshots_result&);
+  InfinityService_ListSnapshots_result() noexcept;
+
+  virtual ~InfinityService_ListSnapshots_result() noexcept;
+  ListSnapshotsResponse success;
+
+  _InfinityService_ListSnapshots_result__isset __isset;
+
+  void __set_success(const ListSnapshotsResponse& val);
+
+  bool operator == (const InfinityService_ListSnapshots_result & rhs) const;
+  bool operator != (const InfinityService_ListSnapshots_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ListSnapshots_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ListSnapshots_presult__isset {
+  _InfinityService_ListSnapshots_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ListSnapshots_presult__isset;
+
+class InfinityService_ListSnapshots_presult {
+ public:
+
+
+  virtual ~InfinityService_ListSnapshots_presult() noexcept;
+  ListSnapshotsResponse* success;
+
+  _InfinityService_ListSnapshots_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_DropSnapshot_args__isset {
+  _InfinityService_DropSnapshot_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_DropSnapshot_args__isset;
+
+class InfinityService_DropSnapshot_args {
+ public:
+
+  InfinityService_DropSnapshot_args(const InfinityService_DropSnapshot_args&);
+  InfinityService_DropSnapshot_args& operator=(const InfinityService_DropSnapshot_args&);
+  InfinityService_DropSnapshot_args() noexcept;
+
+  virtual ~InfinityService_DropSnapshot_args() noexcept;
+  DropSnapshotRequest request;
+
+  _InfinityService_DropSnapshot_args__isset __isset;
+
+  void __set_request(const DropSnapshotRequest& val);
+
+  bool operator == (const InfinityService_DropSnapshot_args & rhs) const;
+  bool operator != (const InfinityService_DropSnapshot_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_DropSnapshot_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_DropSnapshot_pargs {
+ public:
+
+
+  virtual ~InfinityService_DropSnapshot_pargs() noexcept;
+  const DropSnapshotRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_DropSnapshot_result__isset {
+  _InfinityService_DropSnapshot_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_DropSnapshot_result__isset;
+
+class InfinityService_DropSnapshot_result {
+ public:
+
+  InfinityService_DropSnapshot_result(const InfinityService_DropSnapshot_result&);
+  InfinityService_DropSnapshot_result& operator=(const InfinityService_DropSnapshot_result&);
+  InfinityService_DropSnapshot_result() noexcept;
+
+  virtual ~InfinityService_DropSnapshot_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_DropSnapshot_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_DropSnapshot_result & rhs) const;
+  bool operator != (const InfinityService_DropSnapshot_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_DropSnapshot_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_DropSnapshot_presult__isset {
+  _InfinityService_DropSnapshot_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_DropSnapshot_presult__isset;
+
+class InfinityService_DropSnapshot_presult {
+ public:
+
+
+  virtual ~InfinityService_DropSnapshot_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_DropSnapshot_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class InfinityServiceClient : virtual public InfinityServiceIf {
  public:
   InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -3939,6 +4611,27 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Compact(CommonResponse& _return, const CompactRequest& request) override;
   void send_Compact(const CompactRequest& request);
   void recv_Compact(CommonResponse& _return);
+  void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) override;
+  void send_CreateTableSnapshot(const CreateTableSnapshotRequest& request);
+  void recv_CreateTableSnapshot(CommonResponse& _return);
+  void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) override;
+  void send_CreateDatabaseSnapshot(const CreateDatabaseSnapshotRequest& request);
+  void recv_CreateDatabaseSnapshot(CommonResponse& _return);
+  void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) override;
+  void send_CreateSystemSnapshot(const CreateSystemSnapshotRequest& request);
+  void recv_CreateSystemSnapshot(CommonResponse& _return);
+  void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) override;
+  void send_RestoreSnapshot(const RestoreSnapshotRequest& request);
+  void recv_RestoreSnapshot(CommonResponse& _return);
+  void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) override;
+  void send_ShowSnapshot(const ShowSnapshotRequest& request);
+  void recv_ShowSnapshot(ShowSnapshotResponse& _return);
+  void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) override;
+  void send_ListSnapshots(const ListSnapshotsRequest& request);
+  void recv_ListSnapshots(ListSnapshotsResponse& _return);
+  void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) override;
+  void send_DropSnapshot(const DropSnapshotRequest& request);
+  void recv_DropSnapshot(CommonResponse& _return);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -3993,6 +4686,13 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Compact(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_CreateTableSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_CreateDatabaseSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_CreateSystemSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_RestoreSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ShowSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ListSnapshots(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_DropSnapshot(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) :
     iface_(iface) {
@@ -4035,6 +4735,13 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Command"] = &InfinityServiceProcessor::process_Command;
     processMap_["Flush"] = &InfinityServiceProcessor::process_Flush;
     processMap_["Compact"] = &InfinityServiceProcessor::process_Compact;
+    processMap_["CreateTableSnapshot"] = &InfinityServiceProcessor::process_CreateTableSnapshot;
+    processMap_["CreateDatabaseSnapshot"] = &InfinityServiceProcessor::process_CreateDatabaseSnapshot;
+    processMap_["CreateSystemSnapshot"] = &InfinityServiceProcessor::process_CreateSystemSnapshot;
+    processMap_["RestoreSnapshot"] = &InfinityServiceProcessor::process_RestoreSnapshot;
+    processMap_["ShowSnapshot"] = &InfinityServiceProcessor::process_ShowSnapshot;
+    processMap_["ListSnapshots"] = &InfinityServiceProcessor::process_ListSnapshots;
+    processMap_["DropSnapshot"] = &InfinityServiceProcessor::process_DropSnapshot;
   }
 
   virtual ~InfinityServiceProcessor() {}
@@ -4453,6 +5160,76 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->CreateTableSnapshot(_return, request);
+    }
+    ifaces_[i]->CreateTableSnapshot(_return, request);
+    return;
+  }
+
+  void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->CreateDatabaseSnapshot(_return, request);
+    }
+    ifaces_[i]->CreateDatabaseSnapshot(_return, request);
+    return;
+  }
+
+  void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->CreateSystemSnapshot(_return, request);
+    }
+    ifaces_[i]->CreateSystemSnapshot(_return, request);
+    return;
+  }
+
+  void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->RestoreSnapshot(_return, request);
+    }
+    ifaces_[i]->RestoreSnapshot(_return, request);
+    return;
+  }
+
+  void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->ShowSnapshot(_return, request);
+    }
+    ifaces_[i]->ShowSnapshot(_return, request);
+    return;
+  }
+
+  void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->ListSnapshots(_return, request);
+    }
+    ifaces_[i]->ListSnapshots(_return, request);
+    return;
+  }
+
+  void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->DropSnapshot(_return, request);
+    }
+    ifaces_[i]->DropSnapshot(_return, request);
+    return;
+  }
+
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -4602,6 +5379,27 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Compact(CommonResponse& _return, const CompactRequest& request) override;
   int32_t send_Compact(const CompactRequest& request);
   void recv_Compact(CommonResponse& _return, const int32_t seqid);
+  void CreateTableSnapshot(CommonResponse& _return, const CreateTableSnapshotRequest& request) override;
+  int32_t send_CreateTableSnapshot(const CreateTableSnapshotRequest& request);
+  void recv_CreateTableSnapshot(CommonResponse& _return, const int32_t seqid);
+  void CreateDatabaseSnapshot(CommonResponse& _return, const CreateDatabaseSnapshotRequest& request) override;
+  int32_t send_CreateDatabaseSnapshot(const CreateDatabaseSnapshotRequest& request);
+  void recv_CreateDatabaseSnapshot(CommonResponse& _return, const int32_t seqid);
+  void CreateSystemSnapshot(CommonResponse& _return, const CreateSystemSnapshotRequest& request) override;
+  int32_t send_CreateSystemSnapshot(const CreateSystemSnapshotRequest& request);
+  void recv_CreateSystemSnapshot(CommonResponse& _return, const int32_t seqid);
+  void RestoreSnapshot(CommonResponse& _return, const RestoreSnapshotRequest& request) override;
+  int32_t send_RestoreSnapshot(const RestoreSnapshotRequest& request);
+  void recv_RestoreSnapshot(CommonResponse& _return, const int32_t seqid);
+  void ShowSnapshot(ShowSnapshotResponse& _return, const ShowSnapshotRequest& request) override;
+  int32_t send_ShowSnapshot(const ShowSnapshotRequest& request);
+  void recv_ShowSnapshot(ShowSnapshotResponse& _return, const int32_t seqid);
+  void ListSnapshots(ListSnapshotsResponse& _return, const ListSnapshotsRequest& request) override;
+  int32_t send_ListSnapshots(const ListSnapshotsRequest& request);
+  void recv_ListSnapshots(ListSnapshotsResponse& _return, const int32_t seqid);
+  void DropSnapshot(CommonResponse& _return, const DropSnapshotRequest& request) override;
+  int32_t send_DropSnapshot(const DropSnapshotRequest& request);
+  void recv_DropSnapshot(CommonResponse& _return, const int32_t seqid);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

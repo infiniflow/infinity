@@ -17378,4 +17378,1457 @@ void CompactRequest::printTo(std::ostream& out) const {
   out << ")";
 }
 
+
+CreateTableSnapshotRequest::~CreateTableSnapshotRequest() noexcept {
+}
+
+CreateTableSnapshotRequest::CreateTableSnapshotRequest() noexcept
+   : session_id(0),
+     db_name(),
+     table_name(),
+     snapshot_name() {
+}
+
+void CreateTableSnapshotRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void CreateTableSnapshotRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void CreateTableSnapshotRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void CreateTableSnapshotRequest::__set_snapshot_name(const std::string& val) {
+  this->snapshot_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const CreateTableSnapshotRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t CreateTableSnapshotRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->snapshot_name);
+          this->__isset.snapshot_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t CreateTableSnapshotRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("CreateTableSnapshotRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot_name", ::apache::thrift::protocol::T_STRING, 4);
+  xfer += oprot->writeString(this->snapshot_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(CreateTableSnapshotRequest &a, CreateTableSnapshotRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.snapshot_name, b.snapshot_name);
+  swap(a.__isset, b.__isset);
+}
+
+bool CreateTableSnapshotRequest::operator==(const CreateTableSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(db_name == rhs.db_name))
+    return false;
+  if (!(table_name == rhs.table_name))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
+CreateTableSnapshotRequest::CreateTableSnapshotRequest(const CreateTableSnapshotRequest& other556) {
+  session_id = other556.session_id;
+  db_name = other556.db_name;
+  table_name = other556.table_name;
+  snapshot_name = other556.snapshot_name;
+  __isset = other556.__isset;
+}
+CreateTableSnapshotRequest& CreateTableSnapshotRequest::operator=(const CreateTableSnapshotRequest& other557) {
+  session_id = other557.session_id;
+  db_name = other557.db_name;
+  table_name = other557.table_name;
+  snapshot_name = other557.snapshot_name;
+  __isset = other557.__isset;
+  return *this;
+}
+void CreateTableSnapshotRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "CreateTableSnapshotRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "snapshot_name=" << to_string(snapshot_name);
+  out << ")";
+}
+
+
+CreateDatabaseSnapshotRequest::~CreateDatabaseSnapshotRequest() noexcept {
+}
+
+CreateDatabaseSnapshotRequest::CreateDatabaseSnapshotRequest() noexcept
+   : session_id(0),
+     db_name(),
+     snapshot_name() {
+}
+
+void CreateDatabaseSnapshotRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void CreateDatabaseSnapshotRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void CreateDatabaseSnapshotRequest::__set_snapshot_name(const std::string& val) {
+  this->snapshot_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const CreateDatabaseSnapshotRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t CreateDatabaseSnapshotRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->snapshot_name);
+          this->__isset.snapshot_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t CreateDatabaseSnapshotRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("CreateDatabaseSnapshotRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->snapshot_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(CreateDatabaseSnapshotRequest &a, CreateDatabaseSnapshotRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.snapshot_name, b.snapshot_name);
+  swap(a.__isset, b.__isset);
+}
+
+bool CreateDatabaseSnapshotRequest::operator==(const CreateDatabaseSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(db_name == rhs.db_name))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
+CreateDatabaseSnapshotRequest::CreateDatabaseSnapshotRequest(const CreateDatabaseSnapshotRequest& other558) {
+  session_id = other558.session_id;
+  db_name = other558.db_name;
+  snapshot_name = other558.snapshot_name;
+  __isset = other558.__isset;
+}
+CreateDatabaseSnapshotRequest& CreateDatabaseSnapshotRequest::operator=(const CreateDatabaseSnapshotRequest& other559) {
+  session_id = other559.session_id;
+  db_name = other559.db_name;
+  snapshot_name = other559.snapshot_name;
+  __isset = other559.__isset;
+  return *this;
+}
+void CreateDatabaseSnapshotRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "CreateDatabaseSnapshotRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "snapshot_name=" << to_string(snapshot_name);
+  out << ")";
+}
+
+
+CreateSystemSnapshotRequest::~CreateSystemSnapshotRequest() noexcept {
+}
+
+CreateSystemSnapshotRequest::CreateSystemSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name() {
+}
+
+void CreateSystemSnapshotRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void CreateSystemSnapshotRequest::__set_snapshot_name(const std::string& val) {
+  this->snapshot_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const CreateSystemSnapshotRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t CreateSystemSnapshotRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->snapshot_name);
+          this->__isset.snapshot_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t CreateSystemSnapshotRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("CreateSystemSnapshotRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->snapshot_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(CreateSystemSnapshotRequest &a, CreateSystemSnapshotRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.snapshot_name, b.snapshot_name);
+  swap(a.__isset, b.__isset);
+}
+
+bool CreateSystemSnapshotRequest::operator==(const CreateSystemSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
+CreateSystemSnapshotRequest::CreateSystemSnapshotRequest(const CreateSystemSnapshotRequest& other560) {
+  session_id = other560.session_id;
+  snapshot_name = other560.snapshot_name;
+  __isset = other560.__isset;
+}
+CreateSystemSnapshotRequest& CreateSystemSnapshotRequest::operator=(const CreateSystemSnapshotRequest& other561) {
+  session_id = other561.session_id;
+  snapshot_name = other561.snapshot_name;
+  __isset = other561.__isset;
+  return *this;
+}
+void CreateSystemSnapshotRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "CreateSystemSnapshotRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "snapshot_name=" << to_string(snapshot_name);
+  out << ")";
+}
+
+
+RestoreSnapshotRequest::~RestoreSnapshotRequest() noexcept {
+}
+
+RestoreSnapshotRequest::RestoreSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name(),
+     scope() {
+}
+
+void RestoreSnapshotRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void RestoreSnapshotRequest::__set_snapshot_name(const std::string& val) {
+  this->snapshot_name = val;
+}
+
+void RestoreSnapshotRequest::__set_scope(const std::string& val) {
+  this->scope = val;
+}
+std::ostream& operator<<(std::ostream& out, const RestoreSnapshotRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t RestoreSnapshotRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->snapshot_name);
+          this->__isset.snapshot_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->scope);
+          this->__isset.scope = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t RestoreSnapshotRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("RestoreSnapshotRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->snapshot_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("scope", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->scope);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(RestoreSnapshotRequest &a, RestoreSnapshotRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.snapshot_name, b.snapshot_name);
+  swap(a.scope, b.scope);
+  swap(a.__isset, b.__isset);
+}
+
+bool RestoreSnapshotRequest::operator==(const RestoreSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  if (!(scope == rhs.scope))
+    return false;
+  return true;
+}
+
+RestoreSnapshotRequest::RestoreSnapshotRequest(const RestoreSnapshotRequest& other562) {
+  session_id = other562.session_id;
+  snapshot_name = other562.snapshot_name;
+  scope = other562.scope;
+  __isset = other562.__isset;
+}
+RestoreSnapshotRequest& RestoreSnapshotRequest::operator=(const RestoreSnapshotRequest& other563) {
+  session_id = other563.session_id;
+  snapshot_name = other563.snapshot_name;
+  scope = other563.scope;
+  __isset = other563.__isset;
+  return *this;
+}
+void RestoreSnapshotRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "RestoreSnapshotRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "snapshot_name=" << to_string(snapshot_name);
+  out << ", " << "scope=" << to_string(scope);
+  out << ")";
+}
+
+
+SnapshotInfo::~SnapshotInfo() noexcept {
+}
+
+SnapshotInfo::SnapshotInfo() noexcept
+   : name(),
+     scope(),
+     time(),
+     commit(0),
+     size() {
+}
+
+void SnapshotInfo::__set_name(const std::string& val) {
+  this->name = val;
+}
+
+void SnapshotInfo::__set_scope(const std::string& val) {
+  this->scope = val;
+}
+
+void SnapshotInfo::__set_time(const std::string& val) {
+  this->time = val;
+}
+
+void SnapshotInfo::__set_commit(const int64_t val) {
+  this->commit = val;
+}
+
+void SnapshotInfo::__set_size(const std::string& val) {
+  this->size = val;
+}
+std::ostream& operator<<(std::ostream& out, const SnapshotInfo& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t SnapshotInfo::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->name);
+          this->__isset.name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->scope);
+          this->__isset.scope = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->time);
+          this->__isset.time = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->commit);
+          this->__isset.commit = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->size);
+          this->__isset.size = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t SnapshotInfo::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("SnapshotInfo");
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeString(this->name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("scope", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->scope);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("time", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->time);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("commit", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->commit);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("size", ::apache::thrift::protocol::T_STRING, 5);
+  xfer += oprot->writeString(this->size);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(SnapshotInfo &a, SnapshotInfo &b) {
+  using ::std::swap;
+  swap(a.name, b.name);
+  swap(a.scope, b.scope);
+  swap(a.time, b.time);
+  swap(a.commit, b.commit);
+  swap(a.size, b.size);
+  swap(a.__isset, b.__isset);
+}
+
+bool SnapshotInfo::operator==(const SnapshotInfo & rhs) const
+{
+  if (!(name == rhs.name))
+    return false;
+  if (!(scope == rhs.scope))
+    return false;
+  if (!(time == rhs.time))
+    return false;
+  if (!(commit == rhs.commit))
+    return false;
+  if (!(size == rhs.size))
+    return false;
+  return true;
+}
+
+SnapshotInfo::SnapshotInfo(const SnapshotInfo& other564) {
+  name = other564.name;
+  scope = other564.scope;
+  time = other564.time;
+  commit = other564.commit;
+  size = other564.size;
+  __isset = other564.__isset;
+}
+SnapshotInfo& SnapshotInfo::operator=(const SnapshotInfo& other565) {
+  name = other565.name;
+  scope = other565.scope;
+  time = other565.time;
+  commit = other565.commit;
+  size = other565.size;
+  __isset = other565.__isset;
+  return *this;
+}
+void SnapshotInfo::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "SnapshotInfo(";
+  out << "name=" << to_string(name);
+  out << ", " << "scope=" << to_string(scope);
+  out << ", " << "time=" << to_string(time);
+  out << ", " << "commit=" << to_string(commit);
+  out << ", " << "size=" << to_string(size);
+  out << ")";
+}
+
+
+ShowSnapshotRequest::~ShowSnapshotRequest() noexcept {
+}
+
+ShowSnapshotRequest::ShowSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name() {
+}
+
+void ShowSnapshotRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowSnapshotRequest::__set_snapshot_name(const std::string& val) {
+  this->snapshot_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowSnapshotRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowSnapshotRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->snapshot_name);
+          this->__isset.snapshot_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowSnapshotRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowSnapshotRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->snapshot_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowSnapshotRequest &a, ShowSnapshotRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.snapshot_name, b.snapshot_name);
+  swap(a.__isset, b.__isset);
+}
+
+bool ShowSnapshotRequest::operator==(const ShowSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
+ShowSnapshotRequest::ShowSnapshotRequest(const ShowSnapshotRequest& other566) {
+  session_id = other566.session_id;
+  snapshot_name = other566.snapshot_name;
+  __isset = other566.__isset;
+}
+ShowSnapshotRequest& ShowSnapshotRequest::operator=(const ShowSnapshotRequest& other567) {
+  session_id = other567.session_id;
+  snapshot_name = other567.snapshot_name;
+  __isset = other567.__isset;
+  return *this;
+}
+void ShowSnapshotRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowSnapshotRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "snapshot_name=" << to_string(snapshot_name);
+  out << ")";
+}
+
+
+ShowSnapshotResponse::~ShowSnapshotResponse() noexcept {
+}
+
+ShowSnapshotResponse::ShowSnapshotResponse() noexcept
+   : error_code(0),
+     error_msg() {
+}
+
+void ShowSnapshotResponse::__set_error_code(const int64_t val) {
+  this->error_code = val;
+}
+
+void ShowSnapshotResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
+}
+
+void ShowSnapshotResponse::__set_snapshot(const SnapshotInfo& val) {
+  this->snapshot = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowSnapshotResponse& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowSnapshotResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->error_code);
+          this->__isset.error_code = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->snapshot.read(iprot);
+          this->__isset.snapshot = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowSnapshotResponse::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowSnapshotResponse");
+
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->error_code);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot", ::apache::thrift::protocol::T_STRUCT, 3);
+  xfer += this->snapshot.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowSnapshotResponse &a, ShowSnapshotResponse &b) {
+  using ::std::swap;
+  swap(a.error_code, b.error_code);
+  swap(a.error_msg, b.error_msg);
+  swap(a.snapshot, b.snapshot);
+  swap(a.__isset, b.__isset);
+}
+
+bool ShowSnapshotResponse::operator==(const ShowSnapshotResponse & rhs) const
+{
+  if (!(error_code == rhs.error_code))
+    return false;
+  if (!(error_msg == rhs.error_msg))
+    return false;
+  if (!(snapshot == rhs.snapshot))
+    return false;
+  return true;
+}
+
+ShowSnapshotResponse::ShowSnapshotResponse(const ShowSnapshotResponse& other568) {
+  error_code = other568.error_code;
+  error_msg = other568.error_msg;
+  snapshot = other568.snapshot;
+  __isset = other568.__isset;
+}
+ShowSnapshotResponse& ShowSnapshotResponse::operator=(const ShowSnapshotResponse& other569) {
+  error_code = other569.error_code;
+  error_msg = other569.error_msg;
+  snapshot = other569.snapshot;
+  __isset = other569.__isset;
+  return *this;
+}
+void ShowSnapshotResponse::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowSnapshotResponse(";
+  out << "error_code=" << to_string(error_code);
+  out << ", " << "error_msg=" << to_string(error_msg);
+  out << ", " << "snapshot=" << to_string(snapshot);
+  out << ")";
+}
+
+
+ListSnapshotsRequest::~ListSnapshotsRequest() noexcept {
+}
+
+ListSnapshotsRequest::ListSnapshotsRequest() noexcept
+   : session_id(0) {
+}
+
+void ListSnapshotsRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const ListSnapshotsRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ListSnapshotsRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ListSnapshotsRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ListSnapshotsRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ListSnapshotsRequest &a, ListSnapshotsRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.__isset, b.__isset);
+}
+
+bool ListSnapshotsRequest::operator==(const ListSnapshotsRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  return true;
+}
+
+ListSnapshotsRequest::ListSnapshotsRequest(const ListSnapshotsRequest& other570) noexcept {
+  session_id = other570.session_id;
+  __isset = other570.__isset;
+}
+ListSnapshotsRequest& ListSnapshotsRequest::operator=(const ListSnapshotsRequest& other571) noexcept {
+  session_id = other571.session_id;
+  __isset = other571.__isset;
+  return *this;
+}
+void ListSnapshotsRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ListSnapshotsRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ")";
+}
+
+
+ListSnapshotsResponse::~ListSnapshotsResponse() noexcept {
+}
+
+ListSnapshotsResponse::ListSnapshotsResponse() noexcept
+   : error_code(0),
+     error_msg() {
+
+}
+
+void ListSnapshotsResponse::__set_error_code(const int64_t val) {
+  this->error_code = val;
+}
+
+void ListSnapshotsResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
+}
+
+void ListSnapshotsResponse::__set_snapshots(const std::vector<SnapshotInfo> & val) {
+  this->snapshots = val;
+}
+std::ostream& operator<<(std::ostream& out, const ListSnapshotsResponse& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ListSnapshotsResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->error_code);
+          this->__isset.error_code = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->snapshots.clear();
+            uint32_t _size572;
+            ::apache::thrift::protocol::TType _etype575;
+            xfer += iprot->readListBegin(_etype575, _size572);
+            this->snapshots.resize(_size572);
+            uint32_t _i576;
+            for (_i576 = 0; _i576 < _size572; ++_i576)
+            {
+              xfer += this->snapshots[_i576].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.snapshots = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ListSnapshotsResponse::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ListSnapshotsResponse");
+
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->error_code);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshots", ::apache::thrift::protocol::T_LIST, 3);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->snapshots.size()));
+    std::vector<SnapshotInfo> ::const_iterator _iter577;
+    for (_iter577 = this->snapshots.begin(); _iter577 != this->snapshots.end(); ++_iter577)
+    {
+      xfer += (*_iter577).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ListSnapshotsResponse &a, ListSnapshotsResponse &b) {
+  using ::std::swap;
+  swap(a.error_code, b.error_code);
+  swap(a.error_msg, b.error_msg);
+  swap(a.snapshots, b.snapshots);
+  swap(a.__isset, b.__isset);
+}
+
+bool ListSnapshotsResponse::operator==(const ListSnapshotsResponse & rhs) const
+{
+  if (!(error_code == rhs.error_code))
+    return false;
+  if (!(error_msg == rhs.error_msg))
+    return false;
+  if (!(snapshots == rhs.snapshots))
+    return false;
+  return true;
+}
+
+ListSnapshotsResponse::ListSnapshotsResponse(const ListSnapshotsResponse& other578) {
+  error_code = other578.error_code;
+  error_msg = other578.error_msg;
+  snapshots = other578.snapshots;
+  __isset = other578.__isset;
+}
+ListSnapshotsResponse& ListSnapshotsResponse::operator=(const ListSnapshotsResponse& other579) {
+  error_code = other579.error_code;
+  error_msg = other579.error_msg;
+  snapshots = other579.snapshots;
+  __isset = other579.__isset;
+  return *this;
+}
+void ListSnapshotsResponse::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ListSnapshotsResponse(";
+  out << "error_code=" << to_string(error_code);
+  out << ", " << "error_msg=" << to_string(error_msg);
+  out << ", " << "snapshots=" << to_string(snapshots);
+  out << ")";
+}
+
+
+DropSnapshotRequest::~DropSnapshotRequest() noexcept {
+}
+
+DropSnapshotRequest::DropSnapshotRequest() noexcept
+   : session_id(0),
+     snapshot_name() {
+}
+
+void DropSnapshotRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void DropSnapshotRequest::__set_snapshot_name(const std::string& val) {
+  this->snapshot_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const DropSnapshotRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t DropSnapshotRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->snapshot_name);
+          this->__isset.snapshot_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t DropSnapshotRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("DropSnapshotRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("snapshot_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->snapshot_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(DropSnapshotRequest &a, DropSnapshotRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.snapshot_name, b.snapshot_name);
+  swap(a.__isset, b.__isset);
+}
+
+bool DropSnapshotRequest::operator==(const DropSnapshotRequest & rhs) const
+{
+  if (!(session_id == rhs.session_id))
+    return false;
+  if (!(snapshot_name == rhs.snapshot_name))
+    return false;
+  return true;
+}
+
+DropSnapshotRequest::DropSnapshotRequest(const DropSnapshotRequest& other580) {
+  session_id = other580.session_id;
+  snapshot_name = other580.snapshot_name;
+  __isset = other580.__isset;
+}
+DropSnapshotRequest& DropSnapshotRequest::operator=(const DropSnapshotRequest& other581) {
+  session_id = other581.session_id;
+  snapshot_name = other581.snapshot_name;
+  __isset = other581.__isset;
+  return *this;
+}
+void DropSnapshotRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "DropSnapshotRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "snapshot_name=" << to_string(snapshot_name);
+  out << ")";
+}
+
 } // namespace

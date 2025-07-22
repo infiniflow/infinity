@@ -58,6 +58,8 @@ private:
     String GetDBTag(const String &tag) const;
 
 private:
+    mutable std::mutex mtx_;
+
     String db_id_str_{};
     String db_name_{};
     NewTxn *txn_{};

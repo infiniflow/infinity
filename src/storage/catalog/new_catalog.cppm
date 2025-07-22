@@ -53,7 +53,7 @@ class IndexBase;
 struct WalSegmentInfo;
 struct WalBlockInfo;
 struct WalChunkIndexInfo;
-class Config;
+struct Config;
 struct MemIndexID;
 class TableCache;
 class DbCache;
@@ -285,6 +285,8 @@ public:
     // static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
+
+    static Status LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
 
     static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
 
