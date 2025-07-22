@@ -1936,11 +1936,14 @@ Status NewTxn::Commit() {
     bool retry_query = true;
     bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason, retry_query);
     if (conflict) {
-        if (retry_query) {
-            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        } else {
-            status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
-        }
+        // TODO: We are not retrying the query if its transaction is conflicted with other transaction right now. We will add retry logic later.
+        status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+
+        // if (retry_query) {
+        //     status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        // } else {
+        //     status = Status::TxnConflictNoRetry(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        // }
 
         this->SetTxnRollbacking(commit_ts);
     }
@@ -4755,7 +4758,7 @@ bool NewTxn::CheckConflict1(SharedPtr<NewTxn> check_txn, String &conflict_reason
     for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         bool conflict = this->CheckConflictCmd(*wal_cmd, check_txn.get(), conflict_reason, retry_query);
         if (conflict) {
-            conflicted_txn_ = check_txn;
+            // conflicted_txn_ = check_txn;
             return true;
         }
     }
@@ -4766,7 +4769,7 @@ bool NewTxn::CheckConflictTxnStores(SharedPtr<NewTxn> check_txn, String &conflic
     LOG_TRACE(fmt::format("CheckConflictTxnStores::Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     bool conflict = this->CheckConflictTxnStore(check_txn.get(), conflict_reason, retry_query);
     if (conflict) {
-        conflicted_txn_ = check_txn;
+        // conflicted_txn_ = check_txn;
         return true;
     }
     return false;
