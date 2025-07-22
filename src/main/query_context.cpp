@@ -470,10 +470,11 @@ TxnTimeStamp QueryContext::CommitTxn() {
     NewTxn *new_txn = session_ptr_->GetNewTxn();
     Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
     if (!status.ok()) {
+        session_ptr_->ResetNewTxn();
         RecoverableError(status);
     }
     session_ptr_->IncreaseCommittedTxnCount();
-
+    session_ptr_->ResetNewTxn();
     return commit_ts;
 }
 
@@ -481,9 +482,11 @@ void QueryContext::RollbackTxn() {
     NewTxn *new_txn = session_ptr_->GetNewTxn();
     Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
     if (!status.ok()) {
+        session_ptr_->ResetNewTxn();
         RecoverableError(status);
     }
     session_ptr_->IncreaseRollbackedTxnCount();
+    session_ptr_->ResetNewTxn();
     return;
 }
 

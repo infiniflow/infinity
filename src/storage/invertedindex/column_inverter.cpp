@@ -204,6 +204,9 @@ struct FullRadix {
 
 void ColumnInverter::Sort() {
     SortTerms();
+    if (positions_.empty()) {
+        return;
+    }
     ShiftBasedRadixSorter<PosInfo, FullRadix, std::less<PosInfo>, 56, true>::RadixSort(FullRadix(),
                                                                                        std::less<PosInfo>(),
                                                                                        &positions_[0],

@@ -96,6 +96,8 @@ public:
     Tuple<SecondaryIndexCardinality, Status> GetSecondaryIndexCardinality();
 
 private:
+    mutable std::mutex mtx_;
+
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     String index_id_str_;

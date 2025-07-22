@@ -55,17 +55,17 @@ DumpIndexProcessor::~DumpIndexProcessor() {
 }
 
 void DumpIndexProcessor::Start() {
-    LOG_INFO("Compaction processor is started.");
+    LOG_INFO("Dump index processor is started.");
     processor_thread_ = Thread([this] { Process(); });
 }
 
 void DumpIndexProcessor::Stop() {
-    LOG_INFO("Compaction processor is stopping.");
+    LOG_INFO("Dump index processor is stopping.");
     SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
     this->Submit(stop_task);
     stop_task->Wait();
     processor_thread_.join();
-    LOG_INFO("Compaction processor is stopped.");
+    LOG_INFO("Dump index processor is stopped.");
 }
 
 void DumpIndexProcessor::Submit(SharedPtr<BGTask> bg_task) {

@@ -44,6 +44,7 @@ TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta)
 TableIndexMeeta::~TableIndexMeeta() = default;
 
 Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!index_def_) {
         index_def_ =
             infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
@@ -74,6 +75,7 @@ Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
 }
 
 Tuple<Vector<SegmentID> *, Status> TableIndexMeeta::GetSegmentIndexIDs1() {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids_) {
         segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_,
                                                        table_meta_.db_id_str(),
@@ -108,6 +110,7 @@ Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
 }
 
 Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!segment_ids_) {
         Status status = LoadSegmentIDs();
         if (!status.ok()) {

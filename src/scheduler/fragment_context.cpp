@@ -606,9 +606,12 @@ bool FragmentContext::TryFinishFragment() {
             for (auto &task : tasks_) {
                 if (task->sink_state_->state_type_ == SinkStateType::kQueue) {
                     auto *queue_sink_state = static_cast<QueueSinkState *>(task->sink_state_.get());
-                    if (queue_sink_state->sent_data_) {
-                        sent_data = true;
-                        queue_sink_state->sent_data_ = false;
+                    {
+                        std::lock_guard<std::mutex> lock(queue_sink_state->sent_data_mutex_);
+                        if (queue_sink_state->sent_data_) {
+                            sent_data = true;
+                            queue_sink_state->sent_data_ = false;
+                        }
                     }
                 }
             }
