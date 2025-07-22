@@ -40,3 +40,13 @@ class Database(ABC):
     @abstractmethod
     def show_tables(self):
         pass
+
+    @abstractmethod
+    def create_table_snapshot(self, snapshot_name: str, table_name: str):
+        pass
+
+    @abstractmethod
+    def restore_table_snapshot(self, snapshot_name: str):
+        pass
+    
+    

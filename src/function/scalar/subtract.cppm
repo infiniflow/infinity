@@ -14,7 +14,7 @@
 
 module;
 
-export module infinity_core:substract;
+export module infinity_core:subtract;
 
 import :stl;
 

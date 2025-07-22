@@ -42,7 +42,7 @@ public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                       UniquePtr<Vector<BlockMeta *>> block_metas,
                       SharedPtr<TableIndexMeeta> table_index_meta,
-                      UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
+                      UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas,
                       Vector<InitParameter> opt_params,
                       i64 topk,
                       i64 dimension,
@@ -58,7 +58,7 @@ public:
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
     SharedPtr<TableIndexMeeta> table_index_meta_{};
-    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
+    UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas_{};
 
     const Vector<InitParameter> opt_params_{};
     const i64 topk_;

@@ -555,6 +555,7 @@ export struct QueueSinkState : public SinkState {
     Vector<UniquePtr<DataBlock>> data_block_array_{};
     Vector<BlockingQueue<SharedPtr<FragmentDataBase>> *> fragment_data_queues_;
 
+    mutable std::mutex sent_data_mutex_;
     bool sent_data_{false};
 };
 

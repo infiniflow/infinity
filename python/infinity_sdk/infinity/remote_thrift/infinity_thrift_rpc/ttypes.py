@@ -9294,6 +9294,808 @@ class CompactRequest(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+
+class CreateTableSnapshotRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - table_name
+     - snapshot_name
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, db_name = None, table_name = None, snapshot_name = None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.table_name = table_name
+        self.snapshot_name = snapshot_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.snapshot_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('CreateTableSnapshotRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 3)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.snapshot_name is not None:
+            oprot.writeFieldBegin('snapshot_name', TType.STRING, 4)
+            oprot.writeString(self.snapshot_name.encode('utf-8') if sys.version_info[0] == 2 else self.snapshot_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class CreateDatabaseSnapshotRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - snapshot_name
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, db_name = None, snapshot_name = None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.snapshot_name = snapshot_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.snapshot_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('CreateDatabaseSnapshotRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.snapshot_name is not None:
+            oprot.writeFieldBegin('snapshot_name', TType.STRING, 3)
+            oprot.writeString(self.snapshot_name.encode('utf-8') if sys.version_info[0] == 2 else self.snapshot_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class CreateSystemSnapshotRequest(object):
+    """
+    Attributes:
+     - session_id
+     - snapshot_name
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, snapshot_name = None,):
+        self.session_id = session_id
+        self.snapshot_name = snapshot_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.snapshot_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('CreateSystemSnapshotRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.snapshot_name is not None:
+            oprot.writeFieldBegin('snapshot_name', TType.STRING, 2)
+            oprot.writeString(self.snapshot_name.encode('utf-8') if sys.version_info[0] == 2 else self.snapshot_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class RestoreSnapshotRequest(object):
+    """
+    Attributes:
+     - session_id
+     - snapshot_name
+     - scope
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, snapshot_name = None, scope = None,):
+        self.session_id = session_id
+        self.snapshot_name = snapshot_name
+        self.scope = scope
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.snapshot_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.scope = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('RestoreSnapshotRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.snapshot_name is not None:
+            oprot.writeFieldBegin('snapshot_name', TType.STRING, 2)
+            oprot.writeString(self.snapshot_name.encode('utf-8') if sys.version_info[0] == 2 else self.snapshot_name)
+            oprot.writeFieldEnd()
+        if self.scope is not None:
+            oprot.writeFieldBegin('scope', TType.STRING, 3)
+            oprot.writeString(self.scope.encode('utf-8') if sys.version_info[0] == 2 else self.scope)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class SnapshotInfo(object):
+    """
+    Attributes:
+     - name
+     - scope
+     - time
+     - commit
+     - size
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, name = None, scope = None, time = None, commit = None, size = None,):
+        self.name = name
+        self.scope = scope
+        self.time = time
+        self.commit = commit
+        self.size = size
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.scope = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.time = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.commit = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRING:
+                    self.size = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('SnapshotInfo')
+        if self.name is not None:
+            oprot.writeFieldBegin('name', TType.STRING, 1)
+            oprot.writeString(self.name.encode('utf-8') if sys.version_info[0] == 2 else self.name)
+            oprot.writeFieldEnd()
+        if self.scope is not None:
+            oprot.writeFieldBegin('scope', TType.STRING, 2)
+            oprot.writeString(self.scope.encode('utf-8') if sys.version_info[0] == 2 else self.scope)
+            oprot.writeFieldEnd()
+        if self.time is not None:
+            oprot.writeFieldBegin('time', TType.STRING, 3)
+            oprot.writeString(self.time.encode('utf-8') if sys.version_info[0] == 2 else self.time)
+            oprot.writeFieldEnd()
+        if self.commit is not None:
+            oprot.writeFieldBegin('commit', TType.I64, 4)
+            oprot.writeI64(self.commit)
+            oprot.writeFieldEnd()
+        if self.size is not None:
+            oprot.writeFieldBegin('size', TType.STRING, 5)
+            oprot.writeString(self.size.encode('utf-8') if sys.version_info[0] == 2 else self.size)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowSnapshotRequest(object):
+    """
+    Attributes:
+     - session_id
+     - snapshot_name
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, snapshot_name = None,):
+        self.session_id = session_id
+        self.snapshot_name = snapshot_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.snapshot_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowSnapshotRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.snapshot_name is not None:
+            oprot.writeFieldBegin('snapshot_name', TType.STRING, 2)
+            oprot.writeString(self.snapshot_name.encode('utf-8') if sys.version_info[0] == 2 else self.snapshot_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowSnapshotResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - snapshot
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, error_code = None, error_msg = None, snapshot = None,):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.snapshot = snapshot
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRUCT:
+                    self.snapshot = SnapshotInfo()
+                    self.snapshot.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowSnapshotResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.snapshot is not None:
+            oprot.writeFieldBegin('snapshot', TType.STRUCT, 3)
+            self.snapshot.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ListSnapshotsRequest(object):
+    """
+    Attributes:
+     - session_id
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None,):
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ListSnapshotsRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ListSnapshotsResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - snapshots
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, error_code = None, error_msg = None, snapshots = [
+    ],):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        if snapshots is self.thrift_spec[3][4]:
+            snapshots = [
+            ]
+        self.snapshots = snapshots
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.LIST:
+                    self.snapshots = []
+                    (_etype430, _size427) = iprot.readListBegin()
+                    for _i431 in range(_size427):
+                        _elem432 = SnapshotInfo()
+                        _elem432.read(iprot)
+                        self.snapshots.append(_elem432)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ListSnapshotsResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.snapshots is not None:
+            oprot.writeFieldBegin('snapshots', TType.LIST, 3)
+            oprot.writeListBegin(TType.STRUCT, len(self.snapshots))
+            for iter433 in self.snapshots:
+                iter433.write(oprot)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class DropSnapshotRequest(object):
+    """
+    Attributes:
+     - session_id
+     - snapshot_name
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, session_id = None, snapshot_name = None,):
+        self.session_id = session_id
+        self.snapshot_name = snapshot_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.snapshot_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('DropSnapshotRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.snapshot_name is not None:
+            oprot.writeFieldBegin('snapshot_name', TType.STRING, 2)
+            oprot.writeString(self.snapshot_name.encode('utf-8') if sys.version_info[0] == 2 else self.snapshot_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
 all_structs.append(Property)
 Property.thrift_spec = (
     None,  # 0
@@ -10035,6 +10837,75 @@ CompactRequest.thrift_spec = (
     (1, TType.I64, 'session_id', None, None, ),  # 1
     (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+)
+all_structs.append(CreateTableSnapshotRequest)
+CreateTableSnapshotRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 4
+)
+all_structs.append(CreateDatabaseSnapshotRequest)
+CreateDatabaseSnapshotRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 3
+)
+all_structs.append(CreateSystemSnapshotRequest)
+CreateSystemSnapshotRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 2
+)
+all_structs.append(RestoreSnapshotRequest)
+RestoreSnapshotRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'scope', 'UTF8', None, ),  # 3
+)
+all_structs.append(SnapshotInfo)
+SnapshotInfo.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'scope', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'time', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'commit', None, None, ),  # 4
+    (5, TType.STRING, 'size', 'UTF8', None, ),  # 5
+)
+all_structs.append(ShowSnapshotRequest)
+ShowSnapshotRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 2
+)
+all_structs.append(ShowSnapshotResponse)
+ShowSnapshotResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.STRUCT, 'snapshot', [SnapshotInfo, None], None, ),  # 3
+)
+all_structs.append(ListSnapshotsRequest)
+ListSnapshotsRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+)
+all_structs.append(ListSnapshotsResponse)
+ListSnapshotsResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.LIST, 'snapshots', (TType.STRUCT, [SnapshotInfo, None], False), [
+    ], ),  # 3
+)
+all_structs.append(DropSnapshotRequest)
+DropSnapshotRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'snapshot_name', 'UTF8', None, ),  # 2
 )
 fix_spec(all_structs)
 del all_structs

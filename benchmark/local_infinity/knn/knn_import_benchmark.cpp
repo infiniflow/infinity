@@ -18,6 +18,7 @@
 #include <iostream>
 #include <set>
 #include <thread>
+#include <memory>
 
 import infinity_core;
 import compilation_config;
