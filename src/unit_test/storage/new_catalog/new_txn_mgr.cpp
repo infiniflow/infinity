@@ -162,38 +162,38 @@ TEST_F(TestTxnManagerTest, test_parallel_ts) {
                 {
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
                     TransactionID txn_id = txn->TxnID();
-                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} CreateDatabase", thread_i, txn_id));
+                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} CreateDatabase", thread_i, txn_id));
                     status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
                             LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
-                            LOG_INFO(fmt::format("Thread: {}, txn_id: {}, CreateDatabase CommitTxn success", thread_i, txn_id));
+                            LOG_TRACE(fmt::format("Thread: {}, txn_id: {}, CreateDatabase CommitTxn success", thread_i, txn_id));
                         }
                     } else {
                         LOG_WARN(fmt::format("Thread: {}, txn_id: {}, CreateDatabase failed: {}", thread_i, txn_id, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
+                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
                 }
                 {
                     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
                     TransactionID txn_id = txn->TxnID();
-                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
+                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} DropDatabase", thread_i, txn->TxnID()));
                     status = txn->DropDatabase(*db_name, ConflictType::kError);
                     if (status.ok()) {
                         status = new_txn_mgr->CommitTxn(txn);
                         if (!status.ok()) {
                             LOG_WARN(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn failed: {}", thread_i, txn_id, status.message()));
                         } else {
-                            LOG_INFO(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn success", thread_i, txn_id));
+                            LOG_TRACE(fmt::format("Thread: {}, txn_id: {}, DropDatabase CommitTxn success", thread_i, txn_id));
                         }
                     } else {
                         LOG_ERROR(fmt::format("Thread: {}, DropDatabase failed: {}", thread_i, status.message()));
                         status = new_txn_mgr->RollBackTxn(txn);
                     }
-                    LOG_INFO(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
+                    LOG_TRACE(fmt::format("Thread: {}, txn_id: {} Done", thread_i, txn_id));
                 }
             }
         }));
