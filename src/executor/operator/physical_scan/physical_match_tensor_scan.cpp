@@ -182,7 +182,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     auto &search_column_name = base_table_ref_->table_info_->column_defs_[search_column_id]->name();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
-    segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
+    segment_index_metas_ = MakeUnique<Vector<SharedPtr<SegmentIndexMeta>>>();
 
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
@@ -264,7 +264,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
-            segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
+            segment_index_metas_->push_back(MakeShared<SegmentIndexMeta>(segment_id, *table_index_meta_));
         } else {
             const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
@@ -324,7 +324,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
     if (const u32 task_job_index = task_executed_++; task_job_index < segment_index_metas_->size()) {
         // use index
-        SegmentIndexMeta &segment_index_meta = (*segment_index_metas_)[task_job_index];
+        SegmentIndexMeta &segment_index_meta = *(*segment_index_metas_)[task_job_index];
         SegmentID segment_id = segment_index_meta.segment_id();
         // SegmentEntry *segment_entry = nullptr;
         SegmentOffset segment_row_count = 0;

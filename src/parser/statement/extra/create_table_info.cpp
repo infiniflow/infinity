@@ -41,7 +41,7 @@ CreateTableInfo::~CreateTableInfo() {
 
 std::string CreateTableInfo::ToString() const {
     std::stringstream ss;
-    ss << table_name_ << " ";
+    ss << "CREATE TABLE " << table_name_ << " ";
     switch (this->conflict_type_) {
         case ConflictType::kIgnore: {
             ss << "Ignore ";

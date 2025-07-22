@@ -102,7 +102,7 @@ private:
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
     UniquePtr<TableIndexMeeta> table_index_meta_{};
-    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
+    UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas_{};
 
     mutable atomic_u32 task_executed_ = 0;
 

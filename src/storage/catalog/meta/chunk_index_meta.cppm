@@ -53,6 +53,7 @@ public:
     SegmentIndexMeta &segment_index_meta() const { return segment_index_meta_; }
 
     Status GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
+        std::lock_guard<std::mutex> lock(mtx_);
         if (!chunk_info_) {
             Status status = LoadChunkInfo();
             if (!status.ok()) {
@@ -87,6 +88,8 @@ private:
     String GetChunkIndexTag(const String &tag) const;
 
 private:
+    mutable std::mutex mtx_;
+
     KVInstance &kv_instance_;
     SegmentIndexMeta &segment_index_meta_;
     ChunkID chunk_id_;

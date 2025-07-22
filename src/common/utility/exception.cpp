@@ -38,11 +38,13 @@ void PrintTransactionHistory() {
     }
     Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
+    OStringStream oss;
     SizeT history_count = txn_contexts.size();
     for (SizeT idx = 0; idx < history_count; ++idx) {
         SharedPtr<TxnContext> txn_history = txn_contexts[idx];
-        LOG_CRITICAL(txn_history->ToString());
+        oss << txn_history->ToString();
     }
+    LOG_CRITICAL(oss.str());
 }
 
 void PrintStacktrace(const String &err_msg) {
@@ -72,11 +74,18 @@ std::string_view GetErrorMsg(const String &message) {
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
-    auto *storage = InfinityContext::instance().storage();
-    if (storage != nullptr) {
-        if (storage->new_txn_manager() != nullptr) {
-            infinity::PrintTransactionHistory();
+    // Use thread-local variable to prevent recursive calls and potential deadlock
+    static thread_local bool in_error_handling = false;
+
+    if (!in_error_handling) {
+        in_error_handling = true;
+        auto *storage = InfinityContext::instance().storage();
+        if (storage != nullptr) {
+            if (storage->new_txn_manager() != nullptr) {
+                infinity::PrintTransactionHistory();
+            }
         }
+        in_error_handling = false;
     }
     // if (storage != nullptr) {
     //     CleanupInfoTracer *cleanup_tracer = storage->cleanup_info_tracer();

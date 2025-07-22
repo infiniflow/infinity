@@ -178,7 +178,7 @@ jobs:
 
       - name: Collect infinity unit test debug output
         if: ${{ !cancelled() && failure() }}
-        run: cat unittest_debug.log 2>/dev/null || true
+        run: tail -n 1000 unittest_debug.log 2>/dev/null || true
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -459,7 +459,7 @@ jobs:
 
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() }}
-        run: cat unittest_release.log 2>/dev/null || true
+        run: tail -n 1000 unittest_release.log 2>/dev/null || true
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}

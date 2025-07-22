@@ -233,8 +233,8 @@ void PersistenceManager::CheckValid() {
         if (obj_addr.obj_key_ == ObjAddr::KeyEmpty) {
             continue;
         }
-        ObjStat *obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
-        if (obj_stat == nullptr) {
+        Optional<ObjStat> obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
+        if (!obj_stat.has_value()) {
             String error_message = fmt::format("CheckValid Failed to find object for local path {}", local_path);
             LOG_ERROR(error_message);
         }
@@ -473,15 +473,15 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
                                        Vector<String> &drop_keys,
                                        Vector<String> &drop_from_remote_keys,
                                        bool check_ref_count) {
-    ObjStat *obj_stat = objects_->GetNoCount(object_addr.obj_key_);
-    if (obj_stat == nullptr) {
+    Optional<ObjStat> obj_stat = objects_->GetNoCount(object_addr.obj_key_);
+    if (!obj_stat.has_value()) {
         if (object_addr.obj_key_ == ObjAddr::KeyEmpty) {
             assert(object_addr.part_size_ == 0);
             return;
         } else if (object_addr.obj_key_ == current_object_key_) {
             CurrentObjFinalizeNoLock(persist_keys, drop_keys);
             obj_stat = objects_->GetNoCount(object_addr.obj_key_);
-            assert(obj_stat != nullptr);
+            assert(obj_stat.has_value());
         } else {
             String error_message = fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_);
             UnrecoverableError(error_message);
@@ -568,8 +568,8 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
 
 ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
     std::lock_guard<std::mutex> lock(mtx_);
-    ObjStat *obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
-    if (obj_stat == nullptr) {
+    Optional<ObjStat> obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
+    if (!obj_stat.has_value()) {
         return ObjStat();
     }
     return *obj_stat;
