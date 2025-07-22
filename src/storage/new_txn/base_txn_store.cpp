@@ -27,6 +27,8 @@ import default_values;
 
 namespace infinity {
 
+void BaseTxnStore::ClearData() { return; }
+
 String DummyTxnStore::ToString() const { return fmt::format("{}: dummy", TransactionType2Str(type_)); }
 
 SharedPtr<WalEntry> DummyTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
@@ -40,6 +42,7 @@ SharedPtr<WalEntry> DummyTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
 String CreateDBTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id:{}, comment: {}", TransactionType2Str(type_), db_name_, db_id_, *comment_ptr_);
 }
+
 SharedPtr<WalEntry> CreateDBTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
@@ -208,6 +211,8 @@ SharedPtr<WalEntry> AppendTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     return wal_entry;
 }
 
+void AppendTxnStore::ClearData() { input_block_ = nullptr; }
+
 String ImportTxnStore::ToString() const {
     return fmt::format("{}: database: {}, db_id: {}, table: {}, table_id: {}", TransactionType2Str(type_), db_name_, db_id_, table_name_, table_id_);
 }
@@ -240,6 +245,8 @@ SharedPtr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
 
     return wal_entry;
 }
+
+void ImportTxnStore::ClearData() { input_blocks_in_imports_.clear(); }
 
 SizeT ImportTxnStore::RowCount() const {
     SizeT row_count = 0;
@@ -367,14 +374,6 @@ String DeleteTxnStore::ToString() const {
                        row_ids_.size());
 }
 
-SizeT UpdateTxnStore::RowCount() const {
-    SizeT row_count = 0;
-    for (const auto &input_block : input_blocks_) {
-        row_count += input_block->row_count();
-    }
-    return row_count;
-}
-
 SharedPtr<WalEntry> DeleteTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
@@ -419,6 +418,16 @@ SharedPtr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
         wal_entry->cmds_.push_back(wal_command2);
     }
     return wal_entry;
+}
+
+void UpdateTxnStore::ClearData() { input_blocks_.clear(); }
+
+SizeT UpdateTxnStore::RowCount() const {
+    SizeT row_count = 0;
+    for (const auto &input_block : input_blocks_) {
+        row_count += input_block->row_count();
+    }
+    return row_count;
 }
 
 String CheckpointTxnStore::ToString() const { return fmt::format("{}: max_commit_ts_: {}", TransactionType2Str(type_), max_commit_ts_); }

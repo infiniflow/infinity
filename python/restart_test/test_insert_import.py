@@ -55,7 +55,6 @@ class TestInsertImport:
                 if insert_finish:
                     logger.debug("insert finished")
                 try:
-                    last_n = 0
                     if not if_import and not insert_finish:
                         insert_data = []
                         # get `batch_size` data in data_gen one time
@@ -78,8 +77,8 @@ class TestInsertImport:
                         logger.debug(f"{write_i}. insert {insert_batch_size} data, cur_n: {cur_n}")
                     else:
                         abs_import_file = os.path.abspath(import_file)
-                        table_obj.import_data(abs_import_file, import_options)
                         last_n = import_size
+                        table_obj.import_data(abs_import_file, import_options)
                         cur_n += import_size
                         logger.debug(f"{write_i}. import {import_size} data, cur_n: {cur_n}")
                     write_i += 1
@@ -121,7 +120,8 @@ class TestInsertImport:
             # insert and import while shutdown might fail or success
             assert count_star in {cur_n, cur_n + last_n}
             cur_n = count_star
-            logger.debug(f"cur_n: {cur_n}")
+            logger.debug(f"cur_n: {cur_n}, last_n: {last_n}")
+            last_n = 0
 
             t1 = RtnThread(target=shutdown_func)
             t1.start()
