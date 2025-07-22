@@ -240,7 +240,15 @@ void PersistenceManager::CheckValid() {
         }
     }
     const auto part2_begin = std::chrono::high_resolution_clock::now();
-    objects_->CheckValid(current_object_size_);
+
+    // Protect access to current_object_size_ with mutex
+    SizeT current_size;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        current_size = current_object_size_;
+    }
+    objects_->CheckValid(current_size);
+
     const auto part2_end = std::chrono::high_resolution_clock::now();
     LOG_INFO(fmt::format("PersistenceManager::CheckValid part 1: {} ms, part2: {} ms",
                          static_cast<TimeDurationType>(part2_begin - part1_begin).count(),
@@ -304,13 +312,13 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
             String error_message = fmt::format("GetObjCache object {} is empty", obj_addr.obj_key_);
             UnrecoverableError(error_message);
         }
-    } else if (ObjStat *obj_stat = objects_->Get(obj_addr.obj_key_); obj_stat != nullptr) {
+    } else if (Optional<ObjStat> obj_stat = objects_->Get(obj_addr.obj_key_); obj_stat) {
         LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", obj_addr.obj_key_, file_path, obj_stat->ref_count_));
         String read_path = GetObjPath(result.obj_addr_.obj_key_);
         if (!VirtualStore::Exists(read_path)) {
             auto expect = ObjCached::kCached;
             obj_stat->cached_.compare_exchange_strong(expect, ObjCached::kNotCached);
-            result.obj_stat_ = obj_stat;
+            result.obj_stat_ = &obj_stat.value();
         }
     } else {
         if (obj_addr.obj_key_ != current_object_key_) {
@@ -410,8 +418,8 @@ PersistWriteResult PersistenceManager::PutObjCache(const String &file_path) {
         current_object_ref_count_--;
         LOG_TRACE(fmt::format("PutObjCache current object {} ref count {}", obj_addr.obj_key_, current_object_ref_count_));
     } else {
-        ObjStat *obj_stat = objects_->Release(obj_addr.obj_key_, result.drop_keys_);
-        if (obj_stat != nullptr) {
+        Optional<ObjStat> obj_stat = objects_->Release(obj_addr.obj_key_, result.drop_keys_);
+        if (obj_stat) {
             LOG_TRACE(fmt::format("PutObjCache object {} ref count {}", obj_addr.obj_key_, obj_stat->ref_count_));
         } else {
             LOG_WARN(fmt::format("PutObjCache object {} unknown ref count", obj_addr.obj_key_));

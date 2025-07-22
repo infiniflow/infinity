@@ -338,13 +338,30 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts, KVInstance *kv_instance, Vect
     constexpr std::string drop_prefix = "drop";
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
-    String drop_key, drop_ts_str;
+    String drop_key, commit_ts_str;
     TxnTimeStamp drop_ts;
 
     while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
         drop_key = iter->Key().ToString();
-        drop_ts_str = iter->Value().ToString();
-        drop_ts = std::stoull(drop_ts_str); // It might not be an integer
+        commit_ts_str = iter->Value().ToString();
+
+        auto keys = infinity::Partition(drop_key, '|');
+        const String &type_str = keys[1];
+        const String &meta_str = keys[2];
+        auto meta_infos = infinity::Partition(meta_str, '/');
+        if (type_str == "db") {
+            drop_ts = std::stoull(meta_infos[1]);
+        } else if (type_str == "tbl") {
+            drop_ts = std::stoull(meta_infos[2]);
+        } else if (type_str == "tbl_name") {
+            drop_ts = std::stoull(meta_infos[2]);
+        } else if (type_str == "tbl_col") {
+            drop_ts = std::stoull(meta_infos[3]);
+        } else if (type_str == "idx") {
+            drop_ts = std::stoull(meta_infos[3]);
+        } else {
+            drop_ts = std::stoull(commit_ts_str); // It might not be an integer
+        }
         if (drop_ts <= ts) {
             drop_keys.emplace_back(drop_key);
         }

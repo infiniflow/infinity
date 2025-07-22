@@ -19,9 +19,6 @@ add_subdirectory(magic_enum)
 # Build mlas
 add_subdirectory(mlas)
 
-# Build concurrentqueue
-add_subdirectory(concurrentqueue)
-
 #add_library(libhv INTERFACE)
 #target_include_directories(libhv INTERFACE libhv/include)
 
@@ -95,3 +92,8 @@ target_compile_options(
 )
 
 add_subdirectory(rocksdb)
+
+find_package(zstd REQUIRED)
+set(CPPTRACE_GET_SYMBOLS_WITH_LIBBACKTRACE ON)
+set(CPPTRACE_USE_EXTERNAL_ZSTD ON)
+add_subdirectory(cpptrace)

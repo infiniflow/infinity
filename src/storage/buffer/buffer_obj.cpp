@@ -186,7 +186,8 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         switch (status_) {
             case BufferStatus::kNew: {
                 file_worker_->AllocateInMemory();
-                status_ = BufferStatus::kLoaded;
+                buffer_mgr_->PushGCQueue(this);
+                status_ = BufferStatus::kUnloaded;
             }
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
@@ -253,7 +254,11 @@ void BufferObj::PickForCleanup() {
             break;
         }
         default: {
-            String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
+            String error_message = fmt::format("Buffer: {}, Invalid status: {}, buffer type: {}, rc: {}",
+                                               GetFilename(),
+                                               BufferStatusToString(status_),
+                                               BufferTypeToString(type_),
+                                               rc_);
             UnrecoverableError(error_message);
         }
     }

@@ -13,8 +13,8 @@ TEST_F(ObjectStatMapTest, test1) {
     SizeT disk_capacity_limit = 10;
     ObjectStatAccessor_ObjectStorage obj_map(disk_capacity_limit);
 
-    ObjStat *obj_stat = obj_map.Get("key1");
-    EXPECT_EQ(obj_stat, nullptr);
+    Optional<ObjStat> obj_stat = obj_map.Get("key1");
+    EXPECT_EQ(obj_stat, None);
 
     Vector<String> drop_keys;
     obj_map.PutNew("key1", ObjStat(4, 1, 0), drop_keys);
@@ -23,10 +23,10 @@ TEST_F(ObjectStatMapTest, test1) {
     obj_map.PutNew("key2", ObjStat(4, 1, 0), drop_keys);
     EXPECT_EQ(drop_keys.size(), 0);
 
-    ObjStat *stat1 = obj_map.Get("key1");
+    Optional<ObjStat> stat1 = obj_map.Get("key1");
     EXPECT_EQ(stat1->obj_size_, 4);
     EXPECT_EQ(stat1->ref_count_, 1);
-    obj_map.Release("key1", drop_keys);
+    stat1 = obj_map.Release("key1", drop_keys);
     EXPECT_EQ(stat1->ref_count_, 0);
     EXPECT_EQ(drop_keys.size(), 0);
 

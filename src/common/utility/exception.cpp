@@ -14,6 +14,7 @@
 
 module;
 
+#include <cpptrace/cpptrace.hpp>
 #include <cstdlib>
 #include <execinfo.h>
 #include <iostream>
@@ -37,25 +38,22 @@ void PrintTransactionHistory() {
     }
     Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
+    OStringStream oss;
     SizeT history_count = txn_contexts.size();
     for (SizeT idx = 0; idx < history_count; ++idx) {
         SharedPtr<TxnContext> txn_history = txn_contexts[idx];
-        LOG_CRITICAL(txn_history->ToString());
+        oss << txn_history->ToString();
     }
+    LOG_CRITICAL(oss.str());
 }
 
 void PrintStacktrace(const String &err_msg) {
-    int trace_stack_depth = 256;
-    void *array[256];
-    int stack_num = backtrace(array, trace_stack_depth);
-    char **stacktrace = backtrace_symbols(array, stack_num);
-
-    LOG_CRITICAL(fmt::format("Error: {}", err_msg));
-    for (int i = 0; i < stack_num; ++i) {
-        String info = stacktrace[i];
-        LOG_CRITICAL(fmt::format("{}, {}", i, info));
+    if (!err_msg.empty()) {
+        LOG_CRITICAL(err_msg);
     }
-    free(stacktrace);
+    int trace_stack_depth = 256;
+    String trace = cpptrace::generate_trace(0, trace_stack_depth).to_string();
+    LOG_CRITICAL(trace);
 }
 
 #define ADD_LOG_INFO
@@ -76,11 +74,18 @@ std::string_view GetErrorMsg(const String &message) {
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
-    auto *storage = InfinityContext::instance().storage();
-    if (storage != nullptr) {
-        if (storage->new_txn_manager() != nullptr) {
-            infinity::PrintTransactionHistory();
+    // Use thread-local variable to prevent recursive calls and potential deadlock
+    static thread_local bool in_error_handling = false;
+
+    if (!in_error_handling) {
+        in_error_handling = true;
+        auto *storage = InfinityContext::instance().storage();
+        if (storage != nullptr) {
+            if (storage->new_txn_manager() != nullptr) {
+                infinity::PrintTransactionHistory();
+            }
         }
+        in_error_handling = false;
     }
     // if (storage != nullptr) {
     //     CleanupInfoTracer *cleanup_tracer = storage->cleanup_info_tracer();
@@ -89,8 +94,11 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (IS_LOGGER_INITIALIZED()) {
-
-        PrintStacktrace(location_message);
+        if (GetPrintStacktrace()) {
+            PrintStacktrace(location_message);
+        } else {
+            LOG_CRITICAL(location_message);
+        }
     }
     Logger::Flush();
     throw UnrecoverableException(location_message);
@@ -107,7 +115,11 @@ void RecoverableError(Status status) {
 
 void UnrecoverableError(const String &message) {
     if (IS_LOGGER_INITIALIZED()) {
-        LOG_CRITICAL(message);
+        if (GetPrintStacktrace()) {
+            PrintStacktrace(message);
+        } else {
+            LOG_CRITICAL(message);
+        }
     }
     Logger::Flush();
     throw UnrecoverableException(message);
