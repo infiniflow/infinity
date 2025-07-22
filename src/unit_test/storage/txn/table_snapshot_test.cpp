@@ -24,6 +24,7 @@ import logger;
 import query_result;
 import query_context;
 import request_test;
+import command_statement;
 
 #include <thread>
 #include <mutex>
@@ -90,20 +91,10 @@ public:
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(insert_txn);
 
-        // Force checkpoint
-        NewTxn *checkpoint_txn = txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNewCheckpoint);
-        checkpoint_txn->Checkpoint(0);
-        txn_mgr->CommitTxn(checkpoint_txn);
-
-        // Create snapshot
+        // Create snapshot using the correct method
         NewTxn *snapshot_txn = txn_mgr->BeginTxn(MakeUnique<String>("create snapshot"), TransactionType::kNormal);
-        std::tie(table_snapshot_, status) = snapshot_txn->GetTableSnapshotInfo("default_db", "test_table");
+        status = snapshot_txn->CreateSnapshot("default_db", "test_table", "test_snapshot", SnapshotScope::kTable);
         EXPECT_TRUE(status.ok());
-        
-        table_snapshot_->snapshot_name_ = "test_snapshot";
-        String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-        status = table_snapshot_->Serialize(snapshot_dir, txn_mgr->GetReadCommitTS(snapshot_txn));
-        // EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(snapshot_txn);
 
         // Drop the original table
@@ -125,10 +116,15 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     // Test 1: Successful restore
     NewTxn *restore_txn = txn_mgr->BeginTxn(MakeUnique<String>("restore table"), TransactionType::kNormal);
     
-    // Attempt to restore table
-    Status status = restore_txn->RestoreTableSnapshot("default_db", table_snapshot_);
+    // Deserialize the snapshot info
+    String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    SharedPtr<TableSnapshotInfo> table_snapshot;
+    Status status;
+    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
     EXPECT_TRUE(status.ok());
-    status = restore_txn->PrepareCommit();
+    
+    // Attempt to restore table
+    status = restore_txn->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
     txn_mgr->CommitTxn(restore_txn);
 
@@ -146,10 +142,12 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     // Test 2: Rollback restore
     NewTxn *restore_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("restore table"), TransactionType::kNormal);
     
-    // Attempt to restore table
-    status = restore_txn1->RestoreTableSnapshot("default_db", table_snapshot_);
+    // Deserialize the snapshot info again
+    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, "test_snapshot");
     EXPECT_TRUE(status.ok());
-    status = restore_txn1->PrepareCommit();
+    
+    // Attempt to restore table
+    status = restore_txn1->RestoreTableSnapshot("default_db", table_snapshot);
     EXPECT_TRUE(status.ok());
     
     // Now rollback the transaction
@@ -162,15 +160,6 @@ TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     auto [table_info, check_status] = check_txn->GetTableInfo("default_db", "test_table");
     EXPECT_FALSE(check_status.ok()); // Table should not exist after rollback
     txn_mgr->CommitTxn(check_txn);
-    
-}
-
-TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
-    using namespace infinity;
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    // Test 1: Successful restore
-    NewTxn *restore_txn = txn_mgr->BeginTxn(MakeUnique<String>("restore table"), TransactionType::kNormal);
     
 }
 
@@ -437,6 +426,5 @@ TEST_P(TableSnapshotTest, test_restore_table_same_snapshot_multithreaded) {
         }
     }
 }
-
 
 

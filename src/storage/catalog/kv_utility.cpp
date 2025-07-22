@@ -35,6 +35,7 @@ import buffer_obj;
 import block_version;
 import buffer_manager;
 import infinity_exception;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -177,6 +178,8 @@ SizeT GetBlockRowCount(KVInstance *kv_instance,
     SharedPtr<BlockLock> block_lock;
     Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
     if (!status.ok()) {
+        // NewTxnManager *new_txn_manager = InfinityContext::instance().storage()->new_txn_manager();
+        // new_txn_manager->PrintAllKeyValue();
         UnrecoverableError("Failed to get block lock");
     }
 

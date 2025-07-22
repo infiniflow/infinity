@@ -2661,6 +2661,25 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
         if (!status.ok()) {
             return status;
         }
+        // Get next table id of the db
+        String next_table_id_key = KeyEncode::CatalogDbTagKey(restore_database_snapshot_cmd->db_id_str_, NEXT_TABLE_ID.data());
+        String next_table_id_str;
+        status = kv_instance_->Get(next_table_id_key, next_table_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        u64 next_table_id = std::stoull(next_table_id_str);
+        u64 this_table_id = std::stoull(restore_table_snapshot_cmd.table_id_);
+        if (this_table_id + 1 > next_table_id) {
+            // Update the next table id
+            String new_next_table_id_str = std::to_string(this_table_id + 1);
+            status = kv_instance_->Put(next_table_id_key, new_next_table_id_str);
+            if (!status.ok()) {
+                return status;
+            }
+            LOG_TRACE(fmt::format("Update next table id to {} for database {}.", new_next_table_id_str, restore_database_snapshot_cmd->db_name_));
+        }
+
     }
     return Status::OK();
 }
@@ -6015,25 +6034,22 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
 }
 
 Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
-    const String &db_name = restore_database_cmd->db_name_;
 
     // Check if the database already exists
-    String db_key = KeyEncode::CatalogDbKey(restore_database_cmd->db_id_, commit_ts);
+    String db_key = KeyEncode::CatalogDbKey(restore_database_cmd->db_id_str_, commit_ts);
     String db_id;
     Status status = kv_instance_->Get(db_key, db_id);
-    bool is_link_files = false;
     if (status.ok()) {
-        if (db_id == restore_database_cmd->db_id_) {
+        if (db_id == restore_database_cmd->db_id_str_) {
             LOG_WARN(fmt::format("Skipping replay restore database: Database {} with id {} already exists, commit ts: {}, txn: {}.",
                                  restore_database_cmd->db_name_,
-                                 restore_database_cmd->db_id_,
+                                restore_database_cmd->db_id_str_,
                                  commit_ts,
                                  txn_id));
-            is_link_files = true;
         } else {
             LOG_ERROR(fmt::format("Replay restore database: Database {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
                                   restore_database_cmd->db_name_,
-                                  restore_database_cmd->db_id_,
+                                  restore_database_cmd->db_id_str_,
                                   db_id,
                                   commit_ts,
                                   txn_id));
@@ -6045,13 +6061,13 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         // Check persistence manager state during restore replay
         PersistenceManager* persistence_manager = InfinityContext::instance().persistence_manager();
         if (persistence_manager != nullptr) {
-            restore_table_cmd->addr_serializer_.AddToPersistenceManager(persistence_manager);
+            restore_table_cmd.addr_serializer_.AddToPersistenceManager(persistence_manager);
             HashMap<String, ObjAddr> all_files = persistence_manager->GetAllFiles();
             LOG_DEBUG(fmt::format("Persistence manager has {} registered files during restore replay, commit ts: {}, txn: {}", 
                                 all_files.size(), commit_ts, txn_id));
             
             // Check if any files from this table are registered
-            String table_prefix = "db_" + restore_table_cmd->db_id_ + "/tbl_" + restore_table_cmd->table_id_;
+            String table_prefix = "db_" + restore_table_cmd.db_id_ + "/tbl_" + restore_table_cmd.table_id_;
             SizeT table_file_count = 0;
             for (const auto& [file_path, obj_addr] : all_files) {
                 if (file_path.find(table_prefix) != String::npos) {
@@ -6061,10 +6077,10 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
                 }
             }
             LOG_DEBUG(fmt::format("Table {} has {} files registered in persistence manager", 
-                                restore_table_cmd->table_id_, table_file_count));
+                                restore_table_cmd.table_id_, table_file_count));
         }else {    // check if the data still exist in the system
             String data_dir = InfinityContext::instance().config()->DataDir();
-            String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd->db_id_), "tbl_" + restore_table_cmd->table_id_);
+            String table_data_dir = VirtualStore::ConcatenatePath(VirtualStore::ConcatenatePath(data_dir, "db_" + restore_table_cmd.db_id_), "tbl_" + restore_table_cmd.table_id_);
             if (!VirtualStore::Exists(table_data_dir)) {
                 LOG_ERROR(fmt::format("Table data directory {} does not exist, commit ts: {}, txn: {}.", table_data_dir, commit_ts, txn_id));
                 //return Status::OK();
@@ -6072,7 +6088,7 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         }
     }
 
-    status = PrepareCommitRestoreDatabaseSnapshot(restore_database_cmd, is_link_files);
+    status = PrepareCommitRestoreDatabaseSnapshot(restore_database_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -6085,7 +6101,7 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
     }
 
     u64 current_next_db_id = std::stoull(current_next_db_id_str);
-    u64 this_db_id = std::stoull(restore_database_cmd->db_id_);
+    u64 this_db_id = std::stoull(restore_database_cmd->db_id_str_);
     if (this_db_id + 1 > current_next_db_id) {
         // Update the next db id
         String next_db_id_str = std::to_string(this_db_id + 1);
