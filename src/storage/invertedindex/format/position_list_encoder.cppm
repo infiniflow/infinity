@@ -48,11 +48,13 @@ private:
 private:
     PostingByteSlice pos_list_buffer_;
     pos_t last_pos_in_cur_doc_; // 4byte
-    u32 total_pos_count_;       // 4byte
     PostingFormatOption format_option_;
     bool is_own_format_; // 1byte
-    UniquePtr<SkipListWriter> pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
+
+    mutable std::shared_mutex rw_mutex_;
+    u32 total_pos_count_; // 4byte
+    SharedPtr<SkipListWriter> pos_skiplist_writer_;
 };
 
 } // namespace infinity
