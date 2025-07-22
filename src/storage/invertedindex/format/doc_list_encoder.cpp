@@ -21,7 +21,8 @@ DocListEncoder::DocListEncoder(const DocListFormat *doc_list_format)
     : doc_list_buffer_(), doc_list_format_(doc_list_format), last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr) {
     assert(doc_list_format != nullptr);
     doc_list_buffer_.Init(doc_list_format_);
-    CreateDocSkipListWriter();
+    doc_skiplist_writer_ = MakeShared<SkipListWriter>();
+    doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
 }
 
 DocListEncoder::~DocListEncoder() {}
@@ -141,32 +142,23 @@ u32 DocListEncoder::GetDumpLength() {
 void DocListEncoder::FlushDocListBuffer() {
     u32 flush_size = doc_list_buffer_.Flush();
     if (flush_size > 0) {
-        SharedPtr<SkipListWriter> doc_skiplist_writer;
-        {
-            std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-            doc_skiplist_writer = doc_skiplist_writer_;
-        }
-        if (!doc_skiplist_writer.get()) {
-            CreateDocSkipListWriter();
-        }
         AddSkipListItem(flush_size);
     }
     block_max_tf_ = 0;
     block_max_percentage_ = 0.0f;
 }
 
-void DocListEncoder::CreateDocSkipListWriter() {
+SharedPtr<SkipListWriter> DocListEncoder::GetDocSkipListWriter() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    doc_skiplist_writer_ = MakeUnique<SkipListWriter>();
-    doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
+    if (!doc_skiplist_writer_.get()) {
+        doc_skiplist_writer_ = MakeShared<SkipListWriter>();
+        doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
+    }
+    return doc_skiplist_writer_;
 }
 
 void DocListEncoder::AddSkipListItem(u32 item_size) {
-    SharedPtr<SkipListWriter> doc_skiplist_writer;
-    {
-        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-        doc_skiplist_writer = doc_skiplist_writer_;
-    }
+    SharedPtr<SkipListWriter> doc_skiplist_writer = GetDocSkipListWriter();
     const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
     if (skiplist_format->HasBlockMax()) {
         assert((block_max_percentage_ > 0 and block_max_percentage_ <= 1.0f));

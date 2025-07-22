@@ -58,7 +58,7 @@ private:
 
     void FlushDocListBuffer();
 
-    void CreateDocSkipListWriter();
+    SharedPtr<SkipListWriter> GetDocSkipListWriter();
 
     void AddSkipListItem(u32 item_size);
 
@@ -75,7 +75,7 @@ private:
     tf_t block_max_tf_ = 0;
     float block_max_percentage_ = 0.0f;
 
-    mutable std::shared_mutex rw_mutex_;
+    mutable std::shared_mutex rw_mutex_; // Protect df_ and doc_skiplist_writer_
     df_t df_;
     SharedPtr<SkipListWriter> doc_skiplist_writer_;
 

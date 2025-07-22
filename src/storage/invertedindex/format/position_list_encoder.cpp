@@ -26,7 +26,8 @@ PositionListEncoder::PositionListEncoder(const PostingFormatOption &format_optio
         is_own_format_ = true;
     }
     pos_list_buffer_.Init(pos_list_format_);
-    CreatePosSkipListWriter();
+    pos_skiplist_writer_ = MakeShared<SkipListWriter>();
+    pos_skiplist_writer_->Init(pos_list_format_->GetPositionSkipListFormat());
 }
 
 PositionListEncoder::~PositionListEncoder() {
@@ -115,18 +116,17 @@ u32 PositionListEncoder::GetDumpLength() const {
     return VByteCompressor::GetVInt32Length(pos_skiplist_size) + VByteCompressor::GetVInt32Length(pos_list_size) + pos_skiplist_size + pos_list_size;
 }
 
-void PositionListEncoder::CreatePosSkipListWriter() {
+SharedPtr<SkipListWriter> PositionListEncoder::GetPosSkipListWriter() {
     std::unique_lock<std::shared_mutex> lock(rw_mutex_);
-    pos_skiplist_writer_ = MakeUnique<SkipListWriter>();
-    pos_skiplist_writer_->Init(pos_list_format_->GetPositionSkipListFormat());
+    if (!pos_skiplist_writer_.get()) {
+        pos_skiplist_writer_ = MakeShared<SkipListWriter>();
+        pos_skiplist_writer_->Init(pos_list_format_->GetPositionSkipListFormat());
+    }
+    return pos_skiplist_writer_;
 }
 
 void PositionListEncoder::AddPosSkipListItem(u32 total_pos_count, u32 compressed_pos_size, bool need_flush) {
-    SharedPtr<SkipListWriter> pos_skiplist_writer;
-    {
-        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-        pos_skiplist_writer = pos_skiplist_writer_;
-    }
+    SharedPtr<SkipListWriter> pos_skiplist_writer = GetPosSkipListWriter();
     pos_skiplist_writer->AddItem(total_pos_count, compressed_pos_size);
 }
 
@@ -137,14 +137,9 @@ void PositionListEncoder::FlushPositionBuffer() {
     u32 flush_size = pos_list_buffer_.Flush();
     if (flush_size > 0) {
         u32 total_pos_count;
-        SharedPtr<SkipListWriter> pos_skiplist_writer;
         {
             std::shared_lock<std::shared_mutex> lock(rw_mutex_);
             total_pos_count = total_pos_count_;
-            pos_skiplist_writer = pos_skiplist_writer_;
-        }
-        if (!pos_skiplist_writer.get()) {
-            CreatePosSkipListWriter();
         }
         AddPosSkipListItem(total_pos_count, flush_size, need_flush);
     }
