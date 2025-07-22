@@ -30,6 +30,9 @@ import persistence_manager;
 import column_def;
 import global_resource_usage;
 import snapshot_info;
+import persistence_manager;
+import infinity_context;
+import command_statement;
 
 namespace infinity {
 
@@ -1131,7 +1134,7 @@ export struct WalCmdCleanup : public WalCmd {
 };
 
 export struct WalCmdCreateSnapshot : public WalCmd {
-    WalCmdCreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, TxnTimeStamp max_commit_ts, const String &snapshot_type)
+    WalCmdCreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, TxnTimeStamp max_commit_ts, SnapshotScope snapshot_type)
         : WalCmd(WalCommandType::CREATE_SNAPSHOT), db_name_(db_name), table_name_(table_name), snapshot_name_(snapshot_name), max_commit_ts_(max_commit_ts), snapshot_type_(snapshot_type) {}
 
     bool operator==(const WalCmd &other) const final;
@@ -1144,7 +1147,7 @@ export struct WalCmdCreateSnapshot : public WalCmd {
     String table_name_{};
     String snapshot_name_{};
     TxnTimeStamp max_commit_ts_{};
-    String snapshot_type_{};
+    SnapshotScope snapshot_type_{};
 };
 
 
@@ -1152,7 +1155,13 @@ export struct WalCmdCreateSnapshot : public WalCmd {
 export struct WalCmdRestoreTableSnapshot : public WalCmd {
     WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files)
         : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
-          files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {}
+          files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds) {
+            PersistenceManager* persistence_manager = InfinityContext::instance().persistence_manager();
+            addr_serializer_.Initialize(persistence_manager, files);
+          }
+    WalCmdRestoreTableSnapshot(const String &db_name, const String &db_id, const String &table_name, const String &table_id, const String &snapshot_name, SharedPtr<TableDef> table_def_, const Vector<WalSegmentInfoV2> &segment_infos, const Vector<WalCmdCreateIndexV2> &index_cmds, const Vector<String> &files, AddrSerializer addr_serializer)
+        : WalCmd(WalCommandType::RESTORE_TABLE_SNAPSHOT), db_name_(db_name), db_id_(db_id), table_name_(table_name), table_id_(table_id),snapshot_name_(snapshot_name),table_def_(table_def_),
+            files_(files), segment_infos_(segment_infos), index_cmds_(index_cmds), addr_serializer_(addr_serializer) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
@@ -1170,6 +1179,7 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     Vector<String> files_;
     Vector<WalSegmentInfoV2> segment_infos_;// eache segment has a vector of block ids(assuming same column count)
     Vector<WalCmdCreateIndexV2> index_cmds_;// index commands to restore indexes
+    AddrSerializer addr_serializer_{};
 };
 
 export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {

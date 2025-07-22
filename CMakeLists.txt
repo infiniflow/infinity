@@ -15,18 +15,8 @@ endif()
 # else()
 #     message("Can not find ccache")
 # endif()
-# Add this near the top of your main CMakeLists.txt
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Set job pools for concurrent linking
-set(CMAKE_JOB_POOLS "link=4")
-
-# Set build type if not specified
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE RelWithDebInfo)
-endif()
 
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER}")
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)

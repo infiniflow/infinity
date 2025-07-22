@@ -240,7 +240,15 @@ void PersistenceManager::CheckValid() {
         }
     }
     const auto part2_begin = std::chrono::high_resolution_clock::now();
-    objects_->CheckValid(current_object_size_);
+
+    // Protect access to current_object_size_ with mutex
+    SizeT current_size;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        current_size = current_object_size_;
+    }
+    objects_->CheckValid(current_size);
+
     const auto part2_end = std::chrono::high_resolution_clock::now();
     LOG_INFO(fmt::format("PersistenceManager::CheckValid part 1: {} ms, part2: {} ms",
                          static_cast<TimeDurationType>(part2_begin - part1_begin).count(),
@@ -427,6 +435,13 @@ int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) 
 void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, SizeT file_size) {
     fs::path src_fp = tmp_file_path;
     fs::path dst_fp = Path(workspace_) / current_object_key_;
+    
+    // Debug: Check if this is a dictionary file
+    bool is_dict_file = tmp_file_path.find(".dic") != String::npos;
+    if (is_dict_file) {
+        LOG_DEBUG(fmt::format("CurrentObjAppendNoLock: Processing dictionary file {} (size: {})", tmp_file_path, file_size));
+    }
+    
     std::ifstream srcFile(src_fp, std::ios::binary);
     if (!srcFile.is_open()) {
         String error_message = fmt::format("Failed to open source file {}", tmp_file_path);
@@ -449,7 +464,10 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     while (srcFile.read(buffer, BUFFER_SIZE)) {
         dstFile.write(buffer, srcFile.gcount());
     }
+    // Write any remaining bytes from the last read
+    if (srcFile.gcount() > 0) {
     dstFile.write(buffer, srcFile.gcount());
+    }
     srcFile.close();
     current_object_size_ += file_size;
     current_object_parts_++;
@@ -458,6 +476,12 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
             fmt::format("CurrentObjAppendNoLock object {} size {} exceeds limit {}", current_object_key_, current_object_size_, object_size_limit_));
     }
     dstFile.close();
+    
+    // Debug: Log completion for dictionary files
+    if (is_dict_file) {
+        LOG_DEBUG(fmt::format("CurrentObjAppendNoLock: Completed processing dictionary file {} -> object {} (offset: {}, size: {})", 
+                              tmp_file_path, current_object_key_, current_object_size_ - file_size, file_size));
+    }
 }
 
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,

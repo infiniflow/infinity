@@ -28,6 +28,7 @@ import snapshot_info;
 import column_def;
 import column_vector;
 import fast_rough_filter;
+import command_statement;
 
 
 namespace infinity {
@@ -310,6 +311,7 @@ private:
     Status ReplayCheckpoint(WalCmdCheckpointV2 *optimize_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayCleanup(WalCmdCleanup *cleanup_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
 public:
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);

@@ -486,7 +486,8 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case SnapshotScope::kDatabase: {
                             LOG_INFO(fmt::format("Execute snapshot database"));
                             const String &db_name = snapshot_cmd->object_name();
-                            Status snapshot_status = Snapshot::CreateDatabaseSnapshot(query_context, snapshot_name, db_name);
+                            NewTxn *new_txn = query_context->GetNewTxn();
+                            Status snapshot_status = new_txn->CreateSnapshot(db_name, "", snapshot_name, SnapshotScope::kDatabase);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }
@@ -496,9 +497,8 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case SnapshotScope::kTable: {
                             const String &table_name = snapshot_cmd->object_name();
                             const String &db_name = query_context->schema_name();
-                            // Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
                             NewTxn *new_txn = query_context->GetNewTxn();
-                            Status snapshot_status = new_txn->CreateSnapshot(db_name, table_name, snapshot_name,);
+                            Status snapshot_status = new_txn->CreateSnapshot(db_name, table_name, snapshot_name, SnapshotScope::kTable);
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }
@@ -542,9 +542,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SnapshotScope::kTable: {
                             Status snapshot_status = Snapshot::RestoreTableSnapshot(query_context, snapshot_name);
-                            // auto new_txn_mgr = InfinityContext::instance().storage()-> new_txn_manager();
-
-                            // new_txn_mgr->PrintAllKeyValue();
                             if (!snapshot_status.ok()) {
                                 RecoverableError(snapshot_status);
                             }

@@ -73,14 +73,14 @@ SharedPtr<WalEntry> CreateTableTxnStore::ToWalEntry(TxnTimeStamp commit_ts) cons
 }
 
 String CreateSnapshotTxnStore::ToString() const {
-    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}, snapshot_type: {}", TransactionType2Str(type_), db_name_, table_name_, snapshot_name_, max_commit_ts_, snapshot_type_);
+    return fmt::format("{}: database: {}, table: {}, snapshot: {}, max_commit_ts: {}, snapshot_type: {}", TransactionType2Str(type_), db_name_, table_name_, snapshot_name_, max_commit_ts_, std::to_string(static_cast<i32>(snapshot_type_)));
 }
 
 // check if we need it
 SharedPtr<WalEntry> CreateSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     SharedPtr<WalEntry> wal_entry = MakeShared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateSnapshot>(db_name_, table_name_, snapshot_name_, max_commit_ts_);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateSnapshot>(db_name_, table_name_, snapshot_name_, max_commit_ts_, snapshot_type_);
     wal_entry->cmds_.push_back(wal_command);
     return wal_entry;
 }

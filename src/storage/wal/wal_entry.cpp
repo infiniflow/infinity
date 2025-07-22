@@ -913,7 +913,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String table_name = ReadBufAdv<String>(ptr);
             String snapshot_name = ReadBufAdv<String>(ptr);
             TxnTimeStamp max_commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            String snapshot_type = ReadBufAdv<String>(ptr);
+            SnapshotScope snapshot_type = ReadBufAdv<SnapshotScope>(ptr);
             cmd = MakeShared<WalCmdCreateSnapshot>(db_name, table_name, snapshot_name, max_commit_ts, snapshot_type);
             break;
         }
@@ -941,7 +941,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             for (i32 i = 0; i < file_n; ++i) {
                 files.push_back(ReadBufAdv<String>(ptr));
             }
-            cmd = MakeShared<WalCmdRestoreTableSnapshot>(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
+            AddrSerializer addr_serializer;
+            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+            bool use_object_cache = pm != nullptr;
+            if (use_object_cache) {
+                addr_serializer.ReadBufAdv(ptr);
+            }
+            cmd = MakeShared<WalCmdRestoreTableSnapshot>(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files, addr_serializer);
             break;
         }
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
@@ -1015,7 +1021,13 @@ WalCmdRestoreTableSnapshot WalCmdRestoreTableSnapshot::ReadBufferAdv(const char 
     for (i32 i = 0; i < files_n; ++i) {
         files.push_back(ReadBufAdv<String>(ptr));
     }
-    return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files);
+    AddrSerializer addr_serializer;
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        addr_serializer.ReadBufAdv(ptr);
+    }
+    return WalCmdRestoreTableSnapshot(db_name, db_id, table_name, table_id, snapshot_name, table_def, segment_infos, index_cmds, files, addr_serializer);
 }
 
 bool WalCmdCreateDatabase::operator==(const WalCmd &other) const {
@@ -1640,12 +1652,17 @@ i32 WalCmdRestoreTableSnapshot::GetSizeInBytes() const {
     for (const auto& file : files_) {
         size += sizeof(i32) + file.size();
     }
-    
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        SizeT pm_size = addr_serializer_.GetSizeInBytes();
+        size += pm_size;
+    }
     return size;
 }
 
 i32 WalCmdCreateSnapshot::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_) + sizeof(i32) + snapshot_type_.size();
+    return sizeof(WalCommandType) + sizeof(i32) + db_name_.size() + sizeof(i32) + table_name_.size() + sizeof(i32) + snapshot_name_.size() + sizeof(max_commit_ts_) + sizeof(snapshot_type_);
 }
 
 i32 WalCmdRestoreDatabaseSnapshot::GetSizeInBytes() const {
@@ -1797,10 +1814,15 @@ void WalCmdRestoreTableSnapshot::WriteAdv(char *&buf) const {
     for (const auto &file : files_) {
         WriteBufAdv(buf, file);
     }
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr; 
+    if (use_object_cache) {
+        addr_serializer_.WriteBufAdv(buf);
+    }
 }
 
 void WalCmdCreateSnapshot::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, WalCommandType::CREATE_TABLE_SNAPSHOT);
+    WriteBufAdv(buf, WalCommandType::CREATE_SNAPSHOT);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->snapshot_name_);
@@ -2889,7 +2911,7 @@ String WalCmdCreateSnapshot::CompactInfo() const {
                        table_name_,
                        snapshot_name_,
                        max_commit_ts_,
-                       snapshot_type_);
+                       std::to_string(static_cast<i32>(snapshot_type_)));
 }
 
 String WalCmdRestoreTableSnapshot::CompactInfo() const {
@@ -2907,7 +2929,7 @@ String WalCmdRestoreTableSnapshot::CompactInfo() const {
 
 String WalCmdCreateSnapshot::ToString() const {
     std::stringstream ss;
-    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << ", snapshot_type: " << snapshot_type_ << std::endl;
+    ss << "db_name: " << db_name_ << ", table_name: " << table_name_ << ", snapshot_name: " << snapshot_name_ << ", max_commit_ts: " << max_commit_ts_ << ", snapshot_type: " << std::to_string(static_cast<i32>(snapshot_type_)) << std::endl;
     return std::move(ss).str();
 }
 
@@ -3099,7 +3121,7 @@ bool WalEntry::IsCheckPointOrSnapshot(WalCmd *&cmd) const {
             LOG_INFO("CLEANUP command found");
         }
         if (command->GetType() == WalCommandType::CHECKPOINT_V2 || 
-            command->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
+            command->GetType() == WalCommandType::CREATE_SNAPSHOT) {
             // For checkpoint, check max_commit_ts
             if (command->GetType() == WalCommandType::CHECKPOINT_V2) {
                 auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
@@ -3110,7 +3132,7 @@ bool WalEntry::IsCheckPointOrSnapshot(WalCmd *&cmd) const {
                 }
             }
             // For snapshot, check max_commit_ts
-            else if (command->GetType() == WalCommandType::CREATE_TABLE_SNAPSHOT) {
+            else if (command->GetType() == WalCommandType::CREATE_SNAPSHOT) {
                 auto snapshot_cmd = static_cast<WalCmdCreateSnapshot *>(command.get());
                 if (!found || TxnTimeStamp(snapshot_cmd->max_commit_ts_) > max_commit_ts) {
                     max_commit_ts = snapshot_cmd->max_commit_ts_;
@@ -3280,8 +3302,8 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::RESTORE_DATABASE_SNAPSHOT:
             command = "RESTORE_DATABASE_SNAPSHOT";
             break;
-        case WalCommandType::CREATE_TABLE_SNAPSHOT:
-            command = "CREATE_TABLE_SNAPSHOT";
+        case WalCommandType::CREATE_SNAPSHOT:
+            command = "CREATE_SNAPSHOT";
             break;
         default: {
             String error_message = "Unknown command type";

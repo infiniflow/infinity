@@ -67,9 +67,6 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     // might need to change this
     const String &db_name = query_context->schema_name();
 
-    // Start timing for overall snapshot restoration
-    auto snapshot_restoration_start = std::chrono::high_resolution_clock::now();
-
     Optional<DBMeeta> db_meta;
     TxnTimeStamp db_create_ts;
     Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
@@ -99,10 +96,6 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
         return status;
     }
 
-    // End timing for overall snapshot restoration
-    auto snapshot_restoration_end = std::chrono::high_resolution_clock::now();
-    auto snapshot_restoration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(snapshot_restoration_end - snapshot_restoration_start);
-    LOG_INFO(fmt::format("Total snapshot restoration took {} ms", snapshot_restoration_duration.count()));
 
     // print txn state
     // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));

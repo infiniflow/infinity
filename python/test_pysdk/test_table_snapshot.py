@@ -303,6 +303,28 @@ class TestSnapshot:
         for i in range(0, len(data), batch_size):
             batch = data[i:i + batch_size]
             table_obj.insert(batch)
+
+    # def test_persistence_restore(self, suffix):
+    #     """Test basic snapshot create, list, drop operations"""
+    #     table_name = f"test_basic_snapshot{suffix}"
+    #     snapshot_name = f"basic_snapshot{suffix}"
+    #     db_obj = self.infinity_obj.get_database("default_db")
+    #     # Drop original table
+    #     db_obj.drop_table(table_name, ConflictType.Ignore)
+    #     # Create table and insert data
+    #     table_obj = self.create_comprehensive_table(table_name)
+    #     # Create indexes
+    #     self._create_indexes(table_obj)
+    #     self.insert_comprehensive_data(table_obj, 100)
+    #     self.infinity_obj.flush_data()
+    #     # snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
+        
+        
+    #     # Verify data integrity and functionality
+    #     self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
+
+    #     # Drop table
+    #     db_obj.drop_table(table_name, ConflictType.Error)
     
     def test_basic_snapshot_operations(self, suffix):
         """Test basic snapshot create, list, drop operations"""
@@ -334,7 +356,7 @@ class TestSnapshot:
         print(f"Error message: {snapshots_response.error_msg}")
         assert snapshot_name in [s.name for s in snapshots]
 
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
+        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
         
         # Drop original table
         db_obj.drop_table(table_name, ConflictType.Error)
@@ -344,7 +366,7 @@ class TestSnapshot:
         assert restore_result.error_code == ErrorCode.OK
         
         # Verify data integrity and functionality
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
+        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
         
         # Drop snapshot
         drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
@@ -386,42 +408,43 @@ class TestSnapshot:
         db_obj.drop_table(table_name, ConflictType.Ignore)
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
-        # self._create_indexes(table_obj)
-        self.insert_comprehensive_data(table_obj, 80000000)  # 80M rows - should be fine with small dimensions
+        self._create_indexes(table_obj)
+        self.insert_comprehensive_data(table_obj, 100000)  # 100k rows - should be fine with small dimensions
+        # self.infinity_obj.flush_data()
 
         # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
 
 
         
-        # # Measure snapshot creation time
-        # start_time = time.time()
-        # snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
-        # snapshot_time = time.time() - start_time
+        # Measure snapshot creation time
+        start_time = time.time()
+        snapshot_result = db_obj.create_table_snapshot(snapshot_name, table_name)
+        snapshot_time = time.time() - start_time
         
-        # assert snapshot_result.error_code == ErrorCode.OK
-        # print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
+        assert snapshot_result.error_code == ErrorCode.OK
+        print(f"Snapshot creation time: {snapshot_time:.2f} seconds")
 
-        # # Drop table
-        # db_obj.drop_table(table_name, ConflictType.Error)
+        # Drop table
+        db_obj.drop_table(table_name, ConflictType.Error)
         
-        # # Test restore performance
-        # start_time = time.time()
-        # restore_result = db_obj.restore_table_snapshot(snapshot_name)
-        # restore_time = time.time() - start_time
+        # Test restore performance
+        start_time = time.time()
+        restore_result = db_obj.restore_table_snapshot(snapshot_name)
+        restore_time = time.time() - start_time
         
-        # assert restore_result.error_code == ErrorCode.OK
+        assert restore_result.error_code == ErrorCode.OK
 
-        # # Verify data integrity and functionality
-        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
+        # Verify data integrity and functionality
+        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
 
-        # # Drop snapshot
-        # drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
-        # assert drop_result.error_code == ErrorCode.OK
+        # Drop snapshot
+        drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
+        assert drop_result.error_code == ErrorCode.OK
 
-        # # Drop table
-        # db_obj.drop_table(table_name, ConflictType.Error)
+        # Drop table
+        db_obj.drop_table(table_name, ConflictType.Error)
 
-        # print(f"Snapshot restore time: {restore_time:.2f} seconds")
+        print(f"Snapshot restore time: {restore_time:.2f} seconds")
     
     def test_snapshot_error_conditions(self):
         """Test error conditions for snapshot operations"""

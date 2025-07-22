@@ -191,8 +191,14 @@ Vector<SharedPtr<MemIndexDetail>> BGMemIndexTracer::GetAllMemIndexes(NewTxn *new
         }
         mem_index_details.push_back(detail);
     }
+
+    // Sort the mem indexes.
+    // EMVB indexes will be sorted to the front of the list. Non-EMVB indexes will be sorted by mem_used_ in descending order.
     std::sort(mem_index_details.begin(), mem_index_details.end(), [](const SharedPtr<MemIndexDetail> &lhs, const SharedPtr<MemIndexDetail> &rhs) {
-        return lhs->is_emvb_index_ || lhs->mem_used_ > rhs->mem_used_;
+        if (lhs->is_emvb_index_ != rhs->is_emvb_index_) {
+            return lhs->is_emvb_index_;
+        }
+        return lhs->mem_used_ > rhs->mem_used_;
     });
     return mem_index_details;
 }
