@@ -1067,34 +1067,6 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     return Status::OK();
 }
 
-Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                    ChunkID chunk_id,
-                                    RowID base_row_id,
-                                    SizeT row_count,
-                                    const String &base_name,
-                                    SizeT index_size,
-                                    Optional<ChunkIndexMeta> &chunk_index_meta) {
-    ChunkIndexMetaInfo chunk_info;
-    chunk_info.base_name_ = base_name;
-    chunk_info.base_row_id_ = base_row_id;
-    chunk_info.row_cnt_ = row_count;
-    chunk_info.index_size_ = index_size;
-    {
-        chunk_index_meta.emplace(chunk_id, segment_index_meta);
-        Status status = chunk_index_meta->InitSet(chunk_info);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = segment_index_meta.AddChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                      NewTxn *new_txn,
                                      ChunkID chunk_id,
@@ -1124,57 +1096,10 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
-Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info) {
-    Status status;
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm) {
-        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
-    }
-
-    ChunkID chunk_id = 0;
-    {
-        status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        if (chunk_id != chunk_info.chunk_id_) {
-            UnrecoverableError(fmt::format("Chunk id mismatch, expect: {}, actual: {}", chunk_id, chunk_info.chunk_id_));
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.AddChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-
-    ChunkIndexMetaInfo chunk_meta_info;
-    {
-        chunk_meta_info.base_name_ = chunk_info.base_name_;
-        chunk_meta_info.base_row_id_ = chunk_info.base_rowid_;
-        chunk_meta_info.row_cnt_ = chunk_info.row_count_;
-        chunk_meta_info.index_size_ = 0;
-    }
-    status = chunk_index_meta.SetChunkInfo(chunk_meta_info);
-    if (!status.ok()) {
-        return status;
-    }
-    status = chunk_index_meta.LoadSet();
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
 Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }

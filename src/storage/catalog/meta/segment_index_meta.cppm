@@ -42,8 +42,6 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs();
-
     Status GetNextChunkID(ChunkID &chunk_id);
 
     Tuple<ChunkID, Status> GetNextChunkID1();
@@ -55,8 +53,6 @@ public:
     Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
 
     Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
-
-    Status AddChunkID(ChunkID chunk_id);
 
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
 
@@ -85,8 +81,6 @@ public:
     SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
 
 private:
-    Status LoadChunkIDs();
-
     Status LoadChunkIDs1();
 
     Status LoadNextChunkID();
