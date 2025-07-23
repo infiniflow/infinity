@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -36,7 +37,7 @@ TEST_F(DoubleCastTest, double_cast0) {
     {
         DoubleT source = 0;
         DoubleT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // DoubleT to TinyInt
@@ -133,7 +134,7 @@ TEST_F(DoubleCastTest, double_cast0) {
     {
         DoubleT source = std::numeric_limits<DoubleT>::lowest();
         HugeIntT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // DoubleT to FloatT
@@ -160,7 +161,7 @@ TEST_F(DoubleCastTest, double_cast0) {
     {
         DoubleT source = std::numeric_limits<DoubleT>::lowest();
         DecimalT target;
-        EXPECT_THROW(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(FloatTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // Double to VarcharT
@@ -350,7 +351,7 @@ TEST_F(DoubleCastTest, double_cast1) {
         CastParameters cast_parameters;
 
         //        bool result = double2hugeint_ptr.function(col_float, col_hugeint, DEFAULT_VECTOR_SIZE, cast_parameters);
-        EXPECT_THROW(double2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(double2hugeint_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast double column vector to float column vector
@@ -399,6 +400,6 @@ TEST_F(DoubleCastTest, double_cast1) {
     {
         DataType source(LogicalType::kDouble);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindFloatCast<DoubleT>(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindFloatCast<DoubleT>(source, target), UnrecoverableException);
     }
 }

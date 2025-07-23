@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "unit_test/gtest_expand.h"
 #include "gtest/gtest.h"
 
 import base_test;
@@ -39,7 +40,7 @@ TEST_F(BoolCastTest, bool_cast0) {
     {
         BooleanT source = true;
         BooleanT target;
-        EXPECT_THROW(TryCastBoolean::Run(source, target), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(TryCastBoolean::Run(source, target), RecoverableException);
     }
     // BooleanT to VarcharT
     //    {
@@ -109,6 +110,6 @@ TEST_F(BoolCastTest, bool_cast1) {
     {
         DataType source(LogicalType::kBoolean);
         DataType target(LogicalType::kBoolean);
-        EXPECT_THROW(BindBoolCast(source, target), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindBoolCast(source, target), RecoverableException);
     }
 }

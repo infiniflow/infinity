@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -43,8 +44,8 @@ TEST_F(DateTypeOldTest, test1) {
     date1.FromString("9999-12-31");
     EXPECT_EQ(date1.ToString(), "9999-12-31");
 
-    EXPECT_THROW(date1.FromString("0-0-0"), ParserException);
-    EXPECT_THROW(date1.FromString("0/0/0"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date1.FromString("0-0-0"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date1.FromString("0/0/0"), ParserException);
 }
 
 TEST_F(DateTypeOldTest, TestEqStdChronoForward) {

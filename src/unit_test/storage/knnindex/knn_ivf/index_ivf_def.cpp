@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
 #include <vector>
+
+#include "unit_test/gtest_expand.h"
+#include "gtest/gtest.h"
 
 import base_test;
 import infinity_core;
@@ -88,16 +90,16 @@ TEST_F(IndexIVFTest, testplain) {
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
-        EXPECT_THROW(ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf"), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf"), RecoverableException);
     }
     {
         args_map["unused_param"] = "xxx";
-        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
-                                    "tmp_file_name",
-                                    Vector<String>{"col_ivf"},
-                                    h.build_ipl(args_map)),
-                     RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
+                                                       MakeShared<String>("test comment"),
+                                                       "tmp_file_name",
+                                                       Vector<String>{"col_ivf"},
+                                                       h.build_ipl(args_map)),
+                                        RecoverableException);
     }
 }
 
@@ -125,17 +127,17 @@ TEST_F(IndexIVFTest, testsq) {
                                         "tmp_file_name",
                                         Vector<String>{"col_ivf"},
                                         h.build_ipl(args_map));
-        EXPECT_THROW(ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf"), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(ivf_index->ValidateColumnDataType(base_table_ref, "col_ivf"), RecoverableException);
     }
     {
         args_map["centroids_num_ratio"] = "0.33";
         args_map["Centroids_num_ratio"] = "0.33";
-        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
-                                    "tmp_file_name",
-                                    Vector<String>{"col_ivf"},
-                                    h.build_ipl(args_map)),
-                     RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
+                                                       MakeShared<String>("test comment"),
+                                                       "tmp_file_name",
+                                                       Vector<String>{"col_ivf"},
+                                                       h.build_ipl(args_map)),
+                                        RecoverableException);
     }
 }
 
@@ -158,11 +160,11 @@ TEST_F(IndexIVFTest, testpq) {
     }
     {
         args_map.erase("Metric");
-        EXPECT_THROW(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
-                                    MakeShared<String>("test comment"),
-                                    "tmp_file_name",
-                                    Vector<String>{"col_ivf"},
-                                    h.build_ipl(args_map)),
-                     RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IndexIVF::Make(MakeShared<String>("tmp_index_name"),
+                                                       MakeShared<String>("test comment"),
+                                                       "tmp_file_name",
+                                                       Vector<String>{"col_ivf"},
+                                                       h.build_ipl(args_map)),
+                                        RecoverableException);
     }
 }

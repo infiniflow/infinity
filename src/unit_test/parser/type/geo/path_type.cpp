@@ -29,14 +29,14 @@ TEST_F(PathTypeTest, path1) {
 
     PathT path1;
     EXPECT_EQ(path1.PointCount(), 0);
-    EXPECT_THROW(path1.GetPoint(0), ParserException);
-    EXPECT_THROW(path1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(path1.GetPoint(0), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(path1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
 
     path1.Initialize(2);
-    EXPECT_THROW(path1.Initialize(0), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(path1.Initialize(0), ParserException);
     path1.SetPoint(0, PointT(1.0, 2.1));
     path1.SetPoint(1, PointT(1.1, 2.2));
-    EXPECT_THROW(path1.SetPoint(2, PointT(1.3, 2.5)), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(path1.SetPoint(2, PointT(1.3, 2.5)), ParserException);
     EXPECT_EQ(path1.PointCount(), 2);
 
     EXPECT_EQ(path1.GetPoint(0).x, PointT(1.0, 2.1).x);
@@ -48,7 +48,7 @@ TEST_F(PathTypeTest, path1) {
 
     EXPECT_EQ(path1.PointCount(), 0);
 
-    EXPECT_THROW(path1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(path1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
 
     PathT path2(2);
     path2.SetPoint(0, PointT(1.0, 2.1));

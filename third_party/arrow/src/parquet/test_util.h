@@ -44,7 +44,7 @@
 // https://github.com/google/googletest/pull/2904 might not be available
 // in our version of gtest/gmock
 #define EXPECT_THROW_THAT(callable, ex_type, property)   \
-  EXPECT_THROW(                                          \
+  EXPECT_THROW_WITHOUT_STACKTRACE(                                          \
       try { (callable)(); } catch (const ex_type& err) { \
         EXPECT_THAT(err, (property));                    \
         throw;                                           \

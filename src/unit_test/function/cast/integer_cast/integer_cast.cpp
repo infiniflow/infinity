@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -35,7 +36,7 @@ TEST_F(IntegerCastTest, integer_cast0) {
     {
         IntegerT source = 0;
         IntegerT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // IntegerT to TinyInt
@@ -149,7 +150,7 @@ TEST_F(IntegerCastTest, integer_cast0) {
     {
         IntegerT source = std::numeric_limits<IntegerT>::lowest();
         DecimalT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // IntegerT to VarcharT
@@ -366,7 +367,7 @@ TEST_F(IntegerCastTest, integer_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(int2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(int2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast int column vector to Varchar vector
@@ -395,6 +396,6 @@ TEST_F(IntegerCastTest, integer_cast1) {
     {
         DataType source(LogicalType::kInteger);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindIntegerCast<IntegerT>(source, target), RecoverableException);
     }
 }

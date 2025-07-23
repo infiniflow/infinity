@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -47,12 +48,12 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -73,7 +74,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -106,17 +107,17 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
     // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -134,7 +135,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
@@ -159,12 +160,12 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
@@ -184,7 +185,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValueByIndex(i);
@@ -205,12 +206,12 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.Size(), 0u);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
@@ -229,7 +230,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
         EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 

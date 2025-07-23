@@ -14,6 +14,7 @@
 
 #include "json.hpp"
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -30,7 +31,7 @@ class EmbeddingInfoTest : public BaseTest {};
 TEST_F(EmbeddingInfoTest, embedding_info_A) {
     using namespace infinity;
 
-    EXPECT_THROW(EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, PARSER_EMBEDDING_LIMIT + 1), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, PARSER_EMBEDDING_LIMIT + 1), ParserException);
 
     auto embedding_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
     EXPECT_EQ(embedding_info_ptr->Size(), 32u);

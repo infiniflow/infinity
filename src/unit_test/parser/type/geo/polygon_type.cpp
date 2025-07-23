@@ -27,14 +27,14 @@ TEST_F(PolygonTypeTest, polygon1) {
 
     PolygonT polygon1;
     EXPECT_EQ(polygon1.PointCount(), 0);
-    EXPECT_THROW(polygon1.GetPoint(0), ParserException);
-    EXPECT_THROW(polygon1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(polygon1.GetPoint(0), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(polygon1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
 
     polygon1.Initialize(2);
-    EXPECT_THROW(polygon1.Initialize(0), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(polygon1.Initialize(0), ParserException);
     polygon1.SetPoint(0, PointT(1.0, 2.1));
     polygon1.SetPoint(1, PointT(1.1, 2.2));
-    EXPECT_THROW(polygon1.SetPoint(2, PointT(1.3, 2.5)), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(polygon1.SetPoint(2, PointT(1.3, 2.5)), ParserException);
     EXPECT_EQ(polygon1.PointCount(), 2);
     EXPECT_EQ(polygon1.bounding_box.upper_left.x, 1.0);
     EXPECT_EQ(polygon1.bounding_box.upper_left.y, 2.2);
@@ -50,7 +50,7 @@ TEST_F(PolygonTypeTest, polygon1) {
 
     EXPECT_EQ(polygon1.PointCount(), 0);
 
-    EXPECT_THROW(polygon1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(polygon1.SetPoint(0, PointT(1.0, 2.1)), ParserException);
 
     PolygonT polygon2(2);
     polygon2.SetPoint(0, PointT(1.0, 2.1));
