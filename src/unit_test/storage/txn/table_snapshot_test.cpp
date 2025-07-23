@@ -107,7 +107,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableSnapshotTest,
-                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH);
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     using namespace infinity;

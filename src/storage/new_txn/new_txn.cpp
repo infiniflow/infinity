@@ -2234,6 +2234,13 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+                if (this->IsReplay()) {
+                    // Skip replay of RESTORE_SYSTEM_SNAPSHOT command.
+                    LOG_TRACE("Skip replay of RESTORE_SYSTEM_SNAPSHOT command.");
+                    break;
+                }
+            }
             default: {
                 UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;

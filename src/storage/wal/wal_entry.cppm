@@ -1199,6 +1199,20 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     Vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };
 
+export struct WalCmdRestoreSystemSnapshot : public WalCmd {
+    WalCmdRestoreSystemSnapshot(const String &snapshot_name, const Vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+    String ToString() const final;
+    String CompactInfo() const final;
+    
+    String snapshot_name_{};
+    Vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
+};
+
 export struct WalEntryHeader {
     i32 size_{}; // size of header + payload + 4 bytes pad. There's 4 bytes pad just after the payload storing
     // the same value to assist backward iterating.
