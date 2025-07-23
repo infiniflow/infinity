@@ -64,9 +64,6 @@ public:
 
     constexpr static bool LSG = IsLSGDistance<Distance>;
 
-    constexpr static int prefetch_offset_ = 0;
-    constexpr static int prefetch_step_ = 2;
-
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
 
 public:
@@ -178,7 +175,9 @@ protected:
             }
 
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(c_idx, layer_idx);
+            int prefetch_offset_ = 0;
             int prefetch_start = neighbor_size - 1 - prefetch_offset_;
+            int prefetch_step_ = (32 * 1024) / data_store_.vec_store_meta().GetVecSizeInBytes() / 4;
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
                 if (n_idx >= (VertexType)cur_vec_num || visited[n_idx]) {
