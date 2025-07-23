@@ -650,7 +650,7 @@ SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
 
     TxnTimeStamp this_begin_ts = this_txn->BeginTS();
-    TxnTimeStamp this_kv_commit_ts = this_txn->KVCommitTS();
+    TxnTimeStamp this_commit_ts = this_txn->CommitTS(); // Already got commit ts, but without kv_commit ts.
     TransactionID this_txn_id = this_txn->TxnID();
     TxnTimeStamp this_last_system_kv_commit_ts = this_txn->LastSystemKVCommitTS();
     TxnTimeStamp this_last_system_commit_ts = this_txn->LastSystemCommitTS();
@@ -667,6 +667,7 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
             //                                 other_txn->BeginTS(),
             //                                 other_txn->CommitTS()));
             if (this_txn_id == other_txn->TxnID()) {
+                // Same txn, SKIP
                 continue;
             }
             TxnTimeStamp other_kv_commit_ts = other_txn->KVCommitTS();
@@ -676,6 +677,7 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
             bool is_rollback = (other_txn_state == TxnState::kRollbacking) || (other_txn_state == TxnState::kRollbacked);
             if (other_kv_commit_ts < this_begin_ts || is_rollback) {
                 // SKIP, other txn is committed before this txn begin
+                // SKIP, other txn is rolled back.
                 continue;
             }
 
@@ -719,8 +721,9 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
                 }
             }
 
-            if (other_begin_ts > this_kv_commit_ts) {
+            if (other_begin_ts > this_commit_ts) {
                 // SKIP, other txn is started after this txn commit
+                // Obviously, other txn after this txn commit might also conflict with this txn, due to the kv commit ts reason. But when commit other txn, the conflict check must be done again.
                 break;
             }
             res.push_back(other_txn);

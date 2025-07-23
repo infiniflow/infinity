@@ -1089,34 +1089,6 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     return Status::OK();
 }
 
-Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                    ChunkID chunk_id,
-                                    RowID base_row_id,
-                                    SizeT row_count,
-                                    const String &base_name,
-                                    SizeT index_size,
-                                    Optional<ChunkIndexMeta> &chunk_index_meta) {
-    ChunkIndexMetaInfo chunk_info;
-    chunk_info.base_name_ = base_name;
-    chunk_info.base_row_id_ = base_row_id;
-    chunk_info.row_cnt_ = row_count;
-    chunk_info.index_size_ = index_size;
-    {
-        chunk_index_meta.emplace(chunk_id, segment_index_meta);
-        Status status = chunk_index_meta->InitSet(chunk_info);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = segment_index_meta.AddChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                      NewTxn *new_txn,
                                      ChunkID chunk_id,
@@ -1226,7 +1198,7 @@ Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, c
 Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }

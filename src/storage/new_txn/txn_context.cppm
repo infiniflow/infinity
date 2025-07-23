@@ -32,7 +32,7 @@ export struct TxnContext {
 
     TransactionID txn_id_{};
     TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
+    TxnTimeStamp commit_ts_{UNCOMMIT_TS};
     TxnTimeStamp kv_commit_ts_{UNCOMMIT_TS};
     TxnTimeStamp last_kv_commit_ts_{};
     TxnTimeStamp last_commit_ts_{};
