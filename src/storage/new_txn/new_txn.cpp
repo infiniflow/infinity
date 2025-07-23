@@ -1753,7 +1753,6 @@ Status NewTxn::Commit() {
                 break;
             }
             case TxnState::kRollbacking: {
-                txn_mgr_->RemoveFromAllocation(commit_ts);
                 break;
             }
             default: {
@@ -1948,6 +1947,7 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::APPEND_V2: {
+                // LOG_INFO(fmt::format("txn: {}  prepare commit append", txn_context_ptr_->txn_id_));
                 break;
             }
             case WalCommandType::DELETE_V2: {

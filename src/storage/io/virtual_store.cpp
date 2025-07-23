@@ -195,7 +195,7 @@ Status VirtualStore::DeleteFile(const String &file_name) {
         Status status = Status::IOError(error_message);
         return status;
     }
-    LOG_INFO(fmt::format("Clean file: {}", file_name));
+    LOG_DEBUG(fmt::format("Clean file: {}", file_name));
     return Status::OK();
 }
 

@@ -34,7 +34,7 @@ namespace infinity {
 TxnAllocator::TxnAllocator(Storage *storage) : storage_(storage) {}
 TxnAllocator::~TxnAllocator() = default;
 
-void TxnAllocator::SetSystemCache(SystemCache* system_cache) { system_cache_ = system_cache; }
+void TxnAllocator::SetSystemCache(SystemCache *system_cache) { system_cache_ = system_cache; }
 
 void TxnAllocator::Start() {
     processor_thread_ = Thread([this] { Process(); });
@@ -74,12 +74,13 @@ void TxnAllocator::Process() {
                     case TransactionType::kAppend: {
                         AppendTxnStore *txn_store = static_cast<AppendTxnStore *>(base_txn_store);
                         SizeT row_count = txn_store->input_block_->row_count();
-                        LOG_TRACE(fmt::format("TxnAllocator: Append txn: db: {}, {}, table: {}, {}, data size: {}",
-                                              txn_store->db_name_,
-                                              txn_store->db_id_,
-                                              txn_store->table_name_,
-                                              txn_store->table_id_,
-                                              row_count));
+                        //                        LOG_TRACE(fmt::format("TxnAllocator: Append txn {}: db: {}, {}, table: {}, {}, data size: {}",
+                        //                                              txn->TxnID(),
+                        //                                              txn_store->db_name_,
+                        //                                              txn_store->db_id_,
+                        //                                              txn_store->table_name_,
+                        //                                              txn_store->table_id_,
+                        //                                              row_count));
                         SharedPtr<AppendPrepareInfo> append_info =
                             system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
                         txn_store->row_ranges_ = append_info->ranges_;
@@ -88,7 +89,8 @@ void TxnAllocator::Process() {
                     case TransactionType::kUpdate: {
                         UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
                         SizeT row_count = txn_store->RowCount();
-                        LOG_TRACE(fmt::format("TxnAllocator: Update txn: db: {}, {}, table: {}, {}, data size: {}",
+                        LOG_TRACE(fmt::format("TxnAllocator: Update txn {}: db: {}, {}, table: {}, {}, data size: {}",
+                                              txn->TxnID(),
                                               txn_store->db_name_,
                                               txn_store->db_id_,
                                               txn_store->table_name_,
