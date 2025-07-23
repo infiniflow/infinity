@@ -36,11 +36,11 @@ TEST_F(ObjectStatMapTest, test1) {
     drop_keys.clear();
     EXPECT_EQ(obj_map.disk_used(), 8);
 
-    ObjStat *stat2 = obj_map.GetNoCount("key2");
-    EXPECT_NE(stat2, nullptr);
+    Optional<ObjStat> stat2 = obj_map.GetNoCount("key2");
+    EXPECT_NE(stat2, None);
     EXPECT_EQ(stat2->cached_, ObjCached::kNotCached);
     Optional<ObjStat> stat2_opt = obj_map.Invalidate("key2");
     EXPECT_TRUE(stat2_opt.has_value());
     stat2 = obj_map.GetNoCount("key2");
-    EXPECT_EQ(stat2, nullptr);
+    EXPECT_EQ(stat2, None);
 }
