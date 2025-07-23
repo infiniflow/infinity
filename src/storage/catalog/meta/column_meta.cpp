@@ -39,6 +39,17 @@ namespace infinity {
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
     : kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
 
+Status ChunkIndexMeta::GetChunkOffset(SizeT &chunk_offset) {
+    if (!chunk_offset_) {
+        Status status = LoadChunkOffset();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    chunk_offset = *chunk_offset_;
+    return Status::OK();
+}
+
 Status ColumnMeta::SetChunkOffset(SizeT chunk_offset) {
     chunk_offset_ = chunk_offset;
     String chunk_offset_key = GetColumnTag("last_chunk_offset");
