@@ -336,7 +336,7 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
                     EXPECT_TRUE(status.ok());
                     //                    LOG_INFO("Thread: drop table success");
                 } else {
-                    LOG_WARN(fmt::format("Thread: drop table failed, rollback: {}", status.message()));
+                    // LOG_WARN(fmt::format("Thread: drop table failed, rollback: {}", status.message()));
                     status = new_txn_mgr->RollBackTxn(txn);
                     EXPECT_TRUE(status.ok());
                 }
@@ -375,14 +375,14 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
             if (status.ok()) {
                 status = new_txn_mgr->CommitTxn(txn);
                 if (!status.ok()) {
-                    LOG_WARN(fmt::format("Thread 1: insert commit failed: {}", status.message()));
+                    // LOG_WARN(fmt::format("Thread 1: insert commit failed: {}", status.message()));
                 } else {
-                    //                    LOG_INFO("Thread 1: insert commit success");
+                    // LOG_INFO("Thread 1: insert commit success");
                 }
             } else {
-                //                LOG_WARN(fmt::format("Thread 1: insert rollback: {}", status.message()));
                 status = new_txn_mgr->RollBackTxn(txn);
                 EXPECT_TRUE(status.ok());
+                // LOG_INFO(fmt::format("Thread 1: insert rolled back"));
             }
         }
 
@@ -418,12 +418,12 @@ TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
             if (status.ok()) {
                 status = new_txn_mgr->CommitTxn(txn);
                 if (!status.ok()) {
-                    LOG_WARN(fmt::format("Thread 2: insert commit failed: {}", status.message()));
+                    // LOG_WARN(fmt::format("Thread 2: insert commit failed: {}", status.message()));
                 } else {
-                    //                    LOG_INFO("Thread 2: insert commit success");
+                    // LOG_INFO("Thread 2: insert commit success");
                 }
             } else {
-                //                LOG_WARN(fmt::format("Thread 2: insert rollback: {}", status.message()));
+                // LOG_INFO("Thread 2: start to insert, before rollback");
                 status = new_txn_mgr->RollBackTxn(txn);
                 EXPECT_TRUE(status.ok());
             }
