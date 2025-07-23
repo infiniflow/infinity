@@ -107,8 +107,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableSnapshotTest,
-                            ::testing::Values("test/data/config/test_persistent.toml",
-                                           "test/data/config/pytest_parallel_infinity_conf.toml"));
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH);
 
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     using namespace infinity;

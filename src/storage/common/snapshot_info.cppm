@@ -147,11 +147,12 @@ export struct DatabaseSnapshotInfo : public SnapshotInfo {
 };
 
 export struct SystemSnapshotInfo : public SnapshotInfo {
-    String system_id_str_;
-    String system_name_;
-    String system_comment_{};
-    String system_next_table_id_str_{};
-    Vector<SharedPtr<TableSnapshotInfo>> table_snapshots_{};
+    Vector<SharedPtr<DatabaseSnapshotInfo>> database_snapshots_{};
+    Vector<String> GetFiles() const;
+    Status Serialize(const String &save_path, TxnTimeStamp commit_ts);
+    String ToString() const;
+    nlohmann::json CreateSnapshotMetadataJSON() const;
+    static Tuple<SharedPtr<SystemSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
 };
 
 } // namespace infinity

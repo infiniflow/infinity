@@ -991,5 +991,80 @@ Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize
     
     return {database_snapshot, Status::OK()};
 }
+
+Vector<String> SystemSnapshotInfo::GetFiles() const {
+    Vector<String> files;
+    for (const auto &database_snapshot : database_snapshots_) {
+        Vector<String> database_files = database_snapshot->GetFiles();
+        files.insert(files.end(), database_files.begin(), database_files.end());
+    }
+    return files;
+}
+
+Status SystemSnapshotInfo::Serialize(const String &save_path, TxnTimeStamp commit_ts) {
+    return Status::OK();
+}
+
+String SystemSnapshotInfo::ToString() const {
+    return fmt::format("SystemSnapshotInfo: snapshot_name: {}",
+                       snapshot_name_);
+}
+
+nlohmann::json SystemSnapshotInfo::CreateSnapshotMetadataJSON() const {
+    nlohmann::json json_res;
+    json_res["snapshot_name"] = snapshot_name_;
+    json_res["snapshot_scope"] = SnapshotScope::kSystem;
+    json_res["database_snapshots"] = nlohmann::json::array();
+    for (const auto &database_snapshot : database_snapshots_) {
+        json_res["database_snapshots"].emplace_back(database_snapshot->CreateSnapshotMetadataJSON());
+    }
+    return json_res;
+}
+
+Tuple<SharedPtr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
+    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+
+    String meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, snapshot_name, snapshot_name);
+
+    if (!VirtualStore::Exists(meta_path)) {
+        return {nullptr, Status::FileNotFound(meta_path)};
+    }
+
+    auto [meta_file_handle, status] = VirtualStore::Open(meta_path, FileAccessMode::kRead);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    i64 file_size = meta_file_handle->FileSize();
+    String json_str(file_size, 0);
+    auto [n_bytes, status_read] = meta_file_handle->Read(json_str.data(), file_size);
+    if (!status.ok()) {
+        RecoverableError(status_read);
+    }
+    if ((SizeT)file_size != n_bytes) {
+        Status status = Status::FileCorrupted(meta_path);
+        RecoverableError(status);
+    }
+
+    nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
+
+    //    LOG_INFO(snapshot_meta_json.dump());
+    // Validate snapshot scope
+    if (!snapshot_meta_json.contains("snapshot_scope") || snapshot_meta_json["snapshot_scope"] != SnapshotScope::kSystem) {
+        return {nullptr, Status::Unknown("Invalid snapshot scope")};
+    }
+
+    // Create SystemSnapshotInfo object
+    auto system_snapshot = MakeShared<SystemSnapshotInfo>();
     
+    for (const auto &database_snapshot_json : snapshot_meta_json["database_snapshots"]) {
+        auto [database_snapshot, database_status] = DatabaseSnapshotInfo::Deserialize(database_snapshot_json);
+        if (!database_status.ok()) {
+            return {nullptr, database_status};
+        }
+        system_snapshot->database_snapshots_.emplace_back(database_snapshot);
+    }
+    
+}
+
 } // namespace infinity

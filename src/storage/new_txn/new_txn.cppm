@@ -278,6 +278,8 @@ public:
 
     Status RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info);
 
+    Status RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system_snapshot_info);
+
 private:
     Status OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                               const String &index_name,
