@@ -335,6 +335,10 @@ export {
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
+
+    constexpr u32 BATCH_OR_LEN = 128;
+
+    constexpr int MAX_TUPLE_LENGTH = 1024;
 }
 
 } // namespace infinity

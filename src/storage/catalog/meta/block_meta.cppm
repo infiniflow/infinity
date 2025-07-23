@@ -79,6 +79,8 @@ public:
     Status SetFastRoughFilter(SharedPtr<FastRoughFilter> fast_rough_filter);
 
 private:
+    mutable std::mutex mtx_;
+
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;

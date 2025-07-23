@@ -96,6 +96,8 @@ private:
     String GetSegmentIndexTag(const String &tag);
 
 private:
+    mutable std::mutex mtx_;
+
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;

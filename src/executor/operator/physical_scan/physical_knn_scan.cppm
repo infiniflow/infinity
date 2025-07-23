@@ -93,7 +93,7 @@ public:
 
     UniquePtr<Vector<BlockMeta *>> block_metas_{};
     SharedPtr<TableIndexMeeta> table_index_meta_{};
-    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
+    UniquePtr<Vector<SharedPtr<SegmentIndexMeta>>> segment_index_metas_{};
 
 private:
     void InitBlockParallelOption();
