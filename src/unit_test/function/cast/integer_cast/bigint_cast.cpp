@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -36,7 +37,7 @@ TEST_F(BigIntCastTest, bigint_cast0) {
         BigIntT source = 0;
         BigIntT target;
 
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // BigIntT to TinyInt
@@ -159,7 +160,7 @@ TEST_F(BigIntCastTest, bigint_cast0) {
     {
         BigIntT source = std::numeric_limits<BigIntT>::min();
         DecimalT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // BigIntT to VarcharT
@@ -377,7 +378,7 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast bigint column vector to Varchar vector
@@ -406,6 +407,6 @@ TEST_F(BigIntCastTest, bigint_cast1) {
     {
         DataType source(LogicalType::kBigInt);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindIntegerCast<IntegerT>(source, target), RecoverableException);
     }
 }

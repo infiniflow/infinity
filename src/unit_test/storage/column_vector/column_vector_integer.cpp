@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -47,12 +48,12 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -65,7 +66,7 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
 
     {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(3));
-        EXPECT_THROW(column_vector.SetValueByIndex(3, v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetValueByIndex(3, v), UnrecoverableException);
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -74,7 +75,7 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -106,17 +107,17 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
     // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -133,7 +134,7 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -146,12 +147,12 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -165,11 +166,11 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValueByIndex(i);
@@ -189,12 +190,12 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -207,11 +208,11 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeTinyInt(static_cast<TinyIntT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
         EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -290,12 +291,12 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 2u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -312,7 +313,7 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -344,17 +345,17 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
     // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 2u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -371,7 +372,7 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -384,12 +385,12 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 2u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -403,11 +404,11 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValueByIndex(i);
@@ -427,12 +428,12 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 2u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -445,11 +446,11 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeSmallInt(static_cast<SmallIntT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
         EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -528,12 +529,12 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -550,7 +551,7 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
         EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -582,17 +583,17 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
     // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -609,7 +610,7 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
         EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -622,12 +623,12 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -641,11 +642,11 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeInt(static_cast<IntegerT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
         EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValueByIndex(i);
@@ -665,12 +666,12 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 4u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -683,11 +684,11 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeInt(static_cast<IntegerT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kInteger);
         EXPECT_EQ(vx.value_.integer, static_cast<IntegerT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -766,12 +767,12 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -788,7 +789,7 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -820,17 +821,17 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
 
     // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -847,7 +848,7 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -860,12 +861,12 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -879,11 +880,11 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValueByIndex(i);
@@ -903,12 +904,12 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 8u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -921,11 +922,11 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeBigInt(static_cast<BigIntT>(i));
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBigInt);
         EXPECT_EQ(vx.value_.big_int, static_cast<BigIntT>(i));
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -1005,12 +1006,12 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -1028,7 +1029,7 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, input);
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 
     ColumnVector clone_column_vector(data_type);
@@ -1060,17 +1061,17 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     //    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kInvalid);
     //
     // ====
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
-    //    EXPECT_THROW(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
+    //    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.Initialize(), UnrecoverableException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
@@ -1087,7 +1088,7 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, value);
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 
@@ -1100,12 +1101,12 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -1120,11 +1121,11 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
         HugeIntT input(0, i);
         Value v = Value::MakeHugeInt(input);
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, input);
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValueByIndex(i);
@@ -1143,12 +1144,12 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0u);
 
-    EXPECT_THROW(column_vector.GetValueByIndex(0), UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
@@ -1162,11 +1163,11 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
         HugeIntT input(0, i);
         Value v = Value::MakeHugeInt(input);
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValueByIndex(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kHugeInt);
         EXPECT_EQ(vx.value_.huge_int, input);
-        EXPECT_THROW(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(column_vector.GetValueByIndex(i + 1), UnrecoverableException);
     }
 }
 

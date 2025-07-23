@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -121,5 +122,5 @@ TEST_F(ExpressionExecutorSelectTest, test3) {
                                true);
 #endif
     EXPECT_EQ(output_true_select->Size(), 0u);
-    EXPECT_THROW((*output_true_select)[0], UnrecoverableException);
+    EXPECT_THROW_WITHOUT_STACKTRACE((*output_true_select)[0], UnrecoverableException);
 }

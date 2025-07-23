@@ -20,6 +20,9 @@ import :status;
 
 namespace infinity {
 
+Atomic<bool> print_stacktrace = true;
+export bool GetPrintStacktrace() { return print_stacktrace.load(); }
+export void SetPrintStacktrace(bool enable) { print_stacktrace.store(enable); }
 export void PrintStacktrace(const String &err_msg);
 export void PrintTransactionHistory();
 
@@ -60,6 +63,18 @@ export void UnrecoverableError(const String &message,
                                u32 line = std::source_location::current().line());
 
 export std::string_view GetErrorMsg(const String &message);
+
+// export void EXPECT_THROW_WITHOU_STACKTRACE() {
+//
+// }
+
+// export void enable() {
+//
+// }
+//
+// export void disable() {
+//
+// }
 
 #else
 

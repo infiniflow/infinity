@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -231,6 +232,6 @@ TEST_F(SumFunctionTest, sum_func) {
         DataType data_type(LogicalType::kBoolean);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
 
-        EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
     }
 }

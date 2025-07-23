@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -37,7 +38,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     {
         DataType source_type(LogicalType::kDecimal);
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindEmbeddingCast(source_type, target_type), RecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindEmbeddingCast(source_type, target_type), RecoverableException);
     }
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);

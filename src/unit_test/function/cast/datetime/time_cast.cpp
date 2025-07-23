@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "unit_test/gtest_expand.h"
 
 import base_test;
 import infinity_core;
@@ -36,7 +37,7 @@ TEST_F(TimeCastTest, date_cast0) {
     {
         TimeT source;
         TinyIntT target;
-        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(TimeTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         TimeT source;
@@ -46,7 +47,7 @@ TEST_F(TimeCastTest, date_cast0) {
         SharedPtr<ColumnVector> col_varchar = MakeShared<ColumnVector>(data_type);
         col_varchar->Initialize();
 
-        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, col_varchar.get()), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(TimeTryCastToVarlen::Run(source, target, col_varchar.get()), UnrecoverableException);
     }
 }
 
@@ -56,7 +57,7 @@ TEST_F(TimeCastTest, date_cast1) {
     // Call BindDateCast with wrong type of parameters
     {
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindTimeCast(target_type), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(BindTimeCast(target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kTime);
@@ -82,6 +83,6 @@ TEST_F(TimeCastTest, date_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
+        EXPECT_THROW_WITHOUT_STACKTRACE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 }

@@ -46,7 +46,7 @@ void PrintTransactionHistory() {
 
 void PrintStacktrace(const String &err_msg) {
     LOG_CRITICAL(fmt::format("Error: {}", err_msg));
-    std::println("{}", std::stacktrace::current());
+    fmt::print("{}\n", to_string(std::stacktrace::current()));
 }
 
 #define ADD_LOG_INFO
@@ -79,8 +79,10 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     //     LOG_ERROR(std::move(error_msg));
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
-    if (IS_LOGGER_INITIALIZED()) {
-        PrintStacktrace(location_message);
+    if (GetPrintStacktrace()) {
+        if (IS_LOGGER_INITIALIZED()) {
+            PrintStacktrace(location_message);
+        }
     }
     Logger::Flush();
     throw UnrecoverableException(location_message);

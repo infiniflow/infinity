@@ -1,3 +1,4 @@
+#include "unit_test/gtest_expand.h"
 #include "gtest/gtest.h"
 
 import base_test;
@@ -26,11 +27,11 @@ TEST_F(DateTypeTest, TestFromString) {
     EXPECT_NO_THROW(date_std.FromString("2024-9/4"));
     EXPECT_NO_THROW(date_std.FromString("2024/9-4"));
 
-    EXPECT_THROW(date_std.FromString("2018/2/29"), ParserException);
-    EXPECT_THROW(date_std.FromString("20-1233/45"), ParserException);
-    EXPECT_THROW(date_std.FromString("-12354--56f1--ade"), ParserException);
-    EXPECT_THROW(date_std.FromString("1234@56.789"), ParserException);
-    EXPECT_THROW(date_std.FromString("qwlssmabz"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("2018/2/29"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("20-1233/45"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("-12354--56f1--ade"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("1234@56.789"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(date_std.FromString("qwlssmabz"), ParserException);
 }
 
 TEST_F(DateTypeTest, TestAddSubstract) {

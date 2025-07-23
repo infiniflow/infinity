@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "unit_test/gtest_expand.h"
 #include "gtest/gtest.h"
 
 import base_test;
@@ -288,7 +289,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
     }
 
     // Exception
-    EXPECT_THROW(mixed_tuple1.InsertIntegerIntoArray(100, 10), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_tuple1.InsertIntegerIntoArray(100, 10), ParserException);
 
     // Key1: integer
     mixed_tuple1.InsertIntegerIntoTuple("key1", 100);
@@ -708,7 +709,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
     EXPECT_EQ(tuple_ptr1->count, 7);
 
     // Exception
-    EXPECT_THROW(mixed_tuple1.InsertIntegerIntoArray(100, 10), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_tuple1.InsertIntegerIntoArray(100, 10), ParserException);
 
     // Key1: integer
     mixed_tuple1.InsertIntegerIntoTuple("key1", 100);
@@ -1030,7 +1031,7 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
         auto *integer_value_ptr = (IntegerMixedType *)(value1_ptr);
         EXPECT_EQ(integer_value_ptr->value, 300);
     }
-    EXPECT_THROW(mixed_tuple3.InsertIntegerIntoTuple("key1key1", 400), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_tuple3.InsertIntegerIntoTuple("key1key1", 400), ParserException);
 
     // Key2: short string
     mixed_tuple3.InsertStringIntoTuple("key1key1key1key1key1key2", "ABC");
@@ -1042,7 +1043,7 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
         String result = String(short_str_value_ptr->ptr, short_str_value_ptr->length);
         EXPECT_STREQ(result.c_str(), "ABC");
     }
-    EXPECT_THROW(mixed_tuple3.InsertIntegerIntoTuple("key1key1key1key1key1key2", 900), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_tuple3.InsertIntegerIntoTuple("key1key1key1key1key1key2", 900), ParserException);
 
     // Key3: long string
     mixed_tuple3.InsertStringIntoTuple("key1key1key1key1key1key3", "ABCABCABCABCABCABCABCABCABC");
@@ -1056,10 +1057,10 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
     }
 
     // Validate to throw the type exception, when insert element into a full tuple.
-    EXPECT_THROW(mixed_tuple3.InsertStringIntoTuple("keyX", "ABC"), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_tuple3.InsertStringIntoTuple("keyX", "ABC"), ParserException);
 
     // Validate to throw type exception, when create 0 capacity tuple.
-    EXPECT_THROW(MixedType::MakeTuple(0), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(MixedType::MakeTuple(0), ParserException);
 }
 
 TEST_F(MixedTypeTest, mixed_array1) {
@@ -1073,7 +1074,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
     }
 
     // Exception
-    EXPECT_THROW(mixed_array1.InsertIntegerIntoTuple("key1", 10), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_array1.InsertIntegerIntoTuple("key1", 10), ParserException);
 
     // 1. Integer
     mixed_array1.InsertIntegerIntoArray(300, 0);
@@ -1506,7 +1507,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
     EXPECT_EQ(array_ptr1->count, 7);
 
     // Exception
-    EXPECT_THROW(mixed_array1.InsertIntegerIntoTuple("key1", 10), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_array1.InsertIntegerIntoTuple("key1", 10), ParserException);
 
     // Integer
     mixed_array1.InsertIntegerIntoArray(300, 0);
@@ -1869,6 +1870,6 @@ TEST_F(MixedTypeTest, mixed_array3) {
     }
 
     // Set value into invalid index
-    EXPECT_THROW(mixed_array1.InsertFloatIntoArray(1.5, 2), ParserException);
-    EXPECT_THROW(MixedType::MakeArray(0), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(mixed_array1.InsertFloatIntoArray(1.5, 2), ParserException);
+    EXPECT_THROW_WITHOUT_STACKTRACE(MixedType::MakeArray(0), ParserException);
 }
