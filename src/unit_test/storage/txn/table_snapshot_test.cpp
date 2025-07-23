@@ -106,7 +106,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TableSnapshotTest,
-                         ::testing::Values("/test/data/config/test_persistent.toml"));    
+                         ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));    
 
 TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
     using namespace infinity;
