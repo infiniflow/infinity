@@ -1444,6 +1444,8 @@ Status NewTxn::CreateSnapshot(const String &db_name, const String &table_name, c
         if (!status.ok()) {
             return status;
         }        
+    } else if (snapshot_type == SnapshotScope::kSystem) {
+        // the whole system
     } else {
         return Status::UnexpectedError("Invalid snapshot type");
     }
@@ -1625,6 +1627,13 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
     
     LOG_TRACE("NewTxn::RestoreDatabaseSnapshot created database entry is inserted.");
     return Status::OK();
+}
+
+Status NewTxn::RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system_snapshot_info) {
+    // Cleanup();
+    this->SetTxnType(TransactionType::kRestoreSystem);
+    const String &system_name = system_snapshot_info->system_name_;
+    this->CheckTxn(system_name);
 }
 
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {
@@ -4799,6 +4808,11 @@ void NewTxn::CommitBottom() {
                     Status status = CommitBottomCreateDatabaseSnapshot(create_snapshot_cmd->db_name_, create_snapshot_cmd->snapshot_name_);
                     if (!status.ok()) {
                         UnrecoverableError(fmt::format("CommitBottomCreateDatabaseSnapshot failed: {}", status.message()));
+                    }
+                } else if (create_snapshot_cmd->snapshot_type_ == SnapshotScope::kSystem) {
+                    Status status = CommitBottomCreateSystemSnapshot(create_snapshot_cmd->snapshot_name_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("CommitBottomCreateSystemSnapshot failed: {}", status.message()));
                     }
                 }
                 break;
