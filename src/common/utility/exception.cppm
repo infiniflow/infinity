@@ -64,18 +64,6 @@ export void UnrecoverableError(const String &message,
 
 export std::string_view GetErrorMsg(const String &message);
 
-// export void EXPECT_THROW_WITHOU_STACKTRACE() {
-//
-// }
-
-// export void enable() {
-//
-// }
-//
-// export void disable() {
-//
-// }
-
 #else
 
 export void RecoverableError(Status status);

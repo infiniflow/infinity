@@ -348,7 +348,6 @@ target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-#target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cli11")
@@ -406,13 +405,6 @@ endif ()
 
 add_executable(infinity
         ${main_cpp}
-
-        #        network/http_server.cppm
-        #        network/http_server.cpp
-        #        network/http/http_search.cppm
-        #        network/http/http_search.cpp
-        #        network/infinity_thrift_service.cpp
-        #        network/infinity_thrift_service.cppm
 )
 
 #target_sources(infinity
@@ -439,9 +431,7 @@ target_link_libraries(infinity
         thrift.a
         thriftnb.a
         lz4.a
-        atomic.a
         event.a
-        #        profiler
         oatpp.a
         parquet.a
         arrow.a
@@ -457,8 +447,7 @@ target_link_libraries(infinity
         re2.a
         pcre2-8-static
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -510,11 +499,8 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 #            opencc
 #            dl
 #            lz4.a
-#            atomic.a
 #            event.a
 #            oatpp.a
-#            c++.a
-#            c++abi.a
 #            parquet.a
 #            arrow.a
 #            thrift.a
@@ -531,6 +517,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thri
 #            re2.a
 #            pcre2-8-static
 #            rocksdb.a
+#            ${STDCXX15EXP_STATIC}
 #    )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -646,17 +633,6 @@ add_executable(unit_test
         ${ut_planner_cpp}
         ${ut_function_cpp}
         ${ut_parallel_cpp}
-
-        #        ${infinity_cpp}
-        #        ${planner_cpp}
-        #        ${scheduler_cpp}
-        #        ${storage_cpp}
-        #        ${expression_cpp}
-        #        ${function_cpp}
-        #        ${common_cpp}
-        #        ${executor_cpp}
-        #        ${admin_cpp}
-        #        ${network_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -675,7 +651,6 @@ target_link_libraries(unit_test
         opencc
         dl
         lz4.a
-        atomic.a
         parquet.a
         arrow.a
         snappy.a
@@ -694,8 +669,7 @@ target_link_libraries(unit_test
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -716,23 +690,10 @@ target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
-
-        #        ${infinity_impl_cpp}
-        #        ${planner_impl_cpp}
-        #        ${scheduler_impl_cpp}
-        #        ${storage_impl_cpp}
-        #        ${function_impl_cpp}
-        #        ${expression_impl_cpp}
-        #        ${executor_impl_cpp}
-        #        ${metrics_impl_cpp}
-        #        ${common_impl_cpp}
-        #        ${admin_impl_cpp}
-        #        ${network_impl_cpp}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-#target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/rocksdb/include/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
