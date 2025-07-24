@@ -9,15 +9,15 @@ statement ok
 CREATE TABLE sqllogic_test_rankfeatures(id varchar DEFAULT '', content varchar DEFAULT '', tag varchar DEFAULT '');
 
 query I
-INSERT INTO sqllogic_test_rankfeatures VALUES ('2024','hello world','[{"Tag1":0.1},{"Tag2":0.2}]');
+INSERT INTO sqllogic_test_rankfeatures VALUES ('2024','hello world','[{"Tag1":1},{"Tag2":2}]');
 ----
 
 query I
-INSERT INTO sqllogic_test_rankfeatures VALUES ('2025','hello world','[{"Tag1":0.2},{"Tag2":0.1}]');
+INSERT INTO sqllogic_test_rankfeatures VALUES ('2025','hello world','[{"Tag1":2},{"Tag2":1}]');
 ----
 
 query I
-INSERT INTO sqllogic_test_rankfeatures VALUES ('2026','hello world','[{"Tag2":0.3},{"Tag3":0.4}]');
+INSERT INTO sqllogic_test_rankfeatures VALUES ('2026','hello world','[{"Tag2":3},{"Tag3":4}]');
 ----
 
 statement ok
@@ -27,11 +27,18 @@ statement ok
 CREATE INDEX index2 ON sqllogic_test_rankfeatures(tag) USING FULLTEXT WITH (analyzer=rankfeatures);
 
 query TTI
-SELECT id, SCORE() FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'rank_features=tag^Tag1^1.0,tag^Tag2^1.0;topn=10');
+SELECT id, SCORE() FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'topn=10');
 ----
-2024 0.767185
-2025 0.767185
-2026 0.567051
+2024 0.267063
+2025 0.267063
+2026 0.267063
+
+query TTI
+SELECT id, SCORE() FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content', 'hello world', 'rank_features=tag^Tag1^1.0,tag^Tag2^2.0;topn=10');
+----
+2026 6.267063
+2024 5.267063
+2025 4.267063
 
 # Clean up
 statement ok

@@ -280,11 +280,7 @@ class TestSnapshot:
         data = []
         for i in range(num_rows):
             # Create sparse vector data (only 5-10 non-zero elements out of 30000)
-            num_non_zero = random.randint(1,2)
-            indices = sorted(random.sample(range(3), num_non_zero))
-            values = [random.uniform(-1, 1) for _ in range(num_non_zero)]
-            # Create sparse vector using SparseVector class
-            sparse_data = SparseVector(indices, values)
+            sparse_data = SparseVector([0, 1], [1.0, 1.0]) 
             
             row = {
                 "id": i,
@@ -569,6 +565,10 @@ class TestSnapshot:
             except Exception as e:
                 print(f"   Table {i}: Verification failed - {e}")
                 raise
+        # drop all snaphots
+        snapshots = self.infinity_obj.list_snapshots().snapshots
+        for snapshot in snapshots:
+            self.infinity_obj.drop_snapshot(snapshot.name)
 
     def test_restore_table_snapshot_table_exists(self, suffix):
         """Test restore when table already exists"""

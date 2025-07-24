@@ -43,8 +43,6 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Tuple<Vector<ChunkID> *, Status> GetChunkIDs();
-
     Status GetNextChunkID(ChunkID &chunk_id);
 
     Tuple<ChunkID, Status> GetNextChunkID1();
@@ -56,8 +54,6 @@ public:
     Status SetChunkIDs(const Vector<ChunkID> &chunk_ids);
 
     Status RemoveChunkIDs(const Vector<ChunkID> &chunk_ids);
-
-    Status AddChunkID(ChunkID chunk_id);
 
     Status AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn);
 
@@ -90,8 +86,6 @@ public:
     Tuple<SharedPtr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
 private:
-    Status LoadChunkIDs();
-
     Status LoadChunkIDs1();
 
     Status LoadNextChunkID();
@@ -101,6 +95,8 @@ private:
     String GetSegmentIndexTag(const String &tag);
 
 private:
+    mutable std::mutex mtx_;
+
     TxnTimeStamp begin_ts_;
     TxnTimeStamp commit_ts_;
     KVInstance &kv_instance_;

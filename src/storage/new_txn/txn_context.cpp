@@ -28,9 +28,10 @@ String TxnContext::ToString() {
     if(text_ != nullptr) {
         ss << ", Text: " << *text_;
     }
-    ss << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << TxnState2Str(state_) << "\n";
+    ss << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", KV Commit TS: " << kv_commit_ts_ << ", State: " << TxnState2Str(state_)
+       << "\n";
     for (const auto &operation : operations_) {
-        ss << *operation << "\n";
+        ss << "    " << *operation << "\n";
     }
     return ss.str();
 }

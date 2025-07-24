@@ -73,10 +73,11 @@ export struct BaseTxnStore {
     virtual String ToString() const = 0;
     virtual SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const = 0;
     virtual ~BaseTxnStore() = default;
+    virtual void ClearData();
 };
 
 // DummyTxnStore is only used in test
-export struct DummyTxnStore : public BaseTxnStore {
+export struct DummyTxnStore final : public BaseTxnStore {
     DummyTxnStore() : BaseTxnStore(TransactionType::kNormal) {}
     ~DummyTxnStore() override = default;
 
@@ -84,7 +85,7 @@ export struct DummyTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateDBTxnStore : public BaseTxnStore {
+export struct CreateDBTxnStore final : public BaseTxnStore {
     CreateDBTxnStore() : BaseTxnStore(TransactionType::kCreateDB) {}
     ~CreateDBTxnStore() override = default;
 
@@ -97,7 +98,7 @@ export struct CreateDBTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropDBTxnStore : public BaseTxnStore {
+export struct DropDBTxnStore final : public BaseTxnStore {
     DropDBTxnStore() : BaseTxnStore(TransactionType::kDropDB) {}
     ~DropDBTxnStore() override = default;
 
@@ -110,7 +111,7 @@ export struct DropDBTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateTableTxnStore : public BaseTxnStore {
+export struct CreateTableTxnStore final : public BaseTxnStore {
     CreateTableTxnStore() : BaseTxnStore(TransactionType::kCreateTable) {}
     ~CreateTableTxnStore() override = default;
 
@@ -140,7 +141,7 @@ export struct CreateSnapshotTxnStore : public BaseTxnStore {
 };
 
 
-export struct RestoreTableTxnStore : public BaseTxnStore {
+export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
 
     String db_name_{};
@@ -160,7 +161,7 @@ export struct RestoreTableTxnStore : public BaseTxnStore {
 
 };
 
-export struct RestoreDatabaseTxnStore : public BaseTxnStore {
+export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     RestoreDatabaseTxnStore() : BaseTxnStore(TransactionType::kRestoreDatabase) {}
 
     String db_name_{};
@@ -172,7 +173,8 @@ export struct RestoreDatabaseTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropTableTxnStore : public BaseTxnStore {
+
+export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
     ~DropTableTxnStore() override = default;
 
@@ -189,7 +191,7 @@ export struct DropTableTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct RenameTableTxnStore : public BaseTxnStore {
+export struct RenameTableTxnStore final : public BaseTxnStore {
     RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
     ~RenameTableTxnStore() override = default;
 
@@ -204,7 +206,7 @@ export struct RenameTableTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateIndexTxnStore : public BaseTxnStore {
+export struct CreateIndexTxnStore final : public BaseTxnStore {
     CreateIndexTxnStore() : BaseTxnStore(TransactionType::kCreateIndex) {}
     ~CreateIndexTxnStore() override = default;
 
@@ -222,7 +224,7 @@ export struct CreateIndexTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropIndexTxnStore : public BaseTxnStore {
+export struct DropIndexTxnStore final : public BaseTxnStore {
     DropIndexTxnStore() : BaseTxnStore(TransactionType::kDropIndex) {}
     ~DropIndexTxnStore() override = default;
 
@@ -258,7 +260,7 @@ export struct OptimizeIndexStoreEntry {
     Vector<ChunkID> deprecate_chunks_;
 };
 
-export struct OptimizeIndexTxnStore : public BaseTxnStore {
+export struct OptimizeIndexTxnStore final : public BaseTxnStore {
     OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
     ~OptimizeIndexTxnStore() override = default;
 
@@ -270,7 +272,7 @@ export struct OptimizeIndexTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct AppendTxnStore : public BaseTxnStore {
+export struct AppendTxnStore final : public BaseTxnStore {
     AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
     ~AppendTxnStore() override = default;
 
@@ -293,10 +295,11 @@ export struct AppendTxnStore : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    void ClearData() final;
     SizeT RowCount() const;
 };
 
-export struct ImportTxnStore : public BaseTxnStore {
+export struct ImportTxnStore final : public BaseTxnStore {
     ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
     ~ImportTxnStore() override = default;
 
@@ -320,11 +323,12 @@ export struct ImportTxnStore : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    void ClearData() final;
     SizeT RowCount() const;
     SizeT SegmentCount() const;
 };
 
-export struct DumpMemIndexTxnStore : public BaseTxnStore {
+export struct DumpMemIndexTxnStore final : public BaseTxnStore {
     DumpMemIndexTxnStore() : BaseTxnStore(TransactionType::kDumpMemIndex) {}
     ~DumpMemIndexTxnStore() override = default;
 
@@ -346,7 +350,7 @@ export struct DumpMemIndexTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct AddColumnsTxnStore : public BaseTxnStore {
+export struct AddColumnsTxnStore final : public BaseTxnStore {
     AddColumnsTxnStore() : BaseTxnStore(TransactionType::kAddColumn) {}
     ~AddColumnsTxnStore() override = default;
 
@@ -364,7 +368,7 @@ export struct AddColumnsTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropColumnsTxnStore : public BaseTxnStore {
+export struct DropColumnsTxnStore final : public BaseTxnStore {
     DropColumnsTxnStore() : BaseTxnStore(TransactionType::kDropColumn) {}
     ~DropColumnsTxnStore() override = default;
 
@@ -384,7 +388,7 @@ export struct DropColumnsTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CompactTxnStore : public BaseTxnStore {
+export struct CompactTxnStore final : public BaseTxnStore {
     CompactTxnStore() : BaseTxnStore(TransactionType::kCompact) {}
     ~CompactTxnStore() override = default;
 
@@ -411,7 +415,7 @@ export struct CompactTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DeleteTxnStore : public BaseTxnStore {
+export struct DeleteTxnStore final : public BaseTxnStore {
     DeleteTxnStore() : BaseTxnStore(TransactionType::kDelete) {}
     ~DeleteTxnStore() override = default;
 
@@ -428,7 +432,7 @@ export struct DeleteTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct UpdateTxnStore : public BaseTxnStore {
+export struct UpdateTxnStore final : public BaseTxnStore {
     UpdateTxnStore() : BaseTxnStore(TransactionType::kUpdate) {}
     ~UpdateTxnStore() override = default;
 
@@ -454,6 +458,7 @@ export struct UpdateTxnStore : public BaseTxnStore {
 
     String ToString() const final;
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+    void ClearData() final;
     SizeT RowCount() const;
 };
 
@@ -466,7 +471,7 @@ export struct FlushDataEntry {
     BlockID block_id_{};
     String to_flush_{};
 };
-export struct CheckpointTxnStore : public BaseTxnStore {
+export struct CheckpointTxnStore final : public BaseTxnStore {
     CheckpointTxnStore() : BaseTxnStore(TransactionType::kNewCheckpoint) {}
     ~CheckpointTxnStore() override = default;
 
@@ -477,7 +482,7 @@ export struct CheckpointTxnStore : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CleanupTxnStore : public BaseTxnStore {
+export struct CleanupTxnStore final : public BaseTxnStore {
     CleanupTxnStore() : BaseTxnStore(TransactionType::kCleanup) {}
     ~CleanupTxnStore() override = default;
 

@@ -45,17 +45,8 @@ SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_
 
 SegmentIndexMeta::~SegmentIndexMeta() = default;
 
-Tuple<Vector<ChunkID> *, Status> SegmentIndexMeta::GetChunkIDs() {
-    if (!chunk_ids_) {
-        Status status = LoadChunkIDs();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
-    }
-    return {&*chunk_ids_, Status::OK()};
-}
-
 Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
+    std::lock_guard<std::mutex> lock(mtx_);
     if (!next_chunk_id_) {
         Status status = LoadNextChunkID();
         if (!status.ok()) {
@@ -124,21 +115,6 @@ Status SegmentIndexMeta::RemoveChunkIDs(const Vector<ChunkID> &chunk_ids) {
                 break;
             }
         }
-    }
-    return Status::OK();
-}
-
-Status SegmentIndexMeta::AddChunkID(ChunkID chunk_id) {
-    if (!chunk_ids_) {
-        Status status = LoadChunkIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    chunk_ids_->push_back(chunk_id);
-    Status status = SetChunkIDs(*chunk_ids_);
-    if (!status.ok()) {
-        return status;
     }
     return Status::OK();
 }
@@ -396,20 +372,6 @@ bool SegmentIndexMeta::HasMemIndex() {
     return new_catalog->HasMemIndex(mem_index_key);
 }
 
-Status SegmentIndexMeta::LoadChunkIDs() {
-    String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
-    String chunk_ids_str;
-    Status status = kv_instance_.Get(chunk_ids_key, chunk_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    simdjson::padded_string json_str(chunk_ids_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(json_str);
-    chunk_ids_ = doc.get<Vector<ChunkID>>();
-    return Status::OK();
-}
-
 Status SegmentIndexMeta::LoadChunkIDs1() {
     chunk_ids_ = Vector<ChunkID>();
     Vector<ChunkID> &chunk_ids = *chunk_ids_;
@@ -494,7 +456,7 @@ SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
         return nullptr;
     }
     if (!chunk_ids_) {
-        Status status = LoadChunkIDs();
+        Status status = LoadChunkIDs1();
         if (!status.ok()) {
             return nullptr;
         }

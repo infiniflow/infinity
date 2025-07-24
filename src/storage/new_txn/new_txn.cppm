@@ -139,6 +139,8 @@ public:
     explicit NewTxn(NewTxnManager *txn_manager,
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts,
+                    TxnTimeStamp last_kv_commit_ts,
+                    TxnTimeStamp last_commit_ts,
                     UniquePtr<KVInstance> kv_instance,
                     SharedPtr<String> txn_text,
                     TransactionType txn_type);
@@ -262,6 +264,7 @@ public:
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
+
     // // Snapshot OPs
     Status CreateSnapshot(const String &db_name, const String &table_name, const String &snapshot_name, SnapshotScope scope);
 
@@ -277,6 +280,9 @@ public:
     Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> GetDatabaseSnapshotInfo(const String &db_name);
 
     Status RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &database_snapshot_info);
+  
+    friend class NewTxnManager;
+
 
     Status RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system_snapshot_info);
 
@@ -355,9 +361,17 @@ public:
 
     TransactionID TxnID() const;
 
+    TxnTimeStamp BeginTS() const;
+
     TxnTimeStamp CommitTS() const;
 
-    TxnTimeStamp BeginTS() const;
+    TxnTimeStamp KVCommitTS() const;
+
+    TxnTimeStamp LastSystemKVCommitTS() const;
+
+    TxnTimeStamp LastSystemCommitTS() const;
+
+    void SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts);
 
     TxnState GetTxnState() const;
 

@@ -288,6 +288,8 @@ public:
 
     static Status AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
 
+    static Status LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+
     static Status AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id);
 
     static Status AddNewBlockForTransform(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta);
@@ -315,14 +317,6 @@ public:
 
     static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, UsageFlag usage_flag);
 
-    static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                   ChunkID chunk_id,
-                                   RowID base_row_id,
-                                   SizeT row_count,
-                                   const String &base_name,
-                                   SizeT index_size,
-                                   Optional<ChunkIndexMeta> &chunk_index_meta);
-
     static Status AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                     NewTxn *new_txn,
                                     ChunkID chunk_id,
@@ -341,8 +335,6 @@ public:
                                         SizeT index_size,
                                         Optional<ChunkIndexMeta> &chunk_index_meta,
                                         bool is_link_files = false);
-
-    static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
 
     static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 

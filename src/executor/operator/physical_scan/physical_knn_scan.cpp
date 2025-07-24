@@ -388,7 +388,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     auto &knn_column_name = base_table_ref_->table_info_->column_defs_[knn_column_id]->name();
 
     block_metas_ = MakeUnique<Vector<BlockMeta *>>();
-    segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
+    segment_index_metas_ = MakeUnique<Vector<SharedPtr<SegmentIndexMeta>>>();
 
     TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
 
@@ -471,7 +471,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
         if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
-            segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
+            segment_index_metas_->push_back(MakeShared<SegmentIndexMeta>(segment_id, *table_index_meta_));
         } else {
             const auto &block_map = segment_info.block_map();
             for (const auto &block_meta : block_map) {
@@ -587,7 +587,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
 
-        SegmentIndexMeta *segment_index_meta = &knn_scan_shared_data->segment_index_metas_->at(index_idx);
+        SegmentIndexMeta *segment_index_meta = knn_scan_shared_data->segment_index_metas_->at(index_idx).get();
         SegmentID segment_id = segment_index_meta->segment_id();
 
         const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;

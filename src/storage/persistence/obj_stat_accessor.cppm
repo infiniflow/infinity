@@ -83,7 +83,7 @@ public:
 
     virtual Optional<ObjStat> Get(const String &key) = 0;
 
-    virtual ObjStat *GetNoCount(const String &key) = 0;
+    virtual Optional<ObjStat> GetNoCount(const String &key) = 0;
 
     virtual Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) = 0;
 
@@ -115,7 +115,7 @@ public:
 
     Optional<ObjStat> Get(const String &key) override;
 
-    ObjStat *GetNoCount(const String &key) override;
+    Optional<ObjStat> GetNoCount(const String &key) override;
 
     Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) override;
 
@@ -149,7 +149,7 @@ public:
 
     Optional<ObjStat> Get(const String &key) override;
 
-    ObjStat *GetNoCount(const String &key) override;
+    Optional<ObjStat> GetNoCount(const String &key) override;
 
     Optional<ObjStat> Release(const String &key, Vector<String> &drop_keys) override;
 

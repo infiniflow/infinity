@@ -203,11 +203,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     };
     auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, kv_instance, checkpoint_ts, MAX_TIMESTAMP);
-
-        if (table_id_str == "24") {
-            LOG_INFO(fmt::format("InitTable: table_id_str: {}", table_id_str));
-        }
-
+        
         Vector<SegmentID> *segment_ids_ptr = nullptr;
         std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
         if (!status.ok()) {
@@ -761,6 +757,65 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
     return Status::OK();
 }
 
+Status NewCatalog::LoadImportedOrCompactedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        BlockID block_id = block_info.block_id_;
+        SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
+        Optional<BlockMeta> block_meta;
+        block_meta.emplace(block_id, segment_meta);
+        Status status = block_meta->LoadSet(commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        {
+            TableMeeta &table_meta = segment_meta.table_meta();
+            std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        for (const auto &column_def : *column_defs_ptr) {
+            ColumnMeta column_meta(column_def->id(), *block_meta);
+            status = column_meta.LoadSet();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+
+    // Load segment index
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (const String &index_id_str : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
+        status = segment_index_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
+
+        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+        if (!chunk_status.ok()) {
+            return status;
+        }
+        for (ChunkID chunk_id : *chunk_ids_ptr) {
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+            status = chunk_index_meta.LoadSet();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewCatalog::AddNewBlockWithID(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta, BlockID block_id) {
     Status status = segment_meta.AddBlockWithID(commit_ts, block_id);
     if (!status.ok()) {
@@ -1030,34 +1085,6 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     return Status::OK();
 }
 
-Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                    ChunkID chunk_id,
-                                    RowID base_row_id,
-                                    SizeT row_count,
-                                    const String &base_name,
-                                    SizeT index_size,
-                                    Optional<ChunkIndexMeta> &chunk_index_meta) {
-    ChunkIndexMetaInfo chunk_info;
-    chunk_info.base_name_ = base_name;
-    chunk_info.base_row_id_ = base_row_id;
-    chunk_info.row_cnt_ = row_count;
-    chunk_info.index_size_ = index_size;
-    {
-        chunk_index_meta.emplace(chunk_id, segment_index_meta);
-        Status status = chunk_index_meta->InitSet(chunk_info);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = segment_index_meta.AddChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                      NewTxn *new_txn,
                                      ChunkID chunk_id,
@@ -1117,57 +1144,11 @@ Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
-Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info) {
-    Status status;
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm) {
-        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
-    }
-
-    ChunkID chunk_id = 0;
-    {
-        status = segment_index_meta.GetNextChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-        if (chunk_id != chunk_info.chunk_id_) {
-            UnrecoverableError(fmt::format("Chunk id mismatch, expect: {}, actual: {}", chunk_id, chunk_info.chunk_id_));
-        }
-        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_index_meta.AddChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-
-    ChunkIndexMetaInfo chunk_meta_info;
-    {
-        chunk_meta_info.base_name_ = chunk_info.base_name_;
-        chunk_meta_info.base_row_id_ = chunk_info.base_rowid_;
-        chunk_meta_info.row_cnt_ = chunk_info.row_count_;
-        chunk_meta_info.index_size_ = 0;
-    }
-    status = chunk_index_meta.SetChunkInfo(chunk_meta_info);
-    if (!status.ok()) {
-        return status;
-    }
-    status = chunk_index_meta.LoadSet();
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
-}
 
 Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn) {
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
-    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs();
+    std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }
