@@ -217,6 +217,7 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     check_txn_map_.emplace(commit_ts, txn);
     bottom_txns_.emplace(commit_ts, txn);
     if (txn->NeedToAllocate()) {
+        // LOG_INFO(fmt::format("allocate map add: {}, ts: {}", txn->TxnID(), commit_ts));
         allocator_map_.emplace(commit_ts, nullptr);
     }
     txn->SetTxnWrite();
@@ -675,7 +676,8 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn)
 
             if (other_begin_ts > this_commit_ts) {
                 // SKIP, other txn is started after this txn commit
-                // Obviously, other txn after this txn commit might also conflict with this txn, due to the kv commit ts reason. But when commit other txn, the conflict check must be done again.
+                // Obviously, other txn after this txn commit might also conflict with this txn, due to the kv commit ts reason. But when commit other
+                // txn, the conflict check must be done again.
                 break;
             }
             res.push_back(other_txn);
@@ -720,25 +722,16 @@ void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocato
     //                txn_ptr->CommitTS()));
     //        }
     //    }
+    // LOG_INFO(fmt::format("TxnAllocator: txn: {} ts: {} SubmitForAllocation", txn_allocator_task->txn_ptr()->TxnID(), commit_ts));
     while (!allocator_map_.empty() && allocator_map_.begin()->second != nullptr) {
         //        NewTxn *txn_ptr = allocator_map_.begin()->second->txn_ptr();
         //        LOG_INFO(
         //            fmt::format("Before submit task: {}, transaction id: {}, commit_ts: {}", *txn_ptr->GetTxnText(), txn_ptr->TxnID(),
         //            txn_ptr->CommitTS()));
         txn_allocator_->Submit(allocator_map_.begin()->second);
+        // LOG_INFO(fmt::format("SubmitForAllocation:: remove allocation ts: {}", allocator_map_.begin()->first));
         allocator_map_.erase(allocator_map_.begin());
     }
-}
-
-void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
-    std::lock_guard guard(locker_);
-    auto iter = allocator_map_.find(commit_ts);
-    if (iter == allocator_map_.end()) {
-        String error_message = fmt::format("NewTxnManager::RemoveFromAllocation commit_ts {} not found in allocator_map_", commit_ts);
-        UnrecoverableError(error_message);
-    }
-    allocator_map_.erase(commit_ts);
-    return;
 }
 
 void NewTxnManager::SetSystemCache(UniquePtr<SystemCache> system_cache) {
@@ -757,6 +750,12 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
 
     if (txn_ptr->NeedToAllocate()) {
         allocator_map_.erase(commit_ts);
+        // LOG_INFO(fmt::format("RemoveMapElementForRollbackNoLock ts: {}", commit_ts));
+        // Re-trigger submit allocation.
+        while (!allocator_map_.empty() && allocator_map_.begin()->second != nullptr) {
+            txn_allocator_->Submit(allocator_map_.begin()->second);
+            allocator_map_.erase(allocator_map_.begin());
+        }
     }
 }
 

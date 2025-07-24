@@ -473,7 +473,7 @@ public:
         file_info.file_size_ += var_file_step;
 
         ASSERT_EQ(file_info.buffer_obj_->GetBufferSize(), file_info.file_size_);
-        LOG_INFO(fmt::format("Write file {} size {}", file_info.file_id_, file_info.file_size_));
+        LOG_DEBUG(fmt::format("Write file {} size {}", file_info.file_id_, file_info.file_size_));
     }
 
     void Check(const FileInfo &file_info) override {
