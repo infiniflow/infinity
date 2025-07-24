@@ -62,20 +62,28 @@ RUN --mount=type=bind,source=gcc-15.1.0.tar.gz,target=/root/gcc-15.1.0.tar.gz \
         --program-suffix=-15 \
     && make -j$(nproc) \
     && make install \
-    # Update library paths and ensure new libstdc++ is used
-    && echo "/usr/lib64" >> /etc/ld.so.conf.d/gcc-15.conf \
-    && echo "/usr/lib/x86_64-linux-gnu" >> /etc/ld.so.conf.d/gcc-15.conf \
-    && ldconfig \
-    # Create direct symlink from system libstdc++ to GCC-15's libstdc++
-    && ln -sf /usr/lib64/libstdc++.so.6.0.34 /lib/x86_64-linux-gnu/libstdc++.so.6 \
-    # Also update the symlink in /usr/lib/x86_64-linux-gnu/
-    && ln -sf /usr/lib64/libstdc++.so.6.0.34 /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
-    # Verify the symlink points to the correct version
-    && ls -la /lib/x86_64-linux-gnu/libstdc++.so.6 \
     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 150 \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 150 \
     && update-alternatives --install /usr/bin/cpp cpp /usr/bin/cpp-15 150 \
     && cd /root && rm -rf gcc-releases-gcc-15.1.0
+
+# Configure GCC 15 library paths and symlinks for infinity build system
+RUN mkdir -p /usr/lib64/gcc/15 \
+    && mkdir -p /usr/lib64/gcc/x86_64-linux-gnu/15 \
+    # Copy static libraries to expected locations
+    && cp /usr/lib64/libstdc++.a /usr/lib64/gcc/15/ \
+    && cp /usr/lib64/libstdc++exp.a /usr/lib64/gcc/15/ \
+    && cp /usr/lib64/libstdc++.a /usr/lib64/gcc/x86_64-linux-gnu/15/ \
+    && cp /usr/lib64/libstdc++exp.a /usr/lib64/gcc/x86_64-linux-gnu/15/ \
+    # Update library paths and ensure new libstdc++ is used
+    && echo "/usr/lib64" >> /etc/ld.so.conf.d/gcc-15.conf \
+    && echo "/usr/lib/x86_64-linux-gnu" >> /etc/ld.so.conf.d/gcc-15.conf \
+    && ldconfig \
+    # Create symlinks for dynamic libraries
+    && ln -sf /usr/lib64/libstdc++.so.6.0.34 /lib/x86_64-linux-gnu/libstdc++.so.6 \
+    && ln -sf /usr/lib64/libstdc++.so.6.0.34 /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
+    # Verify the symlink points to the correct version
+    && ls -la /lib/x86_64-linux-gnu/libstdc++.so.6
 
 # Install Python 3.10 from source
 RUN --mount=type=bind,source=Python-3.10.17.tar.xz,target=/root/Python-3.10.17.tar.xz \
