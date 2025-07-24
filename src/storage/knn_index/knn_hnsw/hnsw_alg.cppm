@@ -30,6 +30,7 @@ import data_store;
 import third_party;
 import serialize;
 import dist_func_lsg_wrapper;
+import default_values;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -67,11 +68,11 @@ public:
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
 
 public:
-    KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(4) {}
+    KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(DEFAULT_PREFETCH_SIZE) {}
     KnnHnswBase(This &&other)
         : M_(std::exchange(other.M_, 0)), ef_construction_(std::exchange(other.ef_construction_, 0)), mult_(std::exchange(other.mult_, 0.0)),
           data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)),
-          prefetch_step_(32768 / data_store_.vec_store_meta().GetVecSizeInBytes()) {}
+          prefetch_step_(L1_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes()) {}
     This &operator=(This &&other) {
         if (this != &other) {
             M_ = std::exchange(other.M_, 0);
@@ -433,7 +434,7 @@ protected:
     DataStore data_store_;
     Distance distance_;
 
-    int prefetch_step_;
+    SizeT prefetch_step_;
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:
