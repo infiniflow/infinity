@@ -6098,9 +6098,13 @@ Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn
     }
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    if (!wal_manager->SetCheckpointing()) {
+    while (!wal_manager->SetCheckpointing()) {
         // Checkpointing
-        return Status::OK();
+        last_ckp_ts = wal_manager->GetLastCheckpointTS();
+        if(last_ckp_ts > checkpoint_ts) {
+            return Status::OK();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     DeferFn defer([&] { wal_manager->UnsetCheckpoint(); });
 
