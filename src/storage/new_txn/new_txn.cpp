@@ -6100,7 +6100,7 @@ Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     while (!wal_manager->SetCheckpointing()) {
         // Checkpointing
-        last_ckp_ts = wal_manager->GetLastCheckpointTS();
+        last_ckp_ts = wal_manager->LastCheckpointTS();
         if(last_ckp_ts > checkpoint_ts) {
             return Status::OK();
         }
