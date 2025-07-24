@@ -343,6 +343,82 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result(data=r.json()["nodes"])
 
+    def list_snapshots(self):
+        """List all snapshots via HTTP API"""
+        url = "snapshots"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        response_data = r.json()
+        
+        # Extract snapshots from response
+        snapshots = []
+        if "snapshots" in response_data:
+            for snapshot_info in response_data["snapshots"]:
+                # Create a simple object with name attribute
+                class SnapshotInfo:
+                    def __init__(self, name):
+                        self.name = name
+                
+                snapshots.append(SnapshotInfo(snapshot_info.get("name", "")))
+        
+        return database_result(data=response_data, snapshots=snapshots)
+
+    def show_snapshot(self, snapshot_name):
+        """Show details of a specific snapshot via HTTP API"""
+        url = f"snapshots/{snapshot_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h)
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
+    def create_database_snapshot(self, db_name, snapshot_name):
+        """Create a snapshot of an entire database"""
+        url = "snapshots/database"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {
+            "db_name": db_name,
+            "snapshot_name": snapshot_name,
+        }
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def restore_database_snapshot(self, snapshot_name):
+        """Restore a database from a snapshot"""
+        url = "snapshots/database/restore"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def create_system_snapshot(self, snapshot_name):
+        """Create a system-wide snapshot"""
+        url = "snapshots/system"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def restore_system_snapshot(self, snapshot_name):
+        """Restore system from a snapshot"""
+        url = "snapshots/system/restore"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def drop_snapshot(self, snapshot_name):
+        """Drop a snapshot"""
+        url = f"snapshots/{snapshot_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "delete", h)
+        self.net.raise_exception(r)
+        return database_result()
+
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
@@ -451,6 +527,29 @@ class database_http:
         self.get_all_tables()
         return database_result(columns=["database", "table", "column_count", "block_count", "block_capacity",
                                         "segment_count", "segment_capacity", "comment"])
+
+    # table snapshot operations
+    def create_table_snapshot(self, snapshot_name, table_name):
+        """Create a snapshot of a specific table"""
+        url = "snapshots"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {
+            "db_name": self.database_name,
+            "table_name": table_name,
+            "snapshot_name": snapshot_name,
+        }
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
+    def restore_table_snapshot(self, snapshot_name):
+        """Restore a table from a snapshot"""
+        url = "snapshots/restore"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = {"snapshot_name": snapshot_name}
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
 
 
 class table_http:
@@ -1047,7 +1146,7 @@ class table_http_result:
 @dataclass
 class database_result():
     def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
-                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[]):
+                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[], error_msg="", snapshots=[]):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -1060,6 +1159,8 @@ class database_result():
         self.deleted_rows = deleted_rows
         self.data = data
         self.nodes = nodes
+        self.error_msg = error_msg
+        self.snapshots = snapshots
 
 
 identifier_limit = 65536

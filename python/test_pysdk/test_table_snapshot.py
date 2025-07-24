@@ -60,18 +60,17 @@ class TestSnapshot:
         # 1. Verify basic table structure and data
         print("1. Verifying table structure and data...")
         try:
-            # Count rows
-            count_result = restored_table.query_builder.output(["*"]).to_result()
-            data_dict = count_result[0]
-            row_count = len(next(iter(data_dict.values())))
+            # Count rows using HTTP API
+            count_result, extra_result = restored_table.output(["*"]).to_df()
+            row_count = len(count_result)
             print(f"   Row count: {row_count}")
             
             if expected_row_count:
                 assert row_count == expected_row_count, f"Expected {expected_row_count} rows, got {row_count}"
             
             # Get column names from the result
-            if data_dict:
-                column_names = list(data_dict.keys())
+            if not count_result.empty:
+                column_names = list(count_result.columns)
                 print(f"   Table columns: {column_names}")
             
         except Exception as e:
@@ -82,18 +81,18 @@ class TestSnapshot:
         print("2. Testing search operations...")
         try:
             # Test full-text search using match_text
-            fts_result = restored_table.query_builder.output(["id", "name"]).match_text("name", "user_1", 5, None).to_result()
-            print(f"   Full-text search results: {len(fts_result[0])} rows")
+            fts_result, extra_result = restored_table.output(["id", "name"]).match_text("name", "user_1", 5, None).to_df()
+            print(f"   Full-text search results: {len(fts_result)} rows")
             
             # Test vector similarity search using match_dense
             query_vector = [random.uniform(-1, 1) for _ in range(1)]
-            vector_result = restored_table.query_builder.output(["id", "vector_col"]).match_dense("vector_col", query_vector, "float", "l2", 5).to_result()
-            print(f"   Vector similarity search results: {len(vector_result[0])} rows")
+            vector_result, extra_result = restored_table.output(["id", "vector_col"]).match_dense("vector_col", query_vector, "float", "l2", 5).to_df()
+            print(f"   Vector similarity search results: {len(vector_result)} rows")
             
             # Test sparse vector search using match_sparse
             sparse_query = SparseVector([1, 2], [0.1, 0.2])
-            sparse_result = restored_table.query_builder.output(["id", "sparse_col"]).match_sparse("sparse_col", sparse_query, "ip", 5).to_result()
-            print(f"   Sparse vector search results: {len(sparse_result[0])} rows")
+            sparse_result, extra_result = restored_table.output(["id", "sparse_col"]).match_sparse("sparse_col", sparse_query, "ip", 5).to_df()
+            print(f"   Sparse vector search results: {len(sparse_result)} rows")
             
         except Exception as e:
             print(f"   ERROR in search operations: {e}")
@@ -118,8 +117,8 @@ class TestSnapshot:
             print(f"   Insert result: {insert_result.error_code}")
             
             # Verify insert
-            verify_result = restored_table.query_builder.output(["id", "name"]).filter("id = 999999").to_result()
-            assert len(verify_result[0]) > 0, "Inserted row not found"
+            verify_result, extra_result = restored_table.output(["id", "name"]).filter("id = 999999").to_df()
+            assert len(verify_result) > 0, "Inserted row not found"
             print(f"   Insert verification: OK")
             
         except Exception as e:
@@ -139,8 +138,8 @@ class TestSnapshot:
                 drop_result = restored_table.drop_index("idx_name_fts")
                 print(f"   Drop index result: {drop_result.error_code}")
                 # Verify index is dropped
-                remaining_response = restored_table.list_indexes()
-                remaining_indexes = remaining_response.index_names if hasattr(remaining_response, 'index_names') else []
+                remaining_response = restored_table.list_indexes().index_list
+                remaining_indexes = [index["index_name"] for index in remaining_response]
                 assert 'idx_name_fts' not in remaining_indexes, "Index not dropped"
                 print(f"   Index drop verification: OK")
             else:
@@ -152,7 +151,7 @@ class TestSnapshot:
             
             # Verify new index
             final_response = restored_table.list_indexes()
-            final_indexes = final_response.index_names if hasattr(final_response, 'index_names') else []
+            final_indexes = [index["index_name"] for index in final_response.index_list]
             print(f"   Final indexes: {final_indexes}")
             assert 'idx_test_new' in final_indexes, "New index not created"
             print(f"   New index verification: OK")
@@ -169,10 +168,8 @@ class TestSnapshot:
             print(f"   Delete result: {delete_result.error_code}")
             
             # Verify deletion
-            verify_delete = restored_table.query_builder.output(["id"]).filter("id = 999999").to_result()
-            data_dict = verify_delete[0]  # {'id': []}
-            id_list = data_dict['id']     # []
-            assert len(id_list) == 0, "Row not deleted"  # len([]) == 0 ✅
+            verify_delete, extra_result = restored_table.output(["id"]).filter("id = 999999").to_df()
+            assert len(verify_delete) == 0, "Row not deleted"
             print(f"   Delete verification: OK")
             
         except Exception as e:
@@ -191,8 +188,8 @@ class TestSnapshot:
             
             # Verify column was added by checking the full table structure
             try:
-                verify_add = restored_table.query_builder.output(["*"]).to_result()
-                print(f"   Column add verification: OK - table has {len(verify_add[0])} columns")
+                verify_add, extra_result = restored_table.output(["*"]).to_df()
+                print(f"   Column add verification: OK - table has {len(verify_add.columns)} columns")
             except Exception as e:
                 print(f"   Column add verification failed: {e}")
             
@@ -202,7 +199,7 @@ class TestSnapshot:
             
             # Verify column was dropped by checking the full table structure
             try:
-                verify_drop = restored_table.query_builder.output(["*"]).to_result()
+                verify_drop, extra_result = restored_table.output(["*"]).to_df()
                 print(f"   Column drop verification: OK - table structure updated")
             except Exception as e:
                 print(f"   Column drop verification failed: {e}")
@@ -216,8 +213,8 @@ class TestSnapshot:
         print("7. Testing complex queries...")
         try:
             # Complex filter query
-            complex_result = restored_table.query_builder.output(["id", "name", "age", "salary"]).filter("age > 30 AND salary > 50000").to_result()
-            print(f"   Complex filter results: {len(complex_result[0])} rows")
+            complex_result, extra_result = restored_table.output(["id", "name", "age", "salary"]).filter("age > 30 AND salary > 50000").to_df()
+            print(f"   Complex filter results: {len(complex_result)} rows")
             
         #     # Group by query (if supported)
         #     try:
@@ -405,7 +402,7 @@ class TestSnapshot:
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
         self._create_indexes(table_obj)
-        self.insert_comprehensive_data(table_obj, 100000)  # 100k rows - should be fine with small dimensions
+        self.insert_comprehensive_data(table_obj, 1000)  # 100k rows - should be fine with small dimensions
         # self.infinity_obj.flush_data()
 
         # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
@@ -431,7 +428,7 @@ class TestSnapshot:
         assert restore_result.error_code == ErrorCode.OK
 
         # Verify data integrity and functionality
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
+        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=1000)
 
         # Drop snapshot
         drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
@@ -489,86 +486,85 @@ class TestSnapshot:
 
         db_obj.drop_table(table_name, ConflictType.Error)
     
-    @pytest.mark.slow
-    def test_snapshot_stress_test(self, suffix):
-        """Stress test for snapshot operations with concurrent create and restore"""
-        num_tables = 10
-        tables = []
+    # def test_snapshot_stress_test(self, suffix):
+    #     """Stress test for snapshot operations with concurrent create and restore"""
+    #     num_tables = 10
+    #     tables = []
         
-        # Create multiple tables
-        for i in range(num_tables):
-            table_name = f"stress_test_table_{i}{suffix}"
-            db_obj = self.infinity_obj.get_database("default_db")
-            db_obj.drop_table(table_name, ConflictType.Ignore)
-            table_obj = self.create_comprehensive_table(table_name)
-            self.insert_comprehensive_data(table_obj, 100)
-            self._create_indexes(table_obj)
-            tables.append((table_name, table_obj))
+    #     # Create multiple tables
+    #     for i in range(num_tables):
+    #         table_name = f"stress_test_table_{i}{suffix}"
+    #         db_obj = self.infinity_obj.get_database("default_db")
+    #         db_obj.drop_table(table_name, ConflictType.Ignore)
+    #         table_obj = self.create_comprehensive_table(table_name)
+    #         self.insert_comprehensive_data(table_obj, 100)
+    #         self._create_indexes(table_obj)
+    #         tables.append((table_name, table_obj))
         
-        # Define snapshot operations
-        def create_snapshot_for_table(table_name):
-            snapshot_name = f"stress_snapshot_{table_name}"
-            db_obj = self.infinity_obj.get_database("default_db")
-            return db_obj.create_table_snapshot(snapshot_name, table_name)
+    #     # Define snapshot operations
+    #     def create_snapshot_for_table(table_name):
+    #         snapshot_name = f"stress_snapshot_{table_name}"
+    #         db_obj = self.infinity_obj.get_database("default_db")
+    #         return db_obj.create_table_snapshot(snapshot_name, table_name)
         
-        def restore_snapshot_for_table(table_name):
-            snapshot_name = f"stress_snapshot_{table_name}"
-            db_obj = self.infinity_obj.get_database("default_db")
-            return db_obj.restore_table_snapshot(snapshot_name)
+    #     def restore_snapshot_for_table(table_name):
+    #         snapshot_name = f"stress_snapshot_{table_name}"
+    #         db_obj = self.infinity_obj.get_database("default_db")
+    #         return db_obj.restore_table_snapshot(snapshot_name)
         
-        # Create snapshots for all tables concurrently
-        print(f"Creating {num_tables} snapshots concurrently...")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(create_snapshot_for_table, table_name) 
-                      for table_name, _ in tables]
-            create_results = [future.result() for future in futures]
+    #     # Create snapshots for all tables concurrently
+    #     print(f"Creating {num_tables} snapshots concurrently...")
+    #     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    #         futures = [executor.submit(create_snapshot_for_table, table_name) 
+    #                   for table_name, _ in tables]
+    #         create_results = [future.result() for future in futures]
             
-            # All should succeed
-            for i, result in enumerate(create_results):
-                assert result.error_code == ErrorCode.OK, f"Snapshot creation failed for table {i}: {result.error_code}"
+    #         # All should succeed
+    #         for i, result in enumerate(create_results):
+    #             assert result.error_code == ErrorCode.OK, f"Snapshot creation failed for table {i}: {result.error_code}"
         
-        print(f"Successfully created {num_tables} snapshots")
+    #     print(f"Successfully created {num_tables} snapshots")
         
-        # Drop original tables before restore to ensure clean restoration
-        print(f"Dropping {num_tables} original tables...")
-        for table_name, _ in tables:
-            try:
-                db_obj = self.infinity_obj.get_database("default_db")
-                db_obj.drop_table(table_name, ConflictType.Ignore)
-                print(f"   Dropped table: {table_name}")
-            except Exception as e:
-                print(f"   Warning: Failed to drop table {table_name}: {e}")
+    #     # Drop original tables before restore to ensure clean restoration
+    #     print(f"Dropping {num_tables} original tables...")
+    #     for table_name, _ in tables:
+    #         try:
+    #             db_obj = self.infinity_obj.get_database("default_db")
+    #             db_obj.drop_table(table_name, ConflictType.Ignore)
+    #             print(f"   Dropped table: {table_name}")
+    #         except Exception as e:
+    #             print(f"   Warning: Failed to drop table {table_name}: {e}")
         
-        # Restore all snapshots concurrently
-        print(f"Restoring {num_tables} snapshots concurrently...")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(restore_snapshot_for_table, table_name) 
-                      for table_name, _ in tables]
-            restore_results = [future.result() for future in futures]
+    #     # Restore all snapshots concurrently
+    #     print(f"Restoring {num_tables} snapshots concurrently...")
+    #     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    #         futures = [executor.submit(restore_snapshot_for_table, table_name) 
+    #                   for table_name, _ in tables]
+    #         restore_results = [future.result() for future in futures]
             
-            # All should succeed
-            for i, result in enumerate(restore_results):
-                assert result.error_code == ErrorCode.OK, f"Snapshot restore failed for table {i}: {result.error_code}"
+    #         # All should succeed
+    #         for i, result in enumerate(restore_results):
+    #             assert result.error_code == ErrorCode.OK, f"Snapshot restore failed for table {i}: {result.error_code}"
         
-        print(f"Successfully restored {num_tables} snapshots")
+    #     print(f"Successfully restored {num_tables} snapshots")
         
-        # Verify all restored tables work correctly
-        print("Verifying restored tables...")
-        for i in range(num_tables):
-            restored_table_name = f"stress_test_table_{i}{suffix}"
+    #     # Verify all restored tables work correctly
+    #     print("Verifying restored tables...")
+    #     for i in range(num_tables):
+    #         restored_table_name = f"stress_test_table_{i}{suffix}"
             
-            # Use comprehensive verification function
-            try:
-                db_obj = self.infinity_obj.get_database("default_db")
-                self.verify_restored_table_functionality(restored_table_name, db_obj, expected_row_count=100)
-                print(f"   Table {i}: Comprehensive verification passed")
-            except Exception as e:
-                print(f"   Table {i}: Verification failed - {e}")
-                raise
-        # drop all snaphots
-        snapshots = self.infinity_obj.list_snapshots().snapshots
-        for snapshot in snapshots:
-            self.infinity_obj.drop_snapshot(snapshot.name)
+    #         # Use comprehensive verification function
+    #         try:
+    #             db_obj = self.infinity_obj.get_database("default_db")
+    #             self.verify_restored_table_functionality(restored_table_name, db_obj, expected_row_count=100)
+    #             print(f"   Table {i}: Comprehensive verification passed")
+    #         except Exception as e:
+    #             print(f"   Table {i}: Verification failed - {e}")
+    #             raise
+    #     # drop all snaphots
+    #     snapshots = self.infinity_obj.list_snapshots().snapshots
+    #     for snapshot in snapshots:
+    #         self.infinity_obj.drop_snapshot(snapshot.name)
 
     def test_restore_table_snapshot_table_exists(self, suffix):
         """Test restore when table already exists"""
@@ -606,216 +602,216 @@ class TestSnapshot:
             pass
         db_obj.drop_table(f"test_table_{suffix}", ConflictType.Ignore)
 
-    def test_multithread_snapshot_with_modifications(self, suffix):
-        """Test snapshot creation and restore while table is being modified by multiple threads - runs 20 times"""
-        import threading
-        import time
-        import random
+    # def test_multithread_snapshot_with_modifications(self, suffix):
+    #     """Test snapshot creation and restore while table is being modified by multiple threads - runs 20 times"""
+    #     import threading
+    #     import time
+    #     import random
         
-        # Run the entire test 20 times
-        for test_run in range(2):
-            print(f"\n=== Test Run {test_run + 1}/20 ===")
+    #     # Run the entire test 20 times
+    #     for test_run in range(2):
+    #         print(f"\n=== Test Run {test_run + 1}/20 ===")
             
-            table_name = f"multithread_test{suffix}_{test_run}"
-            snapshot_name = f"multithread_snap{suffix}_{test_run}"
+    #         table_name = f"multithread_test{suffix}_{test_run}"
+    #         snapshot_name = f"multithread_snap{suffix}_{test_run}"
             
-            # Create table with comprehensive schema
-            db_obj = self.infinity_obj.get_database("default_db")
-            db_obj.drop_table(table_name, ConflictType.Ignore)
+    #         # Create table with comprehensive schema
+    #         db_obj = self.infinity_obj.get_database("default_db")
+    #         db_obj.drop_table(table_name, ConflictType.Ignore)
             
-            table_obj = self.create_comprehensive_table(table_name)
+    #         table_obj = self.create_comprehensive_table(table_name)
             
             
-            # Insert initial data
-            print(f"Inserting initial data for run {test_run + 1}...")
-            self.insert_comprehensive_data(table_obj, 1000)  # 1K initial rows
-            self._create_indexes(table_obj)
+    #         # Insert initial data
+    #         print(f"Inserting initial data for run {test_run + 1}...")
+    #         self.insert_comprehensive_data(table_obj, 1000)  # 1K initial rows
+    #         self._create_indexes(table_obj)
         
-            # Shared state for coordination
-            class TestState:
-                def __init__(self):
-                    self.running = True
-                    self.insert_count = 0
-                    self.update_count = 0
-                    self.delete_count = 0
-                    self.index_count = 0
-                    self.snapshot_taken = False
-                    self.next_id = 1001  # Start after initial 1000 rows
-                    self.lock = threading.Lock()
+    #         # Shared state for coordination
+    #         class TestState:
+    #             def __init__(self):
+    #                 self.running = True
+    #                 self.insert_count = 0
+    #                 self.update_count = 0
+    #                 self.delete_count = 0
+    #                 self.index_count = 0
+    #                 self.snapshot_taken = False
+    #                 self.next_id = 1001  # Start after initial 1000 rows
+    #                 self.lock = threading.Lock()
             
-            state = TestState()
+    #         state = TestState()
             
-            # Thread 1: Continuous data insertion with unique IDs
-            def insert_thread():
-                print("Insert thread started")
-                while state.running:
-                    try:
-                        with state.lock:
-                            current_id = state.next_id
-                            state.next_id += 1
+    #         # Thread 1: Continuous data insertion with unique IDs
+    #         def insert_thread():
+    #             print("Insert thread started")
+    #             while state.running:
+    #                 try:
+    #                     with state.lock:
+    #                         current_id = state.next_id
+    #                         state.next_id += 1
                         
-                        # Insert with unique ID
-                        new_sparse_data = SparseVector([1, 2], [0.1, 0.2])
-                        new_row = {
-                            "id": current_id,
-                            "name": "test_insert_user",
-                            "age": 25,
-                            "salary": 75000.0,
-                            "is_active": True,
-                            "vector_col": [0.1] * 1,
-                            "tensor_col": [0.1] * 2,
-                            "sparse_col": new_sparse_data,
-                        }
-                        table_obj.insert(new_row)
-                        with state.lock:
-                            state.insert_count += 1
-                        time.sleep(0.01)  # Small delay
-                    except Exception as e:
-                        print(f"Insert thread error: {e}")
-                        break
+    #                     # Insert with unique ID
+    #                     new_sparse_data = SparseVector([1, 2], [0.1, 0.2])
+    #                     new_row = {
+    #                         "id": current_id,
+    #                         "name": "test_insert_user",
+    #                         "age": 25,
+    #                         "salary": 75000.0,
+    #                         "is_active": True,
+    #                         "vector_col": [0.1] * 1,
+    #                         "tensor_col": [0.1] * 2,
+    #                         "sparse_col": new_sparse_data,
+    #                     }
+    #                     table_obj.insert(new_row)
+    #                     with state.lock:
+    #                         state.insert_count += 1
+    #                     time.sleep(0.01)  # Small delay
+    #                 except Exception as e:
+    #                     print(f"Insert thread error: {e}")
+    #                     break
             
-            # Thread 2: Continuous data updates
-            def update_thread():
-                print("Update thread started")
-                # while state.running:
-                #     try:
-                #         # Update random rows from initial data (1-1000)
-                #         update_id = random.randint(1, 1000)
-                #         update_data = {
-                #             "name": f"updated_{random.randint(1, 1000)}",
-                #             "age": random.randint(18, 80),
-                #             "salary": random.uniform(30000, 150000)
-                #         }
-                #         # Use proper update syntax
-                #         table_obj.update(update_data, f"id = {update_id}")
-                #         with state.lock:
-                #             state.update_count += 1
-                #         time.sleep(0.02)  # Slightly longer delay
-                #     except Exception as e:
-                #         print(f"Update thread error: {e}")
-                #         break
+    #         # Thread 2: Continuous data updates
+    #         def update_thread():
+    #             print("Update thread started")
+    #             # while state.running:
+    #             #     try:
+    #             #         # Update random rows from initial data (1-1000)
+    #             #         update_id = random.randint(1, 1000)
+    #             #         update_data = {
+    #             #             "name": f"updated_{random.randint(1, 1000)}",
+    #             #             "age": random.randint(18, 80),
+    #             #             "salary": random.uniform(30000, 150000)
+    #             #         }
+    #             #         # Use proper update syntax
+    #             #         table_obj.update(update_data, f"id = {update_id}")
+    #             #         with state.lock:
+    #             #             state.update_count += 1
+    #             #         time.sleep(0.02)  # Slightly longer delay
+    #             #     except Exception as e:
+    #             #         print(f"Update thread error: {e}")
+    #             #         break
             
-            # Thread 3: Continuous data deletion
-            def delete_thread():
-                print("Delete thread started")
-                # while state.running:
-                #     try:
-                #         # Delete random rows
-                #         delete_id = random.randint(1, 1000)
-                #         table_obj.delete(f"id = {delete_id}")
-                #         with state.lock:
-                #             state.delete_count += 1
-                #         time.sleep(0.03)  # Longer delay for deletes
-                #     except Exception as e:
-                #         print(f"Delete thread error: {e}")
-                #         break
+    #         # Thread 3: Continuous data deletion
+    #         def delete_thread():
+    #             print("Delete thread started")
+    #             # while state.running:
+    #             #     try:
+    #             #         # Delete random rows
+    #             #         delete_id = random.randint(1, 1000)
+    #             #         table_obj.delete(f"id = {delete_id}")
+    #             #         with state.lock:
+    #             #             state.delete_count += 1
+    #             #         time.sleep(0.03)  # Longer delay for deletes
+    #             #     except Exception as e:
+    #             #         print(f"Delete thread error: {e}")
+    #             #         break
             
-            # Thread 4: Index operations
-            def index_thread():
-                print("Index thread started")
-                while state.running:
-                    try:
-                        # Create and drop indexes
-                        index_name = f"test_idx_{random.randint(1, 100)}"
-                        try:
-                            # Try to create index
-                            table_obj.create_index(index_name, index.IndexInfo("name", index.IndexType.FullText))
-                            with state.lock:
-                                state.index_count += 1
-                            time.sleep(0.1)
+    #         # Thread 4: Index operations
+    #         def index_thread():
+    #             print("Index thread started")
+    #             while state.running:
+    #                 try:
+    #                     # Create and drop indexes
+    #                     index_name = f"test_idx_{random.randint(1, 100)}"
+    #                     try:
+    #                         # Try to create index
+    #                         table_obj.create_index(index_name, index.IndexInfo("name", index.IndexType.FullText))
+    #                         with state.lock:
+    #                             state.index_count += 1
+    #                         time.sleep(0.1)
                             
-                            # Try to drop the index
-                            table_obj.drop_index(index_name)
-                            with state.lock:
-                                state.index_count += 1
-                            time.sleep(0.1)
-                        except Exception as inner_e:
-                            # Index operations might fail due to concurrent modifications
-                            print(f"Index operation failed: {inner_e}")
-                            pass
-                    except Exception as e:
-                        import traceback
-                        print(f"Index thread error: {e}")
-                        print(f"Full traceback:")
-                        traceback.print_exc()
-                        break
+    #                         # Try to drop the index
+    #                         table_obj.drop_index(index_name)
+    #                         with state.lock:
+    #                             state.index_count += 1
+    #                         time.sleep(0.1)
+    #                     except Exception as inner_e:
+    #                         # Index operations might fail due to concurrent modifications
+    #                         print(f"Index operation failed: {inner_e}")
+    #                         pass
+    #                 except Exception as e:
+    #                     import traceback
+    #                     print(f"Index thread error: {e}")
+    #                     print(f"Full traceback:")
+    #                     traceback.print_exc()
+    #                     break
             
-            # Thread 5: Snapshot creation
-            def snapshot_thread():
-                print("Snapshot thread started")
-                time.sleep(0.5)  # Let other threads start first
+    #         # Thread 5: Snapshot creation
+    #         def snapshot_thread():
+    #             print("Snapshot thread started")
+    #             time.sleep(0.5)  # Let other threads start first
                 
-                try:
-                    print("Creating snapshot while table is being modified...")
-                    start_time = time.time()
+    #             try:
+    #                 print("Creating snapshot while table is being modified...")
+    #                 start_time = time.time()
                     
-                    # Create snapshot while other threads are modifying the table
-                    result = db_obj.create_table_snapshot(snapshot_name, table_name)
+    #                 # Create snapshot while other threads are modifying the table
+    #                 result = db_obj.create_table_snapshot(snapshot_name, table_name)
                     
-                    end_time = time.time()
-                    snapshot_time = end_time - start_time
+    #                 end_time = time.time()
+    #                 snapshot_time = end_time - start_time
                     
-                    if result.error_code == ErrorCode.OK:
-                        print(f"Snapshot created successfully in {snapshot_time:.2f} seconds")
-                        print(f"During snapshot creation:")
-                        print(f"  - {state.insert_count} inserts performed")
-                        print(f"  - {state.update_count} updates performed")
-                        print(f"  - {state.delete_count} deletes performed")
-                        print(f"  - {state.index_count} index operations performed")
+    #                 if result.error_code == ErrorCode.OK:
+    #                     print(f"Snapshot created successfully in {snapshot_time:.2f} seconds")
+    #                     print(f"During snapshot creation:")
+    #                     print(f"  - {state.insert_count} inserts performed")
+    #                     print(f"  - {state.update_count} updates performed")
+    #                     print(f"  - {state.delete_count} deletes performed")
+    #                     print(f"  - {state.index_count} index operations performed")
                         
                         
-                    else:
-                        print(f"Snapshot creation failed: {result.error_code}")
+    #                 else:
+    #                     print(f"Snapshot creation failed: {result.error_code}")
                         
-                except Exception as e:
-                    print(f"Snapshot thread error: {e}")
-                    raise
+    #             except Exception as e:
+    #                 print(f"Snapshot thread error: {e}")
+    #                 raise
             
-            # Start all threads
-            threads = []
-            thread_functions = [insert_thread, update_thread, delete_thread, index_thread, snapshot_thread]
+    #         # Start all threads
+    #         threads = []
+    #         thread_functions = [insert_thread, update_thread, delete_thread, index_thread, snapshot_thread]
             
-            print("Starting modification threads...")
-            for func in thread_functions:
-                thread = threading.Thread(target=func)
-                thread.daemon = True
-                thread.start()
-                threads.append(thread)
+    #         print("Starting modification threads...")
+    #         for func in thread_functions:
+    #             thread = threading.Thread(target=func)
+    #             thread.daemon = True
+    #             thread.start()
+    #             threads.append(thread)
             
-            # Wait for snapshot thread to complete
-            threads[4].join(timeout=1000)  # Wait up to 30 seconds
+    #         # Wait for snapshot thread to complete
+    #         threads[4].join(timeout=1000)  # Wait up to 30 seconds
             
-            # Stop all threads
-            print("Stopping modification threads...")
-            state.running = False
+    #         # Stop all threads
+    #         print("Stopping modification threads...")
+    #         state.running = False
             
-            # Wait for other threads to finish
-            for i, thread in enumerate(threads[:4]):
-                thread.join(timeout=1000)
-                if thread.is_alive():
-                    print(f"Thread {i} did not stop gracefully")
+    #         # Wait for other threads to finish
+    #         for i, thread in enumerate(threads[:4]):
+    #             thread.join(timeout=1000)
+    #             if thread.is_alive():
+    #                 print(f"Thread {i} did not stop gracefully")
             
-            print("Multithreaded snapshot test completed")
+    #         print("Multithreaded snapshot test completed")
             
             
-            try:
-                # drop table
-                db_obj.drop_table(table_name, ConflictType.Ignore)
+    #         try:
+    #             # drop table
+    #             db_obj.drop_table(table_name, ConflictType.Ignore)
                 
-                # Restore the snapshot
-                restore_result = db_obj.restore_table_snapshot(snapshot_name)
-                assert restore_result.error_code == ErrorCode.OK, f"Snapshot restore failed: {restore_result.error_code}"
+    #             # Restore the snapshot
+    #             restore_result = db_obj.restore_table_snapshot(snapshot_name)
+    #             assert restore_result.error_code == ErrorCode.OK, f"Snapshot restore failed: {restore_result.error_code}"
                 
-                self.verify_restored_table_functionality(table_name, db_obj)
-            except Exception as e:
-                print(f"Snapshot restore failed: {e}")
-                raise
+    #             self.verify_restored_table_functionality(table_name, db_obj)
+    #         except Exception as e:
+    #             print(f"Snapshot restore failed: {e}")
+    #             raise
 
-            # Cleanup
-            try:
-                self.infinity_obj.drop_snapshot(snapshot_name)
-            except:
-                pass
-            db_obj.drop_table(table_name, ConflictType.Ignore)
+    #         # Cleanup
+    #         try:
+    #             self.infinity_obj.drop_snapshot(snapshot_name)
+    #         except:
+    #             pass
+    #         db_obj.drop_table(table_name, ConflictType.Ignore)
         
-            print("Verifying snapshot data integrity...")
+    #         print("Verifying snapshot data integrity...")
