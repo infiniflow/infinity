@@ -48,8 +48,10 @@ set(GCC_SEARCH_ROOTS
 set(GCC15_SUFFIXES
         lib/gcc/x86_64-linux-gnu/15
         lib/gcc/15
+        lib/gcc/x86_64-pc-linux-gnu/15
         lib64/gcc/x86_64-linux-gnu/15
         lib64/gcc/15
+        lib64/gcc/x86_64-pc-linux-gnu/15
 )
 
 find_library(STDCXX15_STATIC
