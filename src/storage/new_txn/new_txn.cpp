@@ -1649,8 +1649,82 @@ Status NewTxn::RestoreDatabaseSnapshot(const SharedPtr<DatabaseSnapshotInfo> &da
 Status NewTxn::RestoreSystemSnapshot(const SharedPtr<SystemSnapshotInfo> &system_snapshot_info) {
     // Cleanup();
     this->SetTxnType(TransactionType::kRestoreSystem);
-    const String &system_name = system_snapshot_info->system_name_;
-    this->CheckTxn(system_name);
+    base_txn_store_ = MakeShared<RestoreSystemTxnStore>();
+    RestoreSystemTxnStore *txn_store = static_cast<RestoreSystemTxnStore *>(base_txn_store_.get());
+    txn_store->snapshot_name_ = system_snapshot_info->snapshot_name_;
+
+    // get new database ids for new databases
+    for (const auto &database_snapshot_info : system_snapshot_info->database_snapshots_) {
+        String db_id_str;
+        status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
+        if (!status.ok()) {
+            return status;
+        }
+
+        SharedPtr<RestoreDatabaseTxnStore> db_txn_store_ = MakeShared<RestoreDatabaseTxnStore>();
+        db_txn_store_->db_name_ = database_snapshot_info->db_name_;
+        db_txn_store_->db_id_str_ = db_id_str;
+        db_txn_store_->db_comment_ = database_snapshot_info->db_comment_;
+        
+        
+        // Process each table snapshot within the database
+        for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
+            const String &table_name = table_snapshot_info->table_name_;
+            
+            // Create table definition
+            SharedPtr<TableDef> table_def = TableDef::Make(
+                MakeShared<String>(db_txn_store_->db_name_), 
+                MakeShared<String>(table_name), 
+                MakeShared<String>(table_snapshot_info->table_comment_), 
+                table_snapshot_info->columns_
+            );
+
+            String snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+            String snapshot_name = database_snapshot_info->snapshot_name_;
+            Vector<String> restored_file_paths;    
+            status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir, snapshot_name, table_snapshot_info->GetFiles(), table_snapshot_info->table_id_str_, db_id_str, restored_file_paths,false);
+        
+            if (!status.ok()) {
+                return status;
+            }
+            
+            SharedPtr<RestoreTableTxnStore> tmp_txn_store_ = MakeShared<RestoreTableTxnStore>();
+            
+            // Use the helper function to process snapshot restoration data
+            status = ProcessSnapshotRestorationData(db_txn_store_->db_name_, db_id_str, table_name, table_snapshot_info->table_id_str_, table_def, table_snapshot_info, snapshot_name, tmp_txn_store_.get());
+
+            if (!status.ok()) {
+                return status;
+            }
+            db_txn_store_->restore_table_txn_stores_.push_back(std::move(tmp_txn_store_));
+        }
+        txn_store->restore_db_txn_stores_.push_back(std::move(db_txn_store_));
+    }
+
+    // drop all existing databases
+    Vector<String> *db_id_strs_ptr;
+    Vector<String> *db_names_ptr;
+    CatalogMeta catalog_meta(this);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr, db_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (size_t i = 0; i < db_id_strs_ptr->size(); i++) {
+        Optional<DBMeeta> db_meta;
+        TxnTimeStamp db_create_ts;
+        status = GetDBMeta(db_names_ptr->at(i), db_meta, db_create_ts);
+        if (!status.ok()) {
+            return status;
+        }
+        SharedPtr<DropDBTxnStore> drop_db_txn_store_ = MakeShared<DropDBTxnStore>();
+        drop_db_txn_store_->db_name_ = db_names_ptr->at(i);
+        drop_db_txn_store_->db_id_str_ = db_id_strs_ptr->at(i);
+        drop_db_txn_store_->create_ts_ = db_create_ts;
+        txn_store->drop_db_txn_stores_.push_back(std::move(drop_db_txn_store_));
+    }
+
+    return Status::OK();
 }
 
 TxnTimeStamp NewTxn::GetCurrentCkpTS() const {

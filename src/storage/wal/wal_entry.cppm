@@ -1211,6 +1211,7 @@ export struct WalCmdRestoreSystemSnapshot : public WalCmd {
     
     String snapshot_name_{};
     Vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
+    Vector<WalCmdDropDatabaseV2> drop_database_wal_cmds_{};
 };
 
 export struct WalEntryHeader {

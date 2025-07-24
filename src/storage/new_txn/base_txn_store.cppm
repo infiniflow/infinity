@@ -173,6 +173,17 @@ export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
     SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct RestoreSystemTxnStore final : public BaseTxnStore {
+    RestoreSystemTxnStore() : BaseTxnStore(TransactionType::kRestoreSystem) {}
+    ~RestoreSystemTxnStore() override = default;
+
+    Vector<SharedPtr<DropDBTxnStore>> drop_db_txn_stores_{};
+    Vector<SharedPtr<RestoreDatabaseTxnStore>> restore_db_txn_stores_{};
+    
+    String ToString() const final;
+    SharedPtr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 
 export struct DropTableTxnStore final : public BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}

@@ -88,7 +88,8 @@ export enum class TransactionType {
     kAddColumn,
     kDropColumn,
     kCleanup,
-    kCreateSnapshot
+    kCreateSnapshot,
+    kRestoreSystem,
 };
 
 export inline String TransactionType2Str(TransactionType txn_type) {
@@ -173,6 +174,9 @@ export inline String TransactionType2Str(TransactionType txn_type) {
         }
         case TransactionType::kCreateSnapshot: {
             return "CreateSnapshot";
+        }
+        case TransactionType::kRestoreSystem: {
+            return "RestoreSystem";
         }
     }
     return "Normal";
