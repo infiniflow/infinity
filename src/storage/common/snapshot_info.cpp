@@ -1056,6 +1056,7 @@ Tuple<SharedPtr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Deserialize(con
 
     // Create SystemSnapshotInfo object
     auto system_snapshot = MakeShared<SystemSnapshotInfo>();
+    system_snapshot->snapshot_name_ = snapshot_name;
     
     for (const auto &database_snapshot_json : snapshot_meta_json["database_snapshots"]) {
         auto [database_snapshot, database_status] = DatabaseSnapshotInfo::Deserialize(database_snapshot_json);
@@ -1064,7 +1065,8 @@ Tuple<SharedPtr<SystemSnapshotInfo>, Status> SystemSnapshotInfo::Deserialize(con
         }
         system_snapshot->database_snapshots_.emplace_back(database_snapshot);
     }
-    
+
+    return {system_snapshot, Status::OK()};
 }
 
 } // namespace infinity

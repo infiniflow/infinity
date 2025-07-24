@@ -558,6 +558,7 @@ private:
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
     Status CommitBottomCreateDatabaseSnapshot(const String &db_name, const String &snapshot_name);
+    Status CommitBottomCreateSystemSnapshot(const String &snapshot_name);
     Status CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
