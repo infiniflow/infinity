@@ -862,10 +862,35 @@ class table_http_result:
             tmp["option"] = self._option
         # print(tmp)
         d = self.table_http.net.set_up_data([], tmp)
+        
+        # Add timing measurement for network transfer and JSON parsing
+        import time
+        import json
+        
+        # Time the network transfer
+        start_network = time.perf_counter()
         r = self.table_http.net.request(url, "get", h, d)
+        end_network = time.perf_counter()
+        
+        network_time = (end_network - start_network) * 1000
+        response_size = len(r.content)
+        
+        # Time JSON parsing
+        start_parse = time.perf_counter()
+        result_json = r.json()
+        end_parse = time.perf_counter()
+        
+        parse_time = (end_parse - start_parse) * 1000
+        
+        # Print timing information for large responses
+        if response_size > 100000:  # Only print for responses > 100KB
+            print(f"HTTP Timing - Network: {network_time:.2f}ms, Parse: {parse_time:.2f}ms, Size: {response_size:,} bytes")
+            if "output" in result_json:
+                row_count = len(result_json["output"])
+                print(f"  Rows: {row_count:,}, Avg row size: {response_size/row_count:.1f} bytes")
+        
         self.table_http.net.raise_exception(r)
         # print(r.json())
-        result_json = r.json()
         if "output" in result_json:
             self.output_res = result_json["output"]
         else:
@@ -1039,9 +1064,14 @@ class table_http_result:
         return self
 
     def to_result(self):
+        import time
+        
         if self.output_res == []:
             self.select()
 
+        # Time the data processing
+        start_process = time.perf_counter()
+        
         df_dict = {}
         col_types = self.table_http.show_columns_type()
         for output_col in self._output:
@@ -1128,6 +1158,14 @@ class table_http_result:
                     if (function_name in bool_functions):
                         df_type[k] = dtype('bool')
                         break
+        
+        end_process = time.perf_counter()
+        process_time = (end_process - start_process) * 1000
+        
+        # Print timing for large datasets
+        if len(self.output_res) > 1000:  # Only print for datasets with > 1000 rows
+            print(f"HTTP Data Processing - Time: {process_time:.2f}ms, Rows: {len(self.output_res):,}")
+        
         return df_dict, df_type, extra_result
 
     def to_pl(self):
@@ -1135,8 +1173,27 @@ class table_http_result:
         return pl.from_pandas(dataframe), extra_result
 
     def to_df(self):
+        import time
+        
+        # Time the to_result() call (data processing)
+        start_result = time.perf_counter()
         df_dict, df_type, extra_result = self.to_result()
-        return pd.DataFrame(df_dict).astype(df_type), extra_result
+        end_result = time.perf_counter()
+        
+        result_time = (end_result - start_result) * 1000
+        
+        # Time DataFrame construction
+        start_df = time.perf_counter()
+        df = pd.DataFrame(df_dict).astype(df_type)
+        end_df = time.perf_counter()
+        
+        df_time = (end_df - start_df) * 1000
+        
+        # Print timing for large DataFrames
+        if len(df) > 1000:  # Only print for DataFrames with > 1000 rows
+            print(f"HTTP DataFrame Timing - Processing: {result_time:.2f}ms, Construction: {df_time:.2f}ms, Rows: {len(df):,}")
+        
+        return df, extra_result
 
     def to_arrow(self):
         dataframe, extra_result = self.to_df()

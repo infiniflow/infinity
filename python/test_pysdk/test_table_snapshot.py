@@ -60,18 +60,18 @@ class TestSnapshot:
         # 1. Verify basic table structure and data
         print("1. Verifying table structure and data...")
         try:
-            # Count rows using HTTP API
-            count_result, extra_result = restored_table.output(["*"]).to_df()
-            row_count = len(count_result)
+            # Count rows using fast count query instead of fetching all data
+            count_result, extra_result = restored_table.output(["count(*)"]).to_df()
+            row_count = count_result.iloc[0, 0]  # Get the count value
             print(f"   Row count: {row_count}")
             
             if expected_row_count:
                 assert row_count == expected_row_count, f"Expected {expected_row_count} rows, got {row_count}"
             
-            # Get column names from the result
-            if not count_result.empty:
-                column_names = list(count_result.columns)
-                print(f"   Table columns: {column_names}")
+            # Get column names from table metadata instead of fetching data
+            columns_result = restored_table.show_columns()
+            column_names = columns_result["name"].to_list()  # Get column names from polars DataFrame
+            print(f"   Table columns: {column_names}")
             
         except Exception as e:
             print(f"   ERROR in basic verification: {e}")
