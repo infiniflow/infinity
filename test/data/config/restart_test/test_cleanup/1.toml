@@ -11,11 +11,11 @@ log_level = "trace"
 persistence_dir = ""
 data_dir = "/var/infinity/data"
 optimize_interval = "0s"
-cleanup_interval = "3s"
+cleanup_interval = "0s"
 compact_interval = "0s"
 
 [buffer]
 [wal]
-checkpoint_interval = "3s"
+checkpoint_interval = "0s"
 
 [resource]
