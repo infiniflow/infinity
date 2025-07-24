@@ -63,8 +63,11 @@ public:
     }
 
     void Append(SizeT row_cnt, SizeT mem_used) {
-        row_cnt_ += row_cnt;
-        mem_used_ += mem_used;
+        {
+            std::lock_guard lck(mtx_);
+            row_cnt_ += row_cnt;
+            mem_used_ += mem_used;
+        }
         if (tracer_ != nullptr) {
             tracer_->IncreaseMemoryUsage(mem_used);
         }
@@ -73,6 +76,7 @@ public:
     void Dump() {}
 
     MemIndexTracerInfo GetInfo() const override {
+        std::lock_guard lck(mtx_);
         return MemIndexTracerInfo(MakeShared<String>(index_name_),
                                   MakeShared<String>(table_name_),
                                   MakeShared<String>(db_name_),
@@ -81,6 +85,7 @@ public:
     }
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override {
+        std::lock_guard lck(mtx_);
         return ChunkIndexMetaInfo{"chunk1", RowID(segment_id_, 0), row_cnt_, mem_used_};
     }
 
@@ -91,9 +96,11 @@ public:
     String table_name_;
     String index_name_;
     SegmentID segment_id_{};
+    MemIndexTracer *tracer_{nullptr};
+
+    mutable std::mutex mtx_; // protect row_cnt_, mem_used_;
     SizeT row_cnt_{};
     SizeT mem_used_{};
-    MemIndexTracer *tracer_{nullptr};
 };
 
 } // namespace infinity
