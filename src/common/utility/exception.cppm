@@ -21,8 +21,14 @@ import :status;
 namespace infinity {
 
 Atomic<bool> print_stacktrace = true;
+
 export bool GetPrintStacktrace() { return print_stacktrace.load(); }
 export void SetPrintStacktrace(bool enable) { print_stacktrace.store(enable); }
+
+Atomic<bool> print_transaction_history = true;
+export bool GetPrintTransactionHistory() { return print_transaction_history.load(); }
+export void SetPrintTransactionHistory(bool enable) { print_transaction_history.store(enable); }
+
 export void PrintStacktrace(const String &err_msg);
 export void PrintTransactionHistory();
 

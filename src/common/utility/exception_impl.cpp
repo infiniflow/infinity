@@ -14,7 +14,6 @@
 
 module;
 
-#include <print>
 #include <stacktrace>
 
 module infinity_core:infinity_exception.impl;
@@ -69,7 +68,7 @@ std::string_view GetErrorMsg(const String &message) {
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {
-        if (storage->new_txn_manager() != nullptr) {
+        if (storage->new_txn_manager() != nullptr && GetPrintTransactionHistory()) {
             infinity::PrintTransactionHistory();
         }
     }

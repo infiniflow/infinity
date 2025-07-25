@@ -38,16 +38,7 @@ public:
 
     SizeT column_idx() const { return column_idx_; }
 
-    Status GetChunkOffset(SizeT &chunk_offset) {
-        if (!chunk_offset_) {
-            Status status = LoadChunkOffset();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        chunk_offset = *chunk_offset_;
-        return Status::OK();
-    }
+    Status GetChunkOffset(SizeT &chunk_offset);
 
     Status SetChunkOffset(SizeT chunk_offset);
 

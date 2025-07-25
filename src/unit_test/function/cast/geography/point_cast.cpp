@@ -24,11 +24,7 @@ import data_type;
 
 using namespace infinity;
 
-class PointCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class PointCastTest : public BaseTest {};
 
 TEST_F(PointCastTest, point_cast0) {
     using namespace infinity;

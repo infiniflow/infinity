@@ -43,7 +43,6 @@ NodeRole InfinityContext::GetServerRole() const {
 }
 
 void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
-
     if (GetServerRole() != NodeRole::kUnInitialized) {
         LOG_ERROR("Infinity is already initialized.");
         return;
@@ -64,6 +63,11 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultCo
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
     }
+
+    // Printing stack trace costs several seconds, so it's disabled by default.
+    SetPrintStacktrace(true);
+    // Uncomment the following line to see if cpptrace work.
+    // UnrecoverableError("InfinityContext::InitPhase1");
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
@@ -496,6 +500,9 @@ void InfinityContext::UnInit() {
     LOG_INFO("Infinity context is un-initialized.");
     Logger::Shutdown();
     config_.reset();
+
+    // Printing stack trace costs several seconds, so it's disabled by default.
+    SetPrintStacktrace(false);
 }
 
 void InfinityContext::SetIndexThreadPool() {

@@ -24,11 +24,7 @@ import data_type;
 
 using namespace infinity;
 
-class LineSegCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class LineSegCastTest : public BaseTest {};
 
 TEST_F(LineSegCastTest, line_seg_cast0) {
     using namespace infinity;

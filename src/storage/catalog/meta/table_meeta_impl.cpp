@@ -776,6 +776,17 @@ String TableMeeta::GetTableTag(const String &tag) const { return KeyEncode::Cata
 //     return Status::OK();
 // }
 
+Status TableMeeta::GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
+    if (!unsealed_segment_id_) {
+        Status status = LoadUnsealedSegmentID();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    unsealed_segment_id = *unsealed_segment_id_;
+    return Status::OK();
+}
+
 Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
     unsealed_segment_id_ = unsealed_segment_id;
     String unsealed_id_key = GetTableTag("unsealed_segment_id");

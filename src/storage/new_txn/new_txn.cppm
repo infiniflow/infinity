@@ -130,6 +130,8 @@ public:
     explicit NewTxn(NewTxnManager *txn_manager,
                     TransactionID txn_id,
                     TxnTimeStamp begin_ts,
+                    TxnTimeStamp last_kv_commit_ts,
+                    TxnTimeStamp last_commit_ts,
                     UniquePtr<KVInstance> kv_instance,
                     SharedPtr<String> txn_text,
                     TransactionType txn_type);
@@ -249,6 +251,8 @@ public:
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
+    friend class NewTxnManager;
+
 private:
     Status OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                               const String &index_name,
@@ -322,9 +326,17 @@ public:
 
     TransactionID TxnID() const;
 
+    TxnTimeStamp BeginTS() const;
+
     TxnTimeStamp CommitTS() const;
 
-    TxnTimeStamp BeginTS() const;
+    TxnTimeStamp KVCommitTS() const;
+
+    TxnTimeStamp LastSystemKVCommitTS() const;
+
+    TxnTimeStamp LastSystemCommitTS() const;
+
+    void SetTxnKVCommitTS(TxnTimeStamp kv_commit_ts);
 
     TxnState GetTxnState() const;
 

@@ -24,11 +24,7 @@ import data_type;
 
 using namespace infinity;
 
-class TimeCastTest : public BaseTest {
-    void SetUp() override { BaseTest::SetUp(); }
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class TimeCastTest : public BaseTest {};
 
 TEST_F(TimeCastTest, date_cast0) {
     using namespace infinity;

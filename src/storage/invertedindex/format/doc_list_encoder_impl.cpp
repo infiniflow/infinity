@@ -23,7 +23,8 @@ DocListEncoder::DocListEncoder(const DocListFormat *doc_list_format)
     : doc_list_buffer_(), doc_list_format_(doc_list_format), last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr) {
     assert(doc_list_format != nullptr);
     doc_list_buffer_.Init(doc_list_format_);
-    CreateDocSkipListWriter();
+    doc_skiplist_writer_ = MakeShared<SkipListWriter>();
+    doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
 }
 
 DocListEncoder::~DocListEncoder() {}
@@ -35,14 +36,22 @@ void DocListEncoder::AddPosition() {
 
 void DocListEncoder::EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_payload) {
     AddDocument(doc_id, doc_payload, current_tf_, doc_len);
-    df_ += 1;
+    {
+        std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+        df_ += 1;
+    }
     current_tf_ = 0;
 }
 
 void DocListEncoder::Flush() {
     FlushDocListBuffer();
-    if (doc_skiplist_writer_.get()) {
-        doc_skiplist_writer_->Flush();
+    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    {
+        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+        doc_skiplist_writer = doc_skiplist_writer_;
+    }
+    if (doc_skiplist_writer.get()) {
+        doc_skiplist_writer->Flush();
     }
 }
 
@@ -67,12 +76,19 @@ void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t 
 }
 
 void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    df_t df;
+    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    {
+        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+        df = df_;
+        doc_skiplist_writer = doc_skiplist_writer_;
+    }
     if (spill) {
         file->WriteVInt(last_doc_id_);
         file->WriteVInt(last_doc_payload_);
         file->WriteVInt(current_tf_);
         file->WriteVInt(total_tf_);
-        file->WriteVInt(df_);
+        file->WriteVInt(df);
         file->WriteVInt(block_max_tf_);
         assert((sizeof(i32) == sizeof(float)));
         i32 block_max_percentage = std::bit_cast<i32>(block_max_percentage_);
@@ -80,8 +96,8 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     } else {
         Flush();
         u32 doc_skiplist_size = 0;
-        if (doc_skiplist_writer_.get()) {
-            doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
+        if (doc_skiplist_writer.get()) {
+            doc_skiplist_size = doc_skiplist_writer->EstimateDumpSize();
         }
 
         u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
@@ -90,8 +106,8 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
         file->WriteVInt(doc_list_size);
     }
 
-    if (doc_skiplist_writer_.get()) {
-        doc_skiplist_writer_->Dump(file, spill);
+    if (doc_skiplist_writer.get()) {
+        doc_skiplist_writer->Dump(file, spill);
     }
 
     doc_list_buffer_.Dump(file, spill);
@@ -112,9 +128,14 @@ void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
 }
 
 u32 DocListEncoder::GetDumpLength() {
+    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    {
+        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+        doc_skiplist_writer = doc_skiplist_writer_;
+    }
     u32 doc_skiplist_size = 0;
-    if (doc_skiplist_writer_.get()) {
-        doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
+    if (doc_skiplist_writer.get()) {
+        doc_skiplist_size = doc_skiplist_writer->EstimateDumpSize();
     }
     u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
     return VByteCompressor::GetVInt32Length(doc_skiplist_size) + VByteCompressor::GetVInt32Length(doc_list_size) + doc_skiplist_size + doc_list_size;
@@ -123,40 +144,48 @@ u32 DocListEncoder::GetDumpLength() {
 void DocListEncoder::FlushDocListBuffer() {
     u32 flush_size = doc_list_buffer_.Flush();
     if (flush_size > 0) {
-        if (!doc_skiplist_writer_.get()) {
-            CreateDocSkipListWriter();
-        }
         AddSkipListItem(flush_size);
     }
     block_max_tf_ = 0;
     block_max_percentage_ = 0.0f;
 }
 
-void DocListEncoder::CreateDocSkipListWriter() {
-    doc_skiplist_writer_ = MakeUnique<SkipListWriter>();
-    doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
+SharedPtr<SkipListWriter> DocListEncoder::GetDocSkipListWriter() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    if (!doc_skiplist_writer_.get()) {
+        doc_skiplist_writer_ = MakeShared<SkipListWriter>();
+        doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
+    }
+    return doc_skiplist_writer_;
 }
 
 void DocListEncoder::AddSkipListItem(u32 item_size) {
+    SharedPtr<SkipListWriter> doc_skiplist_writer = GetDocSkipListWriter();
     const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
     if (skiplist_format->HasBlockMax()) {
         assert((block_max_percentage_ > 0 and block_max_percentage_ <= 1.0f));
         u32 max_percentage_field = static_cast<u32>(std::ceil(block_max_percentage_ * std::numeric_limits<u16>::max()));
         assert((max_percentage_field <= std::numeric_limits<u16>::max()));
-        doc_skiplist_writer_->AddItem(last_doc_id_, total_tf_, block_max_tf_, static_cast<u16>(max_percentage_field), item_size);
+        doc_skiplist_writer->AddItem(last_doc_id_, total_tf_, block_max_tf_, static_cast<u16>(max_percentage_field), item_size);
     } else if (skiplist_format->HasTfList()) {
-        doc_skiplist_writer_->AddItem(last_doc_id_, total_tf_, item_size);
+        doc_skiplist_writer->AddItem(last_doc_id_, total_tf_, item_size);
     } else {
-        doc_skiplist_writer_->AddItem(last_doc_id_, item_size);
+        doc_skiplist_writer->AddItem(last_doc_id_, item_size);
     }
 }
 
 InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder() const {
-    df_t df = df_;
+    df_t df;
+    SharedPtr<SkipListWriter> doc_skiplist_writer;
+    {
+        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+        df = df_;
+        doc_skiplist_writer = doc_skiplist_writer_;
+    }
     SkipListReaderPostingByteSlice *skiplist_reader = nullptr;
-    if (doc_skiplist_writer_) {
+    if (doc_skiplist_writer) {
         skiplist_reader = new SkipListReaderPostingByteSlice(doc_list_format_->GetOption());
-        skiplist_reader->Load(doc_skiplist_writer_.get());
+        skiplist_reader->Load(doc_skiplist_writer.get());
     }
 
     PostingByteSlice *doc_list_buffer = new PostingByteSlice();

@@ -72,16 +72,7 @@ public:
 
     // Status SetNextSegmentID(SegmentID next_segment_id);
 
-    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
-        if (!unsealed_segment_id_) {
-            Status status = LoadUnsealedSegmentID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        unsealed_segment_id = *unsealed_segment_id_;
-        return Status::OK();
-    }
+    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id);
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 

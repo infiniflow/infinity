@@ -208,7 +208,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
 
 String IndexBase::ToString() const {
     std::stringstream ss;
-    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", [";
+    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", name: " << index_name_ << ", [";
     for (size_t i = 0; i < column_names_.size(); ++i) {
         ss << column_names_[i];
         if (i != column_names_.size() - 1) {

@@ -135,7 +135,8 @@ SharedPtr<NewTxn> NewTxnManager::BeginTxnShared(UniquePtr<String> txn_text, Tran
     }
 
     // Create txn instance
-    auto new_txn = MakeShared<NewTxn>(this, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
+    auto new_txn =
+        MakeShared<NewTxn>(this, new_txn_id, begin_ts, last_kv_commit_ts_, last_commit_ts_, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -205,6 +206,11 @@ TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
+TxnTimeStamp NewTxnManager::GetCurrentTS() {
+    std::lock_guard guard(locker_);
+    return current_ts_;
+}
+
 // Prepare to commit WriteTxn
 TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     std::lock_guard guard(locker_);
@@ -214,6 +220,7 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     check_txn_map_.emplace(commit_ts, txn);
     bottom_txns_.emplace(commit_ts, txn);
     if (txn->NeedToAllocate()) {
+        // LOG_INFO(fmt::format("allocate map add: {}, ts: {}", txn->TxnID(), commit_ts));
         allocator_map_.emplace(commit_ts, nullptr);
     }
     txn->SetTxnWrite();
@@ -221,10 +228,8 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
 }
 
 bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason, bool &retry_query) {
-    TxnTimeStamp begin_ts = txn->BeginTS();
-    TxnTimeStamp commit_ts = txn->CommitTS();
 
-    Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn->TxnID(), begin_ts, commit_ts);
+    Vector<SharedPtr<NewTxn>> check_txns = GetCheckCandidateTxns(txn);
     LOG_DEBUG(fmt::format("CheckConflict1:: Txn {} check conflict with check_txns {}", txn->TxnID(), check_txns.size()));
     for (SharedPtr<NewTxn> &check_txn : check_txns) {
         if (txn->CheckConflictTxnStores(check_txn, conflict_reason, retry_query)) {
@@ -428,6 +433,22 @@ void NewTxnManager::CommitBottom(NewTxn *txn) {
     }
 }
 
+void NewTxnManager::CommitKVInstance(NewTxn *txn) {
+    Status status = txn->kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Commit kv_instance: {}", status.message()));
+    }
+    TxnTimeStamp commit_ts = txn->CommitTS();
+    TxnTimeStamp kv_commit_ts;
+    {
+        std::lock_guard guard(locker_);
+        kv_commit_ts = current_ts_ + 1;
+        last_kv_commit_ts_ = kv_commit_ts;
+        last_commit_ts_ = commit_ts;
+    }
+    txn->SetTxnKVCommitTS(kv_commit_ts);
+}
+
 void NewTxnManager::UpdateCatalogCache(NewTxn *txn) {
     switch (txn->GetTxnType()) {
         case TransactionType::kCreateDB: {
@@ -561,7 +582,7 @@ void NewTxnManager::CleanupTxnBottomNolock(TransactionID txn_id, TxnTimeStamp be
     }
 
     TxnTimeStamp first_begin_ts = begin_txn_map_.begin()->first;
-    while (!check_txn_map_.empty() && check_txn_map_.begin()->first < first_begin_ts) {
+    while (!check_txn_map_.empty() && check_txn_map_.begin()->second->KVCommitTS() < first_begin_ts) {
         LOG_TRACE(fmt::format("Pop check txn, id: {}, with commit_ts: {} < begin_ts: {}",
                               check_txn_map_.begin()->second->TxnID(),
                               check_txn_map_.begin()->first,
@@ -581,7 +602,18 @@ void NewTxnManager::PrintAllKeyValue() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID this_txn_id, TxnTimeStamp this_begin_ts, TxnTimeStamp this_commit_ts) {
+//
+//
+//
+//
+Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn *this_txn) {
+
+    TxnTimeStamp this_begin_ts = this_txn->BeginTS();
+    TxnTimeStamp this_commit_ts = this_txn->CommitTS(); // Already got commit ts, but without kv_commit ts.
+    TransactionID this_txn_id = this_txn->TxnID();
+    TxnTimeStamp this_last_system_kv_commit_ts = this_txn->LastSystemKVCommitTS();
+    TxnTimeStamp this_last_system_commit_ts = this_txn->LastSystemCommitTS();
+
     Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
@@ -594,18 +626,64 @@ Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(TransactionID thi
             //                                 other_txn->BeginTS(),
             //                                 other_txn->CommitTS()));
             if (this_txn_id == other_txn->TxnID()) {
+                // Same txn, SKIP
                 continue;
             }
+            TxnTimeStamp other_kv_commit_ts = other_txn->KVCommitTS();
             TxnTimeStamp other_commit_ts = other_txn->CommitTS();
             TxnTimeStamp other_begin_ts = other_txn->BeginTS();
             TxnState other_txn_state = other_txn->GetTxnState();
             bool is_rollback = (other_txn_state == TxnState::kRollbacking) || (other_txn_state == TxnState::kRollbacked);
-            if (other_commit_ts < this_begin_ts || is_rollback) {
+            if (other_kv_commit_ts < this_begin_ts || is_rollback) {
                 // SKIP, other txn is committed before this txn begin
+                // SKIP, other txn is rolled back.
                 continue;
             }
+
+            if (other_kv_commit_ts == this_begin_ts) {
+                if (other_kv_commit_ts < this_last_system_kv_commit_ts) {
+                    // other txn kv commit before this txn begin
+                    // case 1
+                    //  t1               commit     kv commit (509) -- no conflicts
+                    //  |-------------------|----------|
+                    //                                  |---------------------------------|------------|
+                    //                              t3 begin (begin_ts 511) (last_kv_commit 511)
+                    // t2 must begin after t1 kv commit, no conflict
+                    // SKIP
+                    continue;
+                } else if (other_kv_commit_ts == this_last_system_kv_commit_ts) {
+                    // other txn kv commit ts same as this txn begin ts
+                    // case 2
+                    //        t2        commit (512)  kv commit(513) -- conflicts
+                    //        |-----------|--------------|
+                    //  t1            commit (510)  kv commit (513) -- no conflicts
+                    //  |---------------|---------------|
+                    //                                  |---------------------------------|------------|
+                    //                              t3 begin (begin_ts 513) (last_kv_commit 513) (last_commit_ts 510)
+                    if (other_commit_ts <= this_last_system_commit_ts) {
+                        // not conflicts, SKIP
+                        continue;
+                    } else {
+                        // conflicts
+                        ;
+                    }
+                } else {
+                    // other_kv_commit_ts > this_last_system_kv_commit_ts
+                    // case 3
+                    //  t1               commit        kv commit (515) -- conflicts
+                    //  |-------------------|------------|
+                    //                                  |---------------------------------|------------|
+                    //                              t3 begin (begin_ts 513) (last_kv_commit 513)
+                    // t2 must begin before t1 kv commit, no conflict
+                    // conflicts
+                    ;
+                }
+            }
+
             if (other_begin_ts > this_commit_ts) {
                 // SKIP, other txn is started after this txn commit
+                // Obviously, other txn after this txn commit might also conflict with this txn, due to the kv commit ts reason. But when commit other
+                // txn, the conflict check must be done again.
                 break;
             }
             res.push_back(other_txn);
@@ -650,25 +728,16 @@ void NewTxnManager::SubmitForAllocation(SharedPtr<TxnAllocatorTask> txn_allocato
     //                txn_ptr->CommitTS()));
     //        }
     //    }
+    // LOG_INFO(fmt::format("TxnAllocator: txn: {} ts: {} SubmitForAllocation", txn_allocator_task->txn_ptr()->TxnID(), commit_ts));
     while (!allocator_map_.empty() && allocator_map_.begin()->second != nullptr) {
         //        NewTxn *txn_ptr = allocator_map_.begin()->second->txn_ptr();
         //        LOG_INFO(
         //            fmt::format("Before submit task: {}, transaction id: {}, commit_ts: {}", *txn_ptr->GetTxnText(), txn_ptr->TxnID(),
         //            txn_ptr->CommitTS()));
         txn_allocator_->Submit(allocator_map_.begin()->second);
+        // LOG_INFO(fmt::format("SubmitForAllocation:: remove allocation ts: {}", allocator_map_.begin()->first));
         allocator_map_.erase(allocator_map_.begin());
     }
-}
-
-void NewTxnManager::RemoveFromAllocation(TxnTimeStamp commit_ts) {
-    std::lock_guard guard(locker_);
-    auto iter = allocator_map_.find(commit_ts);
-    if (iter == allocator_map_.end()) {
-        String error_message = fmt::format("NewTxnManager::RemoveFromAllocation commit_ts {} not found in allocator_map_", commit_ts);
-        UnrecoverableError(error_message);
-    }
-    allocator_map_.erase(commit_ts);
-    return;
 }
 
 void NewTxnManager::SetSystemCache(UniquePtr<SystemCache> system_cache) {
@@ -687,6 +756,12 @@ void NewTxnManager::RemoveMapElementForRollbackNoLock(TxnTimeStamp commit_ts, Ne
 
     if (txn_ptr->NeedToAllocate()) {
         allocator_map_.erase(commit_ts);
+        // LOG_INFO(fmt::format("RemoveMapElementForRollbackNoLock ts: {}", commit_ts));
+        // Re-trigger submit allocation.
+        while (!allocator_map_.empty() && allocator_map_.begin()->second != nullptr) {
+            txn_allocator_->Submit(allocator_map_.begin()->second);
+            allocator_map_.erase(allocator_map_.begin());
+        }
     }
 }
 

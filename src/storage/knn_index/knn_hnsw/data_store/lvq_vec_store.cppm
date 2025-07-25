@@ -95,6 +95,9 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(dim_) + sizeof(MeanType) * dim_ + sizeof(GlobalCacheType); }
 
+    // Get size of vector in search
+    SizeT GetVecSizeInBytes() const { return compress_data_size_; }
+
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&dim_, sizeof(dim_));
         file_handle.Append(mean_.get(), sizeof(MeanType) * dim_);

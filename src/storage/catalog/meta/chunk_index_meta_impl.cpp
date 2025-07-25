@@ -75,6 +75,18 @@ void ChunkIndexMetaInfo::FromJson(std::string_view json_str) {
 ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta)
     : kv_instance_(segment_index_meta.kv_instance()), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
 
+Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (!chunk_info_) {
+        Status status = LoadChunkInfo();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    chunk_info = &chunk_info_.value();
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::GetIndexBuffer(BufferObj *&index_buffer) {
     if (!index_buffer_) {
         Status status = LoadIndexBuffer();

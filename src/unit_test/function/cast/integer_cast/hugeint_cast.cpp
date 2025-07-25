@@ -23,11 +23,7 @@ import logical_type;
 import data_type;
 
 using namespace infinity;
-class HugeIntCastTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override { BaseTest::TearDown(); }
-};
+class HugeIntCastTest : public BaseTest {};
 
 TEST_F(HugeIntCastTest, hugeint_cast0) {
     using namespace infinity;

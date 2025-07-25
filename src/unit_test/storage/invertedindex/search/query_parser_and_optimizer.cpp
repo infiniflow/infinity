@@ -172,7 +172,7 @@ sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     const String default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
-        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+        LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
         IStringStream iss(row_quires);
         int rc = ParseAndOptimizeFromStream(driver, iss);
@@ -208,7 +208,7 @@ graphic cards
     const String default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
-        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+        LOG_DEBUG(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
         IStringStream iss(row_quires);
         try {

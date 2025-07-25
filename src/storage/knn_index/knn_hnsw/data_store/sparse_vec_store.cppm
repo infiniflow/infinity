@@ -55,6 +55,9 @@ public:
         return This(max_dim);
     }
 
+    // Get size of vector in search
+    SizeT GetVecSizeInBytes() const { return sizeof(DataType) * max_dim_; }
+
     QueryType MakeQuery(QueryVecType vec) const { return vec; }
 
     SizeT dim() const { return max_dim_; }
