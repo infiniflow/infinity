@@ -30,7 +30,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # add_compile_options(-ftime-trace)
 
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
-
+#    add_link_options(-fuse-ld=mold)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
@@ -39,6 +39,40 @@ else ()
     message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING} ${CMAKE_CXX_COMPILER}")
 
 endif ()
+
+set(GCC_SEARCH_ROOTS
+        /usr
+        /usr/local
+)
+
+set(GCC15_SUFFIXES
+        lib/gcc/x86_64-linux-gnu/15
+        lib/gcc/15
+        lib/gcc/x86_64-pc-linux-gnu/15.1.0 # For ci
+        lib64/gcc/x86_64-linux-gnu/15
+        lib64/gcc/15
+        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
+)
+
+find_library(STDCXX15_STATIC
+        NAMES libstdc++.a
+        PATHS ${GCC_SEARCH_ROOTS}
+        PATH_SUFFIXES ${GCC15_SUFFIXES}
+        REQUIRED
+        NO_DEFAULT_PATH
+)
+
+find_library(STDCXX15EXP_STATIC
+        NAMES libstdc++exp.a
+        PATHS ${GCC_SEARCH_ROOTS}
+        PATH_SUFFIXES ${GCC15_SUFFIXES}
+        REQUIRED
+        NO_DEFAULT_PATH
+)
+
+get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)

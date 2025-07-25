@@ -36,10 +36,8 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         thrift.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
         parquet.a
         arrow.a
         snappy.a

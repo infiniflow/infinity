@@ -22,7 +22,6 @@ target_link_libraries(
         thrift.a
         thriftnb.a
         lz4.a
-        atomic.a
         event.a
         snappy.a
         ${JEMALLOC_STATIC_LIB}
@@ -36,8 +35,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -74,7 +72,6 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         event.a
         #        profiler
         parquet.a
@@ -93,8 +90,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -130,7 +126,6 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         parquet.a
         arrow.a
         thrift.a
@@ -147,8 +142,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -185,7 +179,6 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         parquet.a
         arrow.a
         thrift.a
@@ -202,8 +195,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -238,7 +230,6 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         parquet.a
         arrow.a
         thrift.a
@@ -255,8 +246,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -290,7 +280,6 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         parquet.a
         arrow.a
         thrift.a
@@ -307,8 +296,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -342,7 +330,6 @@ target_link_libraries(
         opencc
         dl
         lz4.a
-        atomic.a
         parquet.a
         arrow.a
         thrift.a
@@ -359,8 +346,7 @@ target_link_libraries(
         ssl.a
         crypto.a
         rocksdb.a
-        libstdc++exp.a
-        libstdc++.a
+        ${STDCXX15EXP_STATIC}
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
