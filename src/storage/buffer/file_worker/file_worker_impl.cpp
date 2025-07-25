@@ -178,6 +178,10 @@ void FileWorker::SetData(void *data) {
     data_ = data;
 }
 
+void FileWorker::SetDataSize(SizeT size) {
+    UnrecoverableError("Not implemented");
+}
+
 // Get absolute file path. As key of buffer handle.
 String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
 

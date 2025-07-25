@@ -75,7 +75,7 @@ ColumnVector::ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnV
 ColumnVector::ColumnVector(const ColumnVector &right)
     : data_type_size_(right.data_type_size_), buffer_(right.buffer_), nulls_ptr_(right.nulls_ptr_), initialized(right.initialized),
       vector_type_(right.vector_type_), data_type_(right.data_type_), data_ptr_(right.data_ptr_), capacity_(right.capacity_),
-      tail_index_(right.tail_index_) {
+      tail_index_(right.tail_index_.load()) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("ColumnVector");
 #endif
@@ -85,7 +85,7 @@ ColumnVector::ColumnVector(const ColumnVector &right)
 ColumnVector::ColumnVector(ColumnVector &&right) noexcept
     : data_type_size_(right.data_type_size_), buffer_(std::move(right.buffer_)), nulls_ptr_(std::move(right.nulls_ptr_)),
       initialized(right.initialized), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
-      capacity_(right.capacity_), tail_index_(right.tail_index_) {
+      capacity_(right.capacity_), tail_index_(right.tail_index_.load()) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("ColumnVector");
 #endif
@@ -101,7 +101,7 @@ ColumnVector &ColumnVector::operator=(ColumnVector &&right) noexcept {
         data_type_ = std::move(right.data_type_);
         data_ptr_ = std::exchange(right.data_ptr_, nullptr);
         capacity_ = right.capacity_;
-        tail_index_ = right.tail_index_;
+        tail_index_.store(right.tail_index_.load());
     }
     return *this;
 }
@@ -115,7 +115,7 @@ ColumnVector::~ColumnVector() {
 
 String ColumnVector::ToString() const {
     std::stringstream ss;
-    for (SizeT idx = 0; idx < tail_index_; ++idx) {
+    for (SizeT idx = 0; idx < tail_index_.load(); ++idx) {
         ss << ToString(idx) << std::endl;
     }
     return ss.str();
@@ -129,17 +129,19 @@ void ColumnVector::AppendValue(const Value &value) {
         UnrecoverableError(error_message);
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
-        if (tail_index_ >= 1) {
+        if (tail_index_.load() >= 1) {
             String error_message = "Constant column vector will only have 1 value.";
             UnrecoverableError(error_message);
         }
     }
 
-    if (tail_index_ >= capacity_) {
-        String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_);
+    SizeT tail_index = tail_index_.fetch_add(1);
+    if (tail_index >= capacity_) {
+        tail_index_.fetch_sub(1);
+        String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_);
         UnrecoverableError(error_message);
     }
-    SetValueByIndex(tail_index_++, value);
+    SetValueByIndex(tail_index, value);
 }
 
 void ColumnVector::SetVectorType(ColumnVectorType vector_type) {
@@ -217,7 +219,7 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
     vector_type_ = vector_type;
     capacity_ = capacity;
 
-    tail_index_ = 0;
+    tail_index_.store(0);
     data_type_size_ = data_type_->Size();
     return GetVectorBufferType(*data_type_);
 }
@@ -270,7 +272,7 @@ void ColumnVector::Initialize(BufferObj *buffer_obj,
             break;
         }
     }
-    tail_index_ = current_row_count;
+    tail_index_.store(current_row_count);
 }
 
 void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorMode vector_tipe) {
@@ -300,120 +302,122 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
     Initialize(vector_type, vector_type == ColumnVectorType::kConstant ? other.capacity() : DEFAULT_VECTOR_SIZE);
 
     if (vector_type_ == ColumnVectorType::kConstant) {
-        tail_index_ = other.tail_index_;
-        if (tail_index_ == 0)
+        SizeT tail_index = other.tail_index_.load();
+        tail_index_.store(tail_index);
+        if (tail_index == 0)
             return;
         CopyRow(other, 0, 0);
     } else {
-        tail_index_ = input_select.Size();
+        SizeT tail_index = input_select.Size();
+        tail_index_.store(tail_index);
 
         // Copy data from other column vector to here according to the select
         switch (data_type_->type()) {
             case LogicalType::kBoolean: {
-                CopyFrom<BooleanT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<BooleanT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kTinyInt: {
-                CopyFrom<TinyIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<TinyIntT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kSmallInt: {
-                CopyFrom<SmallIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<SmallIntT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kInteger: {
-                CopyFrom<IntegerT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<IntegerT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kBigInt: {
-                CopyFrom<BigIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<BigIntT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kHugeInt: {
-                CopyFrom<HugeIntT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<HugeIntT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kFloat: {
-                CopyFrom<FloatT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<FloatT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kDouble: {
-                CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kFloat16: {
-                CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kBFloat16: {
-                CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kDecimal: {
-                CopyFrom<DecimalT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<DecimalT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kVarchar: {
-                CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kMultiVector: {
-                CopyFrom<MultiVectorT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<MultiVectorT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kTensor: {
-                CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kTensorArray: {
-                CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
             }
             case LogicalType::kSparse: {
-                CopyFrom<SparseT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<SparseT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kDate: {
-                CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kTime: {
-                CopyFrom<TimeT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<TimeT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kDateTime: {
-                CopyFrom<DateTimeT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<DateTimeT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kTimestamp: {
-                CopyFrom<TimestampT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<TimestampT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kInterval: {
-                CopyFrom<IntervalT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<IntervalT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kArray: {
-                CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<ArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
-            // case LogicalType::kTuple: {
-            //    CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
-            //    break;
-            // }
+            case LogicalType::kTuple: {
+                CopyFrom<TupleT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
+                break;
+            }
             case LogicalType::kPoint: {
-                CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<PointT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kLine: {
-                CopyFrom<LineT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<LineT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kLineSeg: {
-                CopyFrom<LineSegT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<LineSegT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kBox: {
-                CopyFrom<BoxT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<BoxT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
                 //            case kPath: {
@@ -421,27 +425,27 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 //            case kPolygon: {
                 //            }
             case LogicalType::kCircle: {
-                CopyFrom<CircleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<CircleT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
                 //            case kBitmap: {
                 //            }
             case LogicalType::kUuid: {
-                CopyFrom<UuidT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<UuidT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
                 //            case kBlob: {
                 //            }
             case LogicalType::kEmbedding: {
-                CopyFrom<EmbeddingT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<EmbeddingT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kRowID: {
-                CopyFrom<RowID>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<RowID>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kMixed: {
-                CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
                 break;
             }
             case LogicalType::kEmptyArray:
@@ -472,10 +476,10 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
     Initialize(vector_type, end_idx - start_idx);
 
     if (vector_type_ == ColumnVectorType::kConstant) {
-        tail_index_ = 1;
+        tail_index_.store(1);
         CopyRow(other, 0, 0);
     } else {
-        tail_index_ = capacity_;
+        tail_index_.store(capacity_);
         // Copy data from other column vector to here according to the range
         switch (data_type_->type()) {
             case LogicalType::kBoolean: {
@@ -658,9 +662,9 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             String error_message = "Attempting to access non-zero position of constant vector";
             UnrecoverableError(error_message);
         }
-        tail_index_ = 1;
+        tail_index_.store(1);
     } else {
-        if (dst_idx >= tail_index_) {
+        if (dst_idx >= tail_index_.load()) {
             String error_message = "Attempting to access invalid position of target column vector";
             UnrecoverableError(error_message);
         }
@@ -670,7 +674,7 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
         src_idx = 0;
     }
 
-    if (src_idx >= other.tail_index_) {
+    if (src_idx >= other.tail_index_.load()) {
         String error_message = "Attempting to access invalid position of target column vector";
         UnrecoverableError(error_message);
     }
@@ -1011,9 +1015,10 @@ Value ColumnVector::GetValueByIndex(SizeT index) const {
         String error_message = "Column vector isn't initialized.";
         UnrecoverableError(error_message);
     }
-    if (index >= tail_index_) {
+    SizeT tail_index = tail_index_.load();
+    if (index >= tail_index) {
         String error_message =
-            fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index_);
+            fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", std::to_string(index), tail_index);
         UnrecoverableError(error_message);
     }
 
@@ -1168,11 +1173,12 @@ void ColumnVector::SetValueByIndex(SizeT index, const Value &value) {
         String error_message = "Column vector isn't initialized.";
         UnrecoverableError(error_message);
     }
-    if (index > tail_index_ || index >= capacity_) {
+    SizeT tail_index = tail_index_.load();
+    if (index > tail_index || index >= capacity_) {
         String error_message =
             fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                         std::to_string(index),
-                        std::to_string(tail_index_),
+                        std::to_string(tail_index),
                         std::to_string(capacity_));
         UnrecoverableError(error_message);
     }
@@ -1395,7 +1401,7 @@ void ColumnVector::Finalize(SizeT index) {
         String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
         UnrecoverableError(error_message);
     }
-    tail_index_ = index;
+    tail_index_.store(index);
 }
 
 ptr_t ColumnVector::GetRawPtr(SizeT index) { return data_ptr_ + index * data_type_->Size(); }
@@ -1409,11 +1415,12 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
         UnrecoverableError(error_message);
     }
-    if (index > tail_index_) {
+    SizeT tail_index = tail_index_.load();
+    if (index > tail_index) {
         String error_message =
             fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                         std::to_string(index),
-                        std::to_string(tail_index_),
+                        std::to_string(tail_index),
                         std::to_string(capacity_));
         UnrecoverableError(error_message);
     }
@@ -1577,16 +1584,18 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
         UnrecoverableError(error_message);
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
-        if (tail_index_ >= 1) {
+        if (tail_index_.load() >= 1) {
             String error_message = "Constant column vector will only have 1 value.";
             UnrecoverableError(error_message);
         }
     }
-    if (tail_index_ >= capacity_) {
-        String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_);
+    SizeT tail_index = tail_index_.fetch_add(1);
+    if (tail_index >= capacity_) {
+        tail_index_.fetch_sub(1);
+        String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index, capacity_);
         UnrecoverableError(error_message);
     }
-    SetByRawPtr(tail_index_++, value_ptr);
+    SetByRawPtr(tail_index, value_ptr);
 }
 
 namespace {
@@ -1698,7 +1707,7 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
 } // namespace
 
 void ColumnVector::AppendByStringView(std::string_view sv) {
-    SizeT index = tail_index_++;
+    SizeT index = tail_index_.fetch_add(1);
     switch (data_type_->type()) {
         case LogicalType::kBoolean: {
             buffer_->SetCompactBit(index, DataType::StringToValue<BooleanT>(sv));
@@ -2104,9 +2113,10 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         UnrecoverableError(error_message);
     }
 
-    if (this->tail_index_ + count > this->capacity_) {
+    SizeT tail_index = tail_index_.load();
+    if (tail_index + count > this->capacity_) {
         String error_message =
-            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_);
+            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, tail_index, this->capacity_);
         UnrecoverableError(error_message);
     }
 
@@ -2158,7 +2168,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         case LogicalType::kVarchar: {
             // Copy string
             auto *base_src_ptr = (VarcharT *)(other.data_ptr_);
-            VarcharT *base_dst_ptr = &((VarcharT *)(data_ptr_))[this->tail_index_];
+            VarcharT *base_dst_ptr = &((VarcharT *)(data_ptr_))[tail_index_.load()];
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
@@ -2168,7 +2178,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
         case LogicalType::kMultiVector: {
             auto *base_src_ptr = (MultiVectorT *)(other.data_ptr_);
-            MultiVectorT *base_dst_ptr = ((MultiVectorT *)(data_ptr_)) + this->tail_index_;
+            MultiVectorT *base_dst_ptr = ((MultiVectorT *)(data_ptr_)) + tail_index_.load();
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const MultiVectorT &src_ref = base_src_ptr[from + idx];
@@ -2179,7 +2189,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
         case LogicalType::kTensor: {
             auto *base_src_ptr = (TensorT *)(other.data_ptr_);
-            TensorT *base_dst_ptr = ((TensorT *)(data_ptr_)) + this->tail_index_;
+            TensorT *base_dst_ptr = ((TensorT *)(data_ptr_)) + tail_index_.load();
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const TensorT &src_ref = base_src_ptr[from + idx];
@@ -2190,7 +2200,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
         case LogicalType::kTensorArray: {
             auto *base_src_ptr = (TensorArrayT *)(other.data_ptr_);
-            TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_)) + this->tail_index_;
+            TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_)) + tail_index_.load();
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const TensorArrayT &src_ref = base_src_ptr[from + idx];
@@ -2201,7 +2211,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
         case LogicalType::kSparse: {
             const auto *base_src_ptr = reinterpret_cast<const SparseT *>(other.data_ptr_);
-            auto *base_dst_ptr = reinterpret_cast<SparseT *>(data_ptr_) + this->tail_index_;
+            auto *base_dst_ptr = reinterpret_cast<SparseT *>(data_ptr_) + tail_index_.load();
             const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const SparseT &src_sparse = base_src_ptr[from + idx];
@@ -2212,7 +2222,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
         case LogicalType::kArray: {
             const auto *base_src_ptr = reinterpret_cast<const ArrayT *>(other.data_ptr_);
-            auto *base_dst_ptr = reinterpret_cast<ArrayT *>(data_ptr_) + this->tail_index_;
+            auto *base_dst_ptr = reinterpret_cast<ArrayT *>(data_ptr_) + tail_index_.load();
             const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const ArrayT &src_array = base_src_ptr[from + idx];
@@ -2279,7 +2289,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         case LogicalType::kEmbedding: {
             //            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
             auto *base_src_ptr = other.data_ptr_;
-            ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_->Size();
+            ptr_t base_dst_ptr = data_ptr_ + tail_index_.load() * data_type_->Size();
             for (SizeT idx = 0; idx < count; ++idx) {
                 ptr_t src_ptr = base_src_ptr + (from + idx) * data_type_->Size();
                 ptr_t dst_ptr = base_dst_ptr + idx * data_type_->Size();
@@ -2304,7 +2314,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             // Null/Missing/Invalid
         }
     }
-    this->tail_index_ += count;
+    tail_index_.fetch_add(count);
 }
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
@@ -2317,17 +2327,18 @@ SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
     }
 
     SizeT appended_rows = row_count;
-    if (tail_index_ + row_count > capacity_) {
+    SizeT tail_index = tail_index_.load();
+    if (tail_index + row_count > capacity_) {
         // attempt to append data rows more than the capacity;
-        appended_rows = capacity_ - tail_index_;
+        appended_rows = capacity_ - tail_index;
     }
 
-    ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
+    ptr_t dst_ptr = data_ptr_ + tail_index * data_type_size_;
     for (SizeT i = 0; i < row_count; i++) {
         *(RowID *)dst_ptr = RowID(from.segment_id_, from.segment_offset_ + i);
         dst_ptr += data_type_size_;
     }
-    this->tail_index_ += appended_rows;
+    tail_index_.fetch_add(appended_rows);
     return appended_rows;
 }
 
@@ -2348,7 +2359,7 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
     this->data_type_size_ = other.data_type_size_;
     this->initialized = other.initialized;
     this->capacity_ = other.capacity_;
-    this->tail_index_ = other.tail_index_;
+    this->tail_index_.store(other.tail_index_.load());
 }
 
 void ColumnVector::Reset() {
@@ -2367,7 +2378,7 @@ void ColumnVector::Reset() {
         // This part of memory should managed by ColumnVector, but it isn't now.
         // So, when ColumnVector is destructed, this part need to free here.
         // TODO: we are going to manage the nested object in ColumnVector.
-        for (SizeT idx = 0; idx < tail_index_; ++idx) {
+        for (SizeT idx = 0; idx < tail_index_.load(); ++idx) {
             ((MixedT *)data_ptr_)[idx].Reset();
         }
     }
@@ -2385,7 +2396,7 @@ void ColumnVector::Reset() {
     capacity_ = 0;
 
     // 7. Tail index is set to zero
-    tail_index_ = 0;
+    tail_index_.store(0);
 
     // 8. Reset initialized flag
     initialized = false;
@@ -2397,10 +2408,10 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         return true;
     if (!this->initialized || !other.initialized || this->data_type_.get() == nullptr || other.data_type_.get() == nullptr ||
         (*this->data_type_).operator!=(*other.data_type_) || this->data_type_size_ != other.data_type_size_ ||
-        this->vector_type_ != other.vector_type_ || this->tail_index_ != other.tail_index_ || *this->nulls_ptr_ != *other.nulls_ptr_)
+        this->vector_type_ != other.vector_type_ || this->tail_index_.load() != other.tail_index_.load() || *this->nulls_ptr_ != *other.nulls_ptr_)
         return false;
     if (data_type_->type() == LogicalType::kVarchar) {
-        for (SizeT i = 0; i < this->tail_index_; i++) {
+        for (SizeT i = 0; i < this->tail_index_.load(); i++) {
             Span<const char> data1 = this->GetVarchar(i);
             Span<const char> data2 = other.GetVarchar(i);
             if (data1.size() != data2.size() || std::strncmp(data1.data(), data2.data(), data1.size())) {
@@ -2409,9 +2420,9 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         }
     } else if (data_type_->type() == LogicalType::kBoolean) {
         return other.data_type_->type() == LogicalType::kBoolean &&
-               VectorBuffer::CompactBitIsSame(this->buffer_, this->tail_index_, other.buffer_, other.tail_index_);
+               VectorBuffer::CompactBitIsSame(this->buffer_, this->tail_index_.load(), other.buffer_, other.tail_index_.load());
     } else {
-        return 0 == std::memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
+        return 0 == std::memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_.load() * this->data_type_size_);
     }
     return true;
 }
@@ -2428,9 +2439,9 @@ i32 ColumnVector::GetSizeInBytes() const {
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     size += sizeof(i32);
     if (vector_type_ == ColumnVectorType::kCompactBit) {
-        size += (this->tail_index_ + 7) / 8;
+        size += (this->tail_index_.load() + 7) / 8;
     } else {
-        size += this->tail_index_ * this->data_type_size_;
+        size += this->tail_index_.load() * this->data_type_size_;
     }
     size += buffer_->TotalSize(data_type_.get());
     size += this->nulls_ptr_->GetSizeInBytes();
@@ -2454,14 +2465,14 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     // write fixed part
-    WriteBufAdv<i32>(ptr, tail_index_);
+    WriteBufAdv<i32>(ptr, tail_index_.load());
     if (vector_type_ == ColumnVectorType::kCompactBit) {
-        SizeT byte_size = (this->tail_index_ + 7) / 8;
+        SizeT byte_size = (this->tail_index_.load() + 7) / 8;
         std::memcpy(ptr, this->data_ptr_, byte_size);
         ptr += byte_size;
     } else {
-        std::memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
-        ptr += this->tail_index_ * this->data_type_size_;
+        std::memcpy(ptr, this->data_ptr_, this->tail_index_.load() * this->data_type_size_);
+        ptr += this->tail_index_.load() * this->data_type_size_;
     }
     // write variable part
     buffer_->WriteAdv(ptr, data_type_.get());
@@ -2477,7 +2488,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(const char *&ptr, i32 maxbytes) {
     column_vector->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
     // read fixed part
     i32 tail_index = ReadBufAdv<i32>(ptr);
-    column_vector->tail_index_ = tail_index;
+    column_vector->tail_index_.store(tail_index);
     if (vector_type == ColumnVectorType::kCompactBit) {
         SizeT byte_size = (tail_index + 7) / 8;
         std::memcpy((void *)column_vector->data_ptr_, ptr, byte_size);
@@ -2634,7 +2645,7 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, SizeT offset, Si
     const auto *raw_data = span_data.data();
 
     SizeT array_off = array_offset;
-    SizeT available_space = capacity_ - tail_index_;
+    SizeT available_space = capacity_ - tail_index_.load();
     array_offset = std::min(array_size, available_space);
     bool complete = false;
     if (array_offset == array_val.element_num_) {
@@ -2739,7 +2750,7 @@ void ColumnVector::AppendVarcharInner(Span<const char> data, SizeT dst_off) {
 }
 
 void ColumnVector::AppendVarchar(Span<const char> data) {
-    SizeT dst_off = tail_index_++;
+    SizeT dst_off = tail_index_.fetch_add(1);
     AppendVarcharInner(data, dst_off);
 }
 
