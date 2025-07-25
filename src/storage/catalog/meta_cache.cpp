@@ -18,4 +18,6 @@ module meta_cache;
 
 namespace infinity {
 
-}
+MetaCache::MetaCache(SizeT capacity) : lru_cache_(capacity) {}
+
+} // namespace infinity

@@ -18,6 +18,7 @@ export module meta_cache;
 
 import stl;
 import lru;
+import base_meta;
 // import status;
 // import meta_info;
 // import extra_ddl_info;
@@ -28,6 +29,12 @@ import lru;
 
 namespace infinity {
 
-//using MetaCache = lru_cache<String, SharedPtr<BaseMeta>>;
+class MetaCache {
+public:
+    explicit MetaCache(SizeT capacity);
 
-}
+private:
+    lru_cache<String, SharedPtr<BaseMeta>> lru_cache_;
+};
+
+} // namespace infinity
