@@ -177,6 +177,7 @@ export struct RestoreSystemTxnStore final : public BaseTxnStore {
     RestoreSystemTxnStore() : BaseTxnStore(TransactionType::kRestoreSystem) {}
     ~RestoreSystemTxnStore() override = default;
 
+    String snapshot_name_{};
     Vector<SharedPtr<DropDBTxnStore>> drop_db_txn_stores_{};
     Vector<SharedPtr<RestoreDatabaseTxnStore>> restore_db_txn_stores_{};
     

@@ -60,6 +60,7 @@ struct WalCmdCleanup;
 struct WalCmdCreateSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
+struct WalCmdRestoreSystemSnapshot; 
 
 class BufferObj;
 
@@ -98,6 +99,7 @@ struct DropTableTxnStore;
 struct RenameTableTxnStore;
 struct RestoreTableTxnStore;
 struct RestoreDatabaseTxnStore;
+struct RestoreSystemTxnStore;
 struct UpdateTxnStore;
 struct CreateSnapshotTxnStore;
 class BufferManager;
@@ -570,6 +572,7 @@ private:
     Status PrepareCommitCreateSnapshot(const WalCmdCreateSnapshot *create_snapshot_cmd);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
+    Status PrepareCommitRestoreSystemSnapshot(const WalCmdRestoreSystemSnapshot *restore_system_snapshot_cmd);
     Status CommitBottomCreateTableSnapshot(const String &db_name, const String &table_name, const String &snapshot_name);
     Status CommitBottomCreateDatabaseSnapshot(const String &db_name, const String &snapshot_name);
     Status CommitBottomCreateSystemSnapshot(const String &snapshot_name);
@@ -618,6 +621,7 @@ private:
     bool CheckConflictTxnStore(const RestoreTableTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
     bool CheckConflictTxnStore(const CreateSnapshotTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
+    bool CheckConflictTxnStore(const RestoreSystemTxnStore &txn_store, NewTxn *previous_txn, String &cause, bool &retry_query);
 
 public:
     bool IsReplay() const;

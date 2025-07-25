@@ -144,6 +144,7 @@ export struct DatabaseSnapshotInfo : public SnapshotInfo {
     String ToString() const;
     nlohmann::json CreateSnapshotMetadataJSON() const;
     static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+    static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const nlohmann::json &snapshot_meta_json);
 };
 
 export struct SystemSnapshotInfo : public SnapshotInfo {

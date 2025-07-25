@@ -103,6 +103,7 @@ export enum class WalCommandType : i8 {
     CREATE_SNAPSHOT = 110,
     RESTORE_TABLE_SNAPSHOT = 111,
     RESTORE_DATABASE_SNAPSHOT = 112,
+    RESTORE_SYSTEM_SNAPSHOT = 113,
     // -----------------------------
     // Other
     // -----------------------------
@@ -1191,6 +1192,7 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     void WriteAdv(char *&buf) const final;
     String ToString() const final;
     String CompactInfo() const final;
+    static WalCmdRestoreDatabaseSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
     String db_name_{};
     String db_id_str_{};
@@ -1200,8 +1202,8 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
 };
 
 export struct WalCmdRestoreSystemSnapshot : public WalCmd {
-    WalCmdRestoreSystemSnapshot(const String &snapshot_name, const Vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds)
-        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds) {}
+    WalCmdRestoreSystemSnapshot(const String &snapshot_name, const Vector<WalCmdRestoreDatabaseSnapshot> &restore_database_wal_cmds, const Vector<WalCmdDropDatabaseV2> &drop_database_wal_cmds)
+        : WalCmd(WalCommandType::RESTORE_SYSTEM_SNAPSHOT), snapshot_name_(snapshot_name), restore_database_wal_cmds_(restore_database_wal_cmds), drop_database_wal_cmds_(drop_database_wal_cmds) {}
 
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;

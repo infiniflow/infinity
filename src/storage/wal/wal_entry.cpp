@@ -2616,6 +2616,12 @@ String WalCmdRestoreSystemSnapshot::ToString() const {
     std::stringstream ss;
     ss << "Restore System Snapshot: " << std::endl;
     ss << "snapshot name: " << snapshot_name_ << std::endl;
+    ss << "restore database wal cmds: " << std::endl;
+    for (auto &restore_db_cmd : restore_database_wal_cmds_) {
+        ss << restore_db_cmd.ToString() << std::endl;
+    }
+    ss << "drop database wal cmds: " << std::endl;
+    return std::move(ss).str();
 }
 
 String WalCmdCleanup::ToString() const {
