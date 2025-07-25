@@ -20,6 +20,7 @@ import stl;
 import status;
 import default_values;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -52,7 +53,7 @@ export String ToString(SegmentStatus segment_status) {
     }
 }
 
-export class SegmentMeta {
+export class SegmentMeta : public BaseMeta {
 public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
 

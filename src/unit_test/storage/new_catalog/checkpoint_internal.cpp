@@ -149,7 +149,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Status status;
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -294,7 +294,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Status status;
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         TxnTimeStamp db_create_ts;
         status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
@@ -358,7 +358,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
 
     {
         Status status;
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp db_create_ts;
@@ -390,7 +390,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         EXPECT_TRUE(status.ok());
 
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         TxnTimeStamp db_create_ts;
         status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
@@ -408,7 +408,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint1) {
         RestartTxnMgr();
 
         txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        Optional<DBMeeta> db_meta1;
+        SharedPtr<DBMeeta> db_meta1;
         Optional<TableMeeta> table_meta1;
         TxnTimeStamp db_create_ts1;
         status = txn->GetDBMeta(*db_name, db_meta1, db_create_ts1);
@@ -759,7 +759,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint4) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         {
             Status status;
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             TxnTimeStamp db_create_ts;
             status = txn->GetDBMeta(*db_name, db_meta, db_create_ts);
@@ -815,7 +815,7 @@ TEST_P(TestTxnCheckpointInternalTest, test_checkpoint5) {
 
     {
         auto txn = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         TxnTimeStamp db_creat_ts;
         Status status = txn->GetDBMeta(*db_name, db_meta, db_creat_ts);
         EXPECT_FALSE(status.ok());

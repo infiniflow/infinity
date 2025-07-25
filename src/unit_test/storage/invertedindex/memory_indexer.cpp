@@ -73,7 +73,7 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     Vector<String> wiki_paragraphs_;
     Vector<ExpectedPosting> expected_postings_;
-    Optional<DBMeeta> db_meta_;
+    SharedPtr<DBMeeta> db_meta_;
     Optional<TableMeeta> table_meta_;
     Optional<TableIndexMeeta> index_meta_;
 

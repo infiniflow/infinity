@@ -12,22 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
-import base_test;
+module;
+
+export module meta_cache;
+
 import stl;
-import simd_init;
+import lru;
+import base_meta;
+// import status;
+// import meta_info;
+// import extra_ddl_info;
+// import default_values;
+// import internal_types;
+// import third_party;
+// import status;
 
-using namespace infinity;
+namespace infinity {
 
-class SimdInitTest : public BaseTest {};
+class MetaCache {
+public:
+    explicit MetaCache(SizeT capacity);
 
-TEST_F(SimdInitTest, GetSupportedSimdTypesList) {
-    std::cout << "Supported SIMD types:";
-    for (const auto &simd_type : infinity::GetSupportedSimdTypesList()) {
-        std::cout << " " << simd_type;
-    }
-    std::cout << std::endl;
-    // check endianess for src\common\simd\maxsim_simd_funcs.cppm:66
-    alignas(alignof(u16)) u8 v[2] = {1, 0};
-    EXPECT_EQ(*reinterpret_cast<const u16 *>(v), 1u);
-}
+private:
+    lru_cache<String, SharedPtr<BaseMeta>> lru_cache_;
+};
+
+} // namespace infinity

@@ -38,14 +38,16 @@ import segment_meta;
 import kv_utility;
 import column_index_reader;
 import new_txn;
+import meta_type;
 
 namespace infinity {
 
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance *kv_instance, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts)
-    : begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+    : BaseMeta(MetaType::kTable), begin_ts_(begin_ts), commit_ts_(commit_ts), kv_instance_(kv_instance), db_id_str_(db_id_str),
+      table_id_str_(table_id_str) {}
 
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, NewTxn *txn)
-    : txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str) {
+    : BaseMeta(MetaType::kTable), txn_(txn), db_id_str_(db_id_str), table_id_str_(table_id_str) {
     if (txn == nullptr) {
         UnrecoverableError("Null txn pointer");
     }

@@ -19,6 +19,7 @@ export module db_meeta;
 import stl;
 import status;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -26,7 +27,7 @@ class KVInstance;
 class DatabaseInfo;
 class NewTxn;
 
-export class DBMeeta {
+export class DBMeeta : public BaseMeta {
 public:
     DBMeeta(String db_id_str, NewTxn *txn);
     DBMeeta(String db_id_str, KVInstance *kv_instance);

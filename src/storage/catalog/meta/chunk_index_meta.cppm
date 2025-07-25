@@ -21,6 +21,7 @@ import status;
 import internal_types;
 import third_party;
 import new_catalog;
+import base_meta;
 
 namespace infinity {
 
@@ -44,7 +45,7 @@ export struct ChunkIndexMetaInfo {
     static String IndexFileName(ChunkID chunk_id) { return fmt::format("chunk_{}.idx", chunk_id); }
 };
 
-export class ChunkIndexMeta {
+export class ChunkIndexMeta : public BaseMeta {
 public:
     ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta);
 

@@ -400,11 +400,11 @@ private:
     void CheckTxn(const String &db_name);
 
 public:
-    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, TxnTimeStamp &db_create_ts, String *db_key = nullptr);
+    Status GetDBMeta(const String &db_name, SharedPtr<DBMeeta> &db_meta_ptr, TxnTimeStamp &db_create_ts, String *db_key = nullptr);
 
     Status GetTableMeta(const String &db_name,
                         const String &table_name,
-                        Optional<DBMeeta> &db_meta,
+                        SharedPtr<DBMeeta> &db_meta,
                         Optional<TableMeeta> &table_meta,
                         String *table_key = nullptr);
 
@@ -413,7 +413,7 @@ public:
     Status GetTableIndexMeta(const String &db_name,
                              const String &table_name,
                              const String &index_name,
-                             Optional<DBMeeta> &db_meta,
+                             SharedPtr<DBMeeta> &db_meta,
                              Optional<TableMeeta> &table_meta,
                              Optional<TableIndexMeeta> &table_index_meta,
                              String *table_key,

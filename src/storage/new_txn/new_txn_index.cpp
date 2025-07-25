@@ -84,7 +84,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 
     Status status;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
     String table_key;
@@ -161,7 +161,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, RowID begin_row_id) {
     Status status;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
     String table_key;
@@ -245,7 +245,7 @@ Status NewTxn::CommitBottomDumpMemIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
 
     ChunkID chunk_id = dump_index_cmd->chunk_infos_[0].chunk_id_;
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
     String table_key;
@@ -314,7 +314,7 @@ Status NewTxn::OptimizeAllIndexes() {
 }
 
 Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_name) {
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
@@ -355,7 +355,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
     Status status = Status::OK();
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     Optional<TableIndexMeeta> table_index_meta_opt;
     String table_key;
@@ -586,7 +586,7 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
                                      Vector<UniquePtr<InitParameter>> raw_params) {
     Status status = Status::OK();
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     Optional<TableIndexMeeta> table_index_meta_opt;
     String table_key;
@@ -680,7 +680,7 @@ Status NewTxn::OptimizeIndexByParams(const String &db_name,
 }
 
 Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_names) {
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
@@ -1056,7 +1056,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
 Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     Status status;
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
     String table_key;
@@ -2029,7 +2029,7 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
 }
 
 Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader) {
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {

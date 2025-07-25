@@ -281,7 +281,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     SharedPtr<TableInfo> table_info;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     String table_key;
     Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, &table_key);
@@ -769,7 +769,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_, db_meta, table_meta);
     if (!status.ok()) {
@@ -1029,7 +1029,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     SharedPtr<TableInfo> table_info;
     Status status;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> tmp_table_meta;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, tmp_table_meta);
     if (!status.ok()) {
@@ -1188,7 +1188,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     // Check the table existence
     SharedPtr<TableInfo> table_info;
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
     if (!status.ok()) {
@@ -1226,7 +1226,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
     NewTxn *new_txn = query_context_ptr_->GetNewTxn();
     Status status;
     Optional<TableMeeta> table_meta;
-    Optional<DBMeeta> db_meta;
+    SharedPtr<DBMeeta> db_meta;
     status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
     if (!status.ok()) {
         RecoverableError(status);
@@ -1330,7 +1330,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
             auto *new_txn = query_context_ptr_->GetNewTxn();
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             Status status = new_txn->GetTableMeta(query_context_ptr_->schema_name(), check_table->table_name(), db_meta, table_meta);
             if (!status.ok()) {
@@ -1935,7 +1935,7 @@ Status LogicalPlanner::BuildCheck(const CheckStatement *statement, SharedPtr<Bin
             }
 
             NewTxn *new_txn = query_context_ptr_->GetNewTxn();
-            Optional<DBMeeta> db_meta;
+            SharedPtr<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
             String table_key;
 

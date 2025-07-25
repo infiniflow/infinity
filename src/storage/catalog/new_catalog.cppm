@@ -249,7 +249,7 @@ public:
                            TxnTimeStamp commit_ts,
                            const String &db_name,
                            const String *db_comment,
-                           Optional<DBMeeta> &db_meta);
+                           SharedPtr<DBMeeta> &db_meta);
 
     static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts, UsageFlag usage_flag);
 

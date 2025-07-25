@@ -32,12 +32,13 @@ import new_catalog;
 import fast_rough_filter;
 import column_def;
 import kv_utility;
+import meta_type;
 
 namespace infinity {
 
 SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
-    : begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta),
-      segment_id_(segment_id) {}
+    : BaseMeta(MetaType::kSegment), begin_ts_(table_meta.begin_ts()), commit_ts_(table_meta.commit_ts()), kv_instance_(*table_meta.kv_instance()),
+      table_meta_(table_meta), segment_id_(segment_id) {}
 
 // Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
 //     block_ids_ = MakeShared<Vector<BlockID>>(block_ids);

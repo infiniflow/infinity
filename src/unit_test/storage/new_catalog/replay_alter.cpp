@@ -118,7 +118,7 @@ TEST_P(TestTxnReplayAlter, test_add_column) {
 
         // TxnTimeStamp begin_ts = txn->BeginTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
@@ -225,7 +225,7 @@ TEST_P(TestTxnReplayAlter, test_drop_column) {
 
         // TxnTimeStamp begin_ts = txn->BeginTS();
 
-        Optional<DBMeeta> db_meta;
+        SharedPtr<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
