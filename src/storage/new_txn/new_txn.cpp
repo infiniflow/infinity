@@ -2926,6 +2926,11 @@ bool NewTxn::CheckConflictTxnStore(const CreateDBTxnStore &txn_store, NewTxn *pr
             }
             break;
         }
+        case TransactionType::kCreateTableSnapshot: {
+            retry_query = true;
+            conflict = true;
+            break;
+        }
         default: {
         }
     }
@@ -2955,6 +2960,11 @@ bool NewTxn::CheckConflictTxnStore(const RestoreDatabaseTxnStore &txn_store, New
                 retry_query = false;
                 conflict = true;
             }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            retry_query = true;
+            conflict = true;
             break;
         }
         default: {
@@ -3082,6 +3092,11 @@ bool NewTxn::CheckConflictTxnStore(const CreateTableTxnStore &txn_store, NewTxn 
                 retry_query = false;
                 conflict = true;
             }
+            break;
+        }
+        case TransactionType::kCreateTableSnapshot: {
+            retry_query = true;
+            conflict = true;
             break;
         }
         default: {
@@ -6101,7 +6116,7 @@ Status NewTxn::CheckpointInner(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn
     while (!wal_manager->SetCheckpointing()) {
         // Checkpointing
         last_ckp_ts = wal_manager->LastCheckpointTS();
-        if(last_ckp_ts > checkpoint_ts) {
+        if(last_ckp_ts + 2 >= checkpoint_ts) {
             return Status::OK();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

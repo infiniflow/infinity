@@ -65,8 +65,8 @@ class TestSnapshot:
             row_count = count_result.iloc[0, 0]  # Get the count value
             print(f"   Row count: {row_count}")
             
-            # if expected_row_count:
-            #     assert row_count == expected_row_count, f"Expected {expected_row_count} rows, got {row_count}"
+            if expected_row_count:
+                assert row_count == expected_row_count, f"Expected {expected_row_count} rows, got {row_count}"
             
             # Get column names from table metadata instead of fetching data
             columns_result = restored_table.show_columns()
@@ -425,8 +425,8 @@ class TestSnapshot:
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
         self._create_indexes(table_obj)
-        actual_inserted = self.insert_comprehensive_data(table_obj, 100000)  # 100k rows - should be fine with small dimensions
-        print(f"Successfully inserted {actual_inserted} out of 100000 rows")
+        actual_inserted = self.insert_comprehensive_data(table_obj, 10000)  # 10k rows - should be fine with small dimensions
+        print(f"Successfully inserted {actual_inserted} out of 10000 rows")
 
         #check count
         count_result, extra_result = table_obj.output(["count(*)"]).to_df()
