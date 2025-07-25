@@ -138,8 +138,17 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
             if (ReadBufAdv<bool>(ptr)) {
                 lsg_config = LSGConfig::ReadAdv(ptr);
             }
-            res = MakeShared<
-                IndexHnsw>(index_name, index_comment, file_name, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size, lsg_config);
+            res = MakeShared<IndexHnsw>(index_name,
+                                        index_comment,
+                                        file_name,
+                                        column_names,
+                                        metric_type,
+                                        encode_type,
+                                        build_type,
+                                        M,
+                                        ef_construction,
+                                        block_size,
+                                        lsg_config);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -198,7 +207,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
 
 String IndexBase::ToString() const {
     std::stringstream ss;
-    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", [";
+    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", name: " << index_name_ << ", [";
     for (size_t i = 0; i < column_names_.size(); ++i) {
         ss << column_names_[i];
         if (i != column_names_.size() - 1) {
