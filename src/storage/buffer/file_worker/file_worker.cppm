@@ -61,6 +61,8 @@ public:
 
     void SetData(void *data);
 
+    virtual void SetDataSize(SizeT size);
+
     // Get an absolute file path. As key of a buffer handle.
     String GetFilePath() const;
 

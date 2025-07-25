@@ -271,6 +271,29 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
     return Status::OK();
 }
 
+Tuple<SharedPtr<ColumnDef>, Status> ColumnMeta::GetColumnDef() const {
+    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    return {(*column_defs_ptr)[column_idx_], Status::OK()};
+}
+
+Tuple<SizeT, Status> ColumnMeta::GetColumnSize(SizeT row_cnt) const {
+    auto [col_def, status2] = GetColumnDef();
+    if (!status2.ok()) {
+        return {0, status2};
+    }
+
+    SizeT total_data_size = 0;
+    if (col_def->type()->type() == LogicalType::kBoolean) {
+        total_data_size = (row_cnt + 7) / 8;
+    } else {
+        total_data_size = row_cnt * col_def->type()->Size();
+    }
+    return {total_data_size, Status::OK()};
+}
+
 Status ColumnMeta::UninitSet(const ColumnDef *column_def, UsageFlag usage_flag) {
     Status status;
 

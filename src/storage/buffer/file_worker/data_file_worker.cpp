@@ -85,9 +85,16 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
         RecoverableError(status);
     }
 
-    status = file_handle_->Append(data_, buffer_size_);
+    SizeT data_size = data_size_.load();
+    status = file_handle_->Append(data_, data_size);
     if (!status.ok()) {
         RecoverableError(status);
+    }
+
+    SizeT unused_size = buffer_size_ - data_size;
+    if (unused_size > 0) {
+        String str(unused_size, '\0');
+        file_handle_->Append(str, unused_size);
     }
 
     u64 checksum{};
@@ -170,4 +177,11 @@ bool DataFileWorker::ReadFromMmapImpl(const void *p, SizeT file_size) {
 
 void DataFileWorker::FreeFromMmapImpl() {}
 
+void DataFileWorker::SetDataSize(SizeT size) {
+    if (data_ == nullptr) {
+        String error_message = "Data has not been set.";
+        UnrecoverableError(error_message);
+    }
+    data_size_.store(size);
+}
 } // namespace infinity

@@ -451,4 +451,9 @@ void BufferObj::SetData(void *data) {
     type_ = BufferType::kEphemeral;
 }
 
+void BufferObj::SetDataSize(SizeT size) {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    file_worker_->SetDataSize(size);
+}
+
 } // namespace infinity
