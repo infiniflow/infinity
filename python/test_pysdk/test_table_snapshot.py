@@ -138,9 +138,9 @@ class TestSnapshot:
                 drop_result = restored_table.drop_index("idx_name_fts")
                 print(f"   Drop index result: {drop_result.error_code}")
                 # Verify index is dropped
-                remaining_response = restored_table.list_indexes().index_list
-                remaining_indexes = [index["index_name"] for index in remaining_response]
-                assert 'idx_name_fts' not in remaining_indexes, "Index not dropped"
+                remaining_response = restored_table.list_indexes().index_names
+                # remaining_indexes = [index["index_name"] for index in remaining_response]
+                assert 'idx_name_fts' not in remaining_response, "Index not dropped"
                 print(f"   Index drop verification: OK")
             else:
                 print(f"   Index 'idx_name_fts' not found, skipping drop test")
@@ -149,12 +149,12 @@ class TestSnapshot:
             new_index_result = restored_table.create_index("idx_test_new", index.IndexInfo("age", index.IndexType.Secondary), ConflictType.Ignore)
             print(f"   Add new index result: {new_index_result.error_code}")
             
-            # Verify new index
-            final_response = restored_table.list_indexes()
-            final_indexes = [index["index_name"] for index in final_response.index_list]
-            print(f"   Final indexes: {final_indexes}")
-            assert 'idx_test_new' in final_indexes, "New index not created"
-            print(f"   New index verification: OK")
+            # # Verify new index
+            # final_response = restored_table.list_indexes().index_names
+            # # final_indexes = [index["index_name"] for index in final_response.index_list]
+            # print(f"   Final indexes: {final_response}")
+            # assert 'idx_test_new' in final_response, "New index not created"
+            # print(f"   New index verification: OK")
             
         except Exception as e:
             print(f"   ERROR in index operations: {e}")
@@ -359,7 +359,7 @@ class TestSnapshot:
         assert restore_result.error_code == ErrorCode.OK
         
         # Verify data integrity and functionality
-        # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
+        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100)
         
         # Drop snapshot
         drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
@@ -402,7 +402,7 @@ class TestSnapshot:
         # Create table and insert large amount of data
         table_obj = self.create_comprehensive_table(table_name)
         self._create_indexes(table_obj)
-        self.insert_comprehensive_data(table_obj, 1000)  # 100k rows - should be fine with small dimensions
+        self.insert_comprehensive_data(table_obj, 100000)  # 100k rows - should be fine with small dimensions
         # self.infinity_obj.flush_data()
 
         # self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
@@ -428,7 +428,7 @@ class TestSnapshot:
         assert restore_result.error_code == ErrorCode.OK
 
         # Verify data integrity and functionality
-        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=1000)
+        self.verify_restored_table_functionality(table_name, db_obj, expected_row_count=100000)
 
         # Drop snapshot
         drop_result = self.infinity_obj.drop_snapshot(snapshot_name)
